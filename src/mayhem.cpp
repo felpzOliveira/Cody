@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <lex.h>
+#include <buffers.h>
 
 #define TOKEN_TERMINATORS " ,;(){}+-/|><!~:%&*=\n\r\t\0"
 
@@ -115,6 +117,60 @@ static char *ReadFile(const char *path){
     return nullptr; //TODO
 }
 
+void test_line_count(const char *path){
+    uint filesize = 0;
+    LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
+    char *p = GetFileContents(path, (size_t *)&filesize);
+    clock_t start, end;
+    start = clock();
+    LineBuffer_Init(&lineBuffer, p, filesize);
+    end = clock();
+    double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
+    printf("Took %g\n", taken);
+    
+    Buffer *lastLine = &lineBuffer.lines[lineBuffer.lineCount-1];
+    
+    const char *testString = "This is a test string";
+    
+    Buffer_DebugStdoutData(lastLine);
+    
+    uint at = 28;
+    Buffer_InsertStringAt(lastLine, at, (char *)testString, strlen(testString));
+    Buffer_DebugStdoutData(lastLine);
+    
+    Buffer_RemoveRange(lastLine, at, at+strlen(testString));
+    Buffer_DebugStdoutData(lastLine);
+    
+    at = lineBuffer.lineCount-4;
+    printf("BEFORE =========================== [ %d ]\n", lineBuffer.lineCount);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-2);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+2);
+    
+    const char *testLineString = "This is a test string\n";
+    LineBuffer_InsertLineAt(&lineBuffer, at, (char *)testLineString,
+                            strlen(testLineString));
+    printf("INSERTION =========================== [ %d ]\n", lineBuffer.lineCount);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-2);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+2);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+3);
+    
+    LineBuffer_RemoveLineAt(&lineBuffer, at);
+    printf("DELETION =========================== [ %d ]\n", lineBuffer.lineCount);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-2);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at-1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+1);
+    LineBuffer_DebugStdoutLine(&lineBuffer, at+2);
+    
+    LineBuffer_Free(&lineBuffer);
+}
+
 int main(int argc, char **argv){
     std::cout << "Hello Mayhem[2] " << std::endl;
 #if 0
@@ -133,7 +189,9 @@ int main(int argc, char **argv){
         printf("Not accepted: %s\n", ptr);
     }
 #else
-    (void)ReadFile("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
+    test_line_count("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
+    //test_line_count("/home/felipe/Documents/Mayhem/test/number.cpp");
+    //(void)ReadFile("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //(void)ReadFile("/home/felipe/Documents/Mayhem/test/number.cpp");
 #endif
     return 0;

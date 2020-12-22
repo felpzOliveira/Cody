@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <string.h>
-#include <mayhem_lex.hpp>
+#include <lex.h>
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 

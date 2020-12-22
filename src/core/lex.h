@@ -5,3 +5,4 @@
 #define LEX_PROCESSOR(name) int name(char **p, size_t n, char **head, size_t *len)
 
 LEX_PROCESSOR(Lex_Number);
+LEX_PROCESSOR(Lex_String);

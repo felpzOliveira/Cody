@@ -12,4 +12,7 @@ else()
 	set(MH_FLAGS "-O3")
 endif()
 
+
+include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/core")
 add_subdirectory(src)
