@@ -1,13 +1,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <lex.h>
+#include <sstream>
+#include <utilities.h>
+
+#define MODULE_NAME "Lex"
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 
 static int TerminatorChar(char v){
     const char *term = " ,;(){}+-/|><!~:%&*=\n\r\t";
-    if(v == 0) return 1;
-    for(int i = 0; i < strlen(term); i++){
+    int size = strlen(term);
+    if(v == '\0') return 1;
+    for(int i = 0; i < size; i++){
         if(term[i] == v) return 1;
     }
     
@@ -125,6 +130,41 @@ LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
     return rLen > 0 ? 1 : 0;
 }
 
+//TODO
 LEX_PROCESSOR(Lex_String){
     return 0;
+}
+
+/* Slow code */
+void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
+    std::ifstream ifs(path);
+    std::string linebuf;
+    
+    if(!ifs.is_open()){
+        DEBUG_MSG("Failed to open file %s\n", path);
+        return;
+    }
+    
+    while(ifs.peek() != -1){
+        const char *str = nullptr;
+        char *begin = nullptr;
+        int rc = 0;
+        GetNextLineFromStream(ifs, linebuf);
+        if(linebuf.size() > 0){ //remove '\n'
+            if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
+        }
+        
+        if(linebuf.size() > 0){ //remove '\r'
+            if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
+        }
+        
+        if(linebuf.empty()) continue;
+        str = linebuf.c_str();
+        begin = (char *)str;
+        
+        rc = processor(&begin, linebuf.size());
+        if(rc < 0) break;
+    }
+    
+    ifs.close();
 }

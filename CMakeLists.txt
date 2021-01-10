@@ -14,5 +14,7 @@ endif()
 
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
-					"${CMAKE_CURRENT_SOURCE_DIR}/src/core")
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
+					"${CMAKE_CURRENT_SOURCE_DIR}/external/fontstash/src")
 add_subdirectory(src)

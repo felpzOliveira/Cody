@@ -1,12 +1,9 @@
 #include <iostream>
-#include <stdio.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/stat.h>
 #include <lex.h>
 #include <buffers.h>
+#include <graphics.h>
+#include <utilities.h>
+#include <string.h>
 
 #define TOKEN_TERMINATORS " ,;(){}+-/|><!~:%&*=\n\r\t\0"
 
@@ -31,47 +28,12 @@ static char *LookAhead(char **ptr, size_t n, const char *tokens,
     return nullptr;
 }
 
-static char *GetFileContents(const char *path, size_t *size){
-    struct stat st;
-    size_t filesize = 0, bytes = 0;
-    char *ret = nullptr;
-    
-    int fd = open(path, O_RDONLY);
-    if(fd == -1) goto _error;
-    
-    stat(path, &st);
-    filesize = st.st_size;
-    
-    posix_fadvise(fd, 0, 0, 1);
-    
-    ret = (char *)malloc(filesize);
-    if(!ret) goto _error_memory;
-    
-    bytes = read(fd, ret, filesize);
-    if(bytes != filesize) goto _error_memory;
-    
-    close(fd);
-    *size = bytes;
-    return ret;
-    
-    _error_memory:
-    if(ret){
-        free(ret);
-        ret = nullptr;
-    }
-    
-    _error:
-    if(fd >= 0) close(fd);
-    return ret;
-}
-
-
 #define LEX_PROCESSOR(name) int name(char **p, size_t n, char **head, size_t *len)
 LEX_PROCESSOR(Lex_Number);
 
 //TODO:Fix
 static char *ReadFile(const char *path){
-    size_t bytes = 0, size = 0;
+    uint bytes = 0, size = 0;
     int id = 0;
     char *token = nullptr;
     const char *tokenList = TOKEN_TERMINATORS;
@@ -120,7 +82,7 @@ static char *ReadFile(const char *path){
 void test_line_count(const char *path){
     uint filesize = 0;
     LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
-    char *p = GetFileContents(path, (size_t *)&filesize);
+    char *p = GetFileContents(path, (uint *)&filesize);
     clock_t start, end;
     start = clock();
     LineBuffer_Init(&lineBuffer, p, filesize);
@@ -171,8 +133,18 @@ void test_line_count(const char *path){
     LineBuffer_Free(&lineBuffer);
 }
 
+void test_line_processor(const char *path){
+    auto testLineProcess = [](char **p, unsigned int size) -> int{
+        static int lineID = 0;
+        printf("{ %d }: %s\n", lineID++, *p);
+        return 1;
+    };
+    
+    Lex_LineProcess(path, testLineProcess);
+    
+}
+
 int main(int argc, char **argv){
-    std::cout << "Hello Mayhem[2] " << std::endl;
 #if 0
     const char *ptr = "100000e+3";
     char *p = (char *)ptr;
@@ -188,11 +160,23 @@ int main(int argc, char **argv){
     }else{
         printf("Not accepted: %s\n", ptr);
     }
-#else
+#endif
+#if 0
     test_line_count("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //test_line_count("/home/felipe/Documents/Mayhem/test/number.cpp");
     //(void)ReadFile("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //(void)ReadFile("/home/felipe/Documents/Mayhem/test/number.cpp");
 #endif
+#if 1
+    test_line_processor("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
+#endif
+    
+    
+    Graphics_Opts opts;
+    opts.is_opengl = 1;
+    
+    Graphics_Initialize(&opts);
+    
+    while(1){}
     return 0;
 }

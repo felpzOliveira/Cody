@@ -10,6 +10,11 @@
 typedef unsigned int uint;
 //typedef int64_t uint;
 
+#define DEBUG(...) do{ printf("[DEBUG] "); printf(__VA_ARGS__); }while(0)
+#define DEBUG_MSG(...) do{ printf("[%s] ", MODULE_NAME); printf(__VA_ARGS__); }while(0)
+//#define LEX_DEBUG(...) DEBUG(__VA_ARGS__)
+#define LEX_DEBUG(...)
+
 #define Assert(exp, msg) if(!(exp)){\
 printf("Assert Failure: %s (%s) %s:%d\n", #exp, msg, __FILE__, __LINE__);\
 exit(0);\
