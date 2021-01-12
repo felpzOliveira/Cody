@@ -19,4 +19,10 @@ int GetRightmostSplitter(const char *path, uint size);
 * Utility for getting a line from a opened std::istream.
 */
 std::istream &GetNextLineFromStream(std::istream &is, std::string &str);
+
+/*
+* Simply utility for removing unwanted characters from a line '\n' and '\r' at the
+* end only, it is a line after all.
+*/
+void RemoveUnwantedLineTerminators(std::string &line);
 #endif //UTILITIES_H

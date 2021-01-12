@@ -150,14 +150,7 @@ void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
         char *begin = nullptr;
         int rc = 0;
         GetNextLineFromStream(ifs, linebuf);
-        if(linebuf.size() > 0){ //remove '\n'
-            if(linebuf[linebuf.size()-1] == '\n') linebuf.erase(linebuf.size() - 1);
-        }
-        
-        if(linebuf.size() > 0){ //remove '\r'
-            if(linebuf[linebuf.size()-1] == '\r') linebuf.erase(linebuf.size() - 1);
-        }
-        
+        RemoveUnwantedLineTerminators(linebuf);
         if(linebuf.empty()) continue;
         str = linebuf.c_str();
         begin = (char *)str;

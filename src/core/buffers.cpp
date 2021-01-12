@@ -18,7 +18,7 @@ void Buffer_CopyReferences(Buffer *dst, Buffer *src){
 }
 
 void Buffer_Init(Buffer *buffer, uint size){
-    Assert(buffer != nullptr && size > 0, "Invalid buffer initialization");
+    AssertA(buffer != nullptr && size > 0, "Invalid buffer initialization");
     buffer->data = (char *)AllocatorGet(size * sizeof(char));
     buffer->size = size;
     buffer->count = 0;
@@ -57,7 +57,7 @@ void Buffer_RemoveRange(Buffer *buffer, uint start, uint end){
 }
 
 void Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len){
-    Assert(buffer->size > at, "Invalid insertion index");
+    AssertA(buffer->size > at, "Invalid insertion index");
     if(buffer->size < buffer->count + len){
         uint newSize = buffer->size + len + DefaultAllocatorSize;
         buffer->data = AllocatorExpand(char, buffer->data, newSize);
@@ -92,8 +92,8 @@ void Buffer_Free(Buffer *buffer){
 }
 
 void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size){
-    Assert(lineBuffer != nullptr && line != nullptr && size > 0,
-           "Invalid line initialization");
+    AssertA(lineBuffer != nullptr && line != nullptr && size > 0,
+            "Invalid line initialization");
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
         lineBuffer->lines = AllocatorExpand(Buffer, lineBuffer->lines, newSize);
@@ -167,8 +167,8 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint s
 }
 
 void LineBuffer_Init(LineBuffer *lineBuffer, const char *fileContents, uint filesize){
-    Assert(lineBuffer != nullptr && fileContents != nullptr && filesize > 0,
-           "Invalid line buffer initialization");
+    AssertA(lineBuffer != nullptr && fileContents != nullptr && filesize > 0,
+            "Invalid line buffer initialization");
     
     char *pStart = (char *)fileContents;
     char *p = pStart;

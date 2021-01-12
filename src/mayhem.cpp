@@ -4,6 +4,7 @@
 #include <graphics.h>
 #include <utilities.h>
 #include <string.h>
+#include <maths.h>
 
 #define TOKEN_TERMINATORS " ,;(){}+-/|><!~:%&*=\n\r\t\0"
 
@@ -167,7 +168,7 @@ int main(int argc, char **argv){
     //(void)ReadFile("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //(void)ReadFile("/home/felipe/Documents/Mayhem/test/number.cpp");
 #endif
-#if 1
+#if 0
     test_line_processor("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
 #endif
     

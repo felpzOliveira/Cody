@@ -6,6 +6,16 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+void RemoveUnwantedLineTerminators(std::string &line){
+    if(line.size() > 0){ //remove '\n'
+        if(line[line.size()-1] == '\n') line.erase(line.size() - 1);
+    }
+    
+    if(line.size() > 0){ //remove '\r'
+        if(line[line.size()-1] == '\r') line.erase(line.size() - 1);
+    }
+}
+
 std::istream &GetNextLineFromStream(std::istream &is, std::string &str){
     str.clear();
     std::istream::sentry se(is, true);
@@ -52,7 +62,7 @@ char *GetFileContents(const char *path, uint *size){
     //TODO: Refactor or make cross-platform implementation
     posix_fadvise(fd, 0, 0, 1);
     
-    ret = (char *)malloc(filesize);
+    ret = (char *)AllocatorGet(filesize);
     if(!ret) goto _error_memory;
     
     bytes = read(fd, ret, filesize);
