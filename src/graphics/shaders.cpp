@@ -3,7 +3,7 @@
 #include <string>
 #include <map>
 #include <sstream>
-#include <GL/glew.h>
+#include <glad/glad.h>
 #include <string.h>
 
 #define MODULE_NAME "Shader"
@@ -188,4 +188,18 @@ int Shader_Create(Shader &shader, uint vertex, uint fragment){
     }
     
     return rv;
+}
+
+void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix){
+    Float *rawMatrix = (Float *)matrix->m;
+    int id = glGetUniformLocation(shader.id, name);
+    if(id >= 0){
+        glUniformMatrix4fv(id, 1, false, rawMatrix);
+    }else{
+        static std::map<std::string, int> loggedMap;
+        if(loggedMap.find(name) == loggedMap.end()){
+            DEBUG_MSG("Failed to load uniform %s\n", name);
+            loggedMap[name] = 1;
+        }
+    }
 }

@@ -185,6 +185,19 @@ Transform Rotate(Float theta, const vec3f &axis) {
     return Transform(m, Transpose(m));
 }
 
+Transform Orthographic(Float left, Float right, Float bottom, Float top,
+                       Float zNear, Float zFar)
+{
+    Matrix4x4 m;
+    m.m[0][0] = 2.0f / (right - left);
+    m.m[1][1] = 2.0f / (top - bottom);
+    m.m[2][2] = -2.0f / (zFar - zNear);
+    m.m[3][0] = -(right + left) / (right - left);
+    m.m[3][1] = -(top + bottom) / (top - bottom);
+    m.m[3][2] = -(zFar + zNear) / (zFar - zNear);
+    return Transform(m);
+}
+
 Transform Transform::operator*(const Transform &t2) const{
     return Transform(Matrix4x4::Mul(m, t2.m), Matrix4x4::Mul(t2.mInv, mInv));
 }

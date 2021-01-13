@@ -1,11 +1,13 @@
 /* date = December 21st 2020 7:06 pm */
 
-#ifndef MAYHEM_TYPES_H
-#define MAYHEM_TYPES_H
+#ifndef TYPES_H
+#define TYPES_H
 
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+
+typedef unsigned char uint8;
 
 typedef unsigned int uint;
 //typedef int64_t uint;
@@ -40,4 +42,4 @@ inline void __assert_check(bool v, const char *name, const char *filename,
 #define AllocatorExpand(type, ptr, n) (type*)realloc(ptr,sizeof(type)*((n)))
 #define AllocatorFree(ptr) free(ptr)
 
-#endif //MAYHEM_TYPES_H
+#endif //TYPES_H

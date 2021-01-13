@@ -5,6 +5,7 @@
 
 #include <types.h>
 #include <string>
+#include <transform.h>
 
 #define SHADER_TYPE_VERTEX  0
 #define SHADER_TYPE_FRGMENT 1
@@ -22,6 +23,7 @@ typedef struct{
 #define SHADER_INITIALIZER {.id = 0, .vertexShaderFile = nullptr, .fragmentShaderFile = nullptr}
 
 
+void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix);
 int Shader_Create(Shader &shader, uint vertex, uint fragment);
 
 int Shader_CompileFile(const char *path, int type, char *content=nullptr);

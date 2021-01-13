@@ -188,7 +188,7 @@ class Transform{
         if (wp == 1)
             return vec3<T>(xp, yp, zp);
         else{
-            AssertAEx(!IsZero(wp), "Zero transform wp [Point3f]");
+            AssertA(!IsZero(wp), "Zero transform wp [Point3f]");
             return vec3<T>(xp, yp, zp) / wp;
         }
     }
@@ -218,5 +218,7 @@ Transform RotateX(Float theta);
 Transform RotateY(Float theta);
 Transform RotateZ(Float theta);
 Transform Rotate(Float theta, const vec3f &axis);
+Transform Orthographic(Float left, Float right, Float bottom, Float top,
+                       Float zNear, Float zFar);
 bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], Float *x0,
                           Float *x1);

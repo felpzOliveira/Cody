@@ -1,4 +1,7 @@
-#pragma once
+/* date = December 21st 2020 7:06 pm */
+#ifndef GEOMETRY_H
+#define GEOMETRY_H
+
 #include <math.h>
 #include <cfloat>
 #include <stdio.h>
@@ -17,7 +20,6 @@
 #define v2fA(v) __vec2_strfmtA(v)
 #define v2aA(v) __vec2_argsA(v)
 
-#define OneMinusEpsilon 0.99999994f
 #define Epsilon 0.0001f
 #define Pi 3.14159265358979323846
 #define InvPi 0.31830988618379067154
@@ -27,13 +29,6 @@
 #define PiOver4 0.78539816339744830961
 #define Sqrt2 1.41421356237309504880
 #define MachineEpsilon 5.96046e-08
-#define WaterDensity 1000.0 // density kg/m3
-#define ElementaryQE 1.602176565e-19 // C
-#define PermittivityEPS 8.85418782e-12 // vaccum C/V/m
-#define ElectronMass 9.10938215e-31 // mass kg
-#define AtomicMassUnit 1.660538921e-27 // mass kg
-#define KBoltzman 1.380648e-23 // J/K Boltzman constant
-#define EvToK (ElementaryQE/KBoltzman) // 1eV 
 
 #define MIN_FLT -FLT_MAX
 #define MAX_FLT  FLT_MAX
@@ -757,3 +752,4 @@ template <typename T> inline T Mod(T a, T b) {
     return (T)((result < 0) ? result + b : result);
 }
 
+#endif //GEOMETRY_H
