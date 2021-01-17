@@ -38,6 +38,7 @@ inline void __assert_check(bool v, const char *name, const char *filename,
 //TODO: Make allocator
 #define DefaultAllocatorSize 64
 #define AllocatorGet(size) calloc(size, 1)
+#define AllocatorGetN(type, n) (type *)calloc(n, sizeof(type))
 #define AllocatorGetDefault(type) (type *)calloc(DefaultAllocatorSize, sizeof(type))
 #define AllocatorExpand(type, ptr, n) (type*)realloc(ptr,sizeof(type)*((n)))
 #define AllocatorFree(ptr) free(ptr)

@@ -3,23 +3,15 @@
 #include <lex.h>
 #include <sstream>
 #include <utilities.h>
+#include <vector>
 
 #define MODULE_NAME "Lex"
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 
-static int TerminatorChar(char v){
-    const char *term = " ,;(){}+-/|><!~:%&*=\n\r\t";
-    int size = strlen(term);
-    if(v == '\0') return 1;
-    for(int i = 0; i < size; i++){
-        if(term[i] == v) return 1;
-    }
-    
-    return 0;
-}
-
-LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
+/* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context) */
+LEX_PROCESSOR(Lex_Number){
+    (void)context;
     int iNum = 0;
     int dotCount = 0;
     int eCount = 0;
@@ -28,11 +20,15 @@ LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
     *len = 0;
     *head = *p;
     
-    LEX_DEBUG("Starting at \'%c\'\n", **p);
+    LEX_DEBUG("Starting Numeric parser at \'%c\'\n", **p);
     
     iValue = (**p) - '0';
     
     if(**p == '.'){
+        if(n < 2) return 0;
+        int k = *((*p)+1) - '0';
+        if(k < 0 || k > 9) return 0;
+        
         dotCount = 1;
         rLen = 1;
         INC_OR_ZERO(p, n, rLen);
@@ -58,13 +54,6 @@ LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
             if(dotCount < 1){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
-            }
-            
-            if(rLen+1 < n){
-                if(!TerminatorChar(*((*p)+1))){
-                    LEX_DEBUG("\'f\' found in middle of value\n");
-                    goto end;
-                }
             }
             
             rLen++;
@@ -121,8 +110,38 @@ LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
         }
     }while(iNum != 0 && rLen < n);
     
-    if(TerminatorChar(**p) && **p != 0){
+    end:
+    *len = rLen;
+    return rLen > 0 ? 1 : 0;
+}
+
+/* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context) */
+LEX_PROCESSOR(Lex_Inclusion){
+    int level = 0;
+    int rLen = 0;
+    int reverseSlash = 0;
+    *len = 0;
+    *head = *p;
+    LEX_DEBUG("Starting inclusion parser at \'%c\'\n", **p);
+    
+    if(**p == '<'){
+        level += 1;
+        rLen = 1;
+        if(rLen >= n) return 0;
+    }else{
+        goto end;
+    }
+    
+    while(level > 0 && n > rLen){
         (*p)++;
+        if(**p == '>'){
+            //grab the out part
+            (*p)++;
+            level -= 1;
+        }else if(**p == '<'){
+            level += 1;
+        }
+        rLen++;
     }
     
     end:
@@ -130,34 +149,525 @@ LEX_PROCESSOR(Lex_Number){ /* (char **p, size_t n, char **head, size_t *len) */
     return rLen > 0 ? 1 : 0;
 }
 
-//TODO
-LEX_PROCESSOR(Lex_String){
+LEX_PROCESSOR(Lex_String){ /* (char **p, size_t n, char **head, size_t *len) */
+    int level = 0;
+    int rLen = 0;
+    char lastSep = 0;
+    int reverseSlash = 0;
+    *len = 0;
+    *head = *p;
+    LEX_DEBUG("Starting String parser at \'%c\'\n", **p);
+    
+    if(**p == '\'' || **p == '\"'){
+        level += 1;
+        lastSep = **p;
+        rLen = 1;
+        if(rLen >= n) return 0;
+    }else{
+        goto end;
+    }
+    
+    while(level > 0 && n > rLen){
+        (*p)++;
+        if(**p == '\\'){
+            reverseSlash = 1;
+        }else if(**p == lastSep && !reverseSlash){
+            //grab the out part
+            (*p)++;
+            level -= 1;
+        }else{
+            reverseSlash = 0;
+        }
+        rLen++;
+    }
+    
+    end:
+    *len = rLen;
+    return rLen > 0 ? 1 : 0;
+}
+
+/* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context) */
+LEX_PROCESSOR(Lex_Comments){
+    int aggregate = context->aggregate;
+    int type = context->type;
+    
+    int rLen = 0;
+    char prev = 0;
+    *len = 0;
+    *head = *p;
+    if(aggregate == 0){
+        if(n < 2) return 0;
+        if(**p == '/' && *((*p)+1) == '/'){
+            type = 1;
+        }else if(**p == '/' &&  *((*p)+1) == '*'){
+            type = 2;
+            aggregate = 1;
+        }else{
+            goto end;
+        }
+        
+        (*p) += 2;
+        rLen += 2;
+    }
+    
+    while(rLen < n){
+        if(type == 2){
+            if(**p == '/' && prev == '*'){
+                (*p) ++;
+                rLen ++;
+                aggregate = 0;
+                goto end;
+            }else{
+                prev = **p;
+                (*p) ++;
+                rLen++;
+            }
+        }else{
+            if(rLen+1 <= n){
+                char s = *(*(p)+1);
+                if(**p == '\\' && (s == 0 || s == '\n')){
+                    aggregate = 1;
+                    (*p)++;
+                    rLen++;
+                    goto end;
+                }
+            }
+            
+            (*p)++;
+            rLen++;
+            aggregate = 0;
+        }
+    }
+    
+    end:
+    *len = rLen;
+    context->aggregate = aggregate;
+    context->type = type;
+    return rLen > 0 ? (aggregate > 0 ? 3 : 1) : 0;
+}
+
+/* (char **p, uint n, Token *token, TokenLookupTable *lookup) */
+LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
+    char *h = *p;
+    int matched = 0;
+    uint length = 1;
+    token->value = *p;
+    token->identifier = TOKEN_ID_NONE;
+    
+    if(TerminatorChar(**p)){
+        (*p)++;
+        goto consume;
+    }
+    
+    // 1- select token
+    while(*p != nullptr && length < n){
+        (*p)++;
+        if(TerminatorChar(**p)){
+            goto consume;
+        }else{
+            length++;
+        }
+    }
+    
+    consume:
+    // 2- check against lookup table
+    token->size = length;
+    int tableIndex = -1;
+    for(int k = 0; k < lookup->nSize; k++){
+        if(length == lookup->sizes[k].y){
+            tableIndex = k;
+            break;
+        }
+    }
+    
+    if(tableIndex >= 0){
+        Token *tList = lookup->table[tableIndex];
+        int count = lookup->sizes[tableIndex].x;
+        for(int k = 0; k < count; k++){
+            if(StringEqual(h, tList[k].value, length)){
+                token->identifier = tList[k].identifier;
+                matched = 1;
+                break;
+            }
+        }
+    }
+    
+    //TODO: Check for other cases
+    //      1 - Entering level '{'
+    //      2 - Exiting  level '}'
+    //      3 - Entering a function '('
+    //      4 - Exiting a function ')'
+    // do we need to parse these or can we simply loop during execution?
+    // going to check for '(' to at least detect functions
+    if(!matched){
+        if(**p == '(' && length > 1){
+            token->identifier = TOKEN_ID_FUNCTION;
+        }
+    }
+    
+    return length;
+}
+
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context) */
+LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
+    //1 - Attempt others first
+    int rv = TOKENIZER_OP_FINISHED;
+    int lexrv = 0;
+    char *h = *p;
+    uint len = 1;
+    uint currSize = 0;
+    
+    token->value = *p;
+    token->size = 1;
+    token->identifier = TOKEN_ID_NONE;
+    
+    lexrv = Lex_Comments(p, n, &h, &len, context);
+    if(lexrv == 3){
+        token->size = len;
+        token->identifier = TOKEN_ID_COMMENT;
+        rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }else if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_COMMENT;
+        goto end;
+    }
+    
+    lexrv = Lex_String(p, n, &h, &len, context);
+    if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_STRING;
+        goto end;
+    }
+    
+    lexrv = Lex_Number(p, n, &h, &len, context);
+    if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_NUMBER;
+        goto end;
+    }
+    
+    len = Lex_TokenLookupAny(p, n, token, context->lookup);
+    
+    end:
+    *offset = len;
+    return rv;
+}
+
+
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context) */
+LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
+    //1 - Attempt others first
+    int rv = TOKENIZER_OP_FINISHED;
+    int lexrv = 0;
+    char *h = *p;
+    uint len = 1;
+    uint currSize = 0;
+    
+    token->value = *p;
+    token->size = 1;
+    token->identifier = TOKEN_ID_NONE;
+    
+    lexrv = Lex_Comments(p, n, &h, &len, context);
+    if(lexrv == 3){
+        token->size = len;
+        token->identifier = TOKEN_ID_COMMENT;
+        rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }else if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_COMMENT;
+        goto end;
+    }
+    
+    lexrv = Lex_String(p, n, &h, &len, context);
+    if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_STRING;
+        goto end;
+    }
+    
+    lexrv = Lex_Inclusion(p, n, &h, &len, context);
+    if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_INCLUDE;
+        goto end;
+    }
+    
+    lexrv = Lex_Number(p, n, &h, &len, context);
+    if(lexrv > 0){
+        token->size = len;
+        token->identifier = TOKEN_ID_NUMBER;
+        goto end;
+    }
+    
+    len = Lex_TokenLookupAny(p, n, token, context->lookup);
+    
+    end:
+    *offset = len;
+    context->has_pending_work = 0;
+    if(rv == TOKENIZER_OP_UNFINISHED){
+        context->has_pending_work = 1;
+    }
+    return rv;
+}
+
+
+/* (char **p, uint n, Token *token, Tokenizer *tokenizer) */
+LEX_TOKENIZER(Lex_TokenizeNext){
+    uint offset = 0;
+    uint len = 0;
+    int rv = 0;
+    char *h = *p;
+    TokenizerContext *tCtx = nullptr;
+    int unfinished = tokenizer->unfinishedContext;
+    int lineBeginning = tokenizer->lineBeginning;
+    
+    tokenizer->lineBeginning = 0;
+    tokenizer->unfinishedContext = -1;
+    // 1- Skip spaces
+    while(**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r'){
+        (*p)++;
+        offset ++;
+    }
+    
+    if(offset >= n) return offset;
+    
+    // 2- Check which contexts want to process this line
+    if(lineBeginning){
+        for(int i = 0; i < tokenizer->contextCount; i++){
+            tCtx = &tokenizer->contexts[i];
+            tCtx->is_execing = 1;
+            if(tCtx->entry){
+                tCtx->is_execing = tCtx->entry(p, n-offset, tCtx);
+            }
+        }
+    }
+    
+    // 3- If some context did not finish its job, let it continue
+    if(unfinished >= 0){
+        tCtx = &tokenizer->contexts[unfinished];
+        rv = tCtx->exec(p, n-offset, token, &len, tCtx);
+        if(rv == TOKENIZER_OP_UNFINISHED){
+            tokenizer->unfinishedContext = unfinished;
+            token->position = tokenizer->linePosition + offset;
+            tokenizer->linePosition += offset + len;
+            return offset + len;
+        }else if(rv == TOKENIZER_OP_FINISHED){
+            token->position = tokenizer->linePosition + offset;
+            tokenizer->linePosition += offset + len;
+            return offset + len;
+        }
+    }
+    
+    if(offset + len >= n) return offset + len;
+    
+    offset += len;
+    
+    // 4- Give a chance to other contexts to get a token
+    for(int i = 0; i < tokenizer->contextCount; i++){
+        tCtx = &tokenizer->contexts[i];
+        if(tCtx->is_execing){
+            rv = tCtx->exec(p, n-offset, token, &len, tCtx);
+            if(rv == TOKENIZER_OP_UNFINISHED){
+                tokenizer->unfinishedContext = i;
+                token->position = tokenizer->linePosition + offset;
+                tokenizer->linePosition += offset + len;
+                return offset + len;
+            }else if(rv == TOKENIZER_OP_FINISHED){
+                token->position = tokenizer->linePosition + offset;
+                tokenizer->linePosition += offset + len;
+                return offset + len;
+            }
+        }
+    }
+    
+    AssertA(0, "No context generated token for input\n");
+    return -1;
+}
+
+void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
+    uint fileSize = 0;
+    uint processed = 0;
+    char *content = GetFileContents(path, &fileSize);
+    char *p = content;
+    char *lineStart = p;
+    uint lineSize = 0;
+    uint lineNr = 1;
+    while(p != NULL && *p != EOF && processed < fileSize){
+        if(*p == '\r'){
+            p++;
+            processed++;
+        }
+        
+        if(*p == '\n'){
+            *p = 0;
+            processor(&lineStart, lineSize, lineNr);
+            *p = '\n';
+            p++;
+            lineStart = p;
+            lineSize = 0;
+            processed++;
+            lineNr++;
+        }else{
+            p++;
+            lineSize += 1;
+            processed++;
+        }
+    }
+    
+    if(lineSize > 0){
+        processor(&lineStart, lineSize, lineNr);
+    }
+    
+    AllocatorFree(content);
+}
+
+/* (char **p, uint n, TokenizerContext *context) */
+LEX_TOKENIZER_ENTRY_CONTEXT(Lex_PreprocessorEntry){
+    if(context->has_pending_work) return 1;
+    if(**p == '#') return 1;
     return 0;
 }
 
 /* Slow code */
-void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
-    std::ifstream ifs(path);
-    std::string linebuf;
+// auxiliary structure for building the token table.
+typedef struct{
+    const char *value;
+    TokenId identifier;
+}GToken; // TODO:At least TRY to parse from this and see if it is ok
+
+/* C/C++ tokens that can happen inside a preprocessor */
+std::vector<std::vector<GToken>> cppReservedPreprocessor = {
+    {{ .value = "#", .identifier = TOKEN_ID_OPERATOR }},
+    {{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "line", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "undef", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "ifdef", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "error", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "endif", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "define", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "ifndef", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "include", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "warning", .identifier = TOKEN_ID_OPERATOR },}
+};
+
+/* C/C++ tokens that can happen inside a code and are not preprocessor */
+std::vector<std::vector<GToken>> cppReservedTable = {
+    {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "new", .identifier = TOKEN_ID_OPERATOR },{ .value = "and", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "this", .identifier = TOKEN_ID_OPERATOR },{ .value = "char", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "long", .identifier = TOKEN_ID_DATATYPE },{ .value = "NULL", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "case", .identifier = TOKEN_ID_OPERATOR },{ .value = "true", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "else", .identifier = TOKEN_ID_OPERATOR },{ .value = "goto", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "bool", .identifier = TOKEN_ID_DATATYPE },{ .value = "void", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "enum", .identifier = TOKEN_ID_OPERATOR },{ .value = "auto", .identifier = TOKEN_ID_DATATYPE },},
+    {{ .value = "short", .identifier = TOKEN_ID_DATATYPE },{ .value = "const", .identifier = TOKEN_ID_DATATYPE  },
+        { .value = "union", .identifier = TOKEN_ID_OPERATOR },{ .value = "using", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "class", .identifier = TOKEN_ID_OPERATOR },{ .value = "final", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "false", .identifier = TOKEN_ID_OPERATOR },{ .value = "float", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "catch", .identifier = TOKEN_ID_OPERATOR },{ .value = "throw", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "while", .identifier = TOKEN_ID_OPERATOR },{ .value = "break", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "friend", .identifier = TOKEN_ID_OPERATOR },{ .value = "inline", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "static", .identifier = TOKEN_ID_OPERATOR },{ .value = "sizeof", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "and_eq", .identifier = TOKEN_ID_OPERATOR },{ .value = "signed", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "delete", .identifier = TOKEN_ID_OPERATOR },{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "typeid", .identifier = TOKEN_ID_OPERATOR },{ .value = "export", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "return", .identifier = TOKEN_ID_OPERATOR },{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "public", .identifier = TOKEN_ID_OPERATOR },{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "struct", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "mutable", .identifier = TOKEN_ID_OPERATOR },{ .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "alignas", .identifier = TOKEN_ID_OPERATOR },{ .value = "wchar_t", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "virtual", .identifier = TOKEN_ID_OPERATOR },{ .value = "default", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "typedef", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "decltype", .identifier = TOKEN_ID_OPERATOR },{ .value = "operator", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "template", .identifier = TOKEN_ID_OPERATOR }, { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "register", .identifier = TOKEN_ID_OPERATOR },{ .value = "requires", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "override", .identifier = TOKEN_ID_OPERATOR },{ .value = "typename", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },{ .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "continue", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "namespace", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },{ .value = "thread_local", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }},
+    {{ .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR }},
+};
+
+void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
+                               std::vector<std::vector<GToken>> *cppTable)
+{
+    AssertA(lookupTable != nullptr, "Invalid lookup table given");
+    AssertA(lookupTable->table == nullptr, 
+            "Re-generation of lookup table is not supported");
     
-    if(!ifs.is_open()){
-        DEBUG_MSG("Failed to open file %s\n", path);
-        return;
-    }
+    std::vector<GToken> tokens = cppTable->at(0);
+    int elements = cppTable->size();
+    int offset = tokens.size();
     
-    while(ifs.peek() != -1){
-        const char *str = nullptr;
-        char *begin = nullptr;
-        int rc = 0;
-        GetNextLineFromStream(ifs, linebuf);
-        RemoveUnwantedLineTerminators(linebuf);
-        if(linebuf.empty()) continue;
-        str = linebuf.c_str();
-        begin = (char *)str;
+    lookupTable->table = (Token **)AllocatorGet(sizeof(Token *) * elements);
+    lookupTable->sizes = (vec2i *)AllocatorGet(sizeof(vec2i) * elements);
+    
+    for(int i = 0; i < elements; i++){
+        Token *tokenList = nullptr;
+        tokens = cppTable->at(i);
+        tokenList = (Token *)AllocatorGet(sizeof(Token) * tokens.size());
+        for(int k = 0; k < tokens.size(); k++){
+            GToken gToken = tokens[k];
+            tokenList[k].value = strdup(gToken.value);
+            tokenList[k].identifier = gToken.identifier;
+            tokenList[k].size = strlen(gToken.value);
+            tokenList[k].position = 0;
+        }
         
-        rc = processor(&begin, linebuf.size());
-        if(rc < 0) break;
+        lookupTable->table[i] = tokenList;
+        lookupTable->sizes[i] = vec2i(tokens.size(), tokenList[0].size);
     }
     
-    ifs.close();
+    lookupTable->nSize = elements;
+    
+    DEBUG_MSG("Built lookup table %d rows\n", elements);
+}
+
+void Lex_BuildTokenizer(Tokenizer *tokenizer){
+    TokenLookupTable *tables = nullptr;
+    AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
+    tokenizer->contexts = AllocatorGetN(TokenizerContext, 2);
+    tokenizer->contextCount = 2;
+    
+    tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
+                                              tokenizer->contextCount);
+    
+    for(int i = 0; i < tokenizer->contextCount; i++){
+        tokenizer->contexts[i].lookup = &tables[i];
+        tokenizer->contexts[i].is_execing = 0;
+        tokenizer->contexts[i].has_pending_work = 0;
+        tokenizer->contexts[i].aggregate = 0;
+        tokenizer->contexts[i].type = 0;
+        
+    }
+    
+    Lex_BuildTokenLookupTable(tokenizer->contexts[0].lookup, &cppReservedPreprocessor);
+    Lex_BuildTokenLookupTable(tokenizer->contexts[1].lookup, &cppReservedTable);
+    
+    tokenizer->contexts[0].entry = Lex_PreprocessorEntry;
+    tokenizer->contexts[0].exec = Lex_TokenizeExecCodePreprocessor;
+    tokenizer->contexts[1].entry = nullptr;
+    tokenizer->contexts[1].exec = Lex_TokenizeExecCode;
+    
+    tokenizer->unfinishedContext = -1;
+}
+
+void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer){
+    tokenizer->linePosition = 0;
+    tokenizer->lineBeginning = 1;
+    for(int i = 0; i < tokenizer->contextCount; i++){
+        tokenizer->contexts[i].is_execing = 0;
+    }
 }

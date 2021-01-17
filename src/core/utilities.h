@@ -25,4 +25,14 @@ std::istream &GetNextLineFromStream(std::istream &is, std::string &str);
 * end only, it is a line after all.
 */
 void RemoveUnwantedLineTerminators(std::string &line);
+
+/*
+* Checks if the character given is alphanumeric.
+*/
+int TerminatorChar(char v);
+
+/*
+* Checks if strings are equal.
+*/
+int StringEqual(char *s0, char *s1, uint maxn);
 #endif //UTILITIES_H

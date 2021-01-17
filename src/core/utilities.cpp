@@ -5,6 +5,22 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <string.h>
+
+int StringEqual(char *s0, char *s1, uint maxn){
+    for(uint i = 0; i < maxn; i++){
+        if(s0[i] != s1[i]){
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int TerminatorChar(char v){
+    return (v < 48 || (v > 57 && v < 64) || 
+            (v > 90 && v < 95) || (v > 123)) 
+        ? 1 : 0;
+}
 
 void RemoveUnwantedLineTerminators(std::string &line){
     if(line.size() > 0){ //remove '\n'
@@ -62,7 +78,7 @@ char *GetFileContents(const char *path, uint *size){
     //TODO: Refactor or make cross-platform implementation
     posix_fadvise(fd, 0, 0, 1);
     
-    ret = (char *)AllocatorGet(filesize);
+    ret = (char *)AllocatorGet(filesize+1); // make sure it has null terminator
     if(!ret) goto _error_memory;
     
     bytes = read(fd, ret, filesize);

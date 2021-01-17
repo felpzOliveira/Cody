@@ -62,7 +62,11 @@ inline Float Log2(Float x){
 }
 
 inline void Swap(Float *a, Float *b){
-    Float c = *a; *a = *b; *b = c;
+    Float aux = *a; *a = *b; *b = aux;
+}
+
+inline void Swap(Float &a, Float &b){
+    Float aux = a; a = b; b = aux;
 }
 
 inline bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1){
@@ -91,19 +95,6 @@ inline T Clamp(T val, U low, V high){
     if(val < low) return low;
     if(val > high) return high;
     return val;
-}
-
-template<typename T>
-inline Float gamma(T n){ 
-    return ((Float)n * MachineEpsilon) / (1 - (Float)n * MachineEpsilon); 
-}
-
-inline void swap(Float *a, Float *b){
-    Float aux = *a; *a = *b; *b = aux;
-}
-
-inline void swap(Float &a, Float &b){
-    Float aux = a; a = b; b = aux;
 }
 
 template<typename T> class vec2{

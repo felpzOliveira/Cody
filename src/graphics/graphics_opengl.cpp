@@ -4,15 +4,20 @@
 #include <shaders.h>
 #include <transform.h>
 #include <utilities.h>
+//NOTE: We do have access to glad should we keep it or imlement it?
 #include <glad/glad.h>
 
-//TODO: Refactor these, possibly remove, dev render code only
+//NOTE: Since we already modified fontstash source to reduce draw calls
+//      we might as well embrace it
+#define FONS_VERTEX_COUNT 2048
 #define FONTSTASH_IMPLEMENTATION
-#define GLFONTSTASH_IMPLEMENTATION
-#include <GLFW/glfw3.h>
-#include <unistd.h>
 #include <fontstash.h>
-#include <gl3corefontstash.h>
+
+//TODO: Refactor these, possibly remove, dev render code only
+#define GLFONTSTASH_IMPLEMENTATION
+#include <gl3corefontstash.h> //TODO: Make better backend this one is kinda silly
+#include <GLFW/glfw3.h> // TODO: This one is going to be annoying to replace
+#include <unistd.h> // TODO: I want to use this on Windows so we need to erase this
 
 #define MODULE_NAME "Render"
 
@@ -124,6 +129,7 @@ void OpenGLEntry(){
     
     Transform projection = Orthographic(0.0f, width, height, 0.0f, zNear, zFar);
     Matrix4x4 identity;
+    Float fontSize = 20.0f;
     
     while(!glfwWindowShouldClose(glThreadInfo.window)){
         if(glThreadInfo.window){
@@ -145,16 +151,20 @@ void OpenGLEntry(){
             
             fonsClearState(fsContext);
             fonsSetFont(fsContext, fontNormal);
-            fonsSetSize(fsContext, 65.0f);
+            fonsSetSize(fsContext, fontSize);
             fonsSetAlign(fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
             fonsVertMetrics(fsContext, NULL, NULL, &lineHeight);
-            fonsSetColor(fsContext, glfonsRGBA(255, 0, 0, 255));
-            x = fonsDrawText(fsContext, x, y, "Lorem ", NULL);
-            fonsSetColor(fsContext, glfonsRGBA(255, 255, 0, 255));
             
-            x = fonsDrawText(fsContext, x, y, "ipsum ", NULL);
-            fonsSetColor(fsContext, glfonsRGBA(255, 0, 0, 255));
-            x = fonsDrawText(fsContext, x, y, "-> dolor sit amet (not SDF)", NULL);
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 0, 0, 255), 
+                                        "Lorem ", NULL);
+            
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 255, 0, 255),
+                                        "ipsum ", NULL);
+            
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 0, 0, 255),
+                                        "-> dolor sit amet (not SDF)",NULL);
+            
+            fonsStashFlush(fsContext);
             
             y += lineHeight;
             x = 0.0f;
@@ -165,17 +175,20 @@ void OpenGLEntry(){
             
             fonsClearState(fsContext);
             fonsSetFont(fsContext, fontSdf);
-            fonsSetSize(fsContext, 65.0f);
+            fonsSetSize(fsContext, fontSize);
             fonsSetAlign(fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
             fonsVertMetrics(fsContext, NULL, NULL, &lineHeight);
-            fonsSetColor(fsContext, glfonsRGBA(255, 0, 0, 255));
-            x = fonsDrawText(fsContext, x, y, "Lorem ", NULL);
-            fonsSetColor(fsContext, glfonsRGBA(255, 255, 0, 255));
             
-            x = fonsDrawText(fsContext, x, y, "ipsum ", NULL);
-            fonsSetColor(fsContext, glfonsRGBA(255, 0, 0, 255));
-            x = fonsDrawText(fsContext, x, y, "dolor sit amet (SDF)", NULL);
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 0, 0, 255),
+                                        "Lorem ", NULL);
             
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 255, 0, 255),
+                                        "ipsum ", NULL);
+            
+            x = fonsStashMultiTextColor(fsContext, x, y, glfonsRGBA(255, 0, 0, 255),
+                                        "dolor sit amet (SDF)", NULL);
+            
+            fonsStashFlush(fsContext);
             y += lineHeight;
             
             glDisable(GL_BLEND);

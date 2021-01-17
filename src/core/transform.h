@@ -1,5 +1,4 @@
 #pragma once
-
 #include <geometry.h>
 
 struct Matrix3x3{

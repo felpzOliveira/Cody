@@ -9,13 +9,14 @@ if(CMAKE_BUILD_TYPE MATCHES Debug)
 	set(MH_FLAGS "-g -O0")
 else()
 	message(STATUS "Release build")
-	set(MH_FLAGS "-O3")
+	set(MH_FLAGS "-O2")
 endif()
 
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/core"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/external"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/external/fontstash/src"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include")
 add_subdirectory(src)
