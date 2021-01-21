@@ -7,8 +7,8 @@
 #include <string>
 #include <transform.h>
 
-#define SHADER_TYPE_VERTEX  0
-#define SHADER_TYPE_FRGMENT 1
+#define SHADER_TYPE_VERTEX   0
+#define SHADER_TYPE_FRAGMENT 1
 
 /*
 * Basic shaders support, this is not critical code, we are never going to be

@@ -1,3 +1,1 @@
-#define /*test <inc.h> "test.ccxxasqd"   4.56fe-3 func(x0)\
-a\
-askdjns*/aidj
+#define S(k) if (n >= (UINT64_C(1) << k)) { i += k; n >>= k; }

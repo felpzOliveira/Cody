@@ -7,6 +7,22 @@
 #include <sys/stat.h>
 #include <string.h>
 
+uint DigitCount(uint value){
+    uint v = 0;
+    do{
+        v++;
+        value /= 10;
+    }while(value != 0);
+    return v;
+}
+
+vec3i ColorFromHex(uint hex){
+    uint r = (hex & 0x00ff0000) >> 16;
+    uint g = (hex & 0x0000ff00) >> 8;
+    uint b = (hex & 0x000000ff);
+    return vec3i(r, g, b);
+}
+
 int StringEqual(char *s0, char *s1, uint maxn){
     for(uint i = 0; i < maxn; i++){
         if(s0[i] != s1[i]){
@@ -18,7 +34,7 @@ int StringEqual(char *s0, char *s1, uint maxn){
 
 int TerminatorChar(char v){
     return (v < 48 || (v > 57 && v < 64) || 
-            (v > 90 && v < 95) || (v > 123)) 
+            (v > 90 && v < 95) || (v > 122))
         ? 1 : 0;
 }
 

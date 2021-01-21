@@ -20,6 +20,7 @@
 // NOTE: Modified in January 13/2021 by Felipe.
 // Added 'fonsStashMultiTextColor' and 'fonsStashFlush' to improve performance
 // by reducing render calls and allow multi-color texts in one render pass.
+// Update 0: Added 'fonsGetGlyphRectangle' to expose rectangles coordinates.
 //
 
 #ifndef FONS_H
@@ -158,7 +159,19 @@ extern "C" {
     // Stack a piece of text in a color into the stash buffer. Renders only when needed.
     FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
                                            float x, float y, unsigned int color,
-                                           const char* str, const char* end);
+                                           const char* str, const char* end,
+                                           int *prevGlyph);
+    
+    // Computes the movement in 'x' required to render the first 'n' characters of
+    // the string 'e'
+    FONS_DEF float fonsComputeStringAdvance(FONScontext* stash, const char *e, int n,
+                                            int *prevGlyph);
+    
+    // Get the rectangle that is going to be used to render the 'n' character in the
+    // string 'str'.
+    FONS_DEF void fonsGetGlyphRectangle(FONScontext* stash, float *x0, float *x1,
+                                        float *y0, float *y1, const char *str, int n,
+                                        int *prevGlyph);
     
     // Force a render call on the current stash
     FONS_DEF void fonsStashFlush(FONScontext *stash);
@@ -1184,8 +1197,9 @@ static FONSglyph* fons__getGlyph(FONScontext* stash, FONSfont* font, unsigned in
 	h = fons__hashint(codepoint) & (FONS_HASH_LUT_SIZE-1);
 	i = font->lut[h];
 	while (i != -1) {
-		if (font->glyphs[i].codepoint == codepoint && font->glyphs[i].size == isize && font->glyphs[i].blur == iblur)
+		if (font->glyphs[i].codepoint == codepoint && font->glyphs[i].size == isize && font->glyphs[i].blur == iblur){
 			return &font->glyphs[i];
+        }
 		i = font->glyphs[i].next;
 	}
     
@@ -1265,6 +1279,7 @@ static FONSglyph* fons__getGlyph(FONScontext* stash, FONSfont* font, unsigned in
     
 	// Blur
 	if (iblur > 0) {
+        printf("BLUR\n");
 		stash->nscratch = 0;
 		bdst = &stash->texData[glyph->x0 + glyph->y0 * stash->params.width];
 		fons__blur(stash, bdst, gw,gh, stash->params.width, iblur);
@@ -1387,16 +1402,128 @@ static float fons__getVertAlign(FONScontext* stash, FONSfont* font, int align, s
 	return 0.0;
 }
 
+FONS_DEF float fonsComputeStringAdvance(FONScontext* stash, const char *e, int n,
+                                        int *prevGlyph)
+{
+    FONSstate* state = fons__getState(stash);
+    unsigned int codepoint;
+	unsigned int utf8state = 0;
+	FONSglyph* glyph = NULL;
+	FONSquad q;
+	int prevGlyphIndex = *prevGlyph;
+    short isize = (short)(state->size*10.0f);
+	short iblur = (short)state->blur;
+	float scale;
+	FONSfont* font;
+	float width;
+    float x = 0, y = 0;
+    char *str = (char *)e;
+    char *end = (char *)&str[n];
+    
+    if (stash == NULL) return 0;
+	if (state->font < 0 || state->font >= stash->nfonts) return 0;
+	font = stash->fonts[state->font];
+	if (font->data == NULL) return 0;
+    
+    scale = fons__tt_getPixelHeightScale(&font->font, (float)isize/10.0f);
+    // Align horizontally
+	if (state->align & FONS_ALIGN_LEFT) {
+		// empty
+	} else if (state->align & FONS_ALIGN_RIGHT) {
+		width = fonsTextBounds(stash, x,y, str, end, NULL);
+		x -= width;
+	} else if (state->align & FONS_ALIGN_CENTER) {
+		width = fonsTextBounds(stash, x,y, str, end, NULL);
+		x -= width * 0.5f;
+	}
+    
+    // Align vertically.
+	y += fons__getVertAlign(stash, font, state->align, isize);
+    for(int i = 0; i < n; i++, ++str){
+        if (fons__decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
+			continue;
+        glyph = fons__getGlyph(stash, font, codepoint, isize, iblur);
+        if(glyph != NULL){
+            fons__getQuad(stash, font, prevGlyphIndex, glyph, scale, 
+                          state->spacing, &x, &y, &q);
+        }
+        
+        prevGlyphIndex = glyph != NULL ? glyph->index : -1;
+    }
+    
+    *prevGlyph = prevGlyphIndex;
+    
+    return x;
+}
+
+FONS_DEF void fonsGetGlyphRectangle(FONScontext* stash, float *x0, float *x1,
+                                    float *y0, float *y1, const char *e, int n,
+                                    int *prevGlyph)
+{
+    FONSstate* state = fons__getState(stash);
+    unsigned int codepoint;
+	unsigned int utf8state = 0;
+	FONSglyph* glyph = NULL;
+	FONSquad q;
+	int prevGlyphIndex = *prevGlyph;
+    short isize = (short)(state->size*10.0f);
+	short iblur = (short)state->blur;
+	float scale;
+	FONSfont* font;
+	float width;
+    float x = 0, y = 0;
+    char *str = (char *)e;
+    char *end = (char *)&str[n];
+    
+    if (stash == NULL) return;
+	if (state->font < 0 || state->font >= stash->nfonts) return;
+	font = stash->fonts[state->font];
+	if (font->data == NULL) return;
+    
+    scale = fons__tt_getPixelHeightScale(&font->font, (float)isize/10.0f);
+    // Align horizontally
+	if (state->align & FONS_ALIGN_LEFT) {
+		// empty
+	} else if (state->align & FONS_ALIGN_RIGHT) {
+		width = fonsTextBounds(stash, x,y, str, end, NULL);
+		x -= width;
+	} else if (state->align & FONS_ALIGN_CENTER) {
+		width = fonsTextBounds(stash, x,y, str, end, NULL);
+		x -= width * 0.5f;
+	}
+    
+    // Align vertically.
+	y += fons__getVertAlign(stash, font, state->align, isize);
+    for(int i = 0; i < n; i++, ++str){
+        if (fons__decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
+			continue;
+        glyph = fons__getGlyph(stash, font, codepoint, isize, iblur);
+        if(glyph != NULL){
+            fons__getQuad(stash, font, prevGlyphIndex, glyph, scale, 
+                          state->spacing, &x, &y, &q);
+            *x0 = q.x0;
+            *x1 = q.x1;
+            *y0 = q.y0;
+            *y1 = q.y1;
+        }
+        
+        prevGlyphIndex = glyph != NULL ? glyph->index : -1;
+    }
+    
+    *prevGlyph = prevGlyphIndex;
+}
+
 FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
                                        float x, float y, unsigned int color,
-                                       const char* str, const char* end)
+                                       const char* str, const char* end,
+                                       int *prevGlyph)
 {
 	FONSstate* state = fons__getState(stash);
 	unsigned int codepoint;
 	unsigned int utf8state = 0;
 	FONSglyph* glyph = NULL;
 	FONSquad q;
-	int prevGlyphIndex = -1;
+	int prevGlyphIndex = *prevGlyph;
 	short isize = (short)(state->size*10.0f);
 	short iblur = (short)state->blur;
 	float scale;
@@ -1425,10 +1552,10 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
 	}
 	// Align vertically.
 	y += fons__getVertAlign(stash, font, state->align, isize);
-    
 	for (; str != end; ++str) {
 		if (fons__decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
 			continue;
+        //NOTE: Expensive
 		glyph = fons__getGlyph(stash, font, codepoint, isize, iblur);
 		if (glyph != NULL) {
 			fons__getQuad(stash, font, prevGlyphIndex, glyph, scale, state->spacing, &x, &y, &q);
@@ -1446,6 +1573,8 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
 		}
 		prevGlyphIndex = glyph != NULL ? glyph->index : -1;
 	}
+    
+    *prevGlyph = prevGlyphIndex;
     
 	return x;
 }

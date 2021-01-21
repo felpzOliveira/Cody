@@ -112,10 +112,10 @@ Transform2 Translate2(Float u){
 }
 
 Transform Translate(const vec3f &delta) {
-    Matrix4x4 m(1, 0, 0, delta.x, 0, 1, 0, delta.y, 0, 0, 1, delta.z, 0, 0, 0,
+    Matrix4x4 m(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, delta.x, delta.y, delta.z,
                 1);
-    Matrix4x4 minv(1, 0, 0, -delta.x, 0, 1, 0, -delta.y, 0, 0, 1, -delta.z, 0,
-                   0, 0, 1);
+    Matrix4x4 minv(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -delta.x, -delta.y, -delta.z,
+                   1);
     return Transform(m, minv);
 }
 

@@ -139,14 +139,14 @@ int Shader_CompileFile(const char *path, int type, char *oContent){
     char *p = nullptr;
     
     if(type != SHADER_TYPE_VERTEX && 
-       type != SHADER_TYPE_FRGMENT || path == nullptr) return rv;
+       type != SHADER_TYPE_FRAGMENT || path == nullptr) return rv;
     
     char *content = GetFileContents(path, &filesize);
     if(content == nullptr) return rv;
     
     if(Shader_TranslateShaderContent(content, translated) != 1) goto end;
     
-    if(type == SHADER_TYPE_FRGMENT){
+    if(type == SHADER_TYPE_FRAGMENT){
         str = (char *)f;
         gltype = GL_FRAGMENT_SHADER;
     }
@@ -194,7 +194,7 @@ void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix){
     Float *rawMatrix = (Float *)matrix->m;
     int id = glGetUniformLocation(shader.id, name);
     if(id >= 0){
-        glUniformMatrix4fv(id, 1, false, rawMatrix);
+        glUniformMatrix4fv(id, 1, GL_FALSE, rawMatrix);
     }else{
         static std::map<std::string, int> loggedMap;
         if(loggedMap.find(name) == loggedMap.end()){

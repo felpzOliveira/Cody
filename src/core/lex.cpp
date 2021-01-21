@@ -251,7 +251,6 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     char *h = *p;
     int matched = 0;
     uint length = 1;
-    token->value = *p;
     token->identifier = TOKEN_ID_NONE;
     
     if(TerminatorChar(**p)){
@@ -281,7 +280,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     }
     
     if(tableIndex >= 0){
-        Token *tList = lookup->table[tableIndex];
+        LookupToken *tList = lookup->table[tableIndex];
         int count = lookup->sizes[tableIndex].x;
         for(int k = 0; k < count; k++){
             if(StringEqual(h, tList[k].value, length)){
@@ -308,7 +307,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     return length;
 }
 
-/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context) */
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext) */
 LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     //1 - Attempt others first
     int rv = TOKENIZER_OP_FINISHED;
@@ -317,7 +316,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     uint len = 1;
     uint currSize = 0;
     
-    token->value = *p;
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
     
@@ -355,7 +353,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
 }
 
 
-/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context) */
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext) */
 LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     //1 - Attempt others first
     int rv = TOKENIZER_OP_FINISHED;
@@ -364,7 +362,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     uint len = 1;
     uint currSize = 0;
     
-    token->value = *p;
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
     
@@ -387,11 +384,13 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
         goto end;
     }
     
-    lexrv = Lex_Inclusion(p, n, &h, &len, context);
-    if(lexrv > 0){
-        token->size = len;
-        token->identifier = TOKEN_ID_INCLUDE;
-        goto end;
+    if(context->inclusion){
+        lexrv = Lex_Inclusion(p, n, &h, &len, context);
+        if(lexrv > 0){
+            token->size = len;
+            token->identifier = TOKEN_ID_INCLUDE;
+            goto end;
+        }
     }
     
     lexrv = Lex_Number(p, n, &h, &len, context);
@@ -402,6 +401,10 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     }
     
     len = Lex_TokenLookupAny(p, n, token, context->lookup);
+    if(token->identifier == TOKEN_ID_INCLUDE_SEL){
+        token->identifier = TOKEN_ID_PREPROCESSOR;
+        context->inclusion = 1;
+    }
     
     end:
     *offset = len;
@@ -419,6 +422,8 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     uint len = 0;
     int rv = 0;
     char *h = *p;
+    //printf("Starting at \'%c\'\n", **p);
+    
     TokenizerContext *tCtx = nullptr;
     int unfinished = tokenizer->unfinishedContext;
     int lineBeginning = tokenizer->lineBeginning;
@@ -486,15 +491,15 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     return -1;
 }
 
-void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
-    uint fileSize = 0;
+void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
+                     void *prv)
+{
     uint processed = 0;
-    char *content = GetFileContents(path, &fileSize);
-    char *p = content;
+    char *p = text;
     char *lineStart = p;
     uint lineSize = 0;
     uint lineNr = 1;
-    while(p != NULL && *p != EOF && processed < fileSize){
+    while(p != NULL && *p != EOF && processed < textsize){
         if(*p == '\r'){
             p++;
             processed++;
@@ -502,7 +507,7 @@ void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
         
         if(*p == '\n'){
             *p = 0;
-            processor(&lineStart, lineSize, lineNr);
+            processor(&lineStart, lineSize, lineNr, prv);
             *p = '\n';
             p++;
             lineStart = p;
@@ -517,10 +522,8 @@ void Lex_LineProcess(const char *path, Lex_LineProcessorCallback *processor){
     }
     
     if(lineSize > 0){
-        processor(&lineStart, lineSize, lineNr);
+        processor(&lineStart, lineSize, lineNr, prv);
     }
-    
-    AllocatorFree(content);
 }
 
 /* (char **p, uint n, TokenizerContext *context) */
@@ -539,21 +542,30 @@ typedef struct{
 
 /* C/C++ tokens that can happen inside a preprocessor */
 std::vector<std::vector<GToken>> cppReservedPreprocessor = {
-    {{ .value = "#", .identifier = TOKEN_ID_OPERATOR }},
-    {{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "line", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "undef", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "ifdef", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "error", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "endif", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "define", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "ifndef", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "include", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "warning", .identifier = TOKEN_ID_OPERATOR },}
+    {{ .value = "#", .identifier = TOKEN_ID_PREPROCESSOR }},
+    {{ .value = "if", .identifier = TOKEN_ID_PREPROCESSOR },},
+    {{ .value = "line", .identifier = TOKEN_ID_PREPROCESSOR },
+        {.value = "else", .identifier = TOKEN_ID_PREPROCESSOR },},
+    {{ .value = "undef", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "ifdef", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "error", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "endif", .identifier = TOKEN_ID_PREPROCESSOR },},
+    {{ .value = "define", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "ifndef", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR}},
+    {{ .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
+        { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },}
 };
 
 /* C/C++ tokens that can happen inside a code and are not preprocessor */
 std::vector<std::vector<GToken>> cppReservedTable = {
+    {{ .value = "+", .identifier = TOKEN_ID_MATH }, { .value = "-", .identifier = TOKEN_ID_MATH },
+        { .value = ">", .identifier = TOKEN_ID_MATH }, { .value = "<", .identifier = TOKEN_ID_MATH },
+        { .value = "/", .identifier = TOKEN_ID_MATH }, { .value = "%", .identifier = TOKEN_ID_MATH },
+        { .value = "!", .identifier = TOKEN_ID_MATH }, { .value = "=", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "*", .identifier = TOKEN_ID_MATH }, { .value = "&", .identifier = TOKEN_ID_MATH },
+        { .value = "|", .identifier = TOKEN_ID_MATH }, { .value = "^", .identifier = TOKEN_ID_MATH },
+        { .value = "~", .identifier = TOKEN_ID_MATH },},
     {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
     {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
         { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
@@ -611,19 +623,18 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     int elements = cppTable->size();
     int offset = tokens.size();
     
-    lookupTable->table = (Token **)AllocatorGet(sizeof(Token *) * elements);
+    lookupTable->table = (LookupToken **)AllocatorGet(sizeof(LookupToken *) * elements);
     lookupTable->sizes = (vec2i *)AllocatorGet(sizeof(vec2i) * elements);
     
     for(int i = 0; i < elements; i++){
-        Token *tokenList = nullptr;
+        LookupToken *tokenList = nullptr;
         tokens = cppTable->at(i);
-        tokenList = (Token *)AllocatorGet(sizeof(Token) * tokens.size());
+        tokenList = (LookupToken *)AllocatorGet(sizeof(LookupToken) * tokens.size());
         for(int k = 0; k < tokens.size(); k++){
             GToken gToken = tokens[k];
             tokenList[k].value = strdup(gToken.value);
             tokenList[k].identifier = gToken.identifier;
             tokenList[k].size = strlen(gToken.value);
-            tokenList[k].position = 0;
         }
         
         lookupTable->table[i] = tokenList;
@@ -637,6 +648,8 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
 
 void Lex_BuildTokenizer(Tokenizer *tokenizer){
     TokenLookupTable *tables = nullptr;
+    TokenizerWorkContext *workContext = nullptr;
+    TokenLookupTable *ax = nullptr;
     AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
     tokenizer->contexts = AllocatorGetN(TokenizerContext, 2);
     tokenizer->contextCount = 2;
@@ -644,13 +657,20 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer){
     tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
                                               tokenizer->contextCount);
     
+    workContext = (TokenizerWorkContext *)AllocatorGet(sizeof(TokenizerWorkContext));
+    workContext->workTokenList = AllocatorGetN(Token, 32);
+    workContext->workTokenListSize = 32;
+    workContext->workTokenListHead = 0;
+    workContext->lastToken = nullptr;
+    
+    tokenizer->workContext = workContext;
     for(int i = 0; i < tokenizer->contextCount; i++){
         tokenizer->contexts[i].lookup = &tables[i];
         tokenizer->contexts[i].is_execing = 0;
         tokenizer->contexts[i].has_pending_work = 0;
         tokenizer->contexts[i].aggregate = 0;
         tokenizer->contexts[i].type = 0;
-        
+        tokenizer->contexts[i].inclusion = 0;
     }
     
     Lex_BuildTokenLookupTable(tokenizer->contexts[0].lookup, &cppReservedPreprocessor);
@@ -669,5 +689,6 @@ void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer){
     tokenizer->lineBeginning = 1;
     for(int i = 0; i < tokenizer->contextCount; i++){
         tokenizer->contexts[i].is_execing = 0;
+        tokenizer->contexts[i].inclusion = 0;
     }
 }

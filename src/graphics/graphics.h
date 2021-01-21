@@ -2,12 +2,9 @@
 
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
+#include <geometry.h>
 
-//TODO: Set everything related to opening/options of a context
-typedef struct{
-    int is_opengl;
-}Graphics_Opts;
-
-void Graphics_Initialize(Graphics_Opts *opts);
+void Graphics_Initialize();
+void Graphics_RenderRectangle(vec2ui left, vec2ui right, vec4f color);
 
 #endif //GRAPHICS_H

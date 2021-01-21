@@ -3,6 +3,7 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 #include <types.h>
+#include <geometry.h>
 #include <string>
 #include <fstream>
 
@@ -35,4 +36,14 @@ int TerminatorChar(char v);
 * Checks if strings are equal.
 */
 int StringEqual(char *s0, char *s1, uint maxn);
+
+/*
+* Convert a hex color to a unsigned vec3i color.
+*/
+vec3i ColorFromHex(uint hex);
+
+/*
+* Count the amount of digits in a int.
+*/
+uint DigitCount(uint value);
 #endif //UTILITIES_H

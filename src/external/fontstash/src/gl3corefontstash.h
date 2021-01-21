@@ -172,6 +172,8 @@ static void glfons__renderDraw(void* userPtr, const float* verts, const float* t
 	glBindVertexArray(gl->vertexArray);
 #endif
     
+    //printf("Nverts: %d\n", nverts);
+    
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gl->tex);
     

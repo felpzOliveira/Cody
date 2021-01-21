@@ -743,4 +743,185 @@ template <typename T> inline T Mod(T a, T b) {
     return (T)((result < 0) ? result + b : result);
 }
 
+template <typename T>
+class Bounds2 {
+    public:
+    vec2<T> pMin, pMax;
+    
+    Bounds2(){
+        T minNum = FLT_MIN;
+        T maxNum = FLT_MAX;
+        pMin = vec2<T>(maxNum, maxNum);
+        pMax = vec2<T>(minNum, minNum);
+    }
+    
+    explicit Bounds2(const vec2<T> &p) : pMin(p), pMax(p) {}
+    Bounds2(const vec2<T> &p1, const vec2<T> &p2)
+        : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y)), pMax(Max(p1.x, p2.x), Max(p1.y, p2.y)) {}
+    
+    const vec2<T> &operator[](int i) const;
+    vec2<T> &operator[](int i);
+    bool operator==(const Bounds2<T> &b) const{
+        return b.pMin == pMin && b.pMax == pMax;
+    }
+    
+    bool operator!=(const Bounds2<T> &b) const{
+        return b.pMin != pMin || b.pMax != pMax;
+    }
+    
+    vec2<T> Corner(int corner) const{
+        Assert(corner >= 0 && corner < 4);
+        return vec2<T>((*this)[(corner & 1)].x,
+                       (*this)[(corner & 2) ? 1 : 0].y);
+    }
+    
+    void Expand(Float d){
+        pMin -= vec2<T>(Absf(d));
+        pMax += vec2<T>(Absf(d));
+    }
+    
+    void Reduce(Float d){
+        pMin += vec2<T>(Absf(d));
+        pMax -= vec2<T>(Absf(d));
+    }
+    
+    T LengthAt(int i, int axis) const{
+        Assert(axis == 0 || axis == 1);
+        return (i == 0) ? pMin[axis] : pMax[axis];
+    }
+    
+    vec2<T> Diagonal() const { return pMax - pMin; }
+    T SurfaceArea() const{
+        vec2<T> d = Diagonal();
+        return (d.x * d.y);
+    }
+    
+    T Volume() const{
+        printf("Warning: Called for volume on 2D surface\n");
+        return 0;
+    }
+    
+    vec2<T> Center() const{
+        return (pMin + pMax) * 0.5;
+    }
+    
+    T ExtentOn(int i) const{
+        Assert(i >= 0 && i < 2);
+        if(i == 0) return Absf(pMax.x - pMin.x);
+        return Absf(pMax.y - pMin.y);
+    }
+    
+    int MaximumExtent() const{
+        vec2<T> d = Diagonal();
+        if (d.x > d.y)
+            return 0;
+        else
+            return 1;
+    }
+    
+    int MinimumExtent() const{
+        vec2<T> d = Diagonal();
+        if (d.x > d.y)
+            return 1;
+        else
+            return 0;
+    }
+    
+    vec2<T> Offset(const vec2<T> &p) const{
+        vec2<T> o = p - pMin;
+        if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
+        if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
+        return o;
+    }
+    
+    void BoundingSphere(vec2<T> *center, Float *radius) const{
+        *center = (pMin + pMax) / 2;
+        *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
+    }
+    
+    vec2<T> MinDistance(const vec2<T> &p) const{
+        Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
+        Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
+        return vec2<T>(Min(x0, x1), Min(y0, y1));
+    }
+    
+    template <typename U> explicit operator Bounds2<U>() const{
+        return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
+    }
+    
+    vec2<T> Clamped(const vec2<T> &point) const{
+        return Clamp(point, pMin, pMax);
+    }
+    
+    void PrintSelf() const{
+        printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}",
+               pMin.x, pMin.y, pMax.x, pMax.y);
+    }
+};
+
+typedef Bounds2<Float> Bounds2f;
+typedef Bounds2<int> Bounds2i;
+
+template <typename T> inline 
+vec2<T> &Bounds2<T>::operator[](int i){
+    Assert(i == 0 || i == 1);
+    return (i == 0) ? pMin : pMax;
+}
+
+template <typename T> inline
+Bounds2<T> Union(const Bounds2<T> &b, const vec2<T> &p){
+    Bounds2<T> ret;
+    ret.pMin = Min(b.pMin, p);
+    ret.pMax = Max(b.pMax, p);
+    return ret;
+}
+
+template <typename T> inline
+Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2){
+    Bounds2<T> ret;
+    ret.pMin = Min(b1.pMin, b2.pMin);
+    ret.pMax = Max(b1.pMax, b2.pMax);
+    return ret;
+}
+
+template <typename T> inline 
+Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
+    Bounds2<T> ret;
+    ret.pMin = Max(b1.pMin, b2.pMin);
+    ret.pMax = Min(b1.pMax, b2.pMax);
+    return ret;
+}
+
+template <typename T> inline 
+bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
+    bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
+    bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
+    return (x && y);
+}
+
+template <typename T> inline
+bool Inside(const vec2<T> &p, const Bounds2<T> &b){
+    bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x && 
+               p.y >= b.pMin.y && p.y <= b.pMax.y);
+    if(!rv){
+        vec2<T> oE = b.MinDistance(p);
+        rv = IsUnsafeZero(oE.x) || IsUnsafeZero(oE.y);
+    }
+    
+    return rv;
+}
+
+template <typename T> inline
+bool InsideExclusive(const vec2<T> &p, const Bounds2<T> &b){
+    return (p.x >= b.pMin.x && p.x < b.pMax.x && 
+            p.y >= b.pMin.y && p.y < b.pMax.y);
+}
+
+template <typename T, typename U> inline 
+Bounds2<T> Expand(const Bounds2<T> &b, U delta){
+    return Bounds2<T>(b.pMin - vec2<T>(delta, delta),
+                      b.pMax + vec2<T>(delta, delta));
+}
+
+
 #endif //GEOMETRY_H
