@@ -5,6 +5,6 @@
 #include <geometry.h>
 
 void Graphics_Initialize();
-void Graphics_RenderRectangle(vec2ui left, vec2ui right, vec4f color);
+int  Graphics_IsRunning();
 
 #endif //GRAPHICS_H

@@ -6,6 +6,7 @@
 #include <string.h>
 #include <bufferview.h>
 #include <unistd.h>
+#include <x11_display.h>
 
 void test_line_processor(const char *path){
     uint filesize = 0;
@@ -30,12 +31,33 @@ void test_tokenizer(const char *filename){
 #if 1
     Graphics_Initialize();
     
-    while(1){ sleep(5); }
+    while(Graphics_IsRunning()){ sleep(1); }
 #endif
     LineBuffer_Free(&lineBuffer);
 }
 
+
+#include <glad/glad.h>
 int main(int argc, char **argv){
+#if 0
+    Float ones[] = {1, 1, 1, 1};
+    Float fcol[] = {0.23, 0.62, 0.56, 1.0};
+    WindowX11 window;
+    test_x11_entry(&window);
+    AssertA(gladLoadGL() != 0, "Failed to load OpenGL pointers");
+    while(1){
+        glViewport(0, 0, 1600, 900);
+        glClearBufferfv(GL_COLOR, 0, fcol);
+        glClearBufferfv(GL_DEPTH, 0, ones);
+        
+        swap_buffers(&window);
+        pool_events();
+    }
+    
+    getchar();
+    
+    return 0;
+#endif
 #if 0
     test_line_count("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //test_line_count("/home/felipe/Documents/Mayhem/test/number.cpp");

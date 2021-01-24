@@ -7,6 +7,96 @@
 #include <sys/stat.h>
 #include <string.h>
 
+int ExtensionStringContains(const char *string, const char *extensions){
+    const char* start = extensions;
+    for(;;){
+        const char* where;
+        const char* terminator;
+        
+        where = strstr(start, string);
+        if(!where)
+            return 0;
+        
+        terminator = where + strlen(string);
+        if(where == start || *(where - 1) == ' '){
+            if(*terminator == ' ' || *terminator == '\0')
+                break;
+        }
+        
+        start = terminator;
+    }
+    
+    return 1;
+}
+
+int StringToCodepoint(char *u, int size, int *off){
+    int l = size;
+    *off = 0;
+    if(l < 1) return -1;
+    
+    unsigned char u0 = u[0];
+    if(u0 >= 0 && u0 <= 127){
+        *off = 1;
+        return u0; // Ascii table
+    }
+    
+    if(l < 2) return -1; // if not Ascii we don't known what is this
+    
+    unsigned char u1 = u[1];
+    if(u0 >= 192 && u0 <= 223){
+        *off = 2;
+        return (u0 - 192) * 64 + (u1 - 128);
+    }
+    
+    if(u[0] == 0xed && (u[1] & 0xa0) == 0xa0)
+        return -1; //code points, 0xd800 to 0xdfff
+    if(l < 3) return -1;
+    
+    unsigned char u2 = u[2];
+    if(u0 >= 224 && u0 <= 239){
+        *off = 3;
+        return (u0 - 224) * 4096 + (u1 - 128) * 64 + (u2 - 128);
+    }
+    
+    if(l < 4) return -1;
+    
+    unsigned char u3 = u[3];
+    if(u0 >= 240 && u0 <= 247){
+        *off = 4;
+        return (u0 - 240) * 262144 + (u1 - 128) * 4096 + (u2 - 128) * 64 + (u3 - 128);
+    }
+    
+    return -1;
+}
+
+int CodepointToString(int cp, char *c){
+    int n = -1;
+    memset(c, 0x00, sizeof(char) * 5);
+    if(cp <= 0x7F){ 
+        c[0] = cp;
+        n = 1;
+    }else if(cp <= 0x7FF){
+        c[0] = (cp >> 6) + 192;
+        c[1] = (cp & 63) + 128;
+        n = 2;
+    }else if(0xd800 <= cp && cp <= 0xdfff){
+        n = 0;
+        //invalid block of utf8
+    }else if(cp <= 0xFFFF){
+        c[0] = (cp >> 12) + 224;
+        c[1]= ((cp >> 6) & 63) + 128;
+        c[2]=(cp & 63) + 128;
+        n = 3;
+    }else if(cp <= 0x10FFFF){
+        c[0] = (cp >> 18) + 240;
+        c[1] = ((cp >> 12) & 63) + 128;
+        c[2] = ((cp >> 6) & 63) + 128;
+        c[3] = (cp & 63) + 128;
+        n = 4;
+    }
+    return n;
+}
+
 uint DigitCount(uint value){
     uint v = 0;
     do{
@@ -21,6 +111,11 @@ vec3i ColorFromHex(uint hex){
     uint g = (hex & 0x0000ff00) >> 8;
     uint b = (hex & 0x000000ff);
     return vec3i(r, g, b);
+}
+
+vec3f ColorFromHexf(uint hex){
+    vec3i c = ColorFromHex(hex);
+    return vec3f(c.x / 255.0f, c.y / 255.0f, c.z / 255.0f);
 }
 
 int StringEqual(char *s0, char *s1, uint maxn){

@@ -451,7 +451,7 @@ template<typename T> class vec4{
     Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
     Float Length() const{ return sqrt(LengthSquared()); }
     void PrintSelf() const{
-        printf("P = {x : %g, y :  %g, z : %g, w : %g}", x, y, z, w);
+        printf("P = {x : %g, y :  %g, z : %g, w : %g}\n", x, y, z, w);
     }
 };
 
@@ -854,7 +854,7 @@ class Bounds2 {
     }
     
     void PrintSelf() const{
-        printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}",
+        printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}\n",
                pMin.x, pMin.y, pMax.x, pMax.y);
     }
 };

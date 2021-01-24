@@ -35,8 +35,10 @@ const float brightness = 0.15;
 const float contrast = 0.8;
 const float saturation = 1.5;
 
+varying vec4 interpolatedColor;
+
 void main() {
-    vec4 col = vec4(1.0);
+    vec4 col = interpolatedColor;
     gl_FragColor = brightnessMatrix( brightness ) *
         contrastMatrix( contrast ) * 
         saturationMatrix( saturation ) * 

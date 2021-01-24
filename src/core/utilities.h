@@ -41,9 +41,26 @@ int StringEqual(char *s0, char *s1, uint maxn);
 * Convert a hex color to a unsigned vec3i color.
 */
 vec3i ColorFromHex(uint hex);
+vec3f ColorFromHexf(uint hex);
 
 /*
 * Count the amount of digits in a int.
 */
 uint DigitCount(uint value);
+
+/*
+* Convert a codepoint to sequence of chars, i.e.: string,
+* chars are written to 'c' and 'c' must be a vector with minimum size = 5.
+* Returns the amount of bytes written into 'c'.
+*/
+int CodepointToString(int cp, char *c);
+
+/*
+* Gets the first codepoint in the string given by 'u' with size 'size'
+* and return its integer value, returns the number of bytes tooked from 'u'
+* in 'off'.
+*/
+int StringToCodepoint(char *u, int size, int *off);
+
+int ExtensionStringContains(const char *string, const char *extensions);
 #endif //UTILITIES_H
