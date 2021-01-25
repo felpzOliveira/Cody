@@ -189,6 +189,10 @@ void InitializeX11(){
     InitializeTimer();
     InitializeFramebuffer(&x11Framebuffer);
     
+    //TODO: Expose?
+    x11GLContext.forward = 1;
+    x11GLContext.profile = OPENGL_CORE_PROFILE;
+    
     x11Helper.WM_DELETE_WINDOW = XInternAtom(x11Helper.display, "WM_DELETE_WINDOW", 0);
     x11Helper.NET_WM_PING = XInternAtom(x11Helper.display, "_NET_WM_PING", 0);
 }
@@ -215,9 +219,9 @@ int waitForVisibilityNotify(WindowX11* window, LibHelperX11 *x11){
     return 1;
 }
 
-void CreateWindowX11(int width, int height, const char *title,
-                     Framebuffer *fb, ContextGL *context, LibHelperX11 *x11,
-                     WindowX11 *window)
+void _CreateWindowX11(int width, int height, const char *title,
+                      Framebuffer *fb, ContextGL *context, LibHelperX11 *x11,
+                      WindowX11 *window)
 {
     Visual *visual;
     int depth = 0;
@@ -276,25 +280,27 @@ void CreateWindowX11(int width, int height, const char *title,
     XFlush(x11->display);
 }
 
-void test_x11_entry(WindowX11 *window){
-    memset(window, 0x00, sizeof(WindowX11));
-    
-    InitializeX11();
-    x11Framebuffer.samples = 16;
-    x11GLContext.major = 3;
-    x11GLContext.minor = 3;
-    x11GLContext.forward = 1;
-    x11GLContext.profile = OPENGL_CORE_PROFILE;
-    
-    CreateWindowX11(1600, 900, "Test-window", &x11Framebuffer, 
-                    &x11GLContext, &x11Helper, window);
+void SetSamplesX11(int samples){
+    x11Framebuffer.samples = Max(0, samples);
 }
 
-void swap_buffers(WindowX11 *window){
+void SetOpenGLVersionX11(int major, int minor){
+    x11GLContext.major = major;
+    x11GLContext.minor = minor;
+}
+
+WindowX11 *CreateWindowX11(int width, int height, const char *title){
+    WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
+    _CreateWindowX11(width, height, title, &x11Framebuffer,
+                     &x11GLContext, &x11Helper, window);
+    return window;
+}
+
+void SwapBuffersX11(WindowX11 *window){
     SwapBufferGLX((void *)window);
 }
 
-void pool_events(){
+void PoolEventsX11(){
     XPending(x11Helper.display);
     
     while(XQLength(x11Helper.display)){

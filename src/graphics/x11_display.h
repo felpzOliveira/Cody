@@ -116,9 +116,12 @@ typedef struct{
     
 }LibHelperX11;
 
-void test_x11_entry(WindowX11 *window);
-void swap_buffers(WindowX11 *window);
-void pool_events();
+void InitializeX11();
+void SetSamplesX11(int samples);
+void SetOpenGLVersionX11(int major, int minor);
+void SwapBuffersX11(WindowX11 *window);
+void PoolEventsX11();
+WindowX11 *CreateWindowX11(int width, int height, const char *title);
 
 
 #endif //X11_DISPLAY_H

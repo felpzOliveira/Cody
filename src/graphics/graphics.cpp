@@ -187,25 +187,11 @@ void OpenGLInitialize(OpenGLState *state){
     Quad *quad = &state->quadBuffer;
     int width = state->width;
     int height = state->height;
-    state->window = new WindowX11;
-    test_x11_entry(state->window);
     
-#if 0
-    int rc = glfwInit();
-    
-    AssertA(rc == GLFW_TRUE, "Failed to initialize GLFW");
-    glfwWindowHint(GLFW_SAMPLES, 16);
-    //glfwWindowHint(GLFW_RESIZABLE, 0);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    
-    state->window = glfwCreateWindow(width, height, "Cody - 0.0.1", NULL, NULL);
-    AssertA(state->window != NULL, "Failed to open window");
-    
-    glfwMakeContextCurrent(state->window);
-#endif
+    InitializeX11();
+    SetSamplesX11(16);
+    SetOpenGLVersionX11(3, 3);
+    state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
     
     AssertA(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
@@ -500,8 +486,8 @@ void OpenGLEntry(){
         Graphics_RenderCursorElements(&GlobalGLState, &bufferView, 
                                       lineOffset, scaledWidth);
         
-        swap_buffers(GlobalGLState.window);
-        pool_events();
+        SwapBuffersX11(GlobalGLState.window);
+        PoolEventsX11();
         
         //glfwSwapBuffers(GlobalGLState.window);
         //glfwPollEvents();
