@@ -75,6 +75,14 @@ typedef struct{
     uintptr_t handle;
 }Framebuffer;
 
+#define ON_SCROLL_CALLBACK(name) void name(int is_up)
+#define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y)
+#define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h)
+
+typedef ON_SCROLL_CALLBACK(onScrollCallback);
+typedef ON_MOUSE_CLICK_CALLBACK(onMouseClickCallback);
+typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
+
 typedef struct{
     Colormap colormap;
     Window handle;
@@ -83,12 +91,18 @@ typedef struct{
     int width, height;
     int xpos, ypos;
     int lastCursorPosX, lastCursorPosY;
+    int shouldClose;
     GLXContextInfo glx;
+    
+    onScrollCallback *onScrollCall;
+    onMouseClickCallback *onMouseClickCall;
+    onSizeChangeCallback *onSizeChangeCall;
 }WindowX11;
 
 typedef struct{
     int monotonic;
     uint64_t frequency;
+    uint64_t offset;
 }Timer;
 
 typedef struct{
@@ -119,9 +133,17 @@ typedef struct{
 void InitializeX11();
 void SetSamplesX11(int samples);
 void SetOpenGLVersionX11(int major, int minor);
+int  WindowShouldCloseX11(WindowX11 *window);
 void SwapBuffersX11(WindowX11 *window);
 void PoolEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
+void DestroyWindowX11(WindowX11 *window);
+void TerminateX11();
 
+double GetElapsedTime();
+
+void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
+void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);
+void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback);
 
 #endif //X11_DISPLAY_H

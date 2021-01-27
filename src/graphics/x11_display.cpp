@@ -13,16 +13,7 @@ Timer timer;
 Framebuffer x11Framebuffer;
 ContextGL x11GLContext;
 
-void InitializeTimer(){
-    struct timespec ts;
-    if(clock_gettime(CLOCK_MONOTONIC, &ts) == 0){
-        timer.monotonic = 1;
-        timer.frequency = 1000000000;
-    }else{
-        timer.monotonic = 0;
-        timer.frequency = 1000000;
-    }
-}
+void ProcessEventX11(XEvent *event);
 
 uint64_t GetTimerValue(){
     if(timer.monotonic){
@@ -37,8 +28,25 @@ uint64_t GetTimerValue(){
     }
 }
 
+void InitializeTimer(){
+    struct timespec ts;
+    if(clock_gettime(CLOCK_MONOTONIC, &ts) == 0){
+        timer.monotonic = 1;
+        timer.frequency = 1000000000;
+    }else{
+        timer.monotonic = 0;
+        timer.frequency = 1000000;
+    }
+    
+    timer.offset = GetTimerValue();
+}
+
 uint64_t GetTimerFrequency(){
     return timer.frequency;
+}
+
+double GetElapsedTime(){
+    return (double)(GetTimerValue() - timer.offset) / GetTimerFrequency();
 }
 
 int waitForEvent(double* timeout){
@@ -81,27 +89,6 @@ void InitializeFramebuffer(Framebuffer *framebuffer){
     framebuffer->doublebuffer = 1;
 }
 
-vec2f GetSystemContentScale(Display *display){
-    Float xdpi = 96.0f, ydpi = 96.0f;
-    char *rms = XResourceManagerString(display);
-    if(rms){
-        XrmDatabase xrmDb = XrmGetStringDatabase(rms);
-        if(xrmDb){
-            XrmValue value;
-            char *type = nullptr;
-            if(XrmGetResource(xrmDb, "Xft.dpi", "Xft.Dpi", &type, &value)){
-                if(type && StringEqual(type, (char *)"String", 6)){
-                    xdpi = ydpi = atof(value.addr);
-                }
-            }
-            
-            XrmDestroyDatabase(xrmDb);
-        }
-    }
-    
-    return vec2f(xdpi / 96.0f, ydpi / 96.0f);
-}
-
 Window CreateHelperWindow(LibHelperX11 *x11){
     XSetWindowAttributes wa;
     wa.event_mask = PropertyChangeMask;
@@ -116,8 +103,6 @@ void XkbSetup(LibHelperX11 *x11){
     x11->xkb.available = XkbQueryExtension(x11->display, &x11->xkb.majorOpcode,
                                            &x11->xkb.eventBase, &x11->xkb.errorBase,
                                            &x11->xkb.major, &x11->xkb.minor);
-    
-    printf("XKB: %d.%d\n", x11->xkb.major, x11->xkb.minor);
     
     if(x11->xkb.available){
         XkbStateRec state;
@@ -170,9 +155,6 @@ void InitializeX11(){
     x11Helper.root    = RootWindow(x11Helper.display, x11Helper.screen);
     x11Helper.context = XUniqueContext();
     
-    vec2f scaleDpi = GetSystemContentScale(x11Helper.display);
-    scaleDpi.PrintSelf();
-    
     XkbSetup(&x11Helper);
     x11Helper.helperWindow = CreateHelperWindow(&x11Helper);
     x11Helper.hiddenCursor = None; //TODO
@@ -195,6 +177,10 @@ void InitializeX11(){
     
     x11Helper.WM_DELETE_WINDOW = XInternAtom(x11Helper.display, "WM_DELETE_WINDOW", 0);
     x11Helper.NET_WM_PING = XInternAtom(x11Helper.display, "_NET_WM_PING", 0);
+}
+
+int WindowShouldCloseX11(WindowX11 *window){
+    return window->shouldClose;
 }
 
 int IsWindowVisibleX11(WindowX11 *window, LibHelperX11 *x11){
@@ -266,6 +252,8 @@ void _CreateWindowX11(int width, int height, const char *title,
     if (XGetICValues(window->ic, XNFilterEvents, &filter, NULL) == NULL)
         XSelectInput(x11->display, window->handle, wa.event_mask | filter);
     
+    XSetICFocus(window->ic);
+    
     window->width  = width;
     window->height = height;
     context->window = (WindowX11 *)window;
@@ -276,6 +264,8 @@ void _CreateWindowX11(int width, int height, const char *title,
     
     XMapWindow(x11->display, window->handle);
     waitForVisibilityNotify(window, x11);
+    
+    window->shouldClose = 0;
     
     XFlush(x11->display);
 }
@@ -289,11 +279,48 @@ void SetOpenGLVersionX11(int major, int minor){
     x11GLContext.minor = minor;
 }
 
+void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback){
+    window->onScrollCall = callback;
+}
+
+void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback){
+    window->onMouseClickCall = callback;
+}
+
+void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback){
+    window->onSizeChangeCall = callback;
+}
+
 WindowX11 *CreateWindowX11(int width, int height, const char *title){
     WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
     _CreateWindowX11(width, height, title, &x11Framebuffer,
                      &x11GLContext, &x11Helper, window);
+    
+    //TODO: Set callbacks to empty
+    window->onScrollCall = NULL;
     return window;
+}
+
+void TerminateX11(){
+    XCloseIM(x11Helper.im);
+    XCloseDisplay(x11Helper.display);
+    TerminateGLX();
+}
+
+void DestroyWindowX11(WindowX11 *window){
+    if(window){
+        XDestroyIC(window->ic);
+        DestroyContextGLX((void *)window);
+        
+        XDeleteContext(x11Helper.display, window->handle, x11Helper.context);
+        XUnmapWindow(x11Helper.display, window->handle);
+        XDestroyWindow(x11Helper.display, window->handle);
+        
+        XFreeColormap(x11Helper.display, window->colormap);
+        XFlush(x11Helper.display);
+        
+        free(window);
+    }
 }
 
 void SwapBuffersX11(WindowX11 *window){
@@ -306,11 +333,209 @@ void PoolEventsX11(){
     while(XQLength(x11Helper.display)){
         XEvent event;
         XNextEvent(x11Helper.display, &event);
-        int filtered = XFilterEvent(&event, None);
-        //process_event(&event);
+        ProcessEventX11(&event);
     }
     
     //TODO: Figure out this cursor thingy in glfw
-    
     XFlush(x11Helper.display);
+}
+
+void ProcessEventReparentX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    window->parent = event->xreparent.parent;
+}
+
+void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    int count = 0;
+    KeySym keysym = 0;
+    char buf[20];
+    Status status = 0;
+    count = Xutf8LookupString(window->ic, (XKeyPressedEvent*)event, buf, 
+                              20, &keysym, &status);
+    
+    if(status == XBufferOverflow)
+        printf("BufferOverflow\n");
+    
+    if(count)
+        printf("buffer: %.*s\n", count, buf);
+    
+    printf("pressed KEY: %d\n", (int)keysym);
+}
+
+void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Key Release\n");
+}
+
+void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    int is_scroll = 0;
+    int is_scroll_up = 0;
+    switch(event->xbutton.button){
+        case Button4:{
+            is_scroll_up = 1;
+            is_scroll = 1;
+        } break;
+        case Button5:{
+            is_scroll = 1;
+        } break;
+        case Button1:{
+            if(window->onMouseClickCall){
+                window->onMouseClickCall(window->lastCursorPosX,
+                                         window->lastCursorPosY);
+            }
+        } break;
+        default:{ }
+    }
+    
+    if(is_scroll && window->onScrollCall){
+        window->onScrollCall(is_scroll_up);
+    }
+    
+    
+}
+
+void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Button Release\n");
+}
+
+void ProcessEventEnterX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Enter Notify\n");
+}
+
+void ProcessEventLeaveX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Leave Notify\n");
+}
+
+void ProcessEventMotionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    int x = event->xmotion.x;
+    int y = event->xmotion.y;
+    window->lastCursorPosX = x;
+    window->lastCursorPosY = y;
+}
+
+void ProcessEventConfigureX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    if(event->xconfigure.width != window->width ||
+       event->xconfigure.height != window->height)
+    {
+        window->width = event->xconfigure.width;
+        window->height = event->xconfigure.height;
+        
+        if(window->onSizeChangeCall){
+            window->onSizeChangeCall(window->width, window->height);
+        }
+    }
+}
+
+void ProcessEventClientMessageX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    //TODO: Protocols
+    const Atom protocol = event->xclient.data.l[0];
+    if(protocol == x11Helper.WM_DELETE_WINDOW){
+        window->shouldClose = 1;
+    }else if(protocol == x11Helper.NET_WM_PING){
+        XEvent reply = *event;
+        reply.xclient.window = x11Helper.root;
+        XSendEvent(x11Helper.display, x11Helper.root, False,
+                   SubstructureNotifyMask | SubstructureRedirectMask, &reply);
+    }
+}
+
+void ProcessEventSelectionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Selection Notify\n");
+}
+
+void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Focus IN\n");
+}
+
+void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Focus OUT\n");
+}
+
+void ProcessEventExposeX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    //TODO: ??????????
+}
+
+void ProcessEventPropertyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Property Notify\n");
+}
+
+void ProcessEventDestroyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Destroy Notify\n");
+}
+
+void ProcessEventX11(XEvent *event){
+    WindowX11 *window = NULL;
+    int filtered = XFilterEvent(event, None);
+    int rv = XFindContext(x11Helper.display, event->xany.window,
+                          x11Helper.context, (XPointer *)&window);
+    if(rv != 0) return;
+    
+    switch(event->type){
+        case ReparentNotify:{
+            ProcessEventReparentX11(event, window, &x11Helper);
+        } break;
+        
+        case KeyPress:{
+            ProcessEventKeyPressX11(event, window, &x11Helper);
+        } break;
+        
+        case KeyRelease:{
+            ProcessEventKeyReleaseX11(event, window, &x11Helper);
+        } break;
+        
+        case ButtonPress:{
+            ProcessEventButtonPressX11(event, window, &x11Helper);
+        } break;
+        
+        case ButtonRelease:{
+            ProcessEventButtonReleaseX11(event, window, &x11Helper);
+        } break;
+        
+        case EnterNotify:{
+            ProcessEventEnterX11(event, window, &x11Helper);
+        } break;
+        
+        case LeaveNotify:{
+            ProcessEventLeaveX11(event, window, &x11Helper);
+        } break;
+        
+        case MotionNotify:{
+            ProcessEventMotionX11(event, window, &x11Helper);
+        } break;
+        
+        case ConfigureNotify:{
+            ProcessEventConfigureX11(event, window, &x11Helper);
+        } break;
+        
+        case ClientMessage:{
+            if(filtered) return;
+            ProcessEventClientMessageX11(event, window, &x11Helper);
+        } break;
+        
+        case SelectionNotify:{
+            ProcessEventSelectionX11(event, window, &x11Helper);
+        } break;
+        
+        case FocusIn:{
+            ProcessEventFocusInX11(event, window, &x11Helper);
+        } break;
+        
+        case FocusOut:{
+            ProcessEventFocusOutX11(event, window, &x11Helper);
+        } break;
+        
+        case Expose:{
+            ProcessEventExposeX11(event, window, &x11Helper);
+        } break;
+        
+        case PropertyNotify:{
+            ProcessEventPropertyX11(event, window, &x11Helper);
+        } break;
+        
+        case DestroyNotify:{
+            ProcessEventDestroyX11(event, window, &x11Helper);
+        } break;
+        
+        default:{
+            printf("Pending\n");
+        }
+    }
 }

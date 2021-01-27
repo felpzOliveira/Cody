@@ -105,6 +105,11 @@ void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNr,
 void LineBuffer_RemoveLineAt(LineBuffer *lineBuffer, uint at);
 
 /*
+* Returns the buffer containing the line at 'lineNo' or nullptr if no one exists.
+*/
+Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo);
+
+/*
 * Releases memory taken by a LineBuffer.
 */
 void LineBuffer_Free(LineBuffer *lineBuffer);

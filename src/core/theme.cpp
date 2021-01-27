@@ -2,7 +2,8 @@
 #include <utilities.h>
 
 Theme defaultTheme = {
-    .backgroundColor = ColorFromHex(0x161616),
+    //.backgroundColor = ColorFromHex(0x161616),
+    .backgroundColor = ColorFromHex(0x000000),
     .operatorColor   = ColorFromHex(0xCD950C),
     .datatypeColor   = ColorFromHex(0xCD950C),
     .commentColor    = ColorFromHex(0x7D7D7D),

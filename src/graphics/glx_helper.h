@@ -138,10 +138,12 @@ typedef struct{
     
 }LibHelperGLX;
 
-int InitGLX(LibHelperX11 *x11);
-int ChooseVisualGLX(Framebuffer *desired, LibHelperX11 *x11, Visual **visual, int *depth);
-int CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x11);
+int  InitGLX(LibHelperX11 *x11);
+int  ChooseVisualGLX(Framebuffer *desired, LibHelperX11 *x11, Visual **visual, int *depth);
+int  CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x11);
 void MakeContextCurrentGLX(void *vWin);
 void SwapBufferGLX(void *vWin);
+void DestroyContextGLX(void *vWin);
+void TerminateGLX();
 
 #endif //GLX_HELPER_H

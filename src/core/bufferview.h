@@ -5,11 +5,22 @@
 
 #include <geometry.h>
 #include <buffers.h>
+#include <transform.h>
 
 typedef struct{
     vec2ui textPosition;
     vec2ui ghostPosition;
 }DoubleCursor;
+
+typedef struct{
+    int isAnimating;
+    Float passedTime;
+    Float duration;
+    Float velocity;
+    Float runningPosition;
+    uint endLine; // this is in screen space, i.e.: 1 <= endLine <= N
+    int is_down;
+}AnimationProps;
 
 /*
 * TODO: Since this is only one of the views of a file we might
@@ -29,6 +40,7 @@ typedef struct{
     vec2ui visibleRect;
     Float height;
     Float lineHeight;
+    AnimationProps transitionAnim;
 }BufferView;
 
 //TODO: Implement interpolation, we could either go matrix interpolation
@@ -37,10 +49,20 @@ typedef struct{
 //      Currently we only move the line, this works in a vim-style where no half
 //      line is shown, however being able to animate might give us powerfull tools.
 
+int  BufferView_IsAnimating(BufferView *view);
 void BufferView_InitalizeFromText(BufferView *view, char *content, uint size);
 void BufferView_SetView(BufferView *view, Float lineHeight, Float height);
 void BufferView_CursorTo(BufferView *view, uint lineNo);
+void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up);
+void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
+
+int BufferView_ComputeTextLine(BufferView *view, Float screenY);
+void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
 
 vec2ui BufferView_GetViewRange(BufferView *view);
 vec2ui BufferView_GetCursorPosition(BufferView *view);
+
+void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
+int  BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
+                                    vec2ui *cursorAt, Transform *transform);
 #endif //BUFFERVIEW_H

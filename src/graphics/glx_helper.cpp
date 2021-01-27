@@ -24,6 +24,10 @@ int GetGLXFBConfigAttrib(GLXFBConfig fbconfig, int attrib, LibHelperX11 *x11){
     return value;
 }
 
+void TerminateGLX(){
+    dlclose(glxHelper.handle);
+}
+
 void MakeContextCurrentGLX(void *vWin){
     WindowX11 *window = (WindowX11 *)vWin;
     if(window){
@@ -317,6 +321,7 @@ int ChooseVisualGLX(Framebuffer *desired, LibHelperX11 *x11, Visual **visual, in
     return 1;
 }
 
+//TODO: Inspect all libraries and check all versions?
 int InitGLX(LibHelperX11 *x11){
     const char *glxNames[] = {
         "libGL-1.so",
@@ -355,10 +360,12 @@ int InitGLX(LibHelperX11 *x11){
     AssertA(glXQueryVersion(x11->display, &glxHelper.major, &glxHelper.minor),
             "Failed to query GLX version");
     
+    printf("GLX version: %d.%d\n", glxHelper.major, glxHelper.minor);
+    
+#if 0
     AssertA(!(glxHelper.major == 1 && glxHelper.minor < 3),
             "GLX version 1.3 is required");
-    
-    printf("GLX version: %d.%d\n", glxHelper.major, glxHelper.minor);
+#endif
     
     if(SupportedExtGLX("GLX_EXT_swap_control", x11)){
         LOAD_SYM_GLX(glXSwapIntervalEXT, PFNGLXSWAPINTERVALEXTPROC);

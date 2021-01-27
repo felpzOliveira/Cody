@@ -525,7 +525,6 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
         processor(&lineStart, lineSize, lineNr, prv);
     }
 }
-
 /* (char **p, uint n, TokenizerContext *context) */
 LEX_TOKENIZER_ENTRY_CONTEXT(Lex_PreprocessorEntry){
     if(context->has_pending_work) return 1;
@@ -554,6 +553,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "ifndef", .identifier = TOKEN_ID_PREPROCESSOR },
         { .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR}},
     {{ .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
+        { .value = "defined", .identifier = TOKEN_ID_OPERATOR },
         { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },}
 };
 

@@ -316,6 +316,14 @@ void LineBuffer_Free(LineBuffer *lineBuffer){
     }
 }
 
+Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
+    if(lineNo < lineBuffer->lineCount){
+        return &lineBuffer->lines[lineNo];
+    }
+    
+    return nullptr;
+}
+
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer){
     for(int j = 0; j < buffer->count; j++){
