@@ -59,7 +59,7 @@ LEX_PROCESSOR(Lex_Number){
             rLen++;
             (*p)++;
             goto end;
-        }else if(**p == 'e'){
+        }else if(**p == 'e' || **p == 'E'){
             if(rLen < 1){
                 LEX_DEBUG("Found \'e\' at first token position\n");
                 return 0;

@@ -1,5 +1,58 @@
 #include <bufferview.h>
 
+Float InterpolateValueCubic(Float dt, Float remaining,
+                            Float *initialValue, Float finalValue, 
+                            Float *velocity)
+{
+    if(dt > remaining){
+        *initialValue = finalValue;
+        return finalValue;
+    }
+    
+    Float t  = dt / remaining;
+    Float u  = (1.0f - t);
+    Float c0 = 1.0f * u * u * u;
+    Float c1 = 3.0f * u * u * t;
+    Float c2 = 3.0f * u * t * t;
+    Float c3 = 1.0f * t * t * t;
+    
+    Float dc0 = -3.0f * u * u;
+    Float dc1 = -6.0f * u * t + 3.0f * u * u;
+    Float dc2 =  6.0f * u * t - 3.0f * t * t;
+    Float dc3 =  3.0f * t * t;
+    
+    Float b0 = *initialValue;
+    Float b1 = *initialValue + (remaining / 3.0f) * (*velocity);
+    Float b2 = finalValue - (remaining / 3.0f) * (*velocity);
+    Float b3 = finalValue;
+    
+    *initialValue = c0 * b0 + c1 * b1 + c2 * b2 + c3 * b3;
+    *velocity = (dc0 * b0 + dc1 * b1 + dc2 * b2 + dc3 * b3) * (1.0f / remaining);
+    
+    return *initialValue;
+}
+
+Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
+                             Float initialValue, Float finalValue)
+{
+    Float intervalFract = currentInterval / durationInterval;
+    return intervalFract * (finalValue - initialValue) + initialValue;
+}
+
+
+inline int Animation_Finished(AnimationProps *anim){
+    return IsZero(anim->passedTime - anim->duration) || (anim->passedTime > anim->duration);
+}
+
+inline int BufferView_IsCursorVisible(BufferView *view, vec2ui range){
+    return (range.x <= view->cursor.textPosition.x &&
+            range.y >= view->cursor.textPosition.x) ? 1 : 0;
+}
+
+Transition BufferView_GetTransitionType(BufferView *view){
+    return view->transitionAnim.transition;
+}
+
 void BufferView_InitalizeFromText(BufferView *view, char *content, uint size){
     AssertA(view != nullptr, "Invalid bufferview pointer");
     view->lineBuffer = (LineBuffer)LINE_BUFFER_INITIALIZER;
@@ -12,6 +65,7 @@ void BufferView_InitalizeFromText(BufferView *view, char *content, uint size){
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;
     view->height = 0;
+    view->transitionAnim.transition = TransitionNone;
     view->transitionAnim.isAnimating = 0;
     view->transitionAnim.duration = 0.0f;
     view->transitionAnim.endLine = 0;
@@ -22,6 +76,7 @@ void BufferView_SetView(BufferView *view, Float lineHeight, Float height){
     AssertA(view != nullptr && !IsZero(lineHeight), "Invalid inputs");
     //TODO: Need to recompute the correct position as cursor might be hidden now
     uint yRange = (uint)floor(height / lineHeight);
+    view->currentMaxRange = yRange;
     view->height = height;
     view->lineHeight = lineHeight;
     view->visibleRect.y = view->visibleRect.x + yRange;
@@ -33,23 +88,6 @@ vec2ui BufferView_GetViewRange(BufferView *view){
                                            view->lineBuffer.lineCount));
 }
 
-void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up){
-    AssertA(view != nullptr, "Invalid bufferview pointer");
-    vec2ui rect = BufferView_GetViewRange(view);
-    uint totalLines = view->lineBuffer.lineCount;
-    uint range = view->visibleRect.y - view->visibleRect.x;
-    
-    if(is_up){
-        rect.x = rect.x > lineCount ? rect.x - lineCount : 0;
-    }else{
-        rect.x = rect.x + lineCount < totalLines ? rect.x + lineCount : totalLines-1;
-    }
-    
-    rect.y = rect.x + range;
-    view->visibleRect = rect;
-    BufferView_FitCursorToRange(view, rect);
-}
-
 void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
     Buffer *buffer = nullptr;
     vec2ui cCoord = view->cursor.textPosition;
@@ -58,10 +96,10 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
     int lineNo = (int)cCoord.x;
     int gap = 2;
     if(!(lineNo < Y - gap && lineNo > X + gap)){
-        if(lineNo <= X + gap && X != 0){
-            lineNo = Min(view->lineBuffer.lineCount, X + gap + 1);
-        }else if(lineNo >= Y - gap){
-            lineNo = Max(Y - gap - 1, 0);
+        if(lineNo < X + gap){
+            lineNo = Min(view->lineBuffer.lineCount-1, X + gap);
+        }else if(lineNo > Y - gap){
+            lineNo = Max(Y - gap, 0);
         }
     }
     
@@ -84,18 +122,19 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
 
 void BufferView_CursorTo(BufferView *view, uint lineNo){
     AssertA(view != nullptr, "Invalid bufferview pointer");
-    int gap = 2;
+    int gap = 0;
     vec2ui visibleRect = view->visibleRect;
-    uint lineRangeSize = visibleRect.y - visibleRect.x;
+    uint lineRangeSize = view->currentMaxRange;
     if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
         // Outside screen
         if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
             int iLine = (int)lineNo;
-            iLine = Max(0, iLine - gap - 1);
+            iLine = Max(0, iLine - gap);
             visibleRect.x = (uint)iLine;
-            visibleRect.y = visibleRect.x + lineRangeSize;
+            visibleRect.y = Min(visibleRect.x + lineRangeSize,
+                                view->lineBuffer.lineCount);
         }else if(lineNo >= visibleRect.y - gap){ // going down
-            visibleRect.y = Min(lineNo + gap + 1, view->lineBuffer.lineCount);
+            visibleRect.y = Min(lineNo + gap, view->lineBuffer.lineCount);
             visibleRect.x = visibleRect.y - lineRangeSize;
         }
     }
@@ -110,7 +149,7 @@ int BufferView_ComputeTextLine(BufferView *view, Float screenY){
     Buffer *buffer = nullptr;
     Float lStart = view->visibleRect.x;
     Float fline = lStart + floor(screenY / view->lineHeight);
-    if((uint)fline < view->lineBuffer.lineCount-1){
+    if((uint)fline < view->lineBuffer.lineCount){
         return (int)fline;
     }
     
@@ -126,6 +165,109 @@ void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col){
     }
 }
 
+void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float duration){
+    AssertA(view != nullptr, "Invalid bufferview pointer");
+    //AssertA(view->transitionAnim.isAnimating == 0, "Only one animation at a time");
+    
+    int expectedEnd = (int)view->visibleRect.x + lineDiffs;
+    if(view->transitionAnim.isAnimating == 0){
+        if(lineDiffs < 0){ // going up
+            expectedEnd = Max(0, expectedEnd);
+        }else{ // going down
+            expectedEnd = Min(view->lineBuffer.lineCount - 1, expectedEnd);
+        }
+        
+        view->transitionAnim.isAnimating = 1;
+        view->transitionAnim.transition = TransitionScroll;
+        view->transitionAnim.passedTime = 0;
+        view->transitionAnim.duration = duration;
+        view->transitionAnim.endLine = expectedEnd;
+        view->transitionAnim.velocity = 0;
+        view->transitionAnim.startLine = view->visibleRect.x;
+        view->transitionAnim.runningPosition = (Float)view->visibleRect.x;
+        view->transitionAnim.is_down = lineDiffs > 0;
+    }else if(view->transitionAnim.transition == TransitionScroll){
+        expectedEnd = view->transitionAnim.endLine + lineDiffs;
+        if(lineDiffs < 0){ // going up
+            expectedEnd = Max(0, expectedEnd);
+        }else{ // going down
+            expectedEnd = Min(view->lineBuffer.lineCount - 1, expectedEnd);
+        }
+        
+        int is_down = expectedEnd > view->transitionAnim.endLine;
+        view->transitionAnim.endLine = expectedEnd;
+        view->transitionAnim.is_down = is_down;
+    }
+}
+
+int BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
+                                       vec2ui *cursorAt, Transform *transform)
+{
+    AnimationProps *anim = &view->transitionAnim;
+    vec2ui oldP = view->cursor.textPosition;
+    vec2ui vRect = view->visibleRect;
+    uint range = view->currentMaxRange;
+    
+    AssertA(anim->transition == TransitionScroll, "Incorrect transition query");
+    
+    anim->passedTime += Max(0, dt);
+    if(Animation_Finished(anim)){
+        goto __set_end_transition;
+    }else{
+#if 0
+        Float lak = InterpolateValueLinear(anim->passedTime, anim->duration,
+                                           (Float)anim->startLine, (Float)anim->endLine);
+#else
+        Float remaining = anim->duration - anim->passedTime;
+        Float lak = InterpolateValueCubic(dt, remaining, &anim->runningPosition,
+                                          (Float)anim->endLine, &anim->velocity);
+#endif
+        view->visibleRect.x = Max(0, Floor(lak));
+        view->visibleRect.y = Min(view->visibleRect.x + range,
+                                  view->lineBuffer.lineCount);
+        
+        rRange->x = view->visibleRect.x;
+        rRange->y = view->visibleRect.y;
+        
+        if(!BufferView_IsCursorVisible(view, *rRange)){
+            BufferView_FitCursorToRange(view, view->visibleRect);
+        }
+        
+        Float dif = Absf(lak - rRange->x);
+        if(anim->is_down){
+            if(view->cursor.textPosition.x < oldP.x){
+                view->cursor.textPosition = oldP;
+            }
+            *transform = Translate(0, dif, 0);
+        }else{
+            if(view->cursor.textPosition.x > oldP.x){
+                view->cursor.textPosition = oldP;
+            }
+            *transform = Translate(0, -dif, 0);
+        }
+        
+        cursorAt->x = view->cursor.textPosition.x;
+        cursorAt->y = view->cursor.textPosition.y;
+        
+        if(view->visibleRect.x == anim->endLine) goto __set_end_transition;
+    }
+    
+    return 0;
+    __set_end_transition:
+    view->visibleRect.x = anim->endLine;
+    view->visibleRect.y = Min(view->visibleRect.x + range,
+                              view->lineBuffer.lineCount);
+    BufferView_FitCursorToRange(view, view->visibleRect);
+    cursorAt->x = view->cursor.textPosition.x;
+    cursorAt->y = view->cursor.textPosition.y;
+    rRange->x = view->visibleRect.x;
+    rRange->y = view->visibleRect.y;
+    
+    anim->isAnimating = 0;
+    *transform = Transform();
+    return 1;
+}
+
 void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration){
     AssertA(view != nullptr, "Invalid bufferview pointer");
     lineNo = Clamp(lineNo, 0, view->lineBuffer.lineCount-1);
@@ -134,49 +276,17 @@ void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float durat
     }else if(view->cursor.textPosition.x != lineNo){ // actual animation
         AssertA(view->transitionAnim.isAnimating == 0, "Only one animation at a time");
         view->transitionAnim.isAnimating = 1;
+        view->transitionAnim.transition = TransitionCursor;
         view->transitionAnim.passedTime = 0;
         view->transitionAnim.duration = duration;
+        view->transitionAnim.startLine = view->cursor.textPosition.x;
         view->transitionAnim.endLine = lineNo;
         view->transitionAnim.velocity = 0;
-        view->transitionAnim.runningPosition = -1;
+        view->transitionAnim.runningPosition = (Float)view->cursor.textPosition.x;
         view->transitionAnim.is_down = view->cursor.textPosition.x < lineNo;
     }else{
         //AssertA(0, "Invalid transition requested");
     }
-}
-
-Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue, 
-                            Float *velocity)
-{
-    Float t  = dt / remaining;
-    Float u  = (1.0f - t);
-    Float c0 = 1.0f * u * u * u;
-    Float c1 = 3.0f * u * u * t;
-    Float c2 = 3.0f * u * t * t;
-    Float c3 = 1.0f * t * t * t;
-    
-    Float dc0 = -3.0f * u * u;
-    Float dc1 = -6.0f * u * t + 3.0f * u * u;
-    Float dc2 =  6.0f * u * t - 3.0f * t * t;
-    Float dc3 =  3.0f * t * t;
-    
-    Float b0 = *initialValue;
-    Float b1 = *initialValue + (remaining / 3.0f) * (*velocity);
-    Float b2 = finalValue;
-    Float b3 = b2;
-    
-    *initialValue = c0 * b0 + c1 * b1 + c2 * b2 + c3 * b3;
-    *velocity = (dc0 * b0 + dc1 * b1 + dc2 * b2 + dc3 * b3) * (1.0f / remaining);
-    
-    return *initialValue;
-}
-
-Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
-                             Float initialValue, Float finalValue)
-{
-    Float intervalFract = currentInterval / durationInterval;
-    return intervalFract * (finalValue - initialValue) + initialValue;
 }
 
 int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
@@ -184,24 +294,19 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
 {
     int gap = 2;
     AnimationProps *anim = &view->transitionAnim;
-    
-    if(anim->runningPosition < 0){
-        anim->runningPosition = (Float)view->cursor.textPosition.x;
-    }
+    AssertA(anim->transition == TransitionCursor, "Incorrect transition query");
     
     anim->passedTime += Max(0, dt);
-    if(IsZero(anim->passedTime - anim->duration) ||
-       anim->passedTime > anim->duration)
-    { // This transition is done
+    if(Animation_Finished(anim)){
+        // This transition is done
         goto __set_end_transition;
     }else{
         Buffer *buffer = nullptr;
         vec2ui rect = view->visibleRect;
-        uint range = rect.y - rect.x;
+        uint range = view->currentMaxRange;
 #if 0
         Float lak = InterpolateValueLinear(anim->passedTime, anim->duration,
-                                           (Float)view->cursor.textPosition.x,
-                                           (Float)anim->endLine);
+                                           (Float)anim->startLine, (Float)anim->endLine);
 #else
         Float remaining = anim->duration - anim->passedTime;
         Float lak = InterpolateValueCubic(dt, remaining, &anim->runningPosition,

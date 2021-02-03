@@ -12,6 +12,8 @@
 #include <thread>
 //NOTE: We do have access to glad should we keep it or imlement it?
 #include <glad/glad.h>
+#include <sstream>
+#include <keyboard.h>
 
 #include <x11_display.h>
 #include <iostream>
@@ -30,7 +32,8 @@
 
 #define MODULE_NAME "Render"
 
-#define TRANSITION_DURATION 0.4
+#define TRANSITION_DURATION_SCROLL 0.2
+#define TRANSITION_DURATION_JUMP   0.1
 
 typedef struct{
     Float fontSizeAtRenderCall;
@@ -83,6 +86,13 @@ static OpenGLState GlobalGLState;
 *               font->fontMath.invReduceScale
 */
 
+static Transform ComputeScreenToGLTransform(OpenGLState *state, Float lineHeight){
+    OpenGLFont *font = &state->font;
+    FontMath *fMath = &font->fontMath;
+    Float scale = lineHeight / fMath->fontSizeAtRenderCall;
+    return Scale(scale, scale, 1);
+}
+
 static Float ScreenToGL(Float x, OpenGLState *state){
     vec3f p(x, 0, 0);
     Transform inv = Inverse(state->scale);
@@ -131,6 +141,7 @@ void chars_mods(GLFWwindow* window, unsigned int codepoint, int mods){
 }
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
+#if 0
     int keySymsPerkeyCode=0;
     Display *display = glfwX11GetDisplayHandle();
     KeySym *keySyms( XGetKeyboardMapping(display, scancode, 1, &keySymsPerkeyCode)),
@@ -149,6 +160,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if(mods & GLFW_MOD_SHIFT){
         printf("shift\n");
     }
+#endif
 }
 
 void WindowOnSizeChange(int width, int height){
@@ -156,17 +168,20 @@ void WindowOnSizeChange(int width, int height){
 }
 
 void WindowOnScroll(int is_up){
-    //BufferView_ScrollViewRange(&bufferView, 4, is_up);
-    if(!BufferView_IsAnimating(&bufferView)){
-        vec2ui cursor = BufferView_GetCursorPosition(&bufferView);
-        if(!is_up){
-            BufferView_StartCursorTransition(&bufferView, cursor.x + 100,
-                                             TRANSITION_DURATION);
-        }else{
-            BufferView_StartCursorTransition(&bufferView, Max(0, cursor.x - 100),
-                                             TRANSITION_DURATION);
-        }
+    int scrollRange = 6;
+    BufferView_StartScrollViewTransition(&bufferView, is_up ? -scrollRange : scrollRange,
+                                         TRANSITION_DURATION_SCROLL);
+    //BufferView_StartCursorTransition(&bufferView, 100, TRANSITION_DURATION_JUMP);
+#if 0
+    vec2ui cursor = BufferView_GetCursorPosition(&bufferView);
+    if(!is_up){
+        BufferView_StartCursorTransition(&bufferView, cursor.x + 100,
+                                         TRANSITION_DURATION);
+    }else{
+        BufferView_StartCursorTransition(&bufferView, Max(0, cursor.x - 100),
+                                         TRANSITION_DURATION);
     }
+#endif
 }
 
 void WindowOnClick(int x, int y){
@@ -183,10 +198,26 @@ void WindowOnClick(int x, int y){
     }
 }
 
+void OnKeyA(){
+    printf("Called KEY_A\n");
+}
+
+void OnKeyShiftW(){
+    printf("Called Shift W\n");
+}
+
 void RegisterInputs(WindowX11 *window){
+    BindingMap *mapping = KeyboardCreateMapping();
+    
     RegisterOnScrollCallback(window, WindowOnScroll);
     RegisterOnMouseClickCallback(window, WindowOnClick);
     RegisterOnSizeChangeCallback(window, WindowOnSizeChange);
+    
+    RegisterKeyboardEvent(mapping, OnKeyA, Key_A);
+    RegisterKeyboardEvent(mapping, OnKeyShiftW, Key_W, Key_RightShift);
+    RegisterKeyboardEvent(mapping, OnKeyShiftW, Key_W, Key_LeftShift);
+    
+    KeyboardSetActiveMapping(mapping);
 }
 
 void OpenGLFontSetup(OpenGLFont *font){
@@ -238,10 +269,13 @@ void OpenGLInitialize(OpenGLState *state){
     SetOpenGLVersionX11(3, 3);
     state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
     
+    KeyboardInitMappings();
+    
     AssertA(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
     AssertA(error == GL_NO_ERROR, "Failed to setup opengl context");
     
+    SwapIntervalX11(state->window, 0);
     RegisterInputs(state->window);
     
 #if 0
@@ -346,6 +380,26 @@ vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
     *prevGlyph = previousGlyph;
     
     return vec4f(x0, y0, x1, y1);
+}
+
+void OpenGLRenderTextAndFlush(const char *text, OpenGLState *state,
+                              Float x, Float y, Float lineHeight)
+{
+    int previousGlyph = -1;
+    OpenGLFont *font = &state->font;
+    Transform transform = ComputeScreenToGLTransform(state, lineHeight);
+    
+    glUseProgram(font->shader.id);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    Shader_UniformMatrix4(font->shader, "projection", &state->projection.m);
+    Shader_UniformMatrix4(font->shader, "modelView", &transform.m);
+    
+    x = fonsStashMultiTextColor(font->fsContext, x, y, glfonsRGBA(0, 180, 255, 255), 
+                                text, NULL, &previousGlyph);
+    
+    fonsStashFlush(font->fsContext);
+    glDisable(GL_BLEND);
 }
 
 void OpenGLRenderLine(LineBuffer *lineBuffer, OpenGLFont *font,
@@ -500,6 +554,12 @@ void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
                                    lines, &state->scale);
 }
 
+/*
+* TODO: It is interesting to attempt to render 1 +2pages and allow
+*       for a translation matrix. It might allow us to better represent
+*       transitions and the viewing interface? Also it allows us to by-pass
+*       the 'translate at end of file' issue we have right now.
+*/
 void OpenGLEntry(){
     Float ones[] = {1,1,1,1};
     OpenGLFont *font = &GlobalGLState.font;
@@ -521,6 +581,7 @@ void OpenGLEntry(){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         
+        //printf("Interval: %g, Fps: %g\n", dt, 1.0f / dt);
         lastTime = currTime;
         
         scaledWidth = width * font->fontMath.invReduceScale;
@@ -545,7 +606,18 @@ void OpenGLEntry(){
             vec2ui cursorAt;
             Transform translate;
             Transform model;
-            BufferView_GetCursorTransition(&bufferView, dt, &range, &cursorAt, &translate);
+            Transition tr = BufferView_GetTransitionType(&bufferView);
+            
+            switch(tr){
+                case TransitionCursor:{
+                    BufferView_GetCursorTransition(&bufferView, dt, &range, &cursorAt, &translate);
+                } break;
+                case TransitionScroll:{
+                    BufferView_GetScrollViewTransition(&bufferView, dt, &range, &cursorAt, &translate);
+                } break;
+                
+                default:{}
+            }
             
             model = GlobalGLState.scale * translate;
             _Graphics_RenderTextBlock(font, &bufferView.lineBuffer,
@@ -556,11 +628,16 @@ void OpenGLEntry(){
                                            cursorAt, range, &model);
         }
         
+        std::stringstream ss;
+        ss << "FPS:" << 1.0 / dt;
+        
+        OpenGLRenderTextAndFlush(ss.str().c_str(), &GlobalGLState, 3000, 10, 30);
+        
         SwapBuffersX11(GlobalGLState.window);
         PoolEventsX11();
         
         //glfwWaitEvents();
-        usleep(10000);
+        //usleep(10000);
     }
     
     DEBUG_MSG("Finalizing OpenGL graphics\n");

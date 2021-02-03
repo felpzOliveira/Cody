@@ -7,6 +7,7 @@
 #include <glx_helper.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <x11_keyboard.h>
 
 LibHelperX11 x11Helper;
 Timer timer;
@@ -323,6 +324,10 @@ void DestroyWindowX11(WindowX11 *window){
     }
 }
 
+void SwapIntervalX11(WindowX11 *window, int interval){
+    SwapIntervalGLX((void *)window, interval);
+}
+
 void SwapBuffersX11(WindowX11 *window){
     SwapBufferGLX((void *)window);
 }
@@ -346,23 +351,34 @@ void ProcessEventReparentX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
 
 void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     int count = 0;
+    int code = event->xkey.keycode;
     KeySym keysym = 0;
     char buf[20];
     Status status = 0;
+    
+    int mappedKey = TranslateKeyX11(code);
     count = Xutf8LookupString(window->ic, (XKeyPressedEvent*)event, buf, 
                               20, &keysym, &status);
     
-    if(status == XBufferOverflow)
+    if(status == XBufferOverflow){
         printf("BufferOverflow\n");
+        AssertA(0, "Weird UTF8 character input");
+    }
     
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS, buf, count);
+    
+#if 0
     if(count)
         printf("buffer: %.*s\n", count, buf);
     
     printf("pressed KEY: %d\n", (int)keysym);
+#endif
 }
 
 void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Key Release\n");
+    int code = event->xkey.keycode;
+    int mappedKey = TranslateKeyX11(code);
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE, NULL, 0);
 }
 
 void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -393,15 +409,15 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
 }
 
 void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Button Release\n");
+    //printf("Button Release\n");
 }
 
 void ProcessEventEnterX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Enter Notify\n");
+    //printf("Enter Notify\n");
 }
 
 void ProcessEventLeaveX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Leave Notify\n");
+    //printf("Leave Notify\n");
 }
 
 void ProcessEventMotionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -438,15 +454,15 @@ void ProcessEventClientMessageX11(XEvent *event, WindowX11 *window, LibHelperX11
 }
 
 void ProcessEventSelectionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Selection Notify\n");
+    //printf("Selection Notify\n");
 }
 
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Focus IN\n");
+    //printf("Focus IN\n");
 }
 
 void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Focus OUT\n");
+    //printf("Focus OUT\n");
 }
 
 void ProcessEventExposeX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -454,11 +470,11 @@ void ProcessEventExposeX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
 }
 
 void ProcessEventPropertyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Property Notify\n");
+    //printf("Property Notify\n");
 }
 
 void ProcessEventDestroyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Destroy Notify\n");
+    //printf("Destroy Notify\n");
 }
 
 void ProcessEventX11(XEvent *event){

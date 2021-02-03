@@ -226,8 +226,6 @@ int ChooseGLXFBConfig(Framebuffer *desired, LibHelperX11 *x11,
         usableCount++;
     }
     
-    printf("Usable Count : %d\n", usableCount);
-    
     closest = ChooseClosest(desired, usableFbs, usableCount);
     AssertA(closest != NULL, "Failed to find a Framebuffer configuration");
     
@@ -235,6 +233,20 @@ int ChooseGLXFBConfig(Framebuffer *desired, LibHelperX11 *x11,
     XFree(nativeConfigs);
     free(usableFbs);
     return 1;
+}
+
+void SwapIntervalGLX(void *vWin, int interval){
+    WindowX11 *window = (WindowX11 *)vWin;
+    if(glxHelper.EXT_swap_control){
+        glXSwapIntervalEXT(x11Helper.display, window->glx.window,
+                           interval);
+    }else if(glxHelper.MESA_swap_control){
+        glXSwapIntervalMESA(interval);
+    }else if(glxHelper.SGI_swap_control){
+        if(interval > 0){
+            glxHelper.SwapIntervalSGI(interval);
+        }
+    }
 }
 
 int CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x11){
@@ -291,9 +303,8 @@ int CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x11
         window->glx.makeCurrent = MakeContextCurrentGLX;
         window->glx.swapBuffers = SwapBufferGLX;
         window->glx.destroy = DestroyContextGLX;
-        window->glx.destroy = NULL; //TODO
         window->glx.getProcAddress = NULL; //TODO
-        window->glx.swapInterval = NULL; //TODO
+        window->glx.swapInterval = SwapIntervalGLX;
     }else{
         AssertA(0, "Unsupported context creation");
     }

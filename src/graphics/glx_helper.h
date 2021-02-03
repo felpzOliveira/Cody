@@ -144,6 +144,7 @@ int  CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x1
 void MakeContextCurrentGLX(void *vWin);
 void SwapBufferGLX(void *vWin);
 void DestroyContextGLX(void *vWin);
+void SwapIntervalGLX(void *vWin, int interval);
 void TerminateGLX();
 
 #endif //GLX_HELPER_H

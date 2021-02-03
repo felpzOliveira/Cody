@@ -35,8 +35,8 @@ void test_tokenizer(const char *filename){
 
 int main(int argc, char **argv){
     //test_tokenizer("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
-    //test_tokenizer("/home/felipe/Documents/Bubbles/src/core/geometry.h");
-    test_tokenizer("/home/felipe/Documents/Bubbles/src/bubbles.cpp");
+    test_tokenizer("/home/felipe/Documents/Bubbles/src/core/geometry.h");
+    //test_tokenizer("/home/felipe/Documents/Bubbles/src/bubbles.cpp");
     //test_tokenizer("/home/felipe/Documents/Mayhem/test/simple.cpp");
     //test_tokenizer("/home/felipe/Documents/Mayhem/test/empty.cpp");
     return 0;

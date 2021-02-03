@@ -19,7 +19,7 @@
 
 #define MAKE_CONTEXT_CURRET(name) void name(void *window)
 #define SWAP_BUFFERS(name) void name(void *window)
-#define SWAP_INTERVAL(name) void name(int interval)
+#define SWAP_INTERVAL(name) void name(void *window, int interval)
 #define EXTENSION_SUPPORTED(name) int name(const char *ex)
 #define GET_PROC_ADDRESS(name) void *name(const char *value)
 #define DESTROY_CONTEXT(name) void name(void *window)
@@ -135,6 +135,7 @@ void SetSamplesX11(int samples);
 void SetOpenGLVersionX11(int major, int minor);
 int  WindowShouldCloseX11(WindowX11 *window);
 void SwapBuffersX11(WindowX11 *window);
+void SwapIntervalX11(WindowX11 *window, int interval);
 void PoolEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
 void DestroyWindowX11(WindowX11 *window);

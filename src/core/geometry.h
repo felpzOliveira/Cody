@@ -722,6 +722,10 @@ template<typename T, typename Q> inline T Lerp(const T &p0, const T &p1, Q t){
     return (1 - t) * p0 + t * p1;
 }
 
+inline Float Ceil(const Float &v){
+    return std::ceil(v);
+}
+
 inline Float Floor(const Float &v){
     return std::floor(v);
 }

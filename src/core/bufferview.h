@@ -7,17 +7,25 @@
 #include <buffers.h>
 #include <transform.h>
 
+typedef enum{
+    TransitionNone,
+    TransitionCursor,
+    TransitionScroll,
+}Transition;
+
 typedef struct{
     vec2ui textPosition;
     vec2ui ghostPosition;
 }DoubleCursor;
 
 typedef struct{
+    Transition transition;
     int isAnimating;
     Float passedTime;
     Float duration;
     Float velocity;
     Float runningPosition;
+    uint startLine;
     uint endLine; // this is in screen space, i.e.: 1 <= endLine <= N
     int is_down;
 }AnimationProps;
@@ -38,6 +46,7 @@ typedef struct{
     Tokenizer tokenizer;
     DoubleCursor cursor;
     vec2ui visibleRect;
+    uint currentMaxRange;
     Float height;
     Float lineHeight;
     AnimationProps transitionAnim;
@@ -49,10 +58,22 @@ typedef struct{
 //      Currently we only move the line, this works in a vim-style where no half
 //      line is shown, however being able to animate might give us powerfull tools.
 
+Float InterpolateValueCubic(Float dt, Float remaining,
+                            Float *initialValue, Float finalValue, 
+                            Float *velocity);
+
+Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
+                             Float initialValue, Float finalValue);
+
+
 int  BufferView_IsAnimating(BufferView *view);
+Transition BufferView_GetTransitionType(BufferView *view);
 void BufferView_InitalizeFromText(BufferView *view, char *content, uint size);
 void BufferView_SetView(BufferView *view, Float lineHeight, Float height);
 void BufferView_CursorTo(BufferView *view, uint lineNo);
+
+
+
 void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up);
 void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
 
@@ -61,6 +82,10 @@ void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
 
 vec2ui BufferView_GetViewRange(BufferView *view);
 vec2ui BufferView_GetCursorPosition(BufferView *view);
+
+void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float duration);
+int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
+                                        vec2ui *cursorAt, Transform *transform);
 
 void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
 int  BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
