@@ -24,6 +24,7 @@ typedef struct{
 
 
 void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix);
+void Shader_UniformInteger(Shader &shader, const char *name, int value);
 int Shader_Create(Shader &shader, uint vertex, uint fragment);
 
 int Shader_CompileFile(const char *path, int type, char *content=nullptr);

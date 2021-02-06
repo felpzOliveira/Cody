@@ -1,3 +1,5 @@
+#version 120
+uniform int isCursor = 0;
 
 mat4 brightnessMatrix(float brightness){
     return mat4(1, 0, 0, 0,
@@ -30,18 +32,20 @@ mat4 saturationMatrix(float saturation){
                 0, 0, 0, 1 );
 }
 
-
-const float brightness = 0.15;
-const float contrast = 0.8;
-const float saturation = 1.5;
-
 varying vec4 interpolatedColor;
 
-void main() {
+void main(){
+    float brightness = 0.35;
+    float contrast = 0.8;
+    float saturation = 3.0;
+    
     vec4 col = interpolatedColor;
+    if(isCursor != 0){
+        contrast = 2.1;
+    }
+    
     gl_FragColor = brightnessMatrix( brightness ) *
         contrastMatrix( contrast ) * 
         saturationMatrix( saturation ) * 
         col;
-    
 }

@@ -415,7 +415,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     return rv;
 }
 
-
 /* (char **p, uint n, Token *token, Tokenizer *tokenizer) */
 LEX_TOKENIZER(Lex_TokenizeNext){
     uint offset = 0;
@@ -430,13 +429,23 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     
     tokenizer->lineBeginning = 0;
     tokenizer->unfinishedContext = -1;
+    
+    // Compute the amount of lines being grouped by unfinished work
+    if(lineBeginning){
+        if(unfinished >= 0) tokenizer->linesAggregated ++;
+        else tokenizer->linesAggregated = 0;
+    }
+    
+    if(n == 0){
+        tokenizer->unfinishedContext = unfinished;
+        return -1;
+    }
+    
     // 1- Skip spaces
     while(**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r'){
         (*p)++;
         offset ++;
     }
-    
-    if(offset >= n) return offset;
     
     // 2- Check which contexts want to process this line
     if(lineBeginning){
@@ -448,6 +457,24 @@ LEX_TOKENIZER(Lex_TokenizeNext){
             }
         }
     }
+    
+    if(offset > 0 /*&& lineBeginning*/){
+        tokenizer->unfinishedContext = unfinished;
+        token->position = tokenizer->linePosition;
+        token->size = offset;
+        token->identifier = TOKEN_ID_SPACE;
+        tokenizer->linePosition += offset;
+        return offset;
+    }
+    
+#if 0
+    /* This line is ending in a space, lets not generate this token */
+    if(offset >= n){
+        AssertA(0, "Makes no sense");
+        tokenizer->unfinishedContext = unfinished;
+        return -1;
+    }
+#endif
     
     // 3- If some context did not finish its job, let it continue
     if(unfinished >= 0){
@@ -642,8 +669,6 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     }
     
     lookupTable->nSize = elements;
-    
-    DEBUG_MSG("Built lookup table %d rows\n", elements);
 }
 
 void Lex_BuildTokenizer(Tokenizer *tokenizer){
@@ -653,6 +678,10 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer){
     AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
     tokenizer->contexts = AllocatorGetN(TokenizerContext, 2);
     tokenizer->contextCount = 2;
+    tokenizer->unfinishedContext = 0;
+    tokenizer->linesAggregated = 0;
+    tokenizer->linePosition = 0;
+    tokenizer->lineBeginning = 0;
     
     tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
                                               tokenizer->contextCount);
@@ -682,6 +711,34 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer){
     tokenizer->contexts[1].exec = Lex_TokenizeExecCode;
     
     tokenizer->unfinishedContext = -1;
+}
+
+void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *context){
+    AssertA(tokenizer != nullptr && context != nullptr,
+            "Invalid inputs for Lex_TokenizerGetCurrentState");
+    context->state = (tokenizer->unfinishedContext < 0) ? TOKENIZER_STATE_CLEAN : TOKENIZER_STATE_MULTILINE;
+    context->activeWorkProcessor = tokenizer->unfinishedContext;
+    context->backTrack = 0;
+    if(tokenizer->unfinishedContext >= 0){
+        context->backTrack = tokenizer->linesAggregated+1;
+    }
+}
+
+void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext *context){
+    AssertA(tokenizer != nullptr && context != nullptr,
+            "Invalid inputs for Lex_TokenizerGetCurrentState");
+    tokenizer->unfinishedContext = context->activeWorkProcessor;
+    tokenizer->linesAggregated = context->backTrack > 0 ? context->backTrack-1 : 0;
+}
+
+void Lex_TokenizerReset(Tokenizer *tokenizer){
+    tokenizer->unfinishedContext = -1;
+    tokenizer->linesAggregated = 0;
+    Lex_TokenizerPrepareForNewLine(tokenizer);
+}
+
+int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer){
+    return tokenizer->unfinishedContext >= 0 ? 1 : 0;
 }
 
 void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer){

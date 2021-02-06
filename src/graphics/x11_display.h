@@ -78,10 +78,12 @@ typedef struct{
 #define ON_SCROLL_CALLBACK(name) void name(int is_up)
 #define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y)
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h)
+#define ON_FOCUS_CHANGE_CALLBACK(name) void name()
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
 typedef ON_MOUSE_CLICK_CALLBACK(onMouseClickCallback);
 typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
+typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
 
 typedef struct{
     Colormap colormap;
@@ -92,11 +94,13 @@ typedef struct{
     int xpos, ypos;
     int lastCursorPosX, lastCursorPosY;
     int shouldClose;
+    Time lastKeyTime;
     GLXContextInfo glx;
     
     onScrollCallback *onScrollCall;
     onMouseClickCallback *onMouseClickCall;
     onSizeChangeCallback *onSizeChangeCall;
+    onFocusChangeCallback *onFocusChangeCall;
 }WindowX11;
 
 typedef struct{
@@ -146,5 +150,6 @@ double GetElapsedTime();
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
 void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);
 void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback);
+void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback);
 
 #endif //X11_DISPLAY_H

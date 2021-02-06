@@ -10,6 +10,7 @@
 #include <bufferview.h>
 #include <chrono>
 #include <thread>
+#include <app.h>
 //NOTE: We do have access to glad should we keep it or imlement it?
 #include <glad/glad.h>
 #include <sstream>
@@ -24,11 +25,9 @@
 #define FONTSTASH_IMPLEMENTATION
 #include <fontstash.h>
 
-//TODO: Refactor these, possibly remove, dev render code only
 #define GLFONTSTASH_IMPLEMENTATION
-#include <gl3corefontstash.h> //TODO: Make better backend this one is kinda silly
-#include <GLFW/glfw3.h> // TODO: This one is going to be annoying to replace
-#include <unistd.h> // TODO: I want to use this on Windows so we need to erase this
+#include <gl3corefontstash.h>
+#include <unistd.h>
 
 #define MODULE_NAME "Render"
 
@@ -74,7 +73,6 @@ typedef struct{
     Transform scale;
 }OpenGLState;
 
-BufferView bufferView;
 static OpenGLState GlobalGLState;
 
 /*
@@ -112,7 +110,17 @@ static void _OpenGLStateInitialize(OpenGLState *state){
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
 }
 
+void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
+    Float width = (Float)(upper.x - lower.x);
+    Float height = (Float)(upper.y - lower.y);
+    Float range = width * 2.0f;
+    Float zNear = -range;
+    Float zFar = range;
+    *transform = Orthographic(0, width, height, 0, zNear, zFar);
+}
+
 static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
+    BufferView *bufferView = AppGetActiveBufferView();
     Float range = width * 2.0f;
     Float zNear = -range;
     Float zFar = range;
@@ -123,44 +131,11 @@ static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
     state->projection = Orthographic(0.0f, width, height, 0.0f, zNear, zFar);
     state->scale = Scale(font->fontMath.reduceScale, 
                          font->fontMath.reduceScale, 1);
-    BufferView_SetView(&bufferView, font->fontMath.fontSizeAtDisplay,
-                       state->height);
-}
-
-void character_callback(GLFWwindow* window, unsigned int codepoint){
-    char v[6] = {0, 0, 0, 0, 0, 0};
-    int n = CodepointToString((int)codepoint, v);
-    AssertA(n > 0, "Invalid codepoint given");
-    printf("Received: %s\n", v);
-}
-
-void chars_mods(GLFWwindow* window, unsigned int codepoint, int mods){
-    char v[6] = {0, 0, 0, 0, 0, 0};
-    int n = CodepointToString((int)codepoint, v);
-    //printf("Got: %s\n", v);
-}
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods){
-#if 0
-    int keySymsPerkeyCode=0;
-    Display *display = glfwX11GetDisplayHandle();
-    KeySym *keySyms( XGetKeyboardMapping(display, scancode, 1, &keySymsPerkeyCode)),
-    *keySym = keySyms;
-#if 1
-    while (keySymsPerkeyCode--  &&  *keySym != NoSymbol) {
-        std::cout << *keySym << std::endl;
-        ++keySym;
-    }
-#endif
     
-    if(mods & GLFW_MOD_CONTROL){
-        printf("ctrl\n");
-    }
-    
-    if(mods & GLFW_MOD_SHIFT){
-        printf("shift\n");
-    }
-#endif
+    Geometry geometry;
+    geometry.lower = vec2ui(0, 0);
+    geometry.upper = vec2ui(width, height);
+    AppSetViewingGeometry(geometry, font->fontMath.fontSizeAtDisplay);
 }
 
 void WindowOnSizeChange(int width, int height){
@@ -169,55 +144,54 @@ void WindowOnSizeChange(int width, int height){
 
 void WindowOnScroll(int is_up){
     int scrollRange = 6;
-    BufferView_StartScrollViewTransition(&bufferView, is_up ? -scrollRange : scrollRange,
+    BufferView *bufferView = AppGetActiveBufferView();
+    BufferView_StartScrollViewTransition(bufferView, is_up ? -scrollRange : scrollRange,
                                          TRANSITION_DURATION_SCROLL);
-    //BufferView_StartCursorTransition(&bufferView, 100, TRANSITION_DURATION_JUMP);
+    //BufferView_StartCursorTransition(bufferView, 100, TRANSITION_DURATION_JUMP);
 #if 0
-    vec2ui cursor = BufferView_GetCursorPosition(&bufferView);
+    vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     if(!is_up){
-        BufferView_StartCursorTransition(&bufferView, cursor.x + 100,
+        BufferView_StartCursorTransition(bufferView, cursor.x + 100,
                                          TRANSITION_DURATION);
     }else{
-        BufferView_StartCursorTransition(&bufferView, Max(0, cursor.x - 100),
+        BufferView_StartCursorTransition(bufferView, Max(0, cursor.x - 100),
                                          TRANSITION_DURATION);
     }
 #endif
 }
 
+//TODO: Need to check bufferview geometry for out of bounds click
 void WindowOnClick(int x, int y){
-    int lineNo = BufferView_ComputeTextLine(&bufferView, y);
+    BufferView *bufferView = AppGetActiveBufferView();
+    int lineNo = BufferView_ComputeTextLine(bufferView, y);
     if(lineNo < 0) return;
     
+    lineNo = Clamp(lineNo, 0, BufferView_GetLineCount(bufferView)-1);
+    
     uint colNo = 0;
-    Buffer *buffer = LineBuffer_GetBufferAt(&bufferView.lineBuffer, (uint)lineNo);
+    Buffer *buffer = LineBuffer_GetBufferAt(bufferView->lineBuffer, (uint)lineNo);
     x = ScreenToGL(x, &GlobalGLState) - GlobalGLState.font.lineOffset;
     if(x > 0){
         colNo = fonsComputeStringOffsetCount(GlobalGLState.font.fsContext,
                                              buffer->data, x);
-        BufferView_CursorToPosition(&bufferView, (uint)lineNo, colNo);
+        BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
     }
 }
 
-void OnKeyA(){
-    printf("Called KEY_A\n");
+void WinOnFocusChange(){
+    KeyboardResetState();
 }
 
-void OnKeyShiftW(){
-    printf("Called Shift W\n");
+int Font_SupportsCodepoint(int codepoint){
+    int g = fonsGetGlyphIndex(GlobalGLState.font.fsContext, codepoint);
+    return g != 0;
 }
 
 void RegisterInputs(WindowX11 *window){
-    BindingMap *mapping = KeyboardCreateMapping();
-    
     RegisterOnScrollCallback(window, WindowOnScroll);
     RegisterOnMouseClickCallback(window, WindowOnClick);
     RegisterOnSizeChangeCallback(window, WindowOnSizeChange);
-    
-    RegisterKeyboardEvent(mapping, OnKeyA, Key_A);
-    RegisterKeyboardEvent(mapping, OnKeyShiftW, Key_W, Key_RightShift);
-    RegisterKeyboardEvent(mapping, OnKeyShiftW, Key_W, Key_LeftShift);
-    
-    KeyboardSetActiveMapping(mapping);
+    RegisterOnFocusChangeCallback(window, WinOnFocusChange);
 }
 
 void OpenGLFontSetup(OpenGLFont *font){
@@ -269,21 +243,14 @@ void OpenGLInitialize(OpenGLState *state){
     SetOpenGLVersionX11(3, 3);
     state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
     
-    KeyboardInitMappings();
-    
     AssertA(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
     AssertA(error == GL_NO_ERROR, "Failed to setup opengl context");
     
+    AppInitialize();
+    
     SwapIntervalX11(state->window, 0);
     RegisterInputs(state->window);
-    
-#if 0
-    glfwSetWindowSizeCallback(state->window, window_size_callback);
-    glfwSetCharCallback(state->window, character_callback);
-    glfwSetKeyCallback(state->window, key_callback);
-    glfwSetCharModsCallback(state->window, chars_mods);
-#endif
     
     int n = 1024;
     quad->vertex = AllocatorGetN(Float, n);
@@ -357,13 +324,22 @@ vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
     char *ptr = buffer->data;
     Quad *quad = &state->quadBuffer;
     Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    uint rawp = 0;
+    int utf8Len = 1;
+    int pUtf8Len = 1;
     
     if(cursor.y > 0){
-        x0 = fonsComputeStringAdvance(state->font.fsContext, ptr, cursor.y, &previousGlyph);
+        rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y-1, &utf8Len);
+        //printf("Rawp: %u, len: %d Y: %u\n", rawp, utf8Len, cursor.y);
+        x0 = fonsComputeStringAdvance(state->font.fsContext, ptr,
+                                      rawp+utf8Len, &previousGlyph);
     }
     
-    x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[cursor.y],
-                                       1, &previousGlyph);
+    //if(buffer->count > 1 && cursor.y > 1) DebugBreak();
+    rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &pUtf8Len);
+    //printf("Rawp: %u, len: %d Y: %u, %s\n", rawp, pUtf8Len, cursor.y, &ptr[rawp]);
+    x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[rawp],
+                                       pUtf8Len, &previousGlyph);
     
     y0 = (cursor.x - visibleLines.x) * state->font.fontMath.fontSizeAtRenderCall;
     y1 = y0 + state->font.fontMath.fontSizeAtRenderCall;
@@ -376,7 +352,6 @@ vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
     }
     
     Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), vec4f(0,1,0,1));
-    
     *prevGlyph = previousGlyph;
     
     return vec4f(x0, y0, x1, y1);
@@ -413,16 +388,19 @@ void OpenGLRenderLine(LineBuffer *lineBuffer, OpenGLFont *font,
     memset(linen, ' ', spacing-ncount);
     snprintf(&linen[spacing-ncount], 32, "%u ", lineNr+1);
     
+    
+    Float ox = 0;
     x = fonsStashMultiTextColor(font->fsContext, x, y, glfonsRGBA(0, 180, 255, 255), 
                                 linen, NULL, &previousGlyph);
+    
     font->lineOffset = x;
     //TODO: This is where we would wrap?
-    if(buffer->count > 0){
+    if(buffer->taken > 0){
         uint pos = 0;
         uint at = 0;
         for(int i = 0; i < buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
-            while(pos != token->position){
+            while(pos < token->position){
                 char v = buffer->data[pos];
                 if(v == '\r' || v == '\n'){
                     pos++;
@@ -448,10 +426,15 @@ void OpenGLRenderLine(LineBuffer *lineBuffer, OpenGLFont *font,
                 }
                 
                 printf("Position %u  ==> Token %u, char \'%c\'\n", pos, token->position, v); 
+                printf("Data : %s, taken: %u\n", buffer->data, buffer->taken);
+                BreakIf(0, "Invalid character");
                 AssertA(0, "Invalid character");
             }
             
-            if(token->position < buffer->count){
+            if(token->identifier == TOKEN_ID_SPACE){
+                //TODO: Find out spacing required for this token
+                
+            }else if(token->position < buffer->taken){
                 char *p = &buffer->data[token->position];
                 char *e = &buffer->data[token->position + token->size];
                 vec3i col = GetColor(&defaultTheme, token->identifier);
@@ -464,17 +447,17 @@ void OpenGLRenderLine(LineBuffer *lineBuffer, OpenGLFont *font,
     }
 }
 
+//TODO: Rendering must respect bufferview geometry
 void _Graphics_RenderTextBlock(OpenGLFont *font, LineBuffer *lineBuffer, 
-                               Transform *projection, Transform *model, vec2ui lines,
-                               vec2ui left, vec2ui right)
+                               Transform *projection, Transform *model, vec2ui lines)
 {
     Float x = 0.0f;
     Float y = 0.0f;
+    
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
     
-    glViewport(left.x, left.y, right.x, right.y);
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
     
@@ -483,7 +466,7 @@ void _Graphics_RenderTextBlock(OpenGLFont *font, LineBuffer *lineBuffer,
     Shader_UniformMatrix4(font->shader, "modelView", &model->m);
     
     for(int i = lines.x; i < lines.y; i++){
-        OpenGLRenderLine(&bufferView.lineBuffer, font, x, y, i);
+        OpenGLRenderLine(lineBuffer, font, x, y, i);
         x = 0.0f;
         y += font->fontMath.fontSizeAtRenderCall;
     }
@@ -494,24 +477,30 @@ void _Graphics_RenderTextBlock(OpenGLFont *font, LineBuffer *lineBuffer,
 
 void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
                                     Float lineSpan, vec2ui cursor, vec2ui lines,
-                                    Transform *model)
+                                    Transform *model, Transform *projection)
 {
     int pGlyph = -1;
     OpenGLFont *font = &state->font;
-    Buffer *buffer = LineBuffer_GetBufferAt(&bufferView->lineBuffer, cursor.x);
+    Buffer *buffer = LineBuffer_GetBufferAt(bufferView->lineBuffer, cursor.x);
     
     glUseProgram(font->cursorShader.id);
-    Shader_UniformMatrix4(font->cursorShader, "projection", &state->projection.m);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
     Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+    Shader_UniformInteger(font->cursorShader, "isCursor", 1);
     
+    glDisable(GL_BLEND);
     vec4f p = OpenGLRenderCursor(state, buffer, cursor, font->lineOffset, lines, &pGlyph);
     
+    Graphics_QuadFlush(state);
+    
+    glEnable(GL_BLEND);
+    Shader_UniformInteger(font->cursorShader, "isCursor", 0);
     //Float g = 0.8705882; //TODO: add this to theme
     Float g = 0.4705882;
     Graphics_QuadPush(state, vec2ui(font->lineOffset, p.y), 
                       vec2ui(font->lineOffset+lineSpan, p.w), 
-                      //vec4f(g, g, 2 * g, 0.1)
-                      vec4f(g, g, 1.5 * g, 0.3)
+                      vec4f(g, g, 2 * g, 0.18)
+                      //vec4f(g, g, g, 0.2)
                       );
     Graphics_QuadFlush(state);
     
@@ -521,37 +510,115 @@ void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
         glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
         
         glUseProgram(font->shader.id);
-        Shader_UniformMatrix4(font->shader, "projection", &state->projection.m);
+        Shader_UniformMatrix4(font->shader, "projection", &projection->m);
         Shader_UniformMatrix4(font->shader, "modelView", &model->m);
         
-        char *chr = &buffer->data[cursor.y];
+        int len = 0;
+        uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &len);
+        //printf("Cursor at: %u, %u\n", rawp, cursor.y);
+        
+        char *chr = &buffer->data[rawp];
         float f = fonsStashMultiTextColor(font->fsContext, p.x, p.y, 
                                           glfonsRGBA(0, 0, 0, 255),
-                                          chr, chr+1, &pGlyph);
+                                          chr, chr+len, &pGlyph);
         
         fonsStashFlush(font->fsContext);
     }
 }
 
-void Graphics_RenderTextBlock(OpenGLState *state, LineBuffer *lineBuffer,
-                              vec2ui left, vec2ui right)
+void Graphics_RenderTextBlock(OpenGLState *state, BufferView *bufferView,
+                              Transform *projection)
 {
-    OpenGLFont *font = &state->font;
     vec2ui lines;
-    lines = BufferView_GetViewRange(&bufferView);
+    OpenGLFont *font = &state->font;
+    LineBuffer *lineBuffer = bufferView->lineBuffer;
+    
+    lines = BufferView_GetViewRange(bufferView);
+    
     //Transform translate = state->scale * Translate(0, 18, 0);
-    _Graphics_RenderTextBlock(font, lineBuffer, &state->projection,
-                              &state->scale, lines, left, right);
+    _Graphics_RenderTextBlock(font, lineBuffer, projection,
+                              &state->scale, lines);
 }
 
 void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
-                                   Float lineSpan)
+                                   Float lineSpan, Transform *projection)
 {
     //Transform translate = state->scale * Translate(0, 18, 0);
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     vec2ui lines = BufferView_GetViewRange(bufferView);
     _Graphics_RenderCursorElements(state, bufferView, lineSpan, cursor, 
-                                   lines, &state->scale);
+                                   lines, &state->scale, projection);
+}
+
+void Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
+    Float ones[] = {1,1,1,1};
+    OpenGLFont *font = &GlobalGLState.font;
+    Geometry *geometry = &view->geometry;
+    /*
+* Offset works in reverse to the lower/upper geometry
+* i.e.: it goes from the top of the screen to the bottom
+*/
+    vec2ui bufferRes = geometry->upper - geometry->lower;
+    Float width = geometry->upper.x - geometry->lower.x;
+    Float scaledWidth = width * font->fontMath.invReduceScale;
+    Transform projection;
+    
+    vec3i backgroundColor = theme->backgroundColor;
+    //vec3i backgroundColor = vec3i(50);
+    Float fcol[] = {(Float)backgroundColor.x / 255.0f,
+        (Float)backgroundColor.y / 255.0f,
+        (Float)backgroundColor.z / 255.0f, 0
+    };
+    
+    OpenGLComputeProjection(geometry->lower, geometry->upper, &projection);
+#if 0
+    
+    
+#endif
+    
+    glViewport(geometry->lower.x, geometry->lower.y,
+               geometry->upper.x - geometry->lower.x, 
+               geometry->upper.y - geometry->lower.y);
+    
+    glScissor(geometry->lower.x, geometry->lower.y,
+              geometry->upper.x - geometry->lower.x, 
+              geometry->upper.y - geometry->lower.y);
+    
+    glEnable(GL_SCISSOR_TEST);
+    
+    glClearBufferfv(GL_COLOR, 0, fcol);
+    glClearBufferfv(GL_DEPTH, 0, ones);
+    
+    if(!BufferView_IsAnimating(view)){
+        Graphics_RenderTextBlock(&GlobalGLState, view, &projection);
+        Graphics_RenderCursorElements(&GlobalGLState, view, scaledWidth, &projection);
+    }else{
+        vec2ui range;
+        vec2ui cursorAt;
+        Transform translate;
+        Transform model;
+        Transition tr = BufferView_GetTransitionType(view);
+        
+        switch(tr){
+            case TransitionCursor:{
+                BufferView_GetCursorTransition(view, dt, &range, &cursorAt, &translate);
+            } break;
+            case TransitionScroll:{
+                BufferView_GetScrollViewTransition(view, dt, &range, &cursorAt, &translate);
+            } break;
+            
+            default:{}
+        }
+        
+        model = GlobalGLState.scale * translate;
+        _Graphics_RenderTextBlock(font, view->lineBuffer,
+                                  &projection, &model, range);
+        
+        _Graphics_RenderCursorElements(&GlobalGLState, view, scaledWidth,
+                                       cursorAt, range, &model, &projection);
+    }
+    
+    glDisable(GL_SCISSOR_TEST);
 }
 
 /*
@@ -562,6 +629,7 @@ void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
 */
 void OpenGLEntry(){
     Float ones[] = {1,1,1,1};
+    BufferView *bufferView = AppGetActiveBufferView();
     OpenGLFont *font = &GlobalGLState.font;
     
     _OpenGLStateInitialize(&GlobalGLState);
@@ -571,20 +639,14 @@ void OpenGLEntry(){
     _OpenGLUpdateProjections(&GlobalGLState, GlobalGLState.width, 
                              GlobalGLState.height);
     
-    BufferView_CursorTo(&bufferView, 0);
+    BufferView_CursorTo(bufferView, 0);
     double lastTime = GetElapsedTime();
     while(!WindowShouldCloseX11(GlobalGLState.window)){
-        vec2ui offset = vec2ui(0, 0);
-        Float scaledWidth = 0;
-        Float width = GlobalGLState.width;
-        Float height = GlobalGLState.height;
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         
-        //printf("Interval: %g, Fps: %g\n", dt, 1.0f / dt);
-        lastTime = currTime;
-        
-        scaledWidth = width * font->fontMath.invReduceScale;
+        Float width = GlobalGLState.width;
+        Float height = GlobalGLState.height;
         
         vec3i backgroundColor = defaultTheme.backgroundColor;
         Float fcol[] = {(Float)backgroundColor.x / 255.0f,
@@ -596,35 +658,48 @@ void OpenGLEntry(){
         glClearBufferfv(GL_COLOR, 0, fcol);
         glClearBufferfv(GL_DEPTH, 0, ones);
         
-        if(!BufferView_IsAnimating(&bufferView)){
-            Graphics_RenderTextBlock(&GlobalGLState, &bufferView.lineBuffer, offset,
-                                     vec2ui(width, height));
+        int c = AppGetBufferViewCount();
+        for(int i = 0; i < c; i++){
+            BufferView *view = AppGetBufferView(i);
+            Graphics_RenderBufferView(view, &defaultTheme, dt);
+        }
+#if 0
+        vec2ui offset = vec2ui(0, 0);
+        Float scaledWidth = 0;
+        
+        //printf("Interval: %g, Fps: %g\n", dt, 1.0f / dt);
+        lastTime = currTime;
+        
+        scaledWidth = width * font->fontMath.invReduceScale;
+        
+        if(!BufferView_IsAnimating(bufferView)){
+            Graphics_RenderTextBlock(&GlobalGLState, bufferView,
+                                     &GlobalGLState.projection);
             
-            Graphics_RenderCursorElements(&GlobalGLState, &bufferView, scaledWidth);
+            Graphics_RenderCursorElements(&GlobalGLState, bufferView, scaledWidth);
         }else{
             vec2ui range;
             vec2ui cursorAt;
             Transform translate;
             Transform model;
-            Transition tr = BufferView_GetTransitionType(&bufferView);
+            Transition tr = BufferView_GetTransitionType(bufferView);
             
             switch(tr){
                 case TransitionCursor:{
-                    BufferView_GetCursorTransition(&bufferView, dt, &range, &cursorAt, &translate);
+                    BufferView_GetCursorTransition(bufferView, dt, &range, &cursorAt, &translate);
                 } break;
                 case TransitionScroll:{
-                    BufferView_GetScrollViewTransition(&bufferView, dt, &range, &cursorAt, &translate);
+                    BufferView_GetScrollViewTransition(bufferView, dt, &range, &cursorAt, &translate);
                 } break;
                 
                 default:{}
             }
             
             model = GlobalGLState.scale * translate;
-            _Graphics_RenderTextBlock(font, &bufferView.lineBuffer,
-                                      &GlobalGLState.projection, &model, range,
-                                      offset, vec2ui(width, height));
+            _Graphics_RenderTextBlock(font, bufferView->lineBuffer,
+                                      &GlobalGLState.projection, &model, range);
             
-            _Graphics_RenderCursorElements(&GlobalGLState, &bufferView, scaledWidth,
+            _Graphics_RenderCursorElements(&GlobalGLState, bufferView, scaledWidth,
                                            cursorAt, range, &model);
         }
         
@@ -632,12 +707,12 @@ void OpenGLEntry(){
         ss << "FPS:" << 1.0 / dt;
         
         OpenGLRenderTextAndFlush(ss.str().c_str(), &GlobalGLState, 3000, 10, 30);
-        
+#endif
         SwapBuffersX11(GlobalGLState.window);
         PoolEventsX11();
         
         //glfwWaitEvents();
-        //usleep(10000);
+        usleep(10000);
     }
     
     DEBUG_MSG("Finalizing OpenGL graphics\n");

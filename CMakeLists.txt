@@ -16,7 +16,5 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/core"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/external"
-					"${CMAKE_CURRENT_SOURCE_DIR}/src/external/fontstash/src"
-					"${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include"
-					"/home/felipe/Documents/libs/glfw-3.3.2/include")
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include")
 add_subdirectory(src)

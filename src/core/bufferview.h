@@ -19,6 +19,13 @@ typedef struct{
 }DoubleCursor;
 
 typedef struct{
+    vec2ui lower;
+    vec2ui upper;
+    vec2f extensionX;
+    vec2f extensionY;
+}Geometry;
+
+typedef struct{
     Transition transition;
     int isAnimating;
     Float passedTime;
@@ -42,21 +49,16 @@ typedef struct{
 *       change its LineBuffer when files are swapped.
 */
 typedef struct{
-    LineBuffer lineBuffer;
-    Tokenizer tokenizer;
+    LineBuffer *lineBuffer;
+    Tokenizer *tokenizer;
     DoubleCursor cursor;
     vec2ui visibleRect;
     uint currentMaxRange;
     Float height;
     Float lineHeight;
     AnimationProps transitionAnim;
+    Geometry geometry;
 }BufferView;
-
-//TODO: Implement interpolation, we could either go matrix interpolation
-//      using quaternions or, simpler, detect changes and perform a interpolation
-//      only on the y-axis. This could be the basis for a scroll scheme.
-//      Currently we only move the line, this works in a vim-style where no half
-//      line is shown, however being able to animate might give us powerfull tools.
 
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
@@ -66,19 +68,26 @@ Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
                              Float initialValue, Float finalValue);
 
 
+void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer);
+
+void BufferView_SetGeometry(BufferView *view, Geometry geometry,
+                            Float lineHeight);
+
 int  BufferView_IsAnimating(BufferView *view);
 Transition BufferView_GetTransitionType(BufferView *view);
-void BufferView_InitalizeFromText(BufferView *view, char *content, uint size);
-void BufferView_SetView(BufferView *view, Float lineHeight, Float height);
 void BufferView_CursorTo(BufferView *view, uint lineNo);
 
-
+int BufferView_LocateNextCursorToken(BufferView *view, Token **token);
+int BufferView_LocatePreviousCursorToken(BufferView *view, Buffer *buffer, Token **token);
 
 void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up);
 void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
 
 int BufferView_ComputeTextLine(BufferView *view, Float screenY);
 void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
+
+Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo);
+LineBuffer *BufferView_GetLineBuffer(BufferView *view);
 
 vec2ui BufferView_GetViewRange(BufferView *view);
 vec2ui BufferView_GetCursorPosition(BufferView *view);
@@ -90,4 +99,6 @@ int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRan
 void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
 int  BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
                                     vec2ui *cursorAt, Transform *transform);
+
+uint BufferView_GetLineCount(BufferView *view);
 #endif //BUFFERVIEW_H

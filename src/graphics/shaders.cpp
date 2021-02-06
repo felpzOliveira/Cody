@@ -190,13 +190,25 @@ int Shader_Create(Shader &shader, uint vertex, uint fragment){
     return rv;
 }
 
+static std::map<std::string, int> loggedMap;
+void Shader_UniformInteger(Shader &shader, const char *name, int value){
+    int id = glGetUniformLocation(shader.id, name);
+    if(id >= 0){
+        glUniform1i(id, value);
+    }else{
+        if(loggedMap.find(name) == loggedMap.end()){
+            DEBUG_MSG("Failed to load uniform %s\n", name);
+            loggedMap[name] = 1;
+        }
+    }
+}
+
 void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix){
     Float *rawMatrix = (Float *)matrix->m;
     int id = glGetUniformLocation(shader.id, name);
     if(id >= 0){
         glUniformMatrix4fv(id, 1, GL_FALSE, rawMatrix);
     }else{
-        static std::map<std::string, int> loggedMap;
         if(loggedMap.find(name) == loggedMap.end()){
             DEBUG_MSG("Failed to load uniform %s\n", name);
             loggedMap[name] = 1;

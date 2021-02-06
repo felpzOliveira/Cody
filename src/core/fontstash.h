@@ -156,6 +156,9 @@ extern "C" {
     // Draw text
     FONS_DEF float fonsDrawText(FONScontext* s, float x, float y, const char* string, const char* end);
     
+    // Check if codepoint is available at the current font
+    FONS_DEF int fonsGetGlyphIndex(FONScontext* stash, int codepoint);
+    
     // Stack a piece of text in a color into the stash buffer. Renders only when needed.
     FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
                                            float x, float y, unsigned int color,
@@ -1505,6 +1508,13 @@ FONS_DEF float fonsComputeStringAdvance(FONScontext* stash, const char *e, int n
     
     return x;
 }
+
+FONS_DEF int fonsGetGlyphIndex(FONScontext* stash, int codepoint){
+    FONSstate* state = fons__getState(stash);
+    FONSfont* font = stash->fonts[state->font];
+	return fons__tt_getGlyphIndex(&font->font, codepoint);
+}
+
 
 FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
                                        float x, float y, unsigned int color,

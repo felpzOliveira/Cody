@@ -292,6 +292,10 @@ void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callb
     window->onSizeChangeCall = callback;
 }
 
+void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback){
+    window->onFocusChangeCall = callback;
+}
+
 WindowX11 *CreateWindowX11(int width, int height, const char *title){
     WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
     _CreateWindowX11(width, height, title, &x11Framebuffer,
@@ -356,6 +360,9 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
     char buf[20];
     Status status = 0;
     
+    // Somehow we getting duplicated events lets filter them out
+    if(!(window->lastKeyTime < event->xkey.time)) return;
+    
     int mappedKey = TranslateKeyX11(code);
     count = Xutf8LookupString(window->ic, (XKeyPressedEvent*)event, buf, 
                               20, &keysym, &status);
@@ -365,20 +372,15 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
         AssertA(0, "Weird UTF8 character input");
     }
     
-    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS, buf, count);
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS, buf, count, code);
     
-#if 0
-    if(count)
-        printf("buffer: %.*s\n", count, buf);
-    
-    printf("pressed KEY: %d\n", (int)keysym);
-#endif
+    window->lastKeyTime = event->xkey.time;
 }
 
 void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     int code = event->xkey.keycode;
     int mappedKey = TranslateKeyX11(code);
-    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE, NULL, 0);
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE, NULL, 0, code);
 }
 
 void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -404,8 +406,6 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
     if(is_scroll && window->onScrollCall){
         window->onScrollCall(is_scroll_up);
     }
-    
-    
 }
 
 void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -459,10 +459,16 @@ void ProcessEventSelectionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x1
 
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     //printf("Focus IN\n");
+    if(window->onFocusChangeCall){
+        window->onFocusChangeCall();
+    }
 }
 
 void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     //printf("Focus OUT\n");
+    if(window->onFocusChangeCall){
+        window->onFocusChangeCall();
+    }
 }
 
 void ProcessEventExposeX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){

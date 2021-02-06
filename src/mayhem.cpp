@@ -7,12 +7,13 @@
 #include <bufferview.h>
 #include <unistd.h>
 #include <x11_display.h>
+#include <app.h>
 
-extern BufferView bufferView;
+Tokenizer tokenizer = TOKENIZER_INITIALIZER;
+LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
 void test_tokenizer(const char *filename){
+    
     uint filesize = 0;
-    Tokenizer tokenizer = TOKENIZER_INITIALIZER;
-    LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
     char *content = GetFileContents(filename, &filesize);
     
     if(filesize == 0){ // TODO: Solution for empty file?
@@ -22,18 +23,26 @@ void test_tokenizer(const char *filename){
         filesize = 1;
     }
     
-    BufferView_InitalizeFromText(&bufferView, content, filesize);
+    Lex_BuildTokenizer(&tokenizer);
+    LineBuffer_Init(&lineBuffer, &tokenizer, content, filesize);
+    
+    int c = AppGetBufferViewCount();
+    for(int i = 0; i < c; i++){
+        BufferView *view = AppGetBufferView(i);
+        BufferView_Initialize(view, &lineBuffer, &tokenizer);
+    }
     
 #if 1
     Graphics_Initialize();
     
     while(Graphics_IsRunning()){ sleep(1); }
 #endif
-    LineBuffer_Free(&lineBuffer);
 }
 
 
 int main(int argc, char **argv){
+    AppEarlyInitialize();
+    
     //test_tokenizer("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     test_tokenizer("/home/felipe/Documents/Bubbles/src/core/geometry.h");
     //test_tokenizer("/home/felipe/Documents/Bubbles/src/bubbles.cpp");

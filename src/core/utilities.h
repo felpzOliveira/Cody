@@ -6,6 +6,11 @@
 #include <geometry.h>
 #include <string>
 #include <fstream>
+#include <signal.h>
+
+#define DebugBreak() raise(SIGTRAP)
+
+#define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
@@ -38,7 +43,7 @@ int TerminatorChar(char v);
 int StringEqual(char *s0, char *s1, uint maxn);
 
 /*
-* Convert a hex color to a unsigned vec3i color.
+* Convert a hex color to a unsigned vec3i/f color.
 */
 vec3i ColorFromHex(uint hex);
 vec3f ColorFromHexf(uint hex);
@@ -57,10 +62,16 @@ int CodepointToString(int cp, char *c);
 
 /*
 * Gets the first codepoint in the string given by 'u' with size 'size'
-* and return its integer value, returns the number of bytes tooked from 'u'
-* in 'off'.
+* and return its integer value, returns the number of bytes taken to generate
+* the codepoint in 'off'.
 */
 int StringToCodepoint(char *u, int size, int *off);
 
+/*
+* Checks if a string contains a extensions, mostly for GLX/GL stuff
+*/
 int ExtensionStringContains(const char *string, const char *extensions);
+
+/* memcpy */
+void Memcpy(void *dst, void *src, uint size);
 #endif //UTILITIES_H

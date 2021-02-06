@@ -7,6 +7,14 @@
 #include <sys/stat.h>
 #include <string.h>
 
+void Memcpy(void *dst, void *src, uint size){
+    unsigned char *udst = (unsigned char *)dst;
+    unsigned char *usrc = (unsigned char *)src;
+    while(size --){
+        *(udst++) = *(usrc++);
+    }
+}
+
 int ExtensionStringContains(const char *string, const char *extensions){
     const char* start = extensions;
     for(;;){
@@ -128,6 +136,7 @@ int StringEqual(char *s0, char *s1, uint maxn){
 }
 
 int TerminatorChar(char v){
+    if((int)v < 0) return 0; // utf-8
     return (v < 48 || (v > 57 && v < 64) || 
             (v > 90 && v < 95) || (v > 122))
         ? 1 : 0;

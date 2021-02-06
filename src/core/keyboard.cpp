@@ -2,14 +2,17 @@
 #include <x11_keyboard.h>
 #include <types.h>
 #include <stdarg.h>
-#include <string.h>
+#include <utilities.h>
 
 #define GetKeyID(key) ((int)key - (int)Key_A)
+#define GetBindingID(ki, i) (ki * MAX_BINDINGS_PER_ENTRY + i)
 
 static BindingMap *activeMapping = nullptr;
 static int *keyStates;
+static int unmappedKeyState = KEYBOARD_EVENT_RELEASE;
 
 const char *KeyboardGetKeyName(Key key);
+const char *KeyboardGetStateName(int state);
 
 void KeyboardSetActiveMapping(BindingMap *mapping){
     activeMapping = mapping;
@@ -19,47 +22,81 @@ inline int KeyboardGetKeyState(Key key){
     return keyStates[GetKeyID(key)];
 }
 
-void KeyboardProcessBindingState(Binding *binding){
-    AssertA(binding != nullptr, "Invalid binding");
-    AssertA(binding->callback != nullptr, "Invalid binding callback");
+void KeyboardDebugPrintBindingKeys(Binding *binding){
     for(int i = 0; i < binding->keySetSize; i++){
-        if(KeyboardGetKeyState((Key)binding->keySet[i]) != KEYBOARD_EVENT_PRESS)
-            return;
+        printf("%s ", KeyboardGetKeyName(binding->keySet[i]));
     }
     
-    binding->callback();
+    printf("\n");
 }
 
-void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size){
-    int kid = GetKeyID(eventKey);
-    if(eventKey != Key_Unmapped){
-        keyStates[kid] = eventType;
-    }
-    
-    if(eventType == KEYBOARD_EVENT_PRESS){
-        if(eventKey != Key_Unmapped){
-            printf("Pressed: %s\n", KeyboardGetKeyName((Key)eventKey));
-        }
-        
-        // Check bindings
-        if(activeMapping){
-            Binding *binds = activeMapping->bindings;
-            int *counts = activeMapping->bindingCount;
-            int count = counts[kid];
-            for(int i = 0; i < count; i++){
-                Binding *binding = &binds[kid * MAX_BINDINGS_PER_ENTRY + i];
-                KeyboardProcessBindingState(binding);
+void KeyboardProcessBindingEvents(int keyId){
+    Binding *bestBinding = nullptr;
+    int runningScore = -1;
+    int count = activeMapping->bindingCount[keyId];
+    for(int i = 0; i < count; i++){
+        int score = 0;
+        Binding *bind = &activeMapping->bindings[GetBindingID(keyId, i)];
+        for(int k = 0; k < bind->keySetSize; k++){
+            int kState = keyStates[GetKeyID(bind->keySet[k])];
+            if(kState == KEYBOARD_EVENT_RELEASE){
+                score = -1;
+                break;
+            }
+            
+            if(kState == KEYBOARD_EVENT_PRESS || bind->supportsRepeat){
+                score ++;
             }
         }
-    }else{
-        if(eventKey != Key_Unmapped){
-            printf("Released: %s\n", KeyboardGetKeyName((Key)eventKey));
+        
+        if(score > runningScore){
+            runningScore = score;
+            bestBinding = bind;
         }
+    }
+    
+    if(bestBinding){
+        bestBinding->callback();
     }
 }
 
-void RegisterKeyboardEventv(BindingMap *mapping, KeySetEventCallback *callback,
-                            va_list args)
+void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
+                   int rawKeyCode)
+{
+    int kid = GetKeyID(eventKey);
+    int realEventType = eventType;
+    
+    if(eventKey != Key_Unmapped){
+        int currentKeyState = keyStates[kid];
+        if(eventType == KEYBOARD_EVENT_PRESS){
+            if(currentKeyState != KEYBOARD_EVENT_RELEASE){
+                realEventType = KEYBOARD_EVENT_REPEAT; // TODO: Check if this is enough
+            }
+        }
+        
+        keyStates[kid] = realEventType;
+    }else if(rawKeyCode != 0){
+        // I'm somehow getting a 0 code for UTF-8 that only happens once
+        // i'm not finding any references to this so I'm skip it
+        
+        unmappedKeyState = eventType;
+    }
+    
+    if(realEventType != KEYBOARD_EVENT_RELEASE && eventKey != Key_Unmapped){
+        // Check bindings, only if no unmapped key is active
+        if(activeMapping && unmappedKeyState == KEYBOARD_EVENT_RELEASE){
+            KeyboardProcessBindingEvents(kid);
+        }
+    }
+    
+    if(activeMapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE){
+        if(activeMapping->entryCallback)
+            activeMapping->entryCallback(utf8Data, utf8Size);
+    }
+}
+
+void RegisterKeyboardEventv(BindingMap *mapping, int repeat, 
+                            KeySetEventCallback *callback, va_list args)
 {
     int size = 0;
     int iKey = 0;
@@ -79,10 +116,11 @@ void RegisterKeyboardEventv(BindingMap *mapping, KeySetEventCallback *callback,
         int id = GetKeyID(keySet[i]);
         int count = counts[id];
         if(count < MAX_BINDINGS_PER_ENTRY){
-            Binding *binding = &binds[id * MAX_BINDINGS_PER_ENTRY + count];
-            memcpy(binding->keySet, keySet, sizeof(keySet));
+            Binding *binding = &binds[GetBindingID(id, count)];
+            Memcpy(binding->keySet, keySet, sizeof(keySet));
             binding->keySetSize = size;
             binding->callback = callback;
+            binding->supportsRepeat = repeat;
             counts[id] = count+1;
         }else{
             AssertA(0, "Too many bindings for key");
@@ -90,11 +128,17 @@ void RegisterKeyboardEventv(BindingMap *mapping, KeySetEventCallback *callback,
     }
 }
 
-void RegisterKeyboardEventEx(BindingMap *mapping, KeySetEventCallback *callback, ...){
+void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, 
+                             KeySetEventCallback *callback, ...)
+{
     va_list args;
     va_start(args, callback);
-    RegisterKeyboardEventv(mapping, callback, args);
+    RegisterKeyboardEventv(mapping, repeat, callback, args);
     va_end(args);
+}
+
+void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback){
+    mapping->entryCallback = callback;
 }
 
 BindingMap *KeyboardCreateMapping(){
@@ -104,10 +148,12 @@ BindingMap *KeyboardCreateMapping(){
     
     mapping->bindings = (Binding *)AllocatorGet(sizeof(Binding) * allocationSize);
     mapping->bindingCount = (int *)AllocatorGet(sizeof(int) * keyCodes);
+    mapping->entryCallback = nullptr;
     
     for(int i = 0; i < allocationSize; i++){
         Binding *binding = &mapping->bindings[i];
         binding->keySetSize = 0;
+        binding->supportsRepeat = 0;
         if(i < keyCodes){
             mapping->bindingCount[i] = 0;
         }
@@ -120,7 +166,25 @@ BindingMap *KeyboardCreateMapping(){
 void KeyboardInitMappings(){
     int keyCodes = CreateKeyTableX11();
     keyStates = (int *)AllocatorGet(sizeof(int) * keyCodes);
-    memset(keyStates, KEYBOARD_EVENT_RELEASE, sizeof(int) * keyCodes);
+    for(int i = 0; i < keyCodes; i++){
+        keyStates[i] = KEYBOARD_EVENT_RELEASE;
+    }
+}
+
+void KeyboardResetState(){
+    int keyCodes = CreateKeyTableX11();
+    for(int i = 0; i < keyCodes; i++){
+        keyStates[i] = KEYBOARD_EVENT_RELEASE;
+    }
+}
+
+const char *KeyboardGetStateName(int state){
+    switch(state){
+        case KEYBOARD_EVENT_RELEASE: return "KEYBOARD_EVENT_RELEASE";
+        case KEYBOARD_EVENT_PRESS: return "KEYBOARD_EVENT_PRESS";
+        case KEYBOARD_EVENT_REPEAT: return "KEYBOARD_EVENT_REPEAT";
+        default: return "KEYBOARD_EVENT_UNMAPPED";
+    }
 }
 
 const char *KeyboardGetKeyName(Key key){

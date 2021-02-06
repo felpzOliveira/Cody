@@ -5,13 +5,19 @@
 
 #define KEYBOARD_EVENT_RELEASE 0
 #define KEYBOARD_EVENT_PRESS   1
+#define KEYBOARD_EVENT_REPEAT  2
 
 #define KEYSET_MAX_SIZE 6
 #define MAX_BINDINGS_PER_ENTRY 32
-#define KEYSET_EVENT(name) void name() 
-typedef KEYSET_EVENT(KeySetEventCallback);
+#define KEYSET_EVENT(name) void name()
+#define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size)
 
-#define RegisterKeyboardEvent(map, callback, ...) RegisterKeyboardEventEx(map, callback, __VA_ARGS__, -1)
+typedef KEYSET_EVENT(KeySetEventCallback);
+typedef KEY_ENTRY_EVENT(KeyEntryCallback);
+
+#define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, callback, __VA_ARGS__, -1)
+
+#define RegisterRepeatableEvent(map, callback, ...) RegisterKeyboardEventEx(map, 1, callback, __VA_ARGS__, -1)
 
 typedef enum{
     Key_A = 1,
@@ -85,22 +91,30 @@ typedef enum{
 
 typedef struct{
     Key keySet[KEYSET_MAX_SIZE];
-    int keySetSize;
     KeySetEventCallback *callback;
+    int keySetSize;
+    int supportsRepeat;
 }Binding;
 
 typedef struct{
     Binding *bindings;
     int *bindingCount;
+    KeyEntryCallback *entryCallback;
 }BindingMap;
 
 void KeyboardInitMappings();
 const char *KeyboardGetKeyName(Key key);
+const char *KeyboardGetStateName(int state);
 
 BindingMap *KeyboardCreateMapping();
 void KeyboardSetActiveMapping(BindingMap *mapping);
 
-void RegisterKeyboardEventEx(BindingMap *mapping, KeySetEventCallback *callback, ...);
-void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size);
+void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback);
+void RegisterKeyboardEventEx(BindingMap *mapping, int repeat,
+                             KeySetEventCallback *callback, ...);
+
+void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
+                   int rawKeyCode);
+void KeyboardResetState();
 
 #endif //KEYBOARD_H

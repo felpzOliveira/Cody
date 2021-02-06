@@ -4,7 +4,7 @@
 
 //I like LEX = Logical EXecutor :)
 /* 
-  * This is not a real lexer, it a parser that logically process keywords/contexts.
+  * This is not a real lexer, it is a parser that logically process keywords/contexts.
 * Writting a regex engine is quite hard and I don't want to use a library,
 * so I'm gonna see where parsing can get me.
 */
@@ -20,8 +20,14 @@ typedef enum{
     TOKEN_ID_INCLUDE_SEL,
     TOKEN_ID_INCLUDE,
     TOKEN_ID_MATH,
+    TOKEN_ID_SPACE,
     TOKEN_ID_NONE,
 }TokenId;
+
+typedef enum{
+    TOKENIZER_STATE_CLEAN,
+    TOKENIZER_STATE_MULTILINE,
+}TokenizerState;
 
 #define TOKENIZER_OP_FINISHED   0
 #define TOKENIZER_OP_UNFINISHED 1
@@ -37,6 +43,7 @@ typedef enum{
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
 #define TOKENIZER_CONTEXT_INITIALIZER {.entry = nullptr, .lookup = nullptr}
 #define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0}
+#define TOKENIZER_STATE_INITIALIZER {.state = TOKENIZER_STATE_CLEAN, .activeWorkProcessor = -1, .backTrack = 0, .forwardTrack = 0}
 
 struct Token;
 struct TokenizerContext;
@@ -47,9 +54,9 @@ typedef LEX_TOKENIZER_EXEC_CONTEXT(Lex_ContextExec);
 /*
 * Basic component for Token information, i.e.: reserved and dynamic generated
 * keywords that need to be detected. I'm going to attempt to implement this
-* with a growing array and a direct size table.
-* 'value' contains the raw string value of the keyword that can be used for matching
-* and identifier what class is this 
+* with a growing array and a direct size table. Token is represented by its size,
+* starting position in the line that generated it and a identifier so we can check
+* what it represents.
 */
 struct Token{
     int size;
@@ -57,12 +64,19 @@ struct Token{
     TokenId identifier;
 };
 
+/*
+* Lookup token is a Token that is only used for constructing the LookupTable
+* the Tokenizer will use to match its results.
+*/
 struct LookupToken{
     char *value;
     int size;
     TokenId identifier;
 };
 
+/*
+* Table used by Tokenizer to see what it needs to match reserved/special keywords.
+*/
 struct TokenLookupTable{
     LookupToken **table; // the table itself
     int nSize; // the amount of entries in the table
@@ -70,6 +84,12 @@ struct TokenLookupTable{
     int startOffset; // the offset that says what is the minimal size of a Token, for C++ this is 2
 };
 
+/*
+* Tokenizer context, 'entry' must specify if given a line the context
+ * wishes to be invoked for token generation, 'exec' asks the context to parse
+* 1 token that it can accept and return the length of this token. 'lookup'
+* is a storage reserved for a table if the context requires one.
+*/
 struct TokenizerContext{
     Lex_ContextEntry *entry;
     Lex_ContextExec *exec;
@@ -85,6 +105,11 @@ struct TokenizerContext{
     int inclusion;
 };
 
+/*
+* Utility used by the parsing routines to accelerate tokenization.
+* Tokens get generated inside a TokenizerWorkContext that caches
+* work arrays for faster copy/insertion.
+*/
 typedef struct{
     Token *workTokenList;
     Token *lastToken;
@@ -92,11 +117,30 @@ typedef struct{
     uint workTokenListHead;
 }TokenizerWorkContext;
 
+/*
+* Tokenizer state. Can be used to save and restore tokenization from
+* a specific point. While 'Lex_TokenizerGetCurrentState' can retrieve most
+* of these, 'forwardTrack' needs to be explicitly defined by querying the
+* 'backTrack' property of the previously processed line. 
+*/
+typedef struct{
+    TokenizerState state;
+    int activeWorkProcessor;
+    uint backTrack;
+    uint forwardTrack;
+}TokenizerStateContext;
+
+/*
+* The actual Tokenizer structure. Contains a list of contexts that need to run,
+ * a work context for faster token insertion, and a few utilities for querying
+* its state and pending works.
+*/
 struct Tokenizer{
     TokenizerContext *contexts;
     TokenizerWorkContext *workContext;
     int contextCount;
     int unfinishedContext;
+    int linesAggregated;
     int linePosition;
     int lineBeginning;
 };
@@ -138,7 +182,6 @@ typedef LEX_PROC_CALLBACK(Lex_LineProcessorCallback);
 */
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
                      void *prv=nullptr);
-
 /*
 * Builds a tokenizer from default tables.
 */
@@ -148,3 +191,24 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer);
 * Resets the tokenizer to prepare for a new line of parsing.
 */
 void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer);
+
+/*
+* Basically 'Lex_TokenizerPrepareForNewLine' but also resets
+* the state of the previous line processed.
+*/
+void Lex_TokenizerReset(Tokenizer *tokenizer);
+
+/*
+* Queries the tokenizer in use to report its state _at_this_moment_.
+*/
+void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *context);
+
+/*
+* Restore the tokenizer state from a saved context.
+*/
+void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext *context);
+
+/*
+* Checks if tokenizer has pending work.
+*/
+int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer);
