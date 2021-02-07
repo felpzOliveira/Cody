@@ -1,5 +1,10 @@
 #include <bufferview.h>
 
+int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
+    return ((p.x <= geometry->upper.x && p.x >= geometry->lower.x) &&
+            (p.y <= geometry->upper.y && p.y >= geometry->lower.y)) ? 1 : 0;
+}
+
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
                             Float *velocity)
@@ -49,20 +54,8 @@ inline int BufferView_IsCursorVisible(BufferView *view, vec2ui range){
             range.y >= view->cursor.textPosition.x) ? 1 : 0;
 }
 
-uint BufferView_GetLineCount(BufferView *view){
-    return view->lineBuffer->lineCount;
-}
-
-Transition BufferView_GetTransitionType(BufferView *view){
-    return view->transitionAnim.transition;
-}
-
-LineBuffer *BufferView_GetLineBuffer(BufferView *view){
-    return view->lineBuffer;
-}
-
-Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo){
-    return LineBuffer_GetBufferAt(view->lineBuffer, lineNo);
+void BufferView_GhostCursorFollow(BufferView *view){
+    view->cursor.ghostPosition = view->cursor.textPosition;
 }
 
 int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
@@ -129,6 +122,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
     
     view->cursor.textPosition  = vec2ui(0, 0);
     view->cursor.ghostPosition = vec2ui(0, 0);
+    view->renderLineNbs = 1;
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;
     view->height = 0;
@@ -435,10 +429,34 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
     return 1;
 }
 
+void BufferView_ToogleLineNumbers(BufferView *view){
+    view->renderLineNbs = 1 - view->renderLineNbs;
+}
+
 vec2ui BufferView_GetCursorPosition(BufferView *view){
     return view->cursor.textPosition;
 }
 
+vec2ui BufferView_GetGhostCursorPosition(BufferView *view){
+    return view->cursor.ghostPosition;
+}
+
 int BufferView_IsAnimating(BufferView *view){
     return view->transitionAnim.isAnimating;
+}
+
+uint BufferView_GetLineCount(BufferView *view){
+    return view->lineBuffer->lineCount;
+}
+
+Transition BufferView_GetTransitionType(BufferView *view){
+    return view->transitionAnim.transition;
+}
+
+LineBuffer *BufferView_GetLineBuffer(BufferView *view){
+    return view->lineBuffer;
+}
+
+Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo){
+    return LineBuffer_GetBufferAt(view->lineBuffer, lineNo);
 }

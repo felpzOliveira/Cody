@@ -9,6 +9,32 @@
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 
+static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback *fetcher)
+{
+    char *s = p;
+    uint runLen = maxn;
+    uint n = 0;
+    uint fetched = start;
+    while(s != NULL){
+        while((*s == ' ' || *s == '\n' || *s == '\t' || *s == '\r') && n < runLen){
+            s++;
+            n++;
+        }
+        
+        if(n < runLen) return *s;
+        
+        // Need to look next segment
+        if(fetcher){
+            fetched += n;
+            runLen = fetcher(&s, fetched);
+        }else{
+            s = NULL;
+        }
+    }
+    
+    return 0;
+}
+
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context) */
 LEX_PROCESSOR(Lex_Number){
     (void)context;
@@ -246,7 +272,7 @@ LEX_PROCESSOR(Lex_Comments){
     return rLen > 0 ? (aggregate > 0 ? 3 : 1) : 0;
 }
 
-/* (char **p, uint n, Token *token, TokenLookupTable *lookup) */
+/* (char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher) */
 LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     char *h = *p;
     int matched = 0;
@@ -299,15 +325,19 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     // do we need to parse these or can we simply loop during execution?
     // going to check for '(' to at least detect functions
     if(!matched){
-        if(**p == '(' && length > 1){
-            token->identifier = TOKEN_ID_FUNCTION;
+        if(length > 1){
+            uint maxn = n - length;
+            char nextC = Lex_LookAhead(*p, length, maxn, fetcher);
+            if(nextC == '('){
+                token->identifier = TOKEN_ID_FUNCTION;
+            }
         }
     }
     
     return length;
 }
 
-/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext) */
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext, TokenizerFetchCallback *fetcher) */
 LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     //1 - Attempt others first
     int rv = TOKENIZER_OP_FINISHED;
@@ -345,7 +375,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
         goto end;
     }
     
-    len = Lex_TokenLookupAny(p, n, token, context->lookup);
+    len = Lex_TokenLookupAny(p, n, token, context->lookup, fetcher);
     
     end:
     *offset = len;
@@ -353,7 +383,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
 }
 
 
-/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext) */
+/* (char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerWorkContext *workContext, TokenizerFetchCallback *fetcher) */
 LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     //1 - Attempt others first
     int rv = TOKENIZER_OP_FINISHED;
@@ -400,7 +430,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
         goto end;
     }
     
-    len = Lex_TokenLookupAny(p, n, token, context->lookup);
+    len = Lex_TokenLookupAny(p, n, token, context->lookup, fetcher);
     if(token->identifier == TOKEN_ID_INCLUDE_SEL){
         token->identifier = TOKEN_ID_PREPROCESSOR;
         context->inclusion = 1;
@@ -434,6 +464,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     if(lineBeginning){
         if(unfinished >= 0) tokenizer->linesAggregated ++;
         else tokenizer->linesAggregated = 0;
+        tokenizer->autoIncrementor = 0;
     }
     
     if(n == 0){
@@ -441,10 +472,17 @@ LEX_TOKENIZER(Lex_TokenizeNext){
         return -1;
     }
     
+    if(**p == '\n'){
+        tokenizer->unfinishedContext = unfinished;
+        return -1;
+    }
+    
+    uint tablen = 0;
     // 1- Skip spaces
-    while(**p == ' ' || **p == '\t' || **p == '\n' || **p == '\r'){
+    while(**p == ' ' || **p == '\t' || **p == '\r'){
+        if(**p == '\t') tablen += tokenizer->tabSpacing-1;
+        offset++;
         (*p)++;
-        offset ++;
     }
     
     // 2- Check which contexts want to process this line
@@ -460,10 +498,11 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     
     if(offset > 0 /*&& lineBeginning*/){
         tokenizer->unfinishedContext = unfinished;
-        token->position = tokenizer->linePosition;
-        token->size = offset;
+        token->position = tokenizer->linePosition + tokenizer->autoIncrementor;
+        token->size = tablen + offset;
         token->identifier = TOKEN_ID_SPACE;
         tokenizer->linePosition += offset;
+        tokenizer->autoIncrementor += tablen;
         return offset;
     }
     
@@ -479,14 +518,19 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     // 3- If some context did not finish its job, let it continue
     if(unfinished >= 0){
         tCtx = &tokenizer->contexts[unfinished];
-        rv = tCtx->exec(p, n-offset, token, &len, tCtx);
+        rv = tCtx->exec(p, n-offset, token, &len, tCtx, tokenizer->fetcher);
         if(rv == TOKENIZER_OP_UNFINISHED){
             tokenizer->unfinishedContext = unfinished;
-            token->position = tokenizer->linePosition + offset;
+            
+            token->position = tokenizer->linePosition + 
+                tokenizer->autoIncrementor + offset;
+            
             tokenizer->linePosition += offset + len;
             return offset + len;
         }else if(rv == TOKENIZER_OP_FINISHED){
-            token->position = tokenizer->linePosition + offset;
+            token->position = tokenizer->linePosition + 
+                tokenizer->autoIncrementor + offset;
+            
             tokenizer->linePosition += offset + len;
             return offset + len;
         }
@@ -500,14 +544,18 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     for(int i = 0; i < tokenizer->contextCount; i++){
         tCtx = &tokenizer->contexts[i];
         if(tCtx->is_execing){
-            rv = tCtx->exec(p, n-offset, token, &len, tCtx);
+            rv = tCtx->exec(p, n-offset, token, &len, tCtx, tokenizer->fetcher);
             if(rv == TOKENIZER_OP_UNFINISHED){
                 tokenizer->unfinishedContext = i;
-                token->position = tokenizer->linePosition + offset;
+                token->position = tokenizer->linePosition + 
+                    tokenizer->autoIncrementor + offset;
+                
                 tokenizer->linePosition += offset + len;
                 return offset + len;
             }else if(rv == TOKENIZER_OP_FINISHED){
-                token->position = tokenizer->linePosition + offset;
+                token->position = tokenizer->linePosition + 
+                    tokenizer->autoIncrementor + offset;
+                
                 tokenizer->linePosition += offset + len;
                 return offset + len;
             }
@@ -533,8 +581,9 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
         }
         
         if(*p == '\n'){
-            *p = 0;
-            processor(&lineStart, lineSize, lineNr, prv);
+            //*p = 0;
+            processor(&lineStart, lineSize+1, lineNr, 
+                      processed-lineSize, textsize, prv);
             *p = '\n';
             p++;
             lineStart = p;
@@ -549,9 +598,11 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
     }
     
     if(lineSize > 0){
-        processor(&lineStart, lineSize, lineNr, prv);
+        processor(&lineStart, lineSize+1, lineNr, 
+                  processed-lineSize, textsize, prv);
     }
 }
+
 /* (char **p, uint n, TokenizerContext *context) */
 LEX_TOKENIZER_ENTRY_CONTEXT(Lex_PreprocessorEntry){
     if(context->has_pending_work) return 1;
@@ -671,7 +722,7 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     lookupTable->nSize = elements;
 }
 
-void Lex_BuildTokenizer(Tokenizer *tokenizer){
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing){
     TokenLookupTable *tables = nullptr;
     TokenizerWorkContext *workContext = nullptr;
     TokenLookupTable *ax = nullptr;
@@ -682,6 +733,7 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer){
     tokenizer->linesAggregated = 0;
     tokenizer->linePosition = 0;
     tokenizer->lineBeginning = 0;
+    tokenizer->tabSpacing = Max(1, tabSpacing);
     
     tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
                                               tokenizer->contextCount);
@@ -739,6 +791,12 @@ void Lex_TokenizerReset(Tokenizer *tokenizer){
 
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer){
     return tokenizer->unfinishedContext >= 0 ? 1 : 0;
+}
+
+void Lex_TokenizerSetFetchCallback(Tokenizer *tokenizer,
+                                   TokenizerFetchCallback *callback)
+{
+    tokenizer->fetcher = callback;
 }
 
 void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer){

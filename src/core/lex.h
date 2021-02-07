@@ -33,16 +33,19 @@ typedef enum{
 #define TOKENIZER_OP_UNFINISHED 1
 #define TOKENIZER_OP_FAILED     2
 
+#define TOKENIZER_FETCH_CALL(name) uint name(char **p, uint n)
+typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
+
 #define LEX_PROCESSOR(name) int name(char **p, uint n, char **head, uint *len, TokenizerContext *context)
-#define LEX_PROCESSOR_TABLE(name) int name(char **p, uint n, Token *token, TokenLookupTable *lookup)
+#define LEX_PROCESSOR_TABLE(name) int name(char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher)
 #define LEX_TOKENIZER_ENTRY_CONTEXT(name) int name(char **p, uint n, TokenizerContext *context)
-#define LEX_TOKENIZER_EXEC_CONTEXT(name) int name(char **p, uint n, Token *token, uint *offset, TokenizerContext *context)
+#define LEX_TOKENIZER_EXEC_CONTEXT(name) int name(char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerFetchCallback *fetcher)
 #define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer)
 
 
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
 #define TOKENIZER_CONTEXT_INITIALIZER {.entry = nullptr, .lookup = nullptr}
-#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0}
+#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .tabSpacing = 1, .fetcher = nullptr}
 #define TOKENIZER_STATE_INITIALIZER {.state = TOKENIZER_STATE_CLEAN, .activeWorkProcessor = -1, .backTrack = 0, .forwardTrack = 0}
 
 struct Token;
@@ -143,6 +146,9 @@ struct Tokenizer{
     int linesAggregated;
     int linePosition;
     int lineBeginning;
+    int autoIncrementor;
+    int tabSpacing;
+    TokenizerFetchCallback *fetcher;
 };
 
 inline const char *Lex_GetIdString(int id){
@@ -174,18 +180,30 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny);
 LEX_TOKENIZER(Lex_TokenizeNext);
 
 /* Generic utility for parsing */
-#define LEX_PROC_CALLBACK(name) void name(char **p, uint size, uint lineNr, void *prv)
+#define LEX_PROC_CALLBACK(name) void name(char **p, uint size, uint lineNr, uint at, uint total, void *prv)
 typedef LEX_PROC_CALLBACK(Lex_LineProcessorCallback);
+
 
 /*
 * Parses a text line-by-line giving each line to a processor callback.
+* The line when given has '\n' traded by 0, and size+1.
 */
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
                      void *prv=nullptr);
+
 /*
 * Builds a tokenizer from default tables.
 */
-void Lex_BuildTokenizer(Tokenizer *tokenizer);
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing);
+
+/*
+* Sets the tokenizer fetcher call for Tokens that cannot be determined by the 
+* current state of the line. The fetcher callback must be able to retrieve a segment of 
+* text that follows or inform that there is none available, in which case the
+* Token is marked as TOKEN_ID_NONE.
+*/
+void Lex_TokenizerSetFetchCallback(Tokenizer *tokenizer,
+                                   TokenizerFetchCallback *callback);
 
 /*
 * Resets the tokenizer to prepare for a new line of parsing.

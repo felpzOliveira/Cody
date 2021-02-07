@@ -321,6 +321,14 @@ template<typename T> class vec3{
         return *this;
     }
     
+    unsigned int ToUnsigned() const{
+        unsigned int r = x;
+        unsigned int g = y;
+        unsigned int b = z;
+        unsigned int a = 255;
+        return (r) | (g << 8) | (b << 16) | (a << 24);
+    }
+    
     Float LengthSquared() const{ return x * x + y * y + z * z; }
     Float Length() const{ return sqrt(LengthSquared()); }
     void PrintSelf() const{
@@ -446,6 +454,14 @@ template<typename T> class vec4{
     vec4<T> &operator*=(T s){
         x *= s; y *= s; z *= s; w *= s;
         return *this;
+    }
+    
+    unsigned int ToUnsigned() const{
+        unsigned int r = x;
+        unsigned int g = y;
+        unsigned int b = z;
+        unsigned int a = w;
+        return (r) | (g << 8) | (b << 16) | (a << 24);
     }
     
     Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
@@ -673,6 +689,10 @@ CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
     }
     
     *v3 = Cross(v1, *v2);
+}
+
+inline Float Sqrt(Float v){
+    return std::sqrt(v);
 }
 
 template<typename T> inline
@@ -927,5 +947,11 @@ Bounds2<T> Expand(const Bounds2<T> &b, U delta){
                       b.pMax + vec2<T>(delta, delta));
 }
 
+typedef struct{
+    vec2ui lower;
+    vec2ui upper;
+    vec2f extensionX;
+    vec2f extensionY;
+}Geometry;
 
 #endif //GEOMETRY_H

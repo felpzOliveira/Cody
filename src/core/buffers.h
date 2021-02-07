@@ -30,8 +30,8 @@ typedef struct{
 }Buffer;
 
 /*
-* Basic description of a structured file. A list of lines with the available size
-* and current line count.
+* Basic description of a structured file. A list of lines with the available size and
+* current line count.
 */
 typedef struct{
     Buffer *lines;

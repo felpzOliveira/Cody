@@ -19,13 +19,6 @@ typedef struct{
 }DoubleCursor;
 
 typedef struct{
-    vec2ui lower;
-    vec2ui upper;
-    vec2f extensionX;
-    vec2f extensionY;
-}Geometry;
-
-typedef struct{
     Transition transition;
     int isAnimating;
     Float passedTime;
@@ -48,7 +41,7 @@ typedef struct{
 *       a screen is divided we create a BufferView and simply
 *       change its LineBuffer when files are swapped.
 */
-typedef struct{
+struct BufferView{
     LineBuffer *lineBuffer;
     Tokenizer *tokenizer;
     DoubleCursor cursor;
@@ -58,7 +51,14 @@ typedef struct{
     Float lineHeight;
     AnimationProps transitionAnim;
     Geometry geometry;
-}BufferView;
+    
+    /*
+* Rendering properties of the BufferView, defined by the renderer
+*/
+    Float lineOffset;
+    int isActive;
+    int renderLineNbs;
+};
 
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
@@ -67,6 +67,7 @@ Float InterpolateValueCubic(Float dt, Float remaining,
 Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
                              Float initialValue, Float finalValue);
 
+int Geometry_IsPointInside(Geometry *geometry, vec2ui p);
 
 void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer);
 
@@ -76,6 +77,7 @@ void BufferView_SetGeometry(BufferView *view, Geometry geometry,
 int  BufferView_IsAnimating(BufferView *view);
 Transition BufferView_GetTransitionType(BufferView *view);
 void BufferView_CursorTo(BufferView *view, uint lineNo);
+void BufferView_GhostCursorFollow(BufferView *view);
 
 int BufferView_LocateNextCursorToken(BufferView *view, Token **token);
 int BufferView_LocatePreviousCursorToken(BufferView *view, Buffer *buffer, Token **token);
@@ -91,6 +93,7 @@ LineBuffer *BufferView_GetLineBuffer(BufferView *view);
 
 vec2ui BufferView_GetViewRange(BufferView *view);
 vec2ui BufferView_GetCursorPosition(BufferView *view);
+vec2ui BufferView_GetGhostCursorPosition(BufferView *view);
 
 void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float duration);
 int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
@@ -99,6 +102,8 @@ int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRan
 void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
 int  BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
                                     vec2ui *cursorAt, Transform *transform);
+
+void BufferView_ToogleLineNumbers(BufferView *view);
 
 uint BufferView_GetLineCount(BufferView *view);
 #endif //BUFFERVIEW_H

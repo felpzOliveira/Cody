@@ -1,5 +1,5 @@
-#include <keyboard.h>
 #include <x11_keyboard.h>
+#include <keyboard.h>
 #include <types.h>
 #include <stdarg.h>
 #include <utilities.h>
@@ -30,10 +30,11 @@ void KeyboardDebugPrintBindingKeys(Binding *binding){
     printf("\n");
 }
 
-void KeyboardProcessBindingEvents(int keyId){
+int KeyboardProcessBindingEvents(int keyId){
     Binding *bestBinding = nullptr;
     int runningScore = -1;
     int count = activeMapping->bindingCount[keyId];
+    int runned = 0;
     for(int i = 0; i < count; i++){
         int score = 0;
         Binding *bind = &activeMapping->bindings[GetBindingID(keyId, i)];
@@ -56,13 +57,17 @@ void KeyboardProcessBindingEvents(int keyId){
     }
     
     if(bestBinding){
+        runned = 1;
         bestBinding->callback();
     }
+    
+    return runned;
 }
 
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
                    int rawKeyCode)
 {
+    int consumed = 0;
     int kid = GetKeyID(eventKey);
     int realEventType = eventType;
     
@@ -85,11 +90,13 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
     if(realEventType != KEYBOARD_EVENT_RELEASE && eventKey != Key_Unmapped){
         // Check bindings, only if no unmapped key is active
         if(activeMapping && unmappedKeyState == KEYBOARD_EVENT_RELEASE){
-            KeyboardProcessBindingEvents(kid);
+            consumed = KeyboardProcessBindingEvents(kid);
         }
     }
     
-    if(activeMapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE){
+    if(activeMapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE
+       && consumed == 0)
+    {
         if(activeMapping->entryCallback)
             activeMapping->entryCallback(utf8Data, utf8Size);
     }

@@ -7,6 +7,10 @@
 #include <sys/stat.h>
 #include <string.h>
 
+vec4ui AutoColor(vec3ui color){
+    return vec4ui(color.x, color.y, color.z, 255);
+}
+
 void Memcpy(void *dst, void *src, uint size){
     unsigned char *udst = (unsigned char *)dst;
     unsigned char *usrc = (unsigned char *)src;

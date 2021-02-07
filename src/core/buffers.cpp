@@ -2,6 +2,7 @@
 #include <geometry.h>
 #include <time.h>
 #include <utilities.h>
+#include <app.h>
 
 #define MODULE_NAME "Buffer"
 
@@ -127,10 +128,17 @@ void Buffer_Init(Buffer *buffer, uint size){
     buffer->stateContext.forwardTrack = 0;
 }
 
-void Buffer_InitSet(Buffer *buffer, char *head, uint len){
+void Buffer_InitSet(Buffer *buffer, char *head, uint leno){
+    uint len = leno;
+    for(int i = 0; i < leno; i++){
+        if(head[i] == '\t'){
+            len += appGlobalConfig.tabSpacing - 1;
+        }
+    }
+    
     if(buffer->data == nullptr){
-        buffer->data = (char *)AllocatorGet((len+DefaultAllocatorSize) * sizeof(char));
         buffer->size = len+DefaultAllocatorSize;
+        buffer->data = (char *)AllocatorGet((buffer->size) * sizeof(char));
     }else{
         if(buffer->size < len){
             uint newSize = buffer->size + len + DefaultAllocatorSize;
@@ -139,10 +147,19 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint len){
         }
     }
     
+    uint ic = 0;
     if(len > 0){
-        Memcpy(buffer->data, head, sizeof(char) * len);
+        for(int i = 0; i < leno; i++){
+            if(head[i] == '\t'){
+                for(int k = 0; k < appGlobalConfig.tabSpacing; k++){
+                    buffer->data[ic++] = '\t';
+                }
+            }else if(head[i] != '\n'){
+                buffer->data[ic++] = head[i];
+            }
+        }
     }
-    buffer->taken = len;
+    buffer->taken = ic;
     buffer->tokens = nullptr;
     buffer->tokenCount = 0;
     buffer->stateContext.state = TOKENIZER_STATE_CLEAN;
@@ -207,7 +224,13 @@ void Buffer_InsertStringAt(Buffer *buffer, uint rap, char *str, uint len){
     }
     
     for(int i = 0; i < len; i++){
-        buffer->data[at+i] = str[i];
+        char v = str[i];
+        if(v == '\t'){
+            buffer->data[at+i] = v;
+            buffer->data[at+i] = v;
+            buffer->data[at+i] = v;
+        }
+        buffer->data[at+i] = v;
     }
     
     buffer->taken += len;
@@ -336,8 +359,28 @@ typedef struct{
     int lineBacktrack;
 }LineBufferTokenizer;
 
+
+static LineBuffer *activeLineBuffer = nullptr;
+static uint current = 0;
+static uint totalSize = 0;
+static char *content = nullptr;
+
+
+uint LineBuffer_TokenizerFileFetcher(char **p, uint fet){
+    if(content && totalSize > fet + current){
+        *p = &content[fet + current];
+        return totalSize - (fet + current);
+    }
+    
+    *p = nullptr;
+    return 0;
+}
+
+
 #define DEBUG_TOKENS  0
-static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr, void *prv){
+static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
+                                     uint at, uint total, void *prv)
+{
     LineBufferTokenizer *lineBufferTokenizer = (LineBufferTokenizer *)prv;
     Tokenizer *tokenizer = lineBufferTokenizer->tokenizer;
     LineBuffer *lineBuffer = lineBufferTokenizer->lineBuffer;
@@ -346,7 +389,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr, void *prv
     TokenizerStateContext tokenizerContext;
     Lex_TokenizerGetCurrentState(tokenizer, &tokenizerContext);
     
-    LineBuffer_InsertLine(lineBuffer, *p, size);
+    LineBuffer_InsertLine(lineBuffer, *p, size-1);
     workContext->workTokenListHead = 0;
     
     Lex_TokenizerPrepareForNewLine(tokenizer);
@@ -356,7 +399,8 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr, void *prv
     printf("{ %d }: %s\n", (int)lineNr, *p);
     printf("==============================================\n");
 #endif
-    int iSize = size;
+    int iSize = size-1;
+    current = at;
     do{
         Token token;
         int rc = Lex_TokenizeNext(p, iSize, &token, tokenizer);
@@ -385,7 +429,8 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr, void *prv
                    Lex_GetIdString(token.identifier), token.position);
             s[token.position+token.size] = f;
 #endif
-            iSize = size - token.position - token.size;
+            iSize -= rc;
+            current += rc;
         }
     }while(iSize > 0 && **p != 0);
     
@@ -403,6 +448,18 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr, void *prv
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
     
+}
+
+static uint currentID;
+uint LineBuffer_BufferFetcher(char **p, uint fet){
+    Buffer *b = LineBuffer_GetBufferAt(activeLineBuffer, currentID+1);
+    if(b){
+        *p = b->data;
+        return b->taken;
+    }
+    
+    *p = NULL;
+    return 0;
 }
 
 static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
@@ -473,15 +530,22 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
     uint expectedEnd = start + buffer->stateContext.forwardTrack + offset + 1;
     
     Lex_TokenizerRestoreFromContext(tokenizer, &buffer->stateContext);
+    Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_BufferFetcher);
     
     i = start;
+    activeLineBuffer = lineBuffer;
     while((i < expectedEnd || Lex_TokenizerHasPendingWork(tokenizer))){
+        currentID = i;
         buffer = LineBuffer_GetBufferAt(lineBuffer, i);
         LineBuffer_RemountBuffer(lineBuffer, buffer, tokenizer, i);
         
         i++;
         if(i >= lineBuffer->lineCount) break;
     }
+    
+    activeLineBuffer = nullptr;
+    currentID = 0;
+    Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
 }
 
 void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
@@ -497,6 +561,13 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     lineBufferTokenizer.lineBuffer = lineBuffer;
     lineBufferTokenizer.lineBacktrack = 0;
     
+    activeLineBuffer = lineBuffer;
+    current = 0;
+    totalSize = filesize;
+    content = fileContents;
+    
+    Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
+    
     clock_t start = clock();
     
     Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
@@ -505,6 +576,12 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     clock_t end = clock();
     double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
     DEBUG_MSG("Lines: %u, Took %g\n\n", lineBuffer->lineCount, taken);
+    activeLineBuffer = nullptr;
+    current = 0;
+    totalSize = 0;
+    content = nullptr;
+    
+    Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
 }
 
 void LineBuffer_InitEmpty(LineBuffer *lineBuffer){

@@ -12,7 +12,6 @@
 Tokenizer tokenizer = TOKENIZER_INITIALIZER;
 LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
 void test_tokenizer(const char *filename){
-    
     uint filesize = 0;
     char *content = GetFileContents(filename, &filesize);
     
@@ -23,7 +22,7 @@ void test_tokenizer(const char *filename){
         filesize = 1;
     }
     
-    Lex_BuildTokenizer(&tokenizer);
+    Lex_BuildTokenizer(&tokenizer, appGlobalConfig.tabSpacing);
     LineBuffer_Init(&lineBuffer, &tokenizer, content, filesize);
     
     int c = AppGetBufferViewCount();
@@ -38,7 +37,6 @@ void test_tokenizer(const char *filename){
     while(Graphics_IsRunning()){ sleep(1); }
 #endif
 }
-
 
 int main(int argc, char **argv){
     AppEarlyInitialize();

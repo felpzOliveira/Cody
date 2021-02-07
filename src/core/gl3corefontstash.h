@@ -18,6 +18,7 @@
 #ifndef GL3COREFONTSTASH_H
 #define GL3COREFONTSTASH_H
 #include <string.h>
+#include <geometry.h>
 
 #ifdef __cplusplus
 extern "C" {

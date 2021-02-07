@@ -3,6 +3,7 @@
 #include <lex.h>
 #include <utilities.h>
 #include <font.h>
+#include <bufferview.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -15,6 +16,7 @@ typedef struct{
     BindingMap *freeTypeMapping;
     BufferView *activeBufferView;
     int viewsCount;
+    int activeId;
     
     BufferView views[MAX_BUFFERVIEWS];
 }App;
@@ -23,7 +25,10 @@ static App appContext = {
     .freeTypeMapping = nullptr, 
     .activeBufferView = nullptr,
     .viewsCount = 0,
+    .activeId = -1,
 };
+
+AppConfig appGlobalConfig;
 
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     Float w = (Float)(geometry.upper.x - geometry.lower.x);
@@ -50,13 +55,19 @@ void AppEarlyInitialize(){
     view->geometry.extensionX = vec2f(0.f, 0.5f);
     view->geometry.extensionY = vec2f(0.f, 1.0f);
     view->geometry.lower = vec2ui();
+    view->isActive = 0;
     
     view = &appContext.views[1];
     view->geometry.extensionX = vec2f(0.5f, 1.0f);
     view->geometry.extensionY = vec2f(0.f, 1.0f);
+    view->isActive = 0;
     appContext.viewsCount = 2;
     
     appContext.activeBufferView = view;
+    appContext.activeBufferView->isActive = 1;
+    appContext.activeId = 1;
+    
+    appGlobalConfig.tabSpacing = 4;
 }
 
 int AppGetBufferViewCount(){
@@ -71,7 +82,17 @@ BufferView *AppGetActiveBufferView(){
     return appContext.activeBufferView;
 }
 
-void AppBindingFreeTypingJumpToDirection(int direction){
+void AppSetActiveBufferView(int i){
+    AssertA(i >= 0 && i < appContext.viewsCount, "Invalid view id");
+    if(appContext.activeBufferView){
+        appContext.activeBufferView->isActive = 0;
+    }
+    appContext.activeBufferView = &appContext.views[i];
+    appContext.activeBufferView->isActive = 1;
+    appContext.activeId = i;
+}
+
+void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
     
     Token *token = nullptr;
@@ -133,12 +154,12 @@ void AppBindingFreeTypingJumpToDirection(int direction){
     }
 }
 
-void AppBindingJumpLeftArrow(){ AppBindingFreeTypingJumpToDirection(DIRECTION_LEFT); }
-void AppBindingJumpRightArrow(){ AppBindingFreeTypingJumpToDirection(DIRECTION_RIGHT); }
-void AppBindingJumpUpArrow(){ AppBindingFreeTypingJumpToDirection(DIRECTION_UP); }
-void AppBindingJumpDownArrow(){ AppBindingFreeTypingJumpToDirection(DIRECTION_DOWN); }
+void AppCommandJumpLeftArrow(){ AppCommandFreeTypingJumpToDirection(DIRECTION_LEFT); }
+void AppCommandJumpRightArrow(){ AppCommandFreeTypingJumpToDirection(DIRECTION_RIGHT); }
+void AppCommandJumpUpArrow(){ AppCommandFreeTypingJumpToDirection(DIRECTION_UP); }
+void AppCommandJumpDownArrow(){ AppCommandFreeTypingJumpToDirection(DIRECTION_DOWN); }
 
-void AppBindingFreeTypingArrows(int direction){
+void AppCommandFreeTypingArrows(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
     uint lineCount = BufferView_GetLineCount(bufferView);
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -186,10 +207,10 @@ void AppBindingFreeTypingArrows(int direction){
     }
 }
 
-void AppBindingLeftArrow(){ AppBindingFreeTypingArrows(DIRECTION_LEFT); }
-void AppBindingRightArrow(){ AppBindingFreeTypingArrows(DIRECTION_RIGHT); }
-void AppBindingUpArrow(){ AppBindingFreeTypingArrows(DIRECTION_UP); }
-void AppBindingDownArrow(){ AppBindingFreeTypingArrows(DIRECTION_DOWN); }
+void AppCommandLeftArrow(){ AppCommandFreeTypingArrows(DIRECTION_LEFT); }
+void AppCommandRightArrow(){ AppCommandFreeTypingArrows(DIRECTION_RIGHT); }
+void AppCommandUpArrow(){ AppCommandFreeTypingArrows(DIRECTION_UP); }
+void AppCommandDownArrow(){ AppCommandFreeTypingArrows(DIRECTION_DOWN); }
 
 void RemountTokensBasedOn(BufferView *view, uint base, uint offset=0){
     LineBuffer *lineBuffer = view->lineBuffer;
@@ -197,7 +218,7 @@ void RemountTokensBasedOn(BufferView *view, uint base, uint offset=0){
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, base, offset);
 }
 
-void AppBindingRemoveOne(){
+void AppCommandRemoveOne(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -219,7 +240,7 @@ void AppBindingRemoveOne(){
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
-void AppBindingRemovePreviousToken(){
+void AppCommandRemovePreviousToken(){
     Token *token = nullptr;
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -245,7 +266,7 @@ void AppBindingRemovePreviousToken(){
 }
 
 
-void AppBindingNewLine(){
+void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     LineBuffer *lineBuffer = BufferView_GetLineBuffer(bufferView);
@@ -272,7 +293,7 @@ void AppBindingNewLine(){
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
-void AppBindingHomeLine(){
+void AppCommandHomeLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     cursor.y = 0;
@@ -280,12 +301,30 @@ void AppBindingHomeLine(){
 }
 
 
-void AppBindingEndLine(){
+void AppCommandEndLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
     cursor.y = buffer->count;
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+}
+
+void AppCommandSwapView(){
+    if(appContext.activeId + 1 < appContext.viewsCount){
+        AppSetActiveBufferView(appContext.activeId+1);
+    }else{
+        AppSetActiveBufferView(0);
+    }
+}
+
+void AppCommandSetGhostCursor(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    BufferView_GhostCursorFollow(bufferView);
+}
+
+void AppCommandSwapLineNbs(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    BufferView_ToogleLineNumbers(bufferView);
 }
 
 void AppDefaultEntry(char *utf8Data, int utf8Size){
@@ -306,6 +345,23 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
     }
 }
 
+vec2ui AppActivateBufferViewAt(int x, int y){
+    // Check which view is the mouse on and activate it
+    int vCount = AppGetBufferViewCount();
+    vec2ui r(x, y);
+    for(int i = 0; i < vCount; i++){
+        BufferView *view = AppGetBufferView(i);
+        if(Geometry_IsPointInside(&view->geometry, r)){
+            // Activate the view and re-map position
+            AppSetActiveBufferView(i);
+            r = r - view->geometry.lower;
+            break;
+        }
+    }
+    
+    return r;
+}
+
 void AppInitialize(){
     BindingMap *mapping = nullptr;
     KeyboardInitMappings();
@@ -315,31 +371,41 @@ void AppInitialize(){
     RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
     
     //TODO: Create basic mappings
-    RegisterRepeatableEvent(mapping, AppBindingLeftArrow, Key_Left);
-    RegisterRepeatableEvent(mapping, AppBindingRightArrow, Key_Right);
-    RegisterRepeatableEvent(mapping, AppBindingUpArrow, Key_Up);
-    RegisterRepeatableEvent(mapping, AppBindingDownArrow, Key_Down);
+    RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
+    RegisterRepeatableEvent(mapping, AppCommandRightArrow, Key_Right);
+    RegisterRepeatableEvent(mapping, AppCommandUpArrow, Key_Up);
+    RegisterRepeatableEvent(mapping, AppCommandDownArrow, Key_Down);
     
-    RegisterRepeatableEvent(mapping, AppBindingJumpLeftArrow, Key_Left, Key_LeftControl);
-    RegisterRepeatableEvent(mapping, AppBindingJumpRightArrow, Key_Right, Key_LeftControl);
-    RegisterRepeatableEvent(mapping, AppBindingJumpUpArrow, Key_Up, Key_LeftControl);
-    RegisterRepeatableEvent(mapping, AppBindingJumpDownArrow, Key_Down, Key_LeftControl);
+    RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftControl);
+    RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftControl);
+    RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftControl);
+    RegisterRepeatableEvent(mapping, AppCommandJumpDownArrow, Key_Down, Key_LeftControl);
     
-    RegisterRepeatableEvent(mapping, AppBindingJumpLeftArrow, Key_Left, Key_LeftAlt);
-    RegisterRepeatableEvent(mapping, AppBindingJumpRightArrow, Key_Right, Key_LeftAlt);
-    RegisterRepeatableEvent(mapping, AppBindingJumpUpArrow, Key_Up, Key_LeftAlt);
-    RegisterRepeatableEvent(mapping, AppBindingJumpDownArrow, Key_Down, Key_LeftAlt);
+    RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftAlt);
+    RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftAlt);
+    RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftAlt);
+    RegisterRepeatableEvent(mapping, AppCommandJumpDownArrow, Key_Down, Key_LeftAlt);
     
-    RegisterRepeatableEvent(mapping, AppBindingRemoveOne, Key_Backspace);
-    RegisterRepeatableEvent(mapping, AppBindingRemovePreviousToken,
+    RegisterRepeatableEvent(mapping, AppCommandRemoveOne, Key_Backspace);
+    RegisterRepeatableEvent(mapping, AppCommandRemovePreviousToken,
                             Key_Backspace, Key_LeftControl);
-    RegisterRepeatableEvent(mapping, AppBindingRemovePreviousToken,
+    RegisterRepeatableEvent(mapping, AppCommandRemovePreviousToken,
                             Key_Backspace, Key_LeftAlt);
     
-    RegisterRepeatableEvent(mapping, AppBindingNewLine, Key_Enter);
+    RegisterRepeatableEvent(mapping, AppCommandNewLine, Key_Enter);
     
-    RegisterRepeatableEvent(mapping, AppBindingHomeLine, Key_Home);
-    RegisterRepeatableEvent(mapping, AppBindingEndLine, Key_End);
+    RegisterRepeatableEvent(mapping, AppCommandHomeLine, Key_Home);
+    RegisterRepeatableEvent(mapping, AppCommandEndLine, Key_End);
+    RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);
+    RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_RightAlt, Key_W);
+    
+    RegisterRepeatableEvent(mapping, AppCommandSetGhostCursor, Key_Space,
+                            Key_LeftControl);
+    RegisterRepeatableEvent(mapping, AppCommandSetGhostCursor, Key_Space,
+                            Key_RightControl);
+    
+    RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftControl, Key_N);
+    RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftControl, Key_N);
     
     appContext.freeTypeMapping = mapping;
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
