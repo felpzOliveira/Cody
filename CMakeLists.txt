@@ -6,7 +6,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 	message(STATUS "Debug build")
-	set(MH_FLAGS "-g -O0 -Wall -std=gnu99")
+	set(MH_FLAGS "-g -O0 -Wall -std=gnu99 -DBUILD_DEBUG")
 else()
 	message(STATUS "Release build")
 	set(MH_FLAGS "-O2 -Wall -std=gnu99")

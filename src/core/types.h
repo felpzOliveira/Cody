@@ -20,8 +20,16 @@ typedef float Float;
 //#define LEX_DEBUG(...) DEBUG(__VA_ARGS__)
 #define LEX_DEBUG(...)
 
+#define AssertErr(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
+
+
+#if !defined(DEBUG_BUILD)
+#define Assert(x) 
+#define AssertA(x, msg)
+#else
 #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
-#define AssertA(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
+#define AssertA(x, msg) AssertErr(x, msg)
+#endif
 
 inline void __assert_check(bool v, const char *name, const char *filename,
                            int line, const char *msg)

@@ -954,4 +954,13 @@ typedef struct{
     vec2f extensionY;
 }Geometry;
 
+typedef struct{
+    vec2ui textPosition;
+    vec2ui ghostPosition;
+    int is_dirty;
+    vec2ui nestStart;
+    vec2ui nestEnd;
+    int nestValid;
+}DoubleCursor;
+
 #endif //GEOMETRY_H

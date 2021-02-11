@@ -4,6 +4,7 @@
 #include <utilities.h>
 #include <font.h>
 #include <bufferview.h>
+#include <x11_display.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -68,6 +69,7 @@ void AppEarlyInitialize(){
     appContext.activeId = 1;
     
     appGlobalConfig.tabSpacing = 4;
+    appGlobalConfig.useTabs = 1;
 }
 
 int AppGetBufferViewCount(){
@@ -106,6 +108,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
             }else{
                 cursor.y = 0;
             }
+            
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_UP:{ // Move Up
@@ -238,6 +241,8 @@ void AppCommandRemoveOne(){
     }
     
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+    BufferView_AdjustGhostCursorIfOut(bufferView);
+    bufferView->lineBuffer->is_dirty = 1;
 }
 
 void AppCommandRemovePreviousToken(){
@@ -263,8 +268,30 @@ void AppCommandRemovePreviousToken(){
     }
     
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+    BufferView_AdjustGhostCursorIfOut(bufferView);
+    bufferView->lineBuffer->is_dirty = 1;
 }
 
+void AppCommandInsertTab(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    vec2ui cursor = BufferView_GetCursorPosition(bufferView);
+    Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
+    char spaces[16];
+    int offset = 0;
+    if(appGlobalConfig.useTabs){
+        Memset(spaces, '\t', appGlobalConfig.tabSpacing);
+        offset = 1;
+    }else{
+        Memset(spaces, ' ', appGlobalConfig.tabSpacing);
+        offset = appGlobalConfig.tabSpacing;
+    }
+    Buffer_InsertStringAt(buffer, cursor.y, spaces, appGlobalConfig.tabSpacing);
+    RemountTokensBasedOn(bufferView, cursor.x);
+    
+    cursor.y += offset;
+    BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+    bufferView->lineBuffer->is_dirty = 1;
+}
 
 void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
@@ -275,10 +302,12 @@ void AppCommandNewLine(){
     int toNextLine = Max((int)buffer->count - (int)cursor.y, 0);
     char *dataptr = nullptr;
     if(toNextLine > 0){
-        dataptr = &buffer->data[cursor.y];
+        uint p = Buffer_Utf8PositionToRawPosition(buffer, (uint)cursor.y, nullptr);
+        dataptr = &buffer->data[p];
+        toNextLine = buffer->taken - p;
     }
     
-    LineBuffer_InsertLineAt(lineBuffer, cursor.x+1, dataptr, toNextLine);
+    LineBuffer_InsertLineAt(lineBuffer, cursor.x+1, dataptr, toNextLine, 0);
     if(toNextLine > 0){
         buffer = BufferView_GetBufferAt(bufferView, cursor.x);
         Buffer_RemoveRange(buffer, cursor.y, buffer->count);
@@ -291,6 +320,8 @@ void AppCommandNewLine(){
     cursor.y = 0;
     
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+    BufferView_AdjustGhostCursorIfOut(bufferView);
+    bufferView->lineBuffer->is_dirty = 1;
 }
 
 void AppCommandHomeLine(){
@@ -327,6 +358,33 @@ void AppCommandSwapLineNbs(){
     BufferView_ToogleLineNumbers(bufferView);
 }
 
+void AppCommandLineQuicklyDisplay(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    BufferView_StartNumbersShowTransition(bufferView, 3.0);
+}
+
+void AppCommandSaveBufferView(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    LineBuffer_SaveToStorage(bufferView->lineBuffer);
+}
+
+void AppCommandPaste(){
+    uint size = 0;
+    const char *p = ClipboardGetStringX11(&size);
+    if(size > 0 && p){
+        Buffer *buffer = nullptr;
+        BufferView *view = AppGetActiveBufferView();
+        vec2ui cursor = BufferView_GetCursorPosition(view);
+        uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
+                                            cursor.x, cursor.y, view->tokenizer);
+        
+        cursor.x += n;
+        buffer = BufferView_GetBufferAt(view, cursor.x);
+        cursor.y = buffer->count;
+        BufferView_CursorToPosition(view, cursor.x, cursor.y);
+    }
+}
+
 void AppDefaultEntry(char *utf8Data, int utf8Size){
     if(utf8Size > 0){
         int off = 0;
@@ -341,6 +399,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
             
             cursor.y += 1;
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+            bufferView->lineBuffer->is_dirty = 1;
         }
     }
 }
@@ -405,7 +464,12 @@ void AppInitialize(){
                             Key_RightControl);
     
     RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftControl, Key_N);
-    RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftControl, Key_N);
+    RegisterRepeatableEvent(mapping, AppCommandLineQuicklyDisplay, Key_LeftAlt, Key_N);
+    
+    RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
+    RegisterRepeatableEvent(mapping, AppCommandInsertTab, Key_Tab);
+    
+    RegisterRepeatableEvent(mapping, AppCommandPaste, Key_LeftControl, Key_V);
     
     appContext.freeTypeMapping = mapping;
     KeyboardSetActiveMapping(appContext.freeTypeMapping);

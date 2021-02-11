@@ -8,9 +8,12 @@
 #include <fstream>
 #include <signal.h>
 
+#define MAX_STACK_SIZE 16
 #define DebugBreak() raise(SIGTRAP)
 
 #define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }
+
+const Float kInv255 = 0.003921569;
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
@@ -42,11 +45,19 @@ int TerminatorChar(char v);
 */
 int StringEqual(char *s0, char *s1, uint maxn);
 
+
+int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
+
+/*
+* Gets the name path of the file without the full path.
+*/
+uint GetSimplifiedPathName(char *fullPath, uint len);
+
 /*
 * Convert a hex color to a unsigned vec3i/f color.
 */
-vec3i ColorFromHex(uint hex);
-vec3f ColorFromHexf(uint hex);
+vec4i ColorFromHex(uint hex);
+vec4f ColorFromHexf(uint hex);
 
 /*
 * Count the amount of digits in a int.
@@ -74,4 +85,7 @@ int ExtensionStringContains(const char *string, const char *extensions);
 
 /* memcpy */
 void Memcpy(void *dst, void *src, uint size);
+/* memset */
+void Memset(void *dst, unsigned char v, uint size);
+
 #endif //UTILITIES_H

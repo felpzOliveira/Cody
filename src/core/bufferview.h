@@ -11,12 +11,13 @@ typedef enum{
     TransitionNone,
     TransitionCursor,
     TransitionScroll,
+    TransitionNumbers,
 }Transition;
 
-typedef struct{
-    vec2ui textPosition;
-    vec2ui ghostPosition;
-}DoubleCursor;
+typedef enum{
+    DescriptionTop,
+    DescriptionBottom
+}DescriptionLocation;
 
 typedef struct{
     Transition transition;
@@ -47,10 +48,10 @@ struct BufferView{
     DoubleCursor cursor;
     vec2ui visibleRect;
     uint currentMaxRange;
-    Float height;
     Float lineHeight;
     AnimationProps transitionAnim;
     Geometry geometry;
+    DescriptionLocation descLocation;
     
     /*
 * Rendering properties of the BufferView, defined by the renderer
@@ -99,11 +100,67 @@ void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float
 int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
                                         vec2ui *cursorAt, Transform *transform);
 
-void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
-int  BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
-                                    vec2ui *cursorAt, Transform *transform);
+/*
+* Starts a 'animation' on line numbering, not really animation but we use as such
+* to prevent graphics to enter a _wait_for_event_ state.
+*/
+void BufferView_StartNumbersShowTransition(BufferView *view, Float duration);
 
+/*
+* Queries the bufferview for the state of the started number transition.
+*/
+int BufferView_GetNumbersShowTransition(BufferView *view, Float dt);
+
+/*
+* Starts a animation on the cursor.
+*/
+void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
+
+/*
+* Queries the bufferview for the state of a started cursor animation after the time
+* 'dt' is executed over it. Returns the estimated cursor position in 'cursorAt',
+* the range view in 'rRange' and the 0-1 transform for scrolling.
+*/
+int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
+                                   vec2ui *cursorAt, Transform *transform);
+
+/*
+* Queries the bufferview if its cursor nest is valid, i.e.: needs rendering.
+*/
+int BufferView_CursorNestIsValid(BufferView *view);
+
+/*
+* Allows the bufferview to update its cursor nesting if it needs to do so.
+*/
+void BufferView_UpdateCursorNesting(BufferView *view);
+
+/*
+* Computes the start and end of the nesting containing the cursor.
+* If cursor is inside a valid nesting value returns 1, returns 0 otherwise.
+*/
+int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end);
+
+/*
+* Adjusts the ghost cursor if it is out of bounds.
+*/
+void BufferView_AdjustGhostCursorIfOut(BufferView *view);
+
+/*
+* Toogles the rendering of line numbers in the BufferView 'view'.
+*/
 void BufferView_ToogleLineNumbers(BufferView *view);
 
+/*
+* Returns the amount of lines present the LineBuffer binded to a BufferView 'view'.
+*/
 uint BufferView_GetLineCount(BufferView *view);
+
+/*
+* Returns a description string for printing to the screen and the current
+* cursor position, in relation to the file head, .i.e: percetage, 0 means
+* cursor at the head while 1 is at the end of the file.
+*/
+Float BufferView_GetDescription(BufferView *view, char *content, uint size);
+
+void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

@@ -1,58 +1,88 @@
 #pragma once
 #include <types.h>
 #include <geometry.h>
+#include <utilities.h>
+#include <symbol.h>
 
 //I like LEX = Logical EXecutor :)
-/* 
-  * This is not a real lexer, it is a parser that logically process keywords/contexts.
-* Writting a regex engine is quite hard and I don't want to use a library,
-* so I'm gonna see where parsing can get me.
+
+/*
+* I'm not interested in writing a regex engine. This parser works by tokenizing components
+* in the source data, it contains a lookup table that triggers states for logical processing
+* each processing unit gets a pointer to LEX_LOGICAL_PROCESSOR, these pointers are added
+* to a short stack for continuous updates, at each token if the stack is not empty it
+* allows the processing unit to change its state or the token identification based
+* on what it thinks it is the correct id, example: the declaration:
+*
+*      typedef struct lex lex;
+* 
+* is broken by Lex_TokenizeNext into 8 tokens, i.e.:
+* <TOKEN_ID_DATATYPE_TYPEDEF_DEF>, <TOKEN_ID_SPACE>, <TOKEN_ID_DATATYPE_STRUCT_DEF>,
+* <TOKEN_ID_SPACE>, <TOKEN_ID_NONE>, <TOKEN_ID_SPACE>, <TOKEN_ID_NONE> and
+ * <TOKEN_ID_SEMICOLON>.
+*
+* Because typedef wishes to be a logical processor, it implements LEX_LOGICAL_PROCESSOR
+* where it wants to classify the last 'lex' as a <TOKEN_ID_DATATYPE_USER_TYPEDEF>.
+* So in its processing unit it looks for states that represent:
+*      typedef <SOMETHING> type; and pushes its function into the tokenizer stack.
+*
+* On the following non empty token <TOKEN_ID_DATATYPE_STRUCT_DEF>, it also wants to
+* do logical processing so it can classify tokens as <TOKEN_ID_DATATYPE_USER_STRUCT>
+* based on:
+*      struct <Anything>{* <Anything> }*
+*
+* So it pushes its logical processing unit into the stack also. When the next token
+* is identified 'lex' (first one), struct's logical unit is called with the token,
+* because it is in an unested state and the token is marked as TOKEN_ID_NONE it knows
+* this is the name of the struct so it changes its id to <TOKEN_ID_DATATYPE_USER_STRUCT>
+* On the following token 'lex' (TOKEN_ID_NONE) once again the struct's logical unit is
+* called but now because it already got its key it pops itself and allows the next
+* unit to process, i.e.: typedef's. Now typedef's is assure that the <SOMETHING> in its
+* rule was consumed and because it is in a unested state it gets the token and marks it
+* as <TOKEN_ID_DATATYPE_USER_TYPEDEF>, when the ';' appears, because typede's unit is 
+* in unested state it means the declaration is done. So it pops itself from the stack
+* and returns.
+* Now we have both 'lex' tokens marked accordingly. I guess in the end this is the
+* start of a regexless regex engine.
 */
-typedef enum{
-    TOKEN_ID_OPERATOR,
-    TOKEN_ID_DATATYPE,
-    TOKEN_ID_COMMENT,
-    TOKEN_ID_STRING,
-    TOKEN_ID_NUMBER,
-    TOKEN_ID_RESERVED,
-    TOKEN_ID_FUNCTION,
-    TOKEN_ID_PREPROCESSOR,
-    TOKEN_ID_INCLUDE_SEL,
-    TOKEN_ID_INCLUDE,
-    TOKEN_ID_MATH,
-    TOKEN_ID_SPACE,
-    TOKEN_ID_NONE,
-}TokenId;
 
 typedef enum{
     TOKENIZER_STATE_CLEAN,
     TOKENIZER_STATE_MULTILINE,
 }TokenizerState;
 
-#define TOKENIZER_OP_FINISHED   0
-#define TOKENIZER_OP_UNFINISHED 1
-#define TOKENIZER_OP_FAILED     2
+#define TOKENIZER_OP_FINISHED      0
+#define TOKENIZER_OP_UNFINISHED    1
+#define TOKENIZER_OP_FAILED        2
+#define TOKENIZER_MAX_CACHE_SIZE   64
 
 #define TOKENIZER_FETCH_CALL(name) uint name(char **p, uint n)
 typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
 
-#define LEX_PROCESSOR(name) int name(char **p, uint n, char **head, uint *len, TokenizerContext *context)
-#define LEX_PROCESSOR_TABLE(name) int name(char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher)
+#define LEX_PROCESSOR(name) int name(char **p, uint n, char **head, uint *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer)
+#define LEX_PROCESSOR_TABLE(name) int name(char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher, TokenizerContext *context, Tokenizer *tokenizer)
 #define LEX_TOKENIZER_ENTRY_CONTEXT(name) int name(char **p, uint n, TokenizerContext *context)
-#define LEX_TOKENIZER_EXEC_CONTEXT(name) int name(char **p, uint n, Token *token, uint *offset, TokenizerContext *context, TokenizerFetchCallback *fetcher)
-#define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer)
+#define LEX_TOKENIZER_EXEC_CONTEXT(name) int name(char **p, uint n, Token *token, uint *offset, TokenizerContext *context, Tokenizer *tokenizer)
+#define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer, int process_tab)
+
+#define LEX_LOGICAL_PROCESSOR(name) int name(Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p)
 
 
+#define TOKEN_INITIALIZER {.size = 0, .position = 0, .identifier = TOKEN_ID_NONE}
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
 #define TOKENIZER_CONTEXT_INITIALIZER {.entry = nullptr, .lookup = nullptr}
-#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .tabSpacing = 1, .fetcher = nullptr}
+#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .tabSpacing = 1, .fetcher = nullptr, .lastToken = TOKEN_INITIALIZER, .procStack = nullptr }
 #define TOKENIZER_STATE_INITIALIZER {.state = TOKENIZER_STATE_CLEAN, .activeWorkProcessor = -1, .backTrack = 0, .forwardTrack = 0}
 
 struct Token;
 struct TokenizerContext;
+struct Tokenizer;
+struct LogicalProcessor;
 
 typedef LEX_TOKENIZER_ENTRY_CONTEXT(Lex_ContextEntry);
 typedef LEX_TOKENIZER_EXEC_CONTEXT(Lex_ContextExec);
+typedef LEX_LOGICAL_PROCESSOR(Lex_LogicalExec);
+
 
 /*
 * Basic component for Token information, i.e.: reserved and dynamic generated
@@ -72,7 +102,7 @@ struct Token{
 * the Tokenizer will use to match its results.
 */
 struct LookupToken{
-    char *value;
+    char value[TOKEN_MAX_LENGTH];
     int size;
     TokenId identifier;
 };
@@ -83,8 +113,8 @@ struct LookupToken{
 struct TokenLookupTable{
     LookupToken **table; // the table itself
     int nSize; // the amount of entries in the table
-    vec2i *sizes; // amount of elements per entry / reference size of each element
-    int startOffset; // the offset that says what is the minimal size of a Token, for C++ this is 2
+    int realSize; // the amount of memory for entries in the table
+    vec3i *sizes; // amount of elements per entry / reference size of each element / maximum elements per entry
 };
 
 /*
@@ -99,13 +129,6 @@ struct TokenizerContext{
     TokenLookupTable *lookup;
     int is_execing;
     int has_pending_work;
-    
-    // Comment parsing
-    int aggregate;
-    int type;
-    
-    // #include 
-    int inclusion;
 };
 
 /*
@@ -121,6 +144,25 @@ typedef struct{
 }TokenizerWorkContext;
 
 /*
+* Processor for logical structures.
+*/
+struct LogicalProcessor{
+    Lex_LogicalExec *proc;
+    uint nestedLevel;
+    uint currentState;
+};
+
+/* Data structures */
+/*
+* Fixed memory stack.
+*/
+struct BoundedStack{
+    LogicalProcessor items[MAX_STACK_SIZE];
+    int capacity;
+    int top;
+};
+
+/*
 * Tokenizer state. Can be used to save and restore tokenization from
 * a specific point. While 'Lex_TokenizerGetCurrentState' can retrieve most
 * of these, 'forwardTrack' needs to be explicitly defined by querying the
@@ -131,6 +173,14 @@ typedef struct{
     int activeWorkProcessor;
     uint backTrack;
     uint forwardTrack;
+    BoundedStack procStack; 
+    
+    // Comment parsing
+    int aggregate;
+    int type;
+    
+    // #include 
+    int inclusion;
 }TokenizerStateContext;
 
 /*
@@ -149,25 +199,24 @@ struct Tokenizer{
     int autoIncrementor;
     int tabSpacing;
     TokenizerFetchCallback *fetcher;
+    Token lastToken;
+    BoundedStack *procStack;
+    uint runningLine;
+    int givenTokens;
+    int trackSymbols;
+    SymbolTable symbolTable;
+    uint commitedSyms[TOKENIZER_MAX_CACHE_SIZE];
+    uint commitedSymsCount;
+    
+    // Comment parsing
+    int aggregate;
+    int type;
+    
+    // #include 
+    int inclusion;
 };
 
-inline const char *Lex_GetIdString(int id){
-#define STR_CASE(x) case x : return #x
-    switch(id){
-        STR_CASE(TOKEN_ID_OPERATOR);
-        STR_CASE(TOKEN_ID_DATATYPE);
-        STR_CASE(TOKEN_ID_COMMENT);
-        STR_CASE(TOKEN_ID_STRING);
-        STR_CASE(TOKEN_ID_NUMBER);
-        STR_CASE(TOKEN_ID_PREPROCESSOR);
-        STR_CASE(TOKEN_ID_FUNCTION);
-        STR_CASE(TOKEN_ID_INCLUDE);
-        STR_CASE(TOKEN_ID_MATH);
-        STR_CASE(TOKEN_ID_NONE);
-        default: return "Invalid";
-    }
-#undef STR_CASE
-}
+//TODO: I fell like I want to refactor this and write a Token streamer.
 
 /* Define few entities for parsing...*/
 LEX_PROCESSOR(Lex_Number);
@@ -175,6 +224,10 @@ LEX_PROCESSOR(Lex_String);
 LEX_PROCESSOR(Lex_Comments);
 LEX_PROCESSOR_TABLE(Lex_TokenLookupMatch);
 LEX_PROCESSOR_TABLE(Lex_TokenLookupAny);
+LEX_LOGICAL_PROCESSOR(Lex_StructProcessor);
+LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor);
+LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor);
+LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor);
 
 /* Main call to get tokens, returns the next matching token */
 LEX_TOKENIZER(Lex_TokenizeNext);
@@ -189,12 +242,18 @@ typedef LEX_PROC_CALLBACK(Lex_LineProcessorCallback);
 * The line when given has '\n' traded by 0, and size+1.
 */
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
-                     void *prv=nullptr);
+                     uint refLine=0, void *prv=nullptr);
 
 /*
 * Builds a tokenizer from default tables.
 */
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing);
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols=0);
+
+/*
+* Pushes a new token into the given lookup table.
+*/
+void Lex_PushTokenIntoTable(TokenLookupTable *lookup, char *value,
+                            uint size, TokenId id);
 
 /*
 * Sets the tokenizer fetcher call for Tokens that cannot be determined by the 
@@ -208,13 +267,7 @@ void Lex_TokenizerSetFetchCallback(Tokenizer *tokenizer,
 /*
 * Resets the tokenizer to prepare for a new line of parsing.
 */
-void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer);
-
-/*
-* Basically 'Lex_TokenizerPrepareForNewLine' but also resets
-* the state of the previous line processed.
-*/
-void Lex_TokenizerReset(Tokenizer *tokenizer);
+void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer, uint lineNo);
 
 /*
 * Queries the tokenizer in use to report its state _at_this_moment_.
@@ -230,3 +283,15 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext
 * Checks if tokenizer has pending work.
 */
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer);
+
+
+/* Data structure functions, actually implemented in utilities.cpp */
+/* Fixed memory Stack */
+BoundedStack *BoundedStack_Create();
+int BoundedStack_IsFull(BoundedStack *stack);
+int BoundedStack_Size(BoundedStack *stack);
+int BoundedStack_IsEmpty(BoundedStack *stack);
+void BoundedStack_Push(BoundedStack *stack, LogicalProcessor *item);
+LogicalProcessor *BoundedStack_Peek(BoundedStack *stack);
+void BoundedStack_Pop(BoundedStack *stack);
+void BoundedStack_Copy(BoundedStack *dst, BoundedStack *src);

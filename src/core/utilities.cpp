@@ -6,9 +6,27 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <lex.h>
+#include <app.h>
 
-vec4ui AutoColor(vec3ui color){
-    return vec4ui(color.x, color.y, color.z, 255);
+uint GetSimplifiedPathName(char *fullPath, uint len){
+    uint c = len > 2 ? len - 2 : 0;
+    while(c > 0){
+        char h = fullPath[c];
+        if(h == '\\' || h == '/'){
+            return c+1;
+        }
+        c--;
+    }
+    
+    return 0;
+}
+
+void Memset(void *dst, unsigned char v, uint size){
+    unsigned char *udst = (unsigned char *)dst;
+    while(size --){
+        *(udst++) = v;
+    }
 }
 
 void Memcpy(void *dst, void *src, uint size){
@@ -47,6 +65,12 @@ int StringToCodepoint(char *u, int size, int *off){
     if(l < 1) return -1;
     
     unsigned char u0 = u[0];
+    
+    if(u0 == '\t'){
+        *off = appGlobalConfig.tabSpacing;
+        return u0;
+    }
+    
     if(u0 >= 0 && u0 <= 127){
         *off = 1;
         return u0; // Ascii table
@@ -118,16 +142,92 @@ uint DigitCount(uint value){
     return v;
 }
 
-vec3i ColorFromHex(uint hex){
+vec4i ColorFromHex(uint hex){
+    uint a = (hex & 0xff000000) >> 24;
     uint r = (hex & 0x00ff0000) >> 16;
     uint g = (hex & 0x0000ff00) >> 8;
     uint b = (hex & 0x000000ff);
-    return vec3i(r, g, b);
+    return vec4i(r, g, b, a);
 }
 
-vec3f ColorFromHexf(uint hex){
-    vec3i c = ColorFromHex(hex);
-    return vec3f(c.x / 255.0f, c.y / 255.0f, c.z / 255.0f);
+vec4f ColorFromHexf(uint hex){
+    vec4i c = ColorFromHex(hex);
+    return vec4f(c.x * kInv255, c.y * kInv255,
+                 c.z * kInv255, c.w * kInv255);
+}
+
+void OUTPUT(int j, char *y, int m){
+    char s = y[j + m];
+    y[j + m] = 0;
+    printf("Found at : %d ( %s )\n", j, y + j);
+    y[j + m] = s;
+}
+
+void preMp(char *x, int m, int mpNext[]) {
+    int i, j;
+    
+    i = 0;
+    j = mpNext[0] = -1;
+    while (i < m) {
+        while (j > -1 && x[i] != x[j])
+            j = mpNext[j];
+        mpNext[++i] = ++j;
+    }
+}
+
+
+void MP(char *x, int m, char *y, int n) {
+    const int XSIZE = 255;
+    int i, j, mpNext[XSIZE];
+    
+    /* Preprocessing */
+    preMp(x, m, mpNext);
+    
+    /* Searching */
+    i = j = 0;
+    while (j < n) {
+        while (i > -1 && x[i] != y[j])
+            i = mpNext[i];
+        i++;
+        j++;
+        if (i >= m) {
+            OUTPUT(j - i, y, m);
+            i = mpNext[i];
+        }
+    }
+}
+
+
+void preQsBc(char *x, int m, int qsBc[], const int ASIZE) {
+    int i;
+    
+    for (i = 0; i < ASIZE; ++i)
+        qsBc[i] = m + 1;
+    for (i = 0; i < m; ++i)
+        qsBc[x[i]] = m - i;
+}
+
+
+void QS(char *x, int m, char *y, int n) {
+    const int ASIZE = 255;
+    int j, qsBc[ASIZE];
+    
+    /* Preprocessing */
+    preQsBc(x, m, qsBc, ASIZE);
+    
+    /* Searching */
+    j = 0;
+    while (j <= n - m) {
+        if(memcmp(x, y + j, m) == 0){
+            OUTPUT(j, y, m);
+        }
+        j += qsBc[y[j + m]];               /* shift */
+    }
+}
+
+int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len){
+    MP(s0, s0len, s1, s1len);
+    return 0;
 }
 
 int StringEqual(char *s0, char *s1, uint maxn){
@@ -221,4 +321,49 @@ char *GetFileContents(const char *path, uint *size){
     _error:
     if(fd >= 0) close(fd);
     return ret;
+}
+
+BoundedStack *BoundedStack_Create(){
+    BoundedStack *stack = (BoundedStack *)AllocatorGet(sizeof(BoundedStack));
+    AssertA(stack != nullptr, "Failed to get stack memory");
+    stack->top = -1;
+    stack->capacity = MAX_STACK_SIZE;
+    return stack;
+}
+
+void BoundedStack_Copy(BoundedStack *dst, BoundedStack *src){
+    dst->capacity = src->capacity;
+    dst->top = src->top;
+    Memcpy(dst->items, src->items, sizeof(LogicalProcessor) * src->capacity);
+}
+
+int BoundedStack_IsFull(BoundedStack *stack){
+    return stack->top == stack->capacity - 1;
+}
+
+int BoundedStack_Size(BoundedStack *stack){
+    return stack->top + 1;
+}
+
+int BoundedStack_IsEmpty(BoundedStack *stack){
+    return stack->top == -1;
+}
+
+void BoundedStack_Push(BoundedStack *stack, LogicalProcessor *item){
+    AssertA(!BoundedStack_IsFull(stack), "Stack is full");
+    Memcpy(&stack->items[++stack->top], item, sizeof(LogicalProcessor));
+}
+
+LogicalProcessor *BoundedStack_Peek(BoundedStack *stack){
+    if(BoundedStack_IsEmpty(stack)){
+        return nullptr;
+    }else{
+        return &stack->items[stack->top];
+    }
+}
+
+void BoundedStack_Pop(BoundedStack *stack){
+    if(!BoundedStack_IsEmpty(stack)){
+        stack->top--;
+    }
 }

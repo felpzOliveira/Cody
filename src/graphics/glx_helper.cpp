@@ -349,6 +349,10 @@ int InitGLX(LibHelperX11 *x11){
     }
     
     AssertA(glxHelper.handle != NULL, "Failed to load GLX");
+    if(glxHelper.handle == NULL){
+        printf("NO GL library loaded\n");
+        exit(0);
+    }
     LOAD_SYM(glXGetFBConfigs, PFNGLXGETFBCONFIGSPROC);
     LOAD_SYM(glXGetFBConfigAttrib, PFNGLXGETFBCONFIGATTRIBPROC);
     LOAD_SYM(glXGetClientString, PFNGLXGETCLIENTSTRINGPROC);

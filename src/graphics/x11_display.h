@@ -121,6 +121,21 @@ typedef struct{
     
     Atom WM_DELETE_WINDOW;
     Atom NET_WM_PING;
+    Atom TARGETS;
+    Atom MULTIPLE;
+    Atom INCR;
+    Atom CLIPBOARD;
+    Atom PRIMARY;
+    Atom CLIPBOARD_MANAGER;
+    Atom SAVE_TARGETS;
+    Atom ATOM_PAIR;
+    Atom NULL_;
+    Atom UTF8_STRING;
+    Atom COMPOUND_STRING;
+    Atom CODY_SELECTION;
+    
+    char *primarySelectionString;
+    char *clipboardString;
     
     struct{
         int available;
@@ -141,11 +156,14 @@ int  WindowShouldCloseX11(WindowX11 *window);
 void SwapBuffersX11(WindowX11 *window);
 void SwapIntervalX11(WindowX11 *window, int interval);
 void PoolEventsX11();
+void WaitForEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
 void DestroyWindowX11(WindowX11 *window);
 void TerminateX11();
 
 double GetElapsedTime();
+
+const char *ClipboardGetStringX11(unsigned int *size);
 
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
 void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);

@@ -1,4 +1,6 @@
 #include <bufferview.h>
+#include <utilities.h>
+#include <app.h>
 
 int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
     return ((p.x <= geometry->upper.x && p.x >= geometry->lower.x) &&
@@ -54,6 +56,13 @@ inline int BufferView_IsCursorVisible(BufferView *view, vec2ui range){
             range.y >= view->cursor.textPosition.x) ? 1 : 0;
 }
 
+void BufferView_AdjustGhostCursorIfOut(BufferView *view){
+    Buffer *b = BufferView_GetBufferAt(view, view->cursor.ghostPosition.x);
+    if(!(view->cursor.ghostPosition.y < b->count)){
+        BufferView_GhostCursorFollow(view);
+    }
+}
+
 void BufferView_GhostCursorFollow(BufferView *view){
     view->cursor.ghostPosition = view->cursor.textPosition;
 }
@@ -63,22 +72,20 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
     Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, view->cursor.textPosition.x);
     int tokenID = -1;
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
-    for(int i = 0; i < (int)buffer->tokenCount; i++){
-        Token *token = &buffer->tokens[i];
-        if(token->position >= pos){
-            Token *prev = &buffer->tokens[i-1];
-            *targetToken = token;
-            tokenID = i;
-            
-            if(pos >= prev->position && pos < prev->position + prev->size){
-                *targetToken = prev;
-                tokenID = i-1;
+    if(pos < buffer->taken){
+        for(int i = 0; i < (int)buffer->tokenCount; i++){
+            Token *token = &buffer->tokens[i];
+            if(token->position + token->size > pos &&
+               (token->identifier != TOKEN_ID_SPACE &&
+                token->identifier != TOKEN_ID_MATH) ||
+               (i == buffer->tokenCount-1 && token->identifier == TOKEN_ID_SPACE))
+            {
+                *targetToken = token;
+                tokenID = i;
+                break;
             }
-            
-            break;
         }
     }
-    
     return tokenID;
 }
 
@@ -88,27 +95,20 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Buffer *buffer,
     AssertA(view != nullptr, "Invalid bufferview pointer");
     int tokenID = -1;
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
-    for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
-        Token *token = &buffer->tokens[i];
-        if(token->position+token->size <= pos){
-            if(i+1 < buffer->tokenCount){
-                Token *prev = &buffer->tokens[i+1];
-                if(prev->position < pos){
-                    *targetToken = prev;
-                    tokenID = i+1;
-                }else{
-                    *targetToken = token;
-                    tokenID = i;
-                }
-            }else{
+    if(pos > 0){
+        for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
+            Token *token = &buffer->tokens[i];
+            if(token->position < pos && 
+               (token->identifier != TOKEN_ID_SPACE &&
+                token->identifier != TOKEN_ID_MATH) || 
+               (i == 0 && token->identifier == TOKEN_ID_SPACE))
+            {
                 *targetToken = token;
                 tokenID = i;
+                break;
             }
-            
-            break;
         }
     }
-    
     return tokenID;
 }
 
@@ -119,13 +119,16 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
             "Invalid initialization");
     view->lineBuffer = lineBuffer;
     view->tokenizer = tokenizer;
-    
+    view->descLocation = DescriptionTop;
     view->cursor.textPosition  = vec2ui(0, 0);
     view->cursor.ghostPosition = vec2ui(0, 0);
-    view->renderLineNbs = 1;
+    view->cursor.is_dirty = 1;
+    view->cursor.nestStart = vec2ui(0, 0);
+    view->cursor.nestEnd = vec2ui(0, 0);
+    view->cursor.nestValid = 0;
+    view->renderLineNbs = 0;
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;
-    view->height = 0;
     view->transitionAnim.transition = TransitionNone;
     view->transitionAnim.isAnimating = 0;
     view->transitionAnim.duration = 0.0f;
@@ -134,10 +137,10 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
 }
 
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){
+    Float height = geometry.upper.y - geometry.lower.y;
     view->geometry = geometry;
     view->lineHeight = lineHeight;
-    view->height = geometry.upper.y - geometry.lower.y;
-    uint yRange = (uint)floor(view->height / view->lineHeight);
+    uint yRange = (uint)floor(height / view->lineHeight) - 1;
     view->currentMaxRange = yRange;
     view->visibleRect.y = view->visibleRect.x + yRange;
     BufferView_CursorTo(view, view->cursor.textPosition.x);
@@ -178,6 +181,8 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
     }else{
         view->cursor.textPosition.y = 0;
     }
+    
+    view->cursor.is_dirty = 1;
 }
 
 void BufferView_CursorTo(BufferView *view, uint lineNo){
@@ -203,11 +208,17 @@ void BufferView_CursorTo(BufferView *view, uint lineNo){
     if(lineNo < view->lineBuffer->lineCount){
         view->cursor.textPosition.x = lineNo;
     }
+    
+    view->cursor.is_dirty = 1;
 }
 
 int BufferView_ComputeTextLine(BufferView *view, Float screenY){
     Buffer *buffer = nullptr;
     Float lStart = view->visibleRect.x;
+    if(view->descLocation == DescriptionTop){
+        screenY -= view->lineHeight;
+    }
+    
     Float fline = lStart + floor(screenY / view->lineHeight);
     if((uint)fline < view->lineBuffer->lineCount){
         return (int)fline;
@@ -226,6 +237,7 @@ void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col){
         
         BufferView_CursorTo(view, (uint)lineNo);
         view->cursor.textPosition.y = col;
+        
     }
 }
 
@@ -274,6 +286,7 @@ int BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRang
     
     AssertA(anim->transition == TransitionScroll, "Incorrect transition query");
     
+    view->cursor.is_dirty = 1;
     anim->passedTime += Max(0, dt);
     if(Animation_Finished(anim)){
         goto __set_end_transition;
@@ -332,6 +345,33 @@ int BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRang
     return 1;
 }
 
+void BufferView_StartNumbersShowTransition(BufferView *view, Float duration){
+    AssertA(view != nullptr, "Invalid bufferview pointer");
+    if(view->renderLineNbs == 0){
+        view->transitionAnim.isAnimating = 1;
+        view->transitionAnim.transition = TransitionNumbers;
+        view->transitionAnim.passedTime = 0;
+        view->transitionAnim.duration = duration;
+    }
+}
+
+int BufferView_GetNumbersShowTransition(BufferView *view, Float dt){
+    AnimationProps *anim = &view->transitionAnim;
+    AssertA(anim->transition == TransitionNumbers, "Incorrect transition query");
+    anim->passedTime += Max(0, dt);
+    if(anim->passedTime < anim->duration){
+        view->renderLineNbs = 1;
+    }else{
+        view->renderLineNbs = 0;
+    }
+    
+    if(view->renderLineNbs == 0){ // done
+        anim->isAnimating = 0;
+    }
+    
+    return view->renderLineNbs == 0 ? 1 : 0;
+}
+
 void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration){
     AssertA(view != nullptr, "Invalid bufferview pointer");
     lineNo = Clamp(lineNo, 0, view->lineBuffer->lineCount-1);
@@ -359,7 +399,7 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
     int gap = 2;
     AnimationProps *anim = &view->transitionAnim;
     AssertA(anim->transition == TransitionCursor, "Incorrect transition query");
-    
+    view->cursor.is_dirty = 1;
     anim->passedTime += Max(0, dt);
     if(Animation_Finished(anim)){
         // This transition is done
@@ -429,8 +469,161 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
     return 1;
 }
 
+Float BufferView_GetDescription(BufferView *view, char *content, uint size){
+    uint lineCount = view->lineBuffer->lineCount;
+    Float pct = ((Float) view->cursor.textPosition.x) / ((Float) lineCount);
+    uint st = GetSimplifiedPathName(view->lineBuffer->filePath,
+                                    view->lineBuffer->filePathSize);
+    
+    if(view->lineBuffer->is_dirty == 0){
+        snprintf(content, size, " %s - Row: %u Col: %u", &view->lineBuffer->filePath[st],
+                 view->cursor.textPosition.x+1, view->cursor.textPosition.y+1);
+    }else{
+        snprintf(content, size, " %s - Row: %u Col: %u *", &view->lineBuffer->filePath[st],
+                 view->cursor.textPosition.x+1, view->cursor.textPosition.y+1);
+    }
+    
+    return pct;
+}
+
 void BufferView_ToogleLineNumbers(BufferView *view){
     view->renderLineNbs = 1 - view->renderLineNbs;
+}
+
+int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end){
+    uint startAt = 0;
+    int refStart = -2;
+    int found = 0;
+    TokenId tdownId, tupId;
+    uint bid = view->cursor.textPosition.x;
+    uint refid = bid;
+    
+    Buffer *buffer = BufferView_GetBufferAt(view, view->cursor.textPosition.x);
+    TokenizerStateContext *context = &buffer->stateContext;
+    uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
+    
+    //1 - read this buffer and gether closer values
+    int n[3] = {0, 0, 0};
+    int c = -1;
+    do{
+        found = 0;
+        int r = (int)buffer->tokenCount;
+        for(int i = r-1; i >= 0; i--){
+            Token *token = &buffer->tokens[i];
+            if(token->position < pos){
+                c = -1;
+                switch(token->identifier){
+                    case TOKEN_ID_BRACE_OPEN:{
+                        *start = vec2ui(bid, i);
+                        tdownId = TOKEN_ID_BRACE_CLOSE;
+                        tupId = TOKEN_ID_BRACE_OPEN;
+                        c = 0;
+                        n[0]++;
+                    } break;
+                    case TOKEN_ID_BRACE_CLOSE:{
+                        n[0]--;
+                        c = 0;
+                    } break;
+                    case TOKEN_ID_PARENTHESE_OPEN:{
+                        *start = vec2ui(bid, i);
+                        tdownId = TOKEN_ID_PARENTHESE_CLOSE;
+                        tupId = TOKEN_ID_PARENTHESE_OPEN;
+                        c = 1;
+                        n[1]++;
+                    } break;
+                    case TOKEN_ID_PARENTHESE_CLOSE:{
+                        n[1]--;
+                        c = 1;
+                    } break;
+                    case TOKEN_ID_BRACKET_OPEN:{
+                        *start = vec2ui(bid, i);
+                        tdownId = TOKEN_ID_BRACKET_CLOSE;
+                        tupId = TOKEN_ID_BRACKET_OPEN;
+                        c = 2;
+                        n[2]++;
+                    } break;
+                    case TOKEN_ID_BRACKET_CLOSE:{
+                        n[2]--;
+                        c = 2;
+                    } break;
+                    default:{}
+                }
+                
+                if(c >= 0){
+                    if(n[c] > 0){
+                        found = 1;
+                        break;
+                    }
+                }
+            }else{
+                startAt = i;
+                refStart = -1;
+            }
+        }
+        
+        if(!found){
+            bid = bid > 0 ? bid - 1 : view->lineBuffer->lineCount+1;
+            if(!(bid < view->lineBuffer->lineCount)){ // no entry
+                return 0;
+            }
+            buffer = BufferView_GetBufferAt(view, bid);
+            pos = buffer->taken;
+        }
+    }while(found == 0);
+    
+    // ok we got something up, now go down
+    if(refStart == -2){ // end of previous buffer
+        bid = refid + 1;
+        if(!(bid < view->lineBuffer->lineCount)) return 0;
+        startAt = 0;
+    }else{
+        bid = refid;
+    }
+    
+    buffer = BufferView_GetBufferAt(view, bid);
+    // search down
+    found = 0;
+    do{
+        found = 0;
+        if(buffer->tokenCount > 0){
+            for(uint i = startAt; i < buffer->tokenCount; i++){
+                Token *token = &buffer->tokens[i];
+                if(token->identifier == tdownId && n[c] == 1){
+                    *end = vec2ui(bid, i);
+                    found = 1;
+                    break;
+                }else if(token->identifier == tdownId){
+                    n[c]--;
+                }else if(token->identifier == tupId){
+                    n[c]++;
+                }
+            }
+        }
+        if(!found){
+            bid++;
+            found = bid < view->lineBuffer->lineCount ? 0 : 1;
+            if(found) return 0;
+            
+            buffer = BufferView_GetBufferAt(view, bid);
+            startAt = 0;
+        }
+    }while(!found);
+    
+    return 1;
+    
+}
+
+int BufferView_CursorNestIsValid(BufferView *view){
+    return view->cursor.nestValid;
+}
+
+void BufferView_UpdateCursorNesting(BufferView *view){
+    if(view->cursor.is_dirty){
+        view->cursor.is_dirty = 0;
+        view->cursor.nestValid = BufferView_ComputeNestingPoints(view,
+                                                                 &view->cursor.nestStart,
+                                                                 &view->cursor.nestEnd);
+    }
 }
 
 vec2ui BufferView_GetCursorPosition(BufferView *view){

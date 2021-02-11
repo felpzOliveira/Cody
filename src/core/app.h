@@ -8,6 +8,7 @@ struct BufferView;
 
 typedef struct{
     int tabSpacing;
+    int useTabs;
 }AppConfig;
 
 extern AppConfig appGlobalConfig;

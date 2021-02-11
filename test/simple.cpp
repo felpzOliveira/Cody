@@ -1,1 +1,1 @@
-	int xab;
+typedef data<Float> someType;

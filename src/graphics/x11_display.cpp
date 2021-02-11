@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <sys/time.h>
 #include <x11_keyboard.h>
+#include <climits>
 
 LibHelperX11 x11Helper;
 Timer timer;
@@ -15,6 +16,46 @@ Framebuffer x11Framebuffer;
 ContextGL x11GLContext;
 
 void ProcessEventX11(XEvent *event);
+
+size_t encodeUTF8(char* s, unsigned int ch){
+    size_t count = 0;
+    
+    if(ch < 0x80)
+        s[count++] = (char) ch;
+    else if (ch < 0x800){
+        s[count++] = (ch >> 6) | 0xc0;
+        s[count++] = (ch & 0x3f) | 0x80;
+    }
+    else if(ch < 0x10000){
+        s[count++] = (ch >> 12) | 0xe0;
+        s[count++] = ((ch >> 6) & 0x3f) | 0x80;
+        s[count++] = (ch & 0x3f) | 0x80;
+    }
+    else if(ch < 0x110000){
+        s[count++] = (ch >> 18) | 0xf0;
+        s[count++] = ((ch >> 12) & 0x3f) | 0x80;
+        s[count++] = ((ch >> 6) & 0x3f) | 0x80;
+        s[count++] = (ch & 0x3f) | 0x80;
+    }
+    
+    return count;
+}
+
+static char* convertLatin1toUTF8(const char* source){
+    size_t size = 1;
+    const char* sp;
+    
+    for(sp = source;  *sp;  sp++)
+        size += (*sp & 0x80) ? 2 : 1;
+    
+    char* target = (char *)calloc(size, 1);
+    char* tp = target;
+    
+    for(sp = source;  *sp;  sp++)
+        tp += encodeUTF8(tp, *sp);
+    
+    return target;
+}
 
 uint64_t GetTimerValue(){
     if(timer.monotonic){
@@ -150,7 +191,7 @@ void InitializeX11(){
     
     x11Helper.display = XOpenDisplay(NULL);
     
-    AssertA(x11Helper.display != NULL, "Failed to connect to X");
+    AssertErr(x11Helper.display != NULL, "Failed to connect to X");
     
     x11Helper.screen  = DefaultScreen(x11Helper.display);
     x11Helper.root    = RootWindow(x11Helper.display, x11Helper.screen);
@@ -160,14 +201,14 @@ void InitializeX11(){
     x11Helper.helperWindow = CreateHelperWindow(&x11Helper);
     x11Helper.hiddenCursor = None; //TODO
     
-    AssertA(setlocale(LC_ALL, "") != NULL, "Failed to set locale");
-    AssertA(XSupportsLocale(), "X does not supporte locale");
-    AssertA(XSetLocaleModifiers("@im=none") != NULL, "Failed to set locale modifiers");
+    AssertErr(setlocale(LC_ALL, "") != NULL, "Failed to set locale");
+    AssertErr(XSupportsLocale(), "X does not supporte locale");
+    AssertErr(XSetLocaleModifiers("@im=none") != NULL, "Failed to set locale modifiers");
     
     x11Helper.im = XOpenIM(x11Helper.display, 0, NULL, NULL);
-    AssertA(x11Helper.im != NULL, "Failed to open input method");
+    AssertErr(x11Helper.im != NULL, "Failed to open input method");
     
-    AssertA(XIMHasInputStyles(&x11Helper) != 0, "No input styles found");
+    AssertErr(XIMHasInputStyles(&x11Helper) != 0, "No input styles found");
     
     InitializeTimer();
     InitializeFramebuffer(&x11Framebuffer);
@@ -176,8 +217,25 @@ void InitializeX11(){
     x11GLContext.forward = 1;
     x11GLContext.profile = OPENGL_CORE_PROFILE;
     
-    x11Helper.WM_DELETE_WINDOW = XInternAtom(x11Helper.display, "WM_DELETE_WINDOW", 0);
-    x11Helper.NET_WM_PING = XInternAtom(x11Helper.display, "_NET_WM_PING", 0);
+    x11Helper.WM_DELETE_WINDOW = XInternAtom(x11Helper.display, "WM_DELETE_WINDOW", False);
+    x11Helper.NET_WM_PING = XInternAtom(x11Helper.display, "_NET_WM_PING", False);
+    
+    x11Helper.TARGETS = XInternAtom(x11Helper.display, "TARGETS", False);
+    x11Helper.MULTIPLE = XInternAtom(x11Helper.display, "MULTIPLE", False);
+    x11Helper.PRIMARY = XInternAtom(x11Helper.display, "PRIMARY", False);
+    x11Helper.INCR = XInternAtom(x11Helper.display, "INCR", False);
+    x11Helper.CLIPBOARD = XInternAtom(x11Helper.display, "CLIPBOARD", False);
+    
+    x11Helper.CLIPBOARD_MANAGER =
+        XInternAtom(x11Helper.display, "CLIPBOARD_MANAGER", False);
+    x11Helper.SAVE_TARGETS =
+        XInternAtom(x11Helper.display, "SAVE_TARGETS", False);
+    
+    x11Helper.NULL_ = XInternAtom(x11Helper.display, "NULL", False);
+    x11Helper.UTF8_STRING = XInternAtom(x11Helper.display, "UTF8_STRING", False);
+    x11Helper.ATOM_PAIR = XInternAtom(x11Helper.display, "ATOM_PAIR", False);
+    x11Helper.CODY_SELECTION =
+        XInternAtom(x11Helper.display, "CODY_SELECTION", False);
 }
 
 int WindowShouldCloseX11(WindowX11 *window){
@@ -212,7 +270,7 @@ void _CreateWindowX11(int width, int height, const char *title,
 {
     Visual *visual;
     int depth = 0;
-    AssertA(InitGLX(x11) == 1, "Failed to initialize GLX");
+    AssertErr(InitGLX(x11) == 1, "Failed to initialize GLX");
     ChooseVisualGLX(fb, x11, &visual, &depth);
     
     window->colormap = XCreateColormap(x11->display, x11->root, visual, AllocNone);
@@ -336,6 +394,147 @@ void SwapBuffersX11(WindowX11 *window){
     SwapBufferGLX((void *)window);
 }
 
+static int isSelPropNewValueNotify(Display* display, XEvent* event, XPointer pointer){
+    XEvent* notification = (XEvent*) pointer;
+    return event->type == PropertyNotify &&
+        event->xproperty.state == PropertyNewValue &&
+        event->xproperty.window == notification->xselection.requestor &&
+        event->xproperty.atom == notification->xselection.property;
+}
+
+const char* GetSelectionString(Atom selection){
+    char** selectionString = NULL;
+    const Atom targets[] = { x11Helper.UTF8_STRING, XA_STRING };
+    const size_t targetCount = sizeof(targets) / sizeof(targets[0]);
+    
+    if(selection == x11Helper.PRIMARY)
+        selectionString = &x11Helper.primarySelectionString;
+    else
+        selectionString = &x11Helper.clipboardString;
+    
+    if(XGetSelectionOwner(x11Helper.display, selection) ==
+       x11Helper.helperWindow)
+    {
+        // Instead of doing a large number of X round-trips just to put this
+        // string into a window property and then read it back, just return it
+        return *selectionString;
+    }
+    
+    free(*selectionString);
+    *selectionString = NULL;
+    
+    for(size_t i = 0;  i < targetCount;  i++){
+        char* data;
+        Atom actualType;
+        int actualFormat;
+        unsigned long itemCount, bytesAfter;
+        XEvent notification, dummy;
+        
+        XConvertSelection(x11Helper.display,
+                          selection,
+                          targets[i],
+                          x11Helper.CODY_SELECTION,
+                          x11Helper.helperWindow,
+                          CurrentTime);
+        
+        while(!XCheckTypedWindowEvent(x11Helper.display,
+                                      x11Helper.helperWindow,
+                                      SelectionNotify,
+                                      &notification))
+        {
+            waitForEvent(NULL);
+        }
+        
+        if(notification.xselection.property == None)
+            continue;
+        
+        XCheckIfEvent(x11Helper.display,
+                      &dummy,
+                      isSelPropNewValueNotify,
+                      (XPointer) &notification);
+        
+        XGetWindowProperty(x11Helper.display,
+                           notification.xselection.requestor,
+                           notification.xselection.property,
+                           0, LONG_MAX, True, AnyPropertyType,
+                           &actualType, &actualFormat,
+                           &itemCount, &bytesAfter,
+                           (unsigned char**) &data);
+        
+        if(actualType == x11Helper.INCR){
+            size_t size = 1;
+            char* string = NULL;
+            
+            for(;;){
+                while(!XCheckIfEvent(x11Helper.display,
+                                     &dummy,
+                                     isSelPropNewValueNotify,
+                                     (XPointer) &notification))
+                {
+                    waitForEvent(NULL);
+                }
+                
+                XFree(data);
+                XGetWindowProperty(x11Helper.display,
+                                   notification.xselection.requestor,
+                                   notification.xselection.property,
+                                   0, LONG_MAX, True, AnyPropertyType,
+                                   &actualType, &actualFormat,
+                                   &itemCount, &bytesAfter,
+                                   (unsigned char**) &data);
+                
+                if(itemCount){
+                    size += itemCount;
+                    string = (char *)realloc(string, size);
+                    string[size - itemCount - 1] = '\0';
+                    strcat(string, data);
+                }
+                
+                if(!itemCount){
+                    if (targets[i] == XA_STRING){
+                        *selectionString = convertLatin1toUTF8(string);
+                        free(string);
+                    }
+                    else
+                        *selectionString = string;
+                    break;
+                }
+            }
+        }
+        else if(actualType == targets[i]){
+            if(targets[i] == XA_STRING)
+                *selectionString = convertLatin1toUTF8(data);
+            else
+                *selectionString = strdup(data);
+        }
+        
+        XFree(data);
+        
+        if(*selectionString)
+            break;
+    }
+    
+    if(!*selectionString){
+        printf("Failed to copy content\n");
+    }
+    
+    return *selectionString;
+    
+}
+
+const char *ClipboardGetStringX11(unsigned int *size){
+    const char *str = GetSelectionString(x11Helper.CLIPBOARD);
+    *size = strlen(str); // TODO: Make this thing go away
+    return str;
+}
+
+void WaitForEventsX11(){
+    while(!XPending(x11Helper.display))
+        waitForEvent(NULL);
+    
+    PoolEventsX11();
+}
+
 void PoolEventsX11(){
     XPending(x11Helper.display);
     
@@ -454,7 +653,27 @@ void ProcessEventClientMessageX11(XEvent *event, WindowX11 *window, LibHelperX11
 }
 
 void ProcessEventSelectionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    //printf("Selection Notify\n");
+    printf("Selection Notify\n");
+}
+
+void ProcessEventSelectionClearX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Selection clear\n");
+#if 0
+    const XSelectionRequestEvent* request = &event->xselectionrequest;
+    XEvent reply = { SelectionNotify };
+    reply.xselection.property = writeTargetToProperty(request);
+    reply.xselection.display = request->display;
+    reply.xselection.requestor = request->requestor;
+    reply.xselection.selection = request->selection;
+    reply.xselection.target = request->target;
+    reply.xselection.time = request->time;
+    
+    XSendEvent(x11Helper.display, request->requestor, False, 0, &reply);
+#endif
+}
+
+void ProcessEventSelectionRequestX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    printf("Selection request\n");
 }
 
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -534,6 +753,14 @@ void ProcessEventX11(XEvent *event){
         
         case SelectionNotify:{
             ProcessEventSelectionX11(event, window, &x11Helper);
+        } break;
+        
+        case SelectionClear:{
+            ProcessEventSelectionClearX11(event, window, &x11Helper);
+        } break;
+        
+        case SelectionRequest:{
+            ProcessEventSelectionRequestX11(event, window, &x11Helper);
         } break;
         
         case FocusIn:{

@@ -35,8 +35,11 @@ typedef struct{
 */
 typedef struct{
     Buffer *lines;
+    char filePath[256];
+    uint filePathSize;
     uint lineCount;
     uint size;
+    uint is_dirty;
 }LineBuffer;
 
 /* For static initialization */
@@ -60,13 +63,14 @@ void Buffer_Init(Buffer *buffer, uint size);
 * Initializes a previously allocated Buffer from a string pointer given in 'head'
 * with size 'len'.
 */
-void Buffer_InitSet(Buffer *buffer, char *head, uint len);
+void Buffer_InitSet(Buffer *buffer, char *head, uint len, int decode_tab);
 
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
-* and must have length 'len'.
+* and must have length 'len'. If you are copying raw data to this buffer and needs 
+* the issue of tab x spacing handled use decode_tab = 1.
 */
-void Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len);
+void Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int decode_tab=0);
 
 /*
 * Updates the curret token list inside the buffer given. This function copies
@@ -130,14 +134,21 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
 * Inserts a new line at the end of the LineBuffer. The line is specified by its contents
 * in 'line' with size 'size'.
 */
-void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size);
+void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int decode_tab);
 
 /*
 * Inserts a new line at a position 'at' of the LineBuffer. The line is 
  * specified by its contents in 'line' with size 'size'.
 */
-void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint size);
+void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
+                             uint size, int decode_tab);
 
+/*
+* Inserts a (possible) multiline UTF-8 text at position 'at'. Returns the amount
+* of lines that were actually inserted.
+*/
+uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
+                                uint base, uint u8offset, Tokenizer *tokenizer);
 /*
 * Merge two lines of the LineBuffer, merges line (base+1) into base.
 */
@@ -168,6 +179,16 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo);
 void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenizer, 
                                      uint base, uint offset);
 /*
+* Sets the storage path for the contents of the LineBuffer given.
+*/
+void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size);
+
+/*
+* Saves the contents of the lineBuffer to storage.
+*/
+void LineBuffer_SaveToStorage(LineBuffer *lineBuffer);
+
+/*
 * Releases memory taken by a LineBuffer.
 */
 void LineBuffer_Free(LineBuffer *lineBuffer);
@@ -175,5 +196,6 @@ void LineBuffer_Free(LineBuffer *lineBuffer);
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer);
 void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo);
+uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint size);
 
 #endif //BUFFERS_H
