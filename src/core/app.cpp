@@ -102,7 +102,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
     switch(direction){
         case DIRECTION_LEFT:{ // Move left
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-            int tid = BufferView_LocatePreviousCursorToken(bufferView, buffer, &token);
+            int tid = BufferView_LocatePreviousCursorToken(bufferView, &token);
             if(tid >= 0){
                 cursor.y = Buffer_Utf8RawPositionToPosition(buffer, token->position);
             }else{
@@ -251,7 +251,7 @@ void AppCommandRemovePreviousToken(){
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
     
-    int tid = BufferView_LocatePreviousCursorToken(bufferView, buffer, &token);
+    int tid = BufferView_LocatePreviousCursorToken(bufferView, &token);
     if(tid >= 0){
         uint u8tp = Buffer_Utf8RawPositionToPosition(buffer, token->position);
         Buffer_RemoveRange(buffer, u8tp, cursor.y);
@@ -368,19 +368,32 @@ void AppCommandSaveBufferView(){
     LineBuffer_SaveToStorage(bufferView->lineBuffer);
 }
 
+void AppCommandCopy(){
+    vec2ui start, end;
+    uint size = 0;
+    char *ptr = nullptr;
+    BufferView *view = AppGetActiveBufferView();
+    
+    if(BufferView_GetCursorSelectionRange(view, &start, &end)){
+        size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
+        ClipboardSetStringX11(ptr);
+    }
+}
+
 void AppCommandPaste(){
     uint size = 0;
     const char *p = ClipboardGetStringX11(&size);
     if(size > 0 && p){
         Buffer *buffer = nullptr;
+        uint off = 0;
         BufferView *view = AppGetActiveBufferView();
         vec2ui cursor = BufferView_GetCursorPosition(view);
         uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
-                                            cursor.x, cursor.y, view->tokenizer);
+                                            cursor.x, cursor.y, view->tokenizer, &off);
         
         cursor.x += n;
-        buffer = BufferView_GetBufferAt(view, cursor.x);
-        cursor.y = buffer->count;
+        cursor.x = cursor.x > 1 ? cursor.x - 1 : cursor.x;
+        cursor.y = off;
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
     }
 }
@@ -470,6 +483,7 @@ void AppInitialize(){
     RegisterRepeatableEvent(mapping, AppCommandInsertTab, Key_Tab);
     
     RegisterRepeatableEvent(mapping, AppCommandPaste, Key_LeftControl, Key_V);
+    RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_C);
     
     appContext.freeTypeMapping = mapping;
     KeyboardSetActiveMapping(appContext.freeTypeMapping);

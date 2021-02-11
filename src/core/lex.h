@@ -152,12 +152,11 @@ struct LogicalProcessor{
     uint currentState;
 };
 
-/* Data structures */
 /*
 * Fixed memory stack.
 */
 struct BoundedStack{
-    LogicalProcessor items[MAX_STACK_SIZE];
+    LogicalProcessor items[MAX_BOUNDED_STACK_SIZE];
     int capacity;
     int top;
 };
@@ -285,8 +284,7 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer);
 
 
-/* Data structure functions, actually implemented in utilities.cpp */
-/* Fixed memory Stack */
+/* Fixed memory Stack for logical processors */
 BoundedStack *BoundedStack_Create();
 int BoundedStack_IsFull(BoundedStack *stack);
 int BoundedStack_Size(BoundedStack *stack);

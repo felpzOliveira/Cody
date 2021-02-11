@@ -89,10 +89,9 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
     return tokenID;
 }
 
-int BufferView_LocatePreviousCursorToken(BufferView *view, Buffer *buffer,
-                                         Token **targetToken)
-{
+int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     AssertA(view != nullptr, "Invalid bufferview pointer");
+    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, view->cursor.textPosition.x);
     int tokenID = -1;
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
     if(pos > 0){
@@ -624,6 +623,27 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                                                                  &view->cursor.nestStart,
                                                                  &view->cursor.nestEnd);
     }
+}
+
+uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){
+    vec2ui s = view->cursor.textPosition;
+    vec2ui e = view->cursor.ghostPosition;
+    if(s.x > e.x){ // ghost cursor is behind
+        s = view->cursor.ghostPosition;
+        e = view->cursor.textPosition;
+    }else if(s.x == e.x){ // same line
+        if(s.y == e.y){ // range is 0
+            return 0;
+        }
+        if(s.y > e.y){ // cursor is foward in line
+            s = view->cursor.ghostPosition;
+            e = view->cursor.textPosition;
+        }
+    }
+    
+    *start = s;
+    *end = e;
+    return 1;
 }
 
 vec2ui BufferView_GetCursorPosition(BufferView *view){

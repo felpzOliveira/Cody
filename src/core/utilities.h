@@ -8,7 +8,8 @@
 #include <fstream>
 #include <signal.h>
 
-#define MAX_STACK_SIZE 16
+#define MAX_STACK_SIZE 1024
+#define MAX_BOUNDED_STACK_SIZE 16
 #define DebugBreak() raise(SIGTRAP)
 
 #define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }

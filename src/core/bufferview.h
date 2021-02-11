@@ -68,20 +68,55 @@ Float InterpolateValueCubic(Float dt, Float remaining,
 Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
                              Float initialValue, Float finalValue);
 
+/*
+* Checks if a point 'p' is inside 'geometry'.
+*/
 int Geometry_IsPointInside(Geometry *geometry, vec2ui p);
 
+/*
+* Initializes a bufferview to represent the contents of the given linebuffer. It also
+* receives the tokenizer responsible for tokenization of the linebuffer to be used
+* for updates.
+*/
 void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer);
 
-void BufferView_SetGeometry(BufferView *view, Geometry geometry,
-                            Float lineHeight);
+/*
+* Sets the geometry of a bufferview.
+*/
+void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight);
 
-int  BufferView_IsAnimating(BufferView *view);
+/*
+* Queries the bufferview if it is _at_this_moment_ in an animation state.
+*/
+int BufferView_IsAnimating(BufferView *view);
+
+/*
+* Queries the bufferview for the current transition that is active in case the bufferview
+* is in an animation state.
+*/
 Transition BufferView_GetTransitionType(BufferView *view);
+
+/*
+* Moves the cursor to 'lineNo' and recompute visible range.
+*/
 void BufferView_CursorTo(BufferView *view, uint lineNo);
+
+/*
+* Forces the ghost cursor to go to the current cursor position.
+*/
 void BufferView_GhostCursorFollow(BufferView *view);
 
+/*
+* Queries the bufferview for the next token to jump when performing line jumping
+* routines. Returns -1 in case no token is available or the id of the token.
+*/
 int BufferView_LocateNextCursorToken(BufferView *view, Token **token);
-int BufferView_LocatePreviousCursorToken(BufferView *view, Buffer *buffer, Token **token);
+
+/*
+* Queries the bufferview for the previous token to jump when performing line jumping
+* routines. Returns -1 in case no token is available or the id of the token.
+*/
+int BufferView_LocatePreviousCursorToken(BufferView *view, Token **token);
 
 void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up);
 void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
@@ -92,13 +127,41 @@ void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
 Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo);
 LineBuffer *BufferView_GetLineBuffer(BufferView *view);
 
+/*
+* Queries the bufferview for the current range of lines that need to be rendered,
+* according to the current cursor position and the geometry of the bufferview.
+*/
 vec2ui BufferView_GetViewRange(BufferView *view);
+
+/*
+* Returns the current cursor position.
+*/
 vec2ui BufferView_GetCursorPosition(BufferView *view);
+
+/*
+* Returns the current position of the ghost cursor.
+*/
 vec2ui BufferView_GetGhostCursorPosition(BufferView *view);
 
+/*
+* Starts a scroll view transition.
+*/
 void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float duration);
-int  BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
-                                        vec2ui *cursorAt, Transform *transform);
+
+/*
+* Queries the bufferview for the state of the started scroll transition after 'dt'.
+* Returns the estimated cursor position in 'cursorAt', the range view in 'rRange' 
+* and the 0-1 transform for scrolling.
+*/
+int BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
+                                       vec2ui *cursorAt, Transform *transform);
+
+/*
+* Gets  the range selected by the ghost cursor and the cursor in 'start' and 'end'.
+* It also returns 0 in case there is no range, i.e.: both are in the same position
+* or 1 in case the range > 0.
+*/
+uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end);
 
 /*
 * Starts a 'animation' on line numbering, not really animation but we use as such

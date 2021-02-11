@@ -164,6 +164,7 @@ void TerminateX11();
 double GetElapsedTime();
 
 const char *ClipboardGetStringX11(unsigned int *size);
+void ClipboardSetStringX11(char *str);
 
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
 void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);

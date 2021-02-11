@@ -327,7 +327,7 @@ BoundedStack *BoundedStack_Create(){
     BoundedStack *stack = (BoundedStack *)AllocatorGet(sizeof(BoundedStack));
     AssertA(stack != nullptr, "Failed to get stack memory");
     stack->top = -1;
-    stack->capacity = MAX_STACK_SIZE;
+    stack->capacity = MAX_BOUNDED_STACK_SIZE;
     return stack;
 }
 

@@ -402,6 +402,153 @@ static int isSelPropNewValueNotify(Display* display, XEvent* event, XPointer poi
         event->xproperty.atom == notification->xselection.property;
 }
 
+unsigned long GetWindowPropertyX11(Window window, Atom property, Atom type,
+                                   unsigned char** value)
+{
+    Atom actualType;
+    int actualFormat;
+    unsigned long itemCount, bytesAfter;
+    
+    XGetWindowProperty(x11Helper.display,
+                       window,
+                       property,
+                       0,
+                       LONG_MAX,
+                       False,
+                       type,
+                       &actualType,
+                       &actualFormat,
+                       &itemCount,
+                       &bytesAfter,
+                       value);
+    
+    return itemCount;
+}
+
+static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
+    int i;
+    char* selectionString = NULL;
+    const Atom formats[] = { x11Helper.UTF8_STRING, XA_STRING };
+    const int formatCount = sizeof(formats) / sizeof(formats[0]);
+    
+    if(request->selection == x11Helper.PRIMARY)
+        selectionString = x11Helper.primarySelectionString;
+    else
+        selectionString = x11Helper.clipboardString;
+    
+    if(request->property == None){
+        // The requester is a legacy client (ICCCM section 2.2)
+        // We don't support legacy clients, so fail here
+        return None;
+    }
+    
+    if(request->target == x11Helper.TARGETS){
+        // The list of supported targets was requested
+        
+        const Atom targets[] = { x11Helper.TARGETS,
+            x11Helper.MULTIPLE,
+            x11Helper.UTF8_STRING,
+            XA_STRING };
+        
+        XChangeProperty(x11Helper.display,
+                        request->requestor,
+                        request->property,
+                        XA_ATOM,
+                        32,
+                        PropModeReplace,
+                        (unsigned char*) targets,
+                        sizeof(targets) / sizeof(targets[0]));
+        
+        return request->property;
+    }
+    
+    if(request->target == x11Helper.MULTIPLE){
+        // Multiple conversions were requested
+        
+        Atom* targets;
+        unsigned long i, count;
+        
+        count = GetWindowPropertyX11(request->requestor,
+                                     request->property,
+                                     x11Helper.ATOM_PAIR,
+                                     (unsigned char**) &targets);
+        
+        for (i = 0; i < count; i += 2){
+            int j;
+            
+            for(j = 0; j < formatCount; j++){
+                if (targets[i] == formats[j])
+                    break;
+            }
+            
+            if(j < formatCount){
+                XChangeProperty(x11Helper.display,
+                                request->requestor,
+                                targets[i + 1],
+                                targets[i],
+                                8,
+                                PropModeReplace,
+                                (unsigned char *) selectionString,
+                                strlen(selectionString));
+            }
+            else
+                targets[i + 1] = None;
+        }
+        
+        XChangeProperty(x11Helper.display,
+                        request->requestor,
+                        request->property,
+                        x11Helper.ATOM_PAIR,
+                        32,
+                        PropModeReplace,
+                        (unsigned char*) targets,
+                        count);
+        
+        XFree(targets);
+        
+        return request->property;
+    }
+    
+    if(request->target == x11Helper.SAVE_TARGETS){
+        // The request is a check whether we support SAVE_TARGETS
+        // It should be handled as a no-op side effect target
+        
+        XChangeProperty(x11Helper.display,
+                        request->requestor,
+                        request->property,
+                        x11Helper.NULL_,
+                        32,
+                        PropModeReplace,
+                        NULL,
+                        0);
+        
+        return request->property;
+    }
+    
+    // Conversion to a data target was requested
+    
+    for(i = 0; i < formatCount; i++){
+        if(request->target == formats[i]){
+            // The requested target is one we support
+            
+            XChangeProperty(x11Helper.display,
+                            request->requestor,
+                            request->property,
+                            request->target,
+                            8,
+                            PropModeReplace,
+                            (unsigned char *) selectionString,
+                            strlen(selectionString));
+            
+            return request->property;
+        }
+    }
+    
+    // The requested target is not supported
+    
+    return None;
+}
+
 const char* GetSelectionString(Atom selection){
     char** selectionString = NULL;
     const Atom targets[] = { x11Helper.UTF8_STRING, XA_STRING };
@@ -526,6 +673,19 @@ const char *ClipboardGetStringX11(unsigned int *size){
     const char *str = GetSelectionString(x11Helper.CLIPBOARD);
     *size = strlen(str); // TODO: Make this thing go away
     return str;
+}
+
+void ClipboardSetStringX11(char *str){
+    free(x11Helper.clipboardString);
+    x11Helper.clipboardString = str;
+    XSetSelectionOwner(x11Helper.display, x11Helper.CLIPBOARD, 
+                       x11Helper.helperWindow, CurrentTime);
+    
+    if(XGetSelectionOwner(x11Helper.display, x11Helper.CLIPBOARD) != 
+       x11Helper.helperWindow)
+    {
+        printf("Failed to get CLIPBOARD\n");
+    }
 }
 
 void WaitForEventsX11(){
@@ -657,11 +817,21 @@ void ProcessEventSelectionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x1
 }
 
 void ProcessEventSelectionClearX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Selection clear\n");
 #if 0
+    if(event->xselectionclear.selection == x11Helper.PRIMARY){
+        free(x11Helper.primarySelectionString);
+        x11Helper.primarySelectionString = NULL;
+    }else{
+        free(x11Helper.clipboardString);
+        x11Helper.clipboardString = NULL;
+    }
+#endif
+}
+
+void ProcessEventSelectionRequestX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     const XSelectionRequestEvent* request = &event->xselectionrequest;
     XEvent reply = { SelectionNotify };
-    reply.xselection.property = writeTargetToProperty(request);
+    reply.xselection.property = WriteTargetToProperty(request);
     reply.xselection.display = request->display;
     reply.xselection.requestor = request->requestor;
     reply.xselection.selection = request->selection;
@@ -669,11 +839,6 @@ void ProcessEventSelectionClearX11(XEvent *event, WindowX11 *window, LibHelperX1
     reply.xselection.time = request->time;
     
     XSendEvent(x11Helper.display, request->requestor, False, 0, &reply);
-#endif
-}
-
-void ProcessEventSelectionRequestX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    printf("Selection request\n");
 }
 
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -707,7 +872,7 @@ void ProcessEventX11(XEvent *event){
     int filtered = XFilterEvent(event, None);
     int rv = XFindContext(x11Helper.display, event->xany.window,
                           x11Helper.context, (XPointer *)&window);
-    if(rv != 0) return;
+    //if(rv != 0) return;
     
     switch(event->type){
         case ReparentNotify:{

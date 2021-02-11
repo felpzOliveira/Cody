@@ -4,6 +4,7 @@
 #define BUFFERS_H
 #include <types.h>
 #include <lex.h>
+#include <undo.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -19,7 +20,7 @@
 * happens in the buffer this variable is updated and shows the amount
 * of encoded UTF-8 characters available in the buffer.
 */
-typedef struct{
+struct Buffer{
     uint size;
     uint count;
     uint taken;
@@ -27,19 +28,21 @@ typedef struct{
     Token *tokens;
     uint tokenCount;
     TokenizerStateContext stateContext;
-}Buffer;
+};
 
 /*
 * Basic description of a structured file. A list of lines with the available size and
 * current line count.
 */
 typedef struct{
-    Buffer *lines;
+    Buffer **lines;
     char filePath[256];
     uint filePathSize;
     uint lineCount;
     uint size;
     uint is_dirty;
+    UndoRedo undoRedo;
+    BufferChange activeChange;
 }LineBuffer;
 
 /* For static initialization */
@@ -109,6 +112,11 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len=nullptr
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
 
 /*
+* Copy the contents of 'src' into 'dst' duplicating the 'src' buffer.
+*/
+void Buffer_CopyDeep(Buffer *dst, Buffer *src);
+
+/*
 * Releases a Buffer, giving its memory back.
 */
 void Buffer_Free(Buffer *buffer);
@@ -145,10 +153,12 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
 
 /*
 * Inserts a (possible) multiline UTF-8 text at position 'at'. Returns the amount
-* of lines that were actually inserted.
+* of lines that were actually inserted. Returns the ending offset of the last
+* line inserted.
 */
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, Tokenizer *tokenizer);
+                                uint base, uint u8offset, Tokenizer *tokenizer,
+                                uint *offset);
 /*
 * Merge two lines of the LineBuffer, merges line (base+1) into base.
 */
@@ -178,6 +188,15 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo);
 */
 void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenizer, 
                                      uint base, uint offset);
+
+/*
+* Generates the raw text from a range with the contents of this linebuffer.
+* Interior formatted tabs are removed from this string, this routine allocates
+* the pointer 'ptr'.
+*/
+uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr, 
+                                 vec2ui start, vec2ui end);
+
 /*
 * Sets the storage path for the contents of the LineBuffer given.
 */

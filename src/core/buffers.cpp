@@ -19,6 +19,32 @@ void Buffer_CopyReferences(Buffer *dst, Buffer *src){
     }
 }
 
+void Buffer_CopyDeep(Buffer *dst, Buffer *src){
+    if(dst != nullptr && src != nullptr){
+        if(dst->data == nullptr){
+            dst->data = (char *)AllocatorGet(src->size * sizeof(char));
+        }else if(dst->size < dst->taken){
+            dst->data = AllocatorExpand(char, dst->data, src->size);
+        }
+        
+        if(dst->tokens == nullptr){
+            dst->tokens = (Token *)AllocatorGet(src->tokenCount * sizeof(Token));
+        }else if(dst->tokenCount < src->tokenCount){
+            dst->tokens = (Token *)AllocatorExpand(Token, dst->tokens,
+                                                   src->tokenCount * sizeof(Token));
+        }
+        
+        Memcpy(dst->data, src->data, src->taken);
+        Memcpy(dst->tokens, src->tokens, src->tokenCount * sizeof(Token));
+        
+        dst->count = src->count;
+        dst->taken = src->taken;
+        dst->size = src->size;
+        dst->tokenCount = src->tokenCount;
+        dst->stateContext = src->stateContext;
+    }
+}
+
 //TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     if(!(rawp <= buffer->taken)){
@@ -291,36 +317,37 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
     AssertA(lineBuffer != nullptr, "Invalid line initialization");
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
-        lineBuffer->lines = AllocatorExpand(Buffer, lineBuffer->lines, newSize);
+        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize);
         
         for(uint i = 0; i < DefaultAllocatorSize; i++){
-            lineBuffer->lines[lineBuffer->size+i] = BUFFER_INITIALIZER;
+            lineBuffer->lines[lineBuffer->size+i] = (Buffer *)AllocatorGet(sizeof(Buffer));
+            *(lineBuffer->lines[lineBuffer->size+i]) = BUFFER_INITIALIZER;
         }
         
         lineBuffer->size = newSize;
     }
     if(size > 0 && line)
-        Buffer_InitSet(&lineBuffer->lines[lineBuffer->lineCount], line, size, decode_tab);
+        Buffer_InitSet(lineBuffer->lines[lineBuffer->lineCount], line, size, decode_tab);
     else
-        Buffer_Init(&lineBuffer->lines[lineBuffer->lineCount], DefaultAllocatorSize);
+        Buffer_Init(lineBuffer->lines[lineBuffer->lineCount], DefaultAllocatorSize);
     lineBuffer->lineCount++;
 }
 
 void LineBuffer_RemoveLineAt(LineBuffer *lineBuffer, uint at){
     if(lineBuffer->lineCount > at){
         // swap pointers forward from 'at'
-        Buffer *Li = &lineBuffer->lines[at];
+        Buffer *Li = lineBuffer->lines[at];
         Buffer_Free(Li);
         for(uint i = at; i < lineBuffer->lineCount-1; i++){
             // Line N receives the pointer from the next line N+1
-            Buffer *lineN   = &lineBuffer->lines[i];
-            Buffer *lineNp1 = &lineBuffer->lines[i+1];
+            Buffer *lineN   = lineBuffer->lines[i];
+            Buffer *lineNp1 = lineBuffer->lines[i+1];
             Buffer_CopyReferences(lineN, lineNp1);
         }
         
         // we need to release the pointers from the final line as it now
         // belongs to line located at 'lineCount-1'
-        Buffer_Release(&lineBuffer->lines[lineBuffer->lineCount-1]);
+        Buffer_Release(lineBuffer->lines[lineBuffer->lineCount-1]);
         lineBuffer->lineCount--;
     }
 }
@@ -341,28 +368,29 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
     // make sure we can hold at least one more line
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
-        lineBuffer->lines = AllocatorExpand(Buffer, lineBuffer->lines, newSize);
+        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize);
         
         for(uint i = 0; i < DefaultAllocatorSize; i++){
-            lineBuffer->lines[lineBuffer->size+i] = BUFFER_INITIALIZER;
+            lineBuffer->lines[lineBuffer->size+i] = (Buffer *)AllocatorGet(sizeof(Buffer));
+            *(lineBuffer->lines[lineBuffer->size+i]) = BUFFER_INITIALIZER;
         }
         
         lineBuffer->size = newSize;
     }
     
     if(lineBuffer->lineCount <= at){ // insert at the end of the linebuffer
-        Li = &lineBuffer->lines[lineBuffer->lineCount];
+        Li = lineBuffer->lines[lineBuffer->lineCount];
     }else{
         // swap pointers from the end until reach 'at'
         for(uint i = lineBuffer->lineCount; i > at; i--){
             // Line N receives the pointer from the previous line N-1
-            Buffer *lineN   = &lineBuffer->lines[i];
-            Buffer *lineNm1 = &lineBuffer->lines[i-1];
+            Buffer *lineN   = lineBuffer->lines[i];
+            Buffer *lineNm1 = lineBuffer->lines[i-1];
             Buffer_CopyReferences(lineN, lineNm1);
         }
         
         // once we reach the line 'at' we create a new line at this location
-        Li = &lineBuffer->lines[at];
+        Li = lineBuffer->lines[at];
         // we need to allocate a new buffer for this line as its pointer now belongs
         // to the line 'at+1', reset its data configuration
         Li->data = nullptr;
@@ -379,10 +407,17 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
 
 void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     AssertA(lineBuffer != nullptr, "Invalid line buffer blank initialization");
-    lineBuffer->lines = AllocatorGetDefault(Buffer);
+    lineBuffer->lines = AllocatorGetDefault(Buffer *);
     lineBuffer->lineCount = 0;
     lineBuffer->is_dirty = 0;
     lineBuffer->size = DefaultAllocatorSize;
+    lineBuffer->undoRedo.undoStack = DoStack_Create();
+    lineBuffer->undoRedo.redoStack = DoStack_Create();
+    for(uint i = 0; i < DefaultAllocatorSize; i++){
+        lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));
+        *(lineBuffer->lines[i]) = BUFFER_INITIALIZER;
+    }
+    
 }
 
 typedef struct{
@@ -619,7 +654,8 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
 }
 
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, Tokenizer *tokenizer)
+                                uint base, uint u8offset, Tokenizer *tokenizer,
+                                uint *offset)
 {
     //TODO: Lets implement the slow method first, if that sucks too much
     //      implement one that solves both tokens and paste in a single pass
@@ -633,40 +669,46 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     uint bufId = base;
     int is_first = 1;
     uint refId = base;
+    Buffer *buffer = nullptr;
+    uint startPos = 0;
     while(p != NULL && *p != EOF && processed < size){
-        if(*p == '\r'){
-            p++;
+        char v = p[processed];
+        if(v == '\r'){
             processed++;
         }
         
-        if(*p == '\n'){
-            *p = 0;
+        if(v == '\n'){
+            p[processed] = 0;
+            buffer = LineBuffer_GetBufferAt(lineBuffer, base);
             if(is_first){ // need to append to buffer
-                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, base);
-                Buffer_InsertStringAt(buffer, u8offset, lineStart, lineSize-1, 1);
+                if(lineSize > 0){
+                    startPos = u8offset;
+                    Buffer_InsertStringAt(buffer, u8offset, lineStart, lineSize, 1);
+                }
                 is_first = 0;
             }else{
-                LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize-1, 1);
+                startPos = 0;
+                LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize, 1);
             }
-            
-            p++;
-            lineStart = p;
+            p[processed] = v;
+            lineStart = &p[processed+1];
             lineSize = 0;
             processed++;
             base++;
         }else{
-            p++;
             lineSize += 1;
             processed++;
         }
     }
     
     if(lineSize > 0){
+        buffer = LineBuffer_GetBufferAt(lineBuffer, base);
         if(is_first){
-            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, base);
+            startPos = u8offset;
             Buffer_InsertStringAt(buffer, u8offset, lineStart, lineSize, 1);
         }
         else{
+            startPos = 0;
             LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize, 1);
         }
         base++;
@@ -674,6 +716,9 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     
     //2 - Retokenize this thing now
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, refId, base-refId);
+    
+    *offset = Buffer_Utf8RawPositionToPosition(buffer, lineSize+startPos);
+    
     return base - refId;
 }
 
@@ -691,7 +736,7 @@ void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNo,
     Buffer *buffer = nullptr;
     AssertA(lineBuffer != nullptr && lineNo >= 0 && lineNo < lineBuffer->lineCount, 
             "Invalid input given");
-    buffer = &lineBuffer->lines[lineNo];
+    buffer = lineBuffer->lines[lineNo];
     
     Buffer_UpdateTokens(buffer, tokens, size);
 }
@@ -699,7 +744,8 @@ void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNo,
 void LineBuffer_Free(LineBuffer *lineBuffer){
     if(lineBuffer){
         for(int i = lineBuffer->lineCount-1; i >= 0; i--){
-            Buffer_Free(&lineBuffer->lines[i]);
+            Buffer_Free(lineBuffer->lines[i]);
+            AllocatorFree(lineBuffer->lines[i]);
         }
         if(lineBuffer->lines)
             AllocatorFree(lineBuffer->lines);
@@ -712,7 +758,7 @@ void LineBuffer_Free(LineBuffer *lineBuffer){
 
 Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
     if(lineNo < lineBuffer->lineCount){
-        return &lineBuffer->lines[lineNo];
+        return lineBuffer->lines[lineNo];
     }
     
     return nullptr;
@@ -721,6 +767,63 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
 void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size){
     strncpy(lineBuffer->filePath, path, Min(size, sizeof(lineBuffer->filePath)));
     lineBuffer->filePathSize = strlen(lineBuffer->filePath);
+}
+
+uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr, 
+                                 vec2ui start, vec2ui end)
+{
+    uint lines = lineBuffer->lineCount;
+    char *data = nullptr;
+    uint unprocessedSize = 0;
+    uint ei = end.x < lines ? end.x : lines-1;
+    uint si = start.x;
+    uint spi = 0;
+    uint maxi = 0;
+    Buffer *b = LineBuffer_GetBufferAt(lineBuffer, si);
+    uint pi = Buffer_Utf8PositionToRawPosition(b, start.y);
+    spi = pi;
+    do{
+        unprocessedSize += b->taken - pi + 1;
+        if(si == ei){
+            pi = Buffer_Utf8PositionToRawPosition(b, end.y);
+            maxi = pi;
+        }
+        
+        si++;
+        if(si <= ei){
+            b = LineBuffer_GetBufferAt(lineBuffer, si);
+            pi = si < ei ? 0 : pi;
+        }
+    }while(si <= ei);
+    
+    data = (char *)AllocatorGet(unprocessedSize);
+    uint ic = 0;
+    uint c = spi;
+    for(uint i = start.x; i <= ei; i++){
+        b = LineBuffer_GetBufferAt(lineBuffer, i);
+        char *p = &b->data[c];
+        uint m = (i == ei) ? maxi : b->taken;
+        while(m > c){
+            data[ic++] = *p;
+            if(*p == '\t'){
+                for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
+                    p++; c++;
+                    AssertA(*p == '\t', "Incorrect line tab configuration");
+                }
+            }
+            AssertA(*p != '\n', "Invalid line configuration {break point}");
+            p++; c++;
+        }
+        
+        if(si < ei)
+            data[ic++] = '\n';
+        c = 0;
+    }
+    
+    data[ic++] = 0;
+    
+    *ptr = data;
+    return ic;
 }
 
 void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
@@ -798,7 +901,7 @@ void Buffer_DebugStdoutData(Buffer *buffer){
 
 void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo){
     if(lineNo < lineBuffer->lineCount){
-        Buffer *buffer = &lineBuffer->lines[lineNo];
+        Buffer *buffer = lineBuffer->lines[lineNo];
         printf("[ %d ] : ", lineNo+1);
         Buffer_DebugStdoutData(buffer);
     }
@@ -808,7 +911,7 @@ uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint s
     uint n = lineBuffer->lineCount;
     uint count = 0;
     for(uint i = 0; i < n; i++){
-        Buffer *buffer = &lineBuffer->lines[i];
+        Buffer *buffer = lineBuffer->lines[i];
         for(uint k = 0; k < buffer->tokenCount; k++){
             Token *token = &buffer->tokens[k];
             if(token->identifier == TOKEN_ID_NONE && token->size == size){

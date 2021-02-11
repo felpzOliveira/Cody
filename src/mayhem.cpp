@@ -36,6 +36,7 @@ void test_tokenizer(const char *filename){
     LineBuffer_Init(&lineBuffer, &tokenizer, content, filesize);
     LineBuffer_SetStoragePath(&lineBuffer, (char *)"tmpfile.h", len);
     
+    AllocatorFree(content);
 #if 0
     clock_t start = clock();
     uint s = LineBuffer_DebugLoopAllTokens(&lineBuffer, "sqlite3", 7);
