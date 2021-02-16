@@ -55,10 +55,11 @@ int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
 uint GetSimplifiedPathName(char *fullPath, uint len);
 
 /*
-* Convert a hex color to a unsigned vec3i/f color.
+* Convert colors.
 */
 vec4i ColorFromHex(uint hex);
 vec4f ColorFromHexf(uint hex);
+vec4i ColorFromRGBA(vec4f color);
 
 /*
 * Count the amount of digits in a int.

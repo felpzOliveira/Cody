@@ -18,13 +18,38 @@ Theme defaultTheme = {
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     //.preprocessorDefineColor = ColorFromHex(0xFFDD1A01),
     .borderColor = ColorFromHex(0xFFFF7F50),
-    
+    .parenthesis0 = ColorFromHex(0xFFFF0000),
+    .parenthesis1 = ColorFromHex(0xFF00FF00),
+    .parenthesis2 = ColorFromHex(0xFF0000FF),
+    .parenthesis3 = ColorFromHex(0xFFAAAA00),
+    .braces = ColorFromHex(0xFF00FFFF),
+    .cursorColor = ColorFromHex(0xFF40FF40),
+    .ghostCursorColor = ColorFromHex(0xFF5B4D3C),
     .testColor = ColorFromHex(0xCCCD950C),
 };
 
 static int globalActive = 0;
 void SetAlpha(int acitve){
     globalActive = acitve;
+}
+
+vec4i GetNestColor(Theme *theme, TokenId id, int level){
+    level = level % 4;
+    if(id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE)
+    {
+        return theme->braces;
+    }else if(id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE){
+        switch(level){
+            case 0: return theme->parenthesis0;
+            case 1: return theme->parenthesis1;
+            case 2: return theme->parenthesis2;
+            case 3: return theme->parenthesis3;
+            default: return theme->parenthesis0;
+        }
+    }
+    
+    AssertErr(0, "Invalid theme query for nesting color");
+    return vec4i(255, 255, 0, 255);
 }
 
 vec4f GetColorf(Theme *theme, TokenId id){
@@ -82,6 +107,8 @@ vec4i GetUIColor(Theme *theme, UIElement id){
 #define COLOR_RET(i, v) case i : return theme->v;
     switch(id){
         COLOR_RET(UIBorder, borderColor);
+        COLOR_RET(UICursor, cursorColor);
+        COLOR_RET(UIGhostCursor, ghostCursorColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);
@@ -95,6 +122,8 @@ vec4f GetUIColorf(Theme *theme, UIElement id){
 #define COLOR_RET(i, v) case i : col =  theme->v; break;
     switch(id){
         COLOR_RET(UIBorder, borderColor);
+        COLOR_RET(UICursor, cursorColor);
+        COLOR_RET(UIGhostCursor, ghostCursorColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4f(1);

@@ -42,7 +42,7 @@ typedef struct{
     uint size;
     uint is_dirty;
     UndoRedo undoRedo;
-    BufferChange activeChange;
+    vec2i activeBuffer;
 }LineBuffer;
 
 /* For static initialization */
@@ -71,9 +71,20 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint len, int decode_tab);
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
 * and must have length 'len'. If you are copying raw data to this buffer and needs 
-* the issue of tab x spacing handled use decode_tab = 1.
+* the issue of tab x spacing handled use decode_tab = 1. The position 'at' is a UTF-8
+ * encoded position. Returns the amount of bytes actually inserted after tab expansion.
 */
-void Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int decode_tab=0);
+uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int decode_tab=0);
+
+/*
+* Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
+* and must have length 'len'. This function receives the 'at' position in raw bytes, you
+* must know where is correct to start the writing in the buffer. Use 'decode_tab' = 0
+* to not perform tab expansion, i.e.: the string was already expanded, or 1 to perform
+* tab expansion. Returns the amount of bytes actually inserted after tab expansion.
+*/
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, 
+                              uint len, int decode_tab=0);
 
 /*
 * Updates the curret token list inside the buffer given. This function copies
@@ -96,6 +107,11 @@ int Buffer_IsBlank(Buffer *buffer);
 * Count the amount of UTF-8 characters.
 */
 uint Buffer_GetUtf8Count(Buffer *buffer);
+
+/*
+* Get the id of the token that contains at position 'u8'.
+*/
+uint Buffer_GetTokenAt(Buffer *buffer, uint u8);
 
 /*
 * Get the raw position inside the buffer corresponding to a UTF-8 position,
@@ -208,6 +224,22 @@ void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size);
 void LineBuffer_SaveToStorage(LineBuffer *lineBuffer);
 
 /*
+* Sets the active buffer during edit. This allows for buffering and prevent
+* unecessary memory and stack usage for undo operations.
+*/
+void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId);
+
+/*
+* Returns the id of the active buffer during edit.
+*/
+vec2i LineBuffer_GetActiveBuffer(LineBuffer *lineBuffer);
+
+/*
+* Replaces the buffer located at 'at' and returns the existing buffer.
+*/
+Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint at);
+
+/*
 * Releases memory taken by a LineBuffer.
 */
 void LineBuffer_Free(LineBuffer *lineBuffer);
@@ -216,5 +248,6 @@ void LineBuffer_Free(LineBuffer *lineBuffer);
 void Buffer_DebugStdoutData(Buffer *buffer);
 void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo);
 uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint size);
+void LineBuffer_DebugPrintRange(LineBuffer *lineBuffer, vec2i range);
 
 #endif //BUFFERS_H

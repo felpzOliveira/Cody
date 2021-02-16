@@ -47,6 +47,15 @@ typedef enum{
     TOKEN_ID_DATATYPE_USER_CLASS
 }TokenId;
 
+inline int Symbol_AreTokensComplementary(TokenId id0, TokenId id1){
+    return ((id0 == TOKEN_ID_PARENTHESE_OPEN && id1 == TOKEN_ID_PARENTHESE_CLOSE) ||
+            (id0 == TOKEN_ID_PARENTHESE_CLOSE && id1 == TOKEN_ID_PARENTHESE_OPEN) ||
+            (id0 == TOKEN_ID_BRACKET_OPEN && id1 == TOKEN_ID_BRACKET_CLOSE) ||
+            (id0 == TOKEN_ID_BRACKET_CLOSE && id1 == TOKEN_ID_BRACKET_OPEN) ||
+            (id0 == TOKEN_ID_BRACE_OPEN && id1 == TOKEN_ID_BRACE_CLOSE) ||
+            (id0 == TOKEN_ID_BRACE_CLOSE && id1 == TOKEN_ID_BRACE_OPEN));
+}
+
 inline const char *Symbol_GetIdString(int id){
 #define STR_CASE(x) case x : return #x
     switch(id){

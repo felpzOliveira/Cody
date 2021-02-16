@@ -59,6 +59,11 @@ struct BufferView{
     Float lineOffset;
     int isActive;
     int renderLineNbs;
+    int activeNestPoint; // to allow jumping, -1 = none, 0 = start, 1 = end
+    vec4ui startNest[64];
+    vec4ui endNest[64];
+    int startNestCount;
+    int endNestCount;
 };
 
 Float InterpolateValueCubic(Float dt, Float remaining,
@@ -124,7 +129,19 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
 int BufferView_ComputeTextLine(BufferView *view, Float screenY);
 void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
 
+/*
+* Returns the pointer to the current cursor.
+*/
+void BufferView_GetCursor(BufferView *view, DoubleCursor **cursor);
+
+/*
+* Get the Buffer located inside the LineBuffer at a specific line.
+*/
 Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo);
+
+/*
+* Get the LineBuffer being used by this BufferView.
+*/
 LineBuffer *BufferView_GetLineBuffer(BufferView *view);
 
 /*
@@ -199,9 +216,8 @@ void BufferView_UpdateCursorNesting(BufferView *view);
 
 /*
 * Computes the start and end of the nesting containing the cursor.
-* If cursor is inside a valid nesting value returns 1, returns 0 otherwise.
 */
-int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end);
+void BufferView_UpdateCursorNesting(BufferView *view);
 
 /*
 * Adjusts the ghost cursor if it is out of bounds.

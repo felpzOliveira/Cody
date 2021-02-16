@@ -439,6 +439,10 @@ void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
     int spacing = DigitCount(BufferView_GetLineCount(view));
     int ncount = DigitCount(lineNr+1);
+    vec4ui *start = view->startNest;
+    vec4ui *end   = view->endNest;
+    uint it = Max(view->startNestCount, view->endNestCount);
+    
     memset(linen, ' ', spacing-ncount);
     snprintf(&linen[spacing-ncount], 32, "%u ", lineNr+1);
     
@@ -489,11 +493,38 @@ void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
                 char *e = &buffer->data[token->position + token->size];
                 vec4i col = GetColor(&defaultTheme, token->identifier);
                 if(BufferView_CursorNestIsValid(view)){
+                    for(uint f = 0; f < it; f++){
+                        if(f < view->startNestCount){
+                            if(start[f].w){ // is valid
+                                if((lineNr == start[f].x && i == start[f].y)){
+                                    //TODO: pick color
+                                    col = GetNestColor(&defaultTheme, 
+                                                       (TokenId)start[f].z, 0);
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if(f < view->endNestCount){
+                            if(end[f].w){ // is valid
+                                if((lineNr == end[f].x && i == end[f].y)){
+                                    //TODO: pick color
+                                    col = GetNestColor(&defaultTheme, 
+                                                       (TokenId)end[f].z, 0);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+#if 0
                     vec2ui s = view->cursor.nestStart;
                     vec2ui e = view->cursor.nestEnd;
                     if((lineNr == s.x && i == s.y) || (lineNr == e.x && i == e.y)){
                         col = vec4i(0, 255, 255, 255);
                     }
+                    
+#endif
                 }
                 
                 pos += token->size;
@@ -553,7 +584,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
     
     vec4f p = OpenGLRenderCursor(state, buffer, cursor, bufferView->lineOffset, 
                                  baseHeight, lines, &pGlyph, bufferView->isActive,
-                                 vec4f(0,1,0,1), 4);
+                                 GetUIColorf(&defaultTheme, UICursor), 4);
     if(bufferView->isActive && ghostcursor.x >= lines.x && ghostcursor.x < lines.y){
         Float g = 0.5;
         Float a = 0.6;

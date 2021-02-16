@@ -1,6 +1,7 @@
 #include <undo.h>
 #include <types.h>
 #include <utilities.h>
+#include <buffers.h>
 
 typedef struct{
     Buffer **bufferPool;
@@ -13,6 +14,16 @@ static UndoSystem uSystem = {
     .size = 0,
     .head = 0,
 };
+
+static void DoStack_ReleaseIfNeeded(BufferChange *item){
+    item->buffer = nullptr;
+}
+static void DoStack_FreeIfNeeded(BufferChange *item){
+    if(item->buffer != nullptr){
+        UndoSystemTakeBuffer(item->buffer);
+        item->buffer = nullptr;
+    }
+}
 
 DoStack *DoStack_Create(){
     DoStack *stack = (DoStack *)AllocatorGet(sizeof(DoStack));
@@ -32,9 +43,13 @@ int DoStack_IsEmpty(DoStack *stack){
 }
 
 void DoStack_Push(DoStack *stack, BufferChange *item){
+    uint toFree = stack->top;
+    DoStack_FreeIfNeeded(&stack->items[toFree]);
     Memcpy(&stack->items[stack->top], item, sizeof(BufferChange));
     stack->top = (stack->top + 1) % stack->capacity;
     stack->elements = Min(stack->elements+1, stack->capacity);
+    printf("[PUSH]Stack len: %u, freeing %u ( %p )\n",
+           stack->elements, toFree, item->buffer);
 }
 
 BufferChange *DoStack_Peek(DoStack *stack){
@@ -49,12 +64,36 @@ BufferChange *DoStack_Peek(DoStack *stack){
 void DoStack_Pop(DoStack *stack){
     stack->top = (stack->top + stack->capacity - 1) % stack->capacity;
     stack->elements = stack->elements > 0 ? stack->elements-1 : 0;
+    DoStack_ReleaseIfNeeded(&stack->items[stack->top]);
+    printf("[POP]Stack len: %u, releasing %u ( %p )\n",
+           stack->elements, stack->top, stack->items[stack->top].buffer);
 }
 
 void UndoSystemGetMemory(){
-    uSystem.bufferPool = (Buffer **)AllocatorGet(sizeof(Buffer *) * 1024);
+    uSystem.bufferPool = (Buffer **)AllocatorGet(sizeof(Buffer *) * MAX_DO_STACK_SIZE);
     uSystem.head = 0;
-    uSystem.size = 1024;
+    uSystem.size = MAX_DO_STACK_SIZE;
+    for(uint i = 0; i < uSystem.size; i++){
+        Buffer *buffer = (Buffer *)AllocatorGet(sizeof(Buffer));
+        buffer->size = 0;
+        buffer->count = 0;
+        buffer->taken = 0;
+        buffer->data = nullptr;
+        buffer->tokens = nullptr;
+        buffer->tokenCount = 0;
+        uSystem.bufferPool[i] = buffer;
+    }
+}
+
+void UndoSystemTakeBuffer(Buffer *buffer){
+    if(uSystem.head > 0){
+        uint h = uSystem.head-1;
+        uSystem.bufferPool[h] = buffer;
+        uSystem.head--;
+    }else{ // cannot hold this buffer, free it
+        Buffer_Free(buffer);
+        AllocatorFree(buffer);
+    }
 }
 
 Buffer *UndoSystemGetBuffer(){
@@ -64,4 +103,98 @@ Buffer *UndoSystemGetBuffer(){
     uint h = uSystem.head;
     uSystem.head++;
     return uSystem.bufferPool[h];
+}
+
+void _UndoRedoPushMerge(UndoRedo *redo, vec2ui baseU8, int is_undo){
+    BufferChange bufferChange = {
+        .bufferInfo = baseU8,
+        .buffer = nullptr,
+        .change = CHANGE_MERGE,
+    };
+    
+    if(is_undo)
+        DoStack_Push(redo->undoStack, &bufferChange);
+    else
+        DoStack_Push(redo->redoStack, &bufferChange);
+}
+
+void _UndoRedoUndoPushNewLine(UndoRedo *redo, vec2ui baseU8, int is_undo){
+    BufferChange bufferChange = {
+        .bufferInfo = baseU8,
+        .buffer = nullptr,
+        .change = CHANGE_NEWLINE,
+    };
+    if(is_undo)
+        DoStack_Push(redo->undoStack, &bufferChange);
+    else
+        DoStack_Push(redo->redoStack, &bufferChange);
+}
+
+void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
+    BufferChange bufferChange = {
+        .bufferInfo = cursor,
+        .buffer = nullptr,
+        .change = CHANGE_INSERT,
+    };
+    
+    Buffer *b = UndoSystemGetBuffer();
+    Buffer_CopyDeep(b, buffer);
+    bufferChange.buffer = b;
+    DoStack_Push(redo->undoStack, &bufferChange);
+}
+
+void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
+    BufferChange bufferChange = {
+        .bufferInfo = cursor,
+        .buffer = nullptr,
+        .change = CHANGE_REMOVE,
+    };
+    
+    Buffer *b = UndoSystemGetBuffer();
+    Buffer_CopyDeep(b, buffer);
+    bufferChange.buffer = b;
+    DoStack_Push(redo->undoStack, &bufferChange);
+}
+
+void UndoRedoUndoPushRemoveBlock(UndoRedo *redo, vec2ui start, vec2ui end){
+    BufferChange bufferChange = {
+        .bufferInfo = start,
+        .bufferInfoEnd = end,
+        .buffer = nullptr,
+        .change = CHANGE_BLOCK_REMOVE,
+    };
+    
+    DoStack_Push(redo->undoStack, &bufferChange);
+}
+
+void UndoRedoUndoPushNewLine(UndoRedo *redo, vec2ui baseU8){
+    _UndoRedoUndoPushNewLine(redo, baseU8, 1);
+}
+
+void UndoRedoRedoPushNewLine(UndoRedo *redo, vec2ui baseU8){
+    _UndoRedoUndoPushNewLine(redo, baseU8, 0);
+}
+
+void UndoRedoUndoPushMerge(UndoRedo *redo, vec2ui baseU8){
+    _UndoRedoPushMerge(redo, baseU8, 1);
+}
+
+void UndoRedoRedoPushMerge(UndoRedo *redo, vec2ui baseU8){
+    _UndoRedoPushMerge(redo, baseU8, 0);
+}
+
+void UndoRedoPopUndo(UndoRedo *redo){
+    DoStack_Pop(redo->undoStack);
+}
+
+void UndoRedoPopRedo(UndoRedo *redo){
+    DoStack_Pop(redo->redoStack);
+}
+
+BufferChange *UndoRedoGetNextRedo(UndoRedo *redo){
+    return DoStack_Peek(redo->redoStack);
+}
+
+BufferChange *UndoRedoGetNextUndo(UndoRedo *redo){
+    return DoStack_Peek(redo->undoStack);
 }

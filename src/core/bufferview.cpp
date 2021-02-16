@@ -1,6 +1,7 @@
 #include <bufferview.h>
 #include <utilities.h>
 #include <app.h>
+#include <symbol.h>
 
 int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
     return ((p.x <= geometry->upper.x && p.x >= geometry->lower.x) &&
@@ -58,7 +59,9 @@ inline int BufferView_IsCursorVisible(BufferView *view, vec2ui range){
 
 void BufferView_AdjustGhostCursorIfOut(BufferView *view){
     Buffer *b = BufferView_GetBufferAt(view, view->cursor.ghostPosition.x);
-    if(!(view->cursor.ghostPosition.y < b->count)){
+    if(b == nullptr){ // in case there was a delete this will be nullptr
+        BufferView_GhostCursorFollow(view);
+    }else if(!(view->cursor.ghostPosition.y < b->count)){
         BufferView_GhostCursorFollow(view);
     }
 }
@@ -125,7 +128,8 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
     view->cursor.nestStart = vec2ui(0, 0);
     view->cursor.nestEnd = vec2ui(0, 0);
     view->cursor.nestValid = 0;
-    view->renderLineNbs = 0;
+    view->renderLineNbs = 1;
+    view->activeNestPoint = -1;
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;
     view->transitionAnim.transition = TransitionNone;
@@ -489,6 +493,117 @@ void BufferView_ToogleLineNumbers(BufferView *view){
     view->renderLineNbs = 1 - view->renderLineNbs;
 }
 
+int BufferView_FindFirstsForward(BufferView *view, vec2ui start, TokenId *ids,
+                                 TokenId *cids, uint nIds, vec4ui *out, uint maxN,
+                                 int *n)
+{
+    Buffer *buffer = BufferView_GetBufferAt(view, start.x);
+    if(buffer == nullptr){ return 0; }
+    
+    int k = 0;
+    uint len = DefaultAllocatorSize;
+    uint bid = start.x;
+    uint startAt = Buffer_GetTokenAt(buffer, start.y);
+    int done = 0;
+    int is_first = 1;
+    for(int i = 0; i < nIds; i++){
+        n[i] = 0;
+    }
+    
+    do{
+        int r = (int)buffer->tokenCount;
+        for(int i = (int)startAt; i < r; i++){
+            Token *token = &buffer->tokens[i];
+            if(token){
+                for(uint s = 0; s < nIds; s++){
+                    if(token->identifier == cids[s] && n[s] == 0){
+                        if(!(k < maxN)) return k;
+                        
+                        out[k++] = vec4ui(bid, i, cids[s], 0);
+                    }else if(token->identifier == ids[s]){
+                        if(!(is_first)){
+                            n[s]--;
+                        }
+                    }else if(token->identifier == cids[s]){
+                        n[s]++;
+                    }
+                }
+            }
+            
+            is_first = 0;
+        }
+        
+        bid += 1;
+        if(bid < view->lineBuffer->lineCount){
+            buffer = BufferView_GetBufferAt(view, bid);
+            startAt = 0;
+        }else{
+            done = 1;
+        }
+        
+    }while(done == 0);
+    
+    return k;
+}
+
+int BufferView_FindFirstsBackwards(BufferView *view, vec2ui start, TokenId *ids,
+                                   TokenId *cids, uint nIds, vec4ui *out, uint maxN,
+                                   int *n)
+{
+    Buffer *buffer = BufferView_GetBufferAt(view, start.x);
+    if(buffer == nullptr){ return 0; }
+    
+    int k = 0;
+    int is_first = 1;
+    uint bid = start.x;
+    uint startAt = Buffer_GetTokenAt(buffer, start.y);
+    int done = 0;
+    for(int i = 0; i < nIds; i++){
+        n[i] = 0;
+    }
+    
+    //TODO: This is going to need support from the lexer state to not be super slow
+    //      we need to actually detect when to stop otherwise it will not be very good
+    do{
+        for(int i = (int)startAt; i >= 0; i--){
+            Token *token = &buffer->tokens[i];
+            if(token && i < buffer->tokenCount){
+                for(uint s = 0; s < nIds; s++){
+                    if(token->identifier == ids[s] && n[s] == 0){
+                        if(!(k < maxN)) return k;
+                        
+                        out[k++] = vec4ui(bid, i, ids[s], 0);
+                    }else if(token->identifier == cids[s]){
+                        if(!(is_first)){
+                            n[s]--;
+                        }
+                    }else if(token->identifier == ids[s]){
+                        n[s]++;
+                    }
+                }
+            }
+            
+            is_first = 0;
+        }
+        
+        if(bid > 0){
+            bid = bid > 0 ? bid - 1 : 0;
+            buffer = BufferView_GetBufferAt(view, bid);
+            startAt = buffer->tokenCount > 0 ? buffer->tokenCount-1 : 0;
+        }else{
+            done = 1;
+        }
+    }while(done == 0);
+    
+    return k;
+}
+
+uint BufferView_ComputeNestingPointsN(BufferView *view, vec2ui *starts, vec2ui *ends,
+                                      uint maxN)
+{
+    return 0;
+}
+
 int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end){
     uint startAt = 0;
     int refStart = -2;
@@ -500,6 +615,7 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
     Buffer *buffer = BufferView_GetBufferAt(view, view->cursor.textPosition.x);
     TokenizerStateContext *context = &buffer->stateContext;
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
+    uint refPos = pos;
     
     //1 - read this buffer and gether closer values
     int n[3] = {0, 0, 0};
@@ -509,7 +625,7 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
         int r = (int)buffer->tokenCount;
         for(int i = r-1; i >= 0; i--){
             Token *token = &buffer->tokens[i];
-            if(token->position < pos){
+            if(token->position <= pos){
                 c = -1;
                 switch(token->identifier){
                     case TOKEN_ID_BRACE_OPEN:{
@@ -520,8 +636,10 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
                         n[0]++;
                     } break;
                     case TOKEN_ID_BRACE_CLOSE:{
-                        n[0]--;
-                        c = 0;
+                        if(pos > token->position){
+                            n[0]--;
+                            c = 0;
+                        }
                     } break;
                     case TOKEN_ID_PARENTHESE_OPEN:{
                         *start = vec2ui(bid, i);
@@ -531,8 +649,10 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
                         n[1]++;
                     } break;
                     case TOKEN_ID_PARENTHESE_CLOSE:{
-                        n[1]--;
-                        c = 1;
+                        if(pos > token->position){
+                            n[1]--;
+                            c = 1;
+                        }
                     } break;
                     case TOKEN_ID_BRACKET_OPEN:{
                         *start = vec2ui(bid, i);
@@ -542,8 +662,10 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
                         n[2]++;
                     } break;
                     case TOKEN_ID_BRACKET_CLOSE:{
-                        n[2]--;
-                        c = 2;
+                        if(pos > token->position){
+                            n[2]--;
+                            c = 2;
+                        }
                     } break;
                     default:{}
                 }
@@ -554,9 +676,6 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
                         break;
                     }
                 }
-            }else{
-                startAt = i;
-                refStart = -1;
             }
         }
         
@@ -571,14 +690,9 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
     }while(found == 0);
     
     // ok we got something up, now go down
-    if(refStart == -2){ // end of previous buffer
-        bid = refid + 1;
-        if(!(bid < view->lineBuffer->lineCount)) return 0;
-        startAt = 0;
-    }else{
-        bid = refid;
-    }
-    
+    bid = start->x;
+    pos = refPos;
+    startAt = start->y+1;
     buffer = BufferView_GetBufferAt(view, bid);
     // search down
     found = 0;
@@ -587,14 +701,16 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
         if(buffer->tokenCount > 0){
             for(uint i = startAt; i < buffer->tokenCount; i++){
                 Token *token = &buffer->tokens[i];
-                if(token->identifier == tdownId && n[c] == 1){
-                    *end = vec2ui(bid, i);
-                    found = 1;
-                    break;
-                }else if(token->identifier == tdownId){
-                    n[c]--;
-                }else if(token->identifier == tupId){
-                    n[c]++;
+                if(token->position >= pos){
+                    if(token->identifier == tdownId && n[c] == 1){
+                        *end = vec2ui(bid, i);
+                        found = 1;
+                        break;
+                    }else if(token->identifier == tdownId){
+                        n[c]--;
+                    }else if(token->identifier == tupId){
+                        n[c]++;
+                    }
                 }
             }
         }
@@ -604,6 +720,7 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
             if(found) return 0;
             
             buffer = BufferView_GetBufferAt(view, bid);
+            pos = 0;
             startAt = 0;
         }
     }while(!found);
@@ -614,20 +731,85 @@ int BufferView_ComputeNestingPoints(BufferView *view, vec2ui *start, vec2ui *end
 
 int BufferView_CursorNestIsValid(BufferView *view){
     return view->cursor.nestValid;
+    //return view->startNestCount > 0 && view->endNestCount;
 }
 
 void BufferView_UpdateCursorNesting(BufferView *view){
     if(view->cursor.is_dirty){
         view->cursor.is_dirty = 0;
+        int is_first = 1;
+#if 0
         view->cursor.nestValid = BufferView_ComputeNestingPoints(view,
                                                                  &view->cursor.nestStart,
                                                                  &view->cursor.nestEnd);
+#endif
+        vec2ui s = view->cursor.textPosition;
+        TokenId ids[]  = { TOKEN_ID_BRACE_OPEN, TOKEN_ID_PARENTHESE_OPEN };
+        TokenId cids[] = { TOKEN_ID_BRACE_CLOSE, TOKEN_ID_PARENTHESE_CLOSE };
+        int n[] = {0, 0};
+        int k = BufferView_FindFirstsBackwards(view, s, ids, cids, 2, 
+                                               view->startNest, 64, n);
+        
+        view->startNestCount = k;
+        
+        k = BufferView_FindFirstsForward(view, s, ids, cids, 2,
+                                         view->endNest, 64, n);
+        
+        view->endNestCount = k;
+        
+        uint eid = 0;
+        for(uint i = 0; i < view->startNestCount; i++){
+            TokenId idst = (TokenId) view->startNest[i].z;
+            for(uint k = eid; k < view->endNestCount; k++){
+                TokenId idend = (TokenId) view->endNest[k].z;
+                if(Symbol_AreTokensComplementary(idst, idend)){
+                    view->startNest[i].w = 1;
+                    view->endNest[k].w = 1;
+                    eid = k + 1;
+                    if(is_first){ // the first one is the closest to the cursor
+                        view->cursor.nestStart = vec2ui(view->startNest[i].x,
+                                                        view->startNest[i].y);
+                        view->cursor.nestEnd = vec2ui(view->endNest[k].x,
+                                                      view->endNest[k].y);
+                        view->cursor.nestValid = 1;
+                        is_first = 0;
+                    }
+                    break;
+                }
+            }
+        }
+        
+        k = view->startNestCount;
+        if(k > 0){
+            for(int i = 0; i < k; i++){
+                vec4ui v = view->startNest[i];
+                printf("Found %s at : %u %u ( %u )\n", Symbol_GetIdString(v.z), v.x, v.y,
+                       v.w);
+            }
+        }
+        
+        k = view->endNestCount;
+        printf("============================\n");
+        if(k > 0){
+            for(int i = 0; i < k; i++){
+                vec4ui v = view->endNest[i];
+                printf("Found %s at : %u %u ( %u )\n", Symbol_GetIdString(v.z), v.x, v.y,
+                       v.w);
+            }
+        }
+        
+#if 0
+        printf("Single: [%u %u] [%u %u]\n", view->cursor.nestStart.x,
+               view->cursor.nestStart.y, view->cursor.nestEnd.x,
+               view->cursor.nestEnd.y);
+#endif
     }
 }
 
 uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){
     vec2ui s = view->cursor.textPosition;
     vec2ui e = view->cursor.ghostPosition;
+    
     if(s.x > e.x){ // ghost cursor is behind
         s = view->cursor.ghostPosition;
         e = view->cursor.textPosition;
@@ -644,6 +826,10 @@ uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui 
     *start = s;
     *end = e;
     return 1;
+}
+
+void BufferView_GetCursor(BufferView *view, DoubleCursor **cursor){
+    *cursor = &view->cursor;
 }
 
 vec2ui BufferView_GetCursorPosition(BufferView *view){

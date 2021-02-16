@@ -9,6 +9,10 @@
 #include <lex.h>
 #include <app.h>
 
+Float ColorClamp(Float val){
+    return Clamp(val, 0.0f, 0.9999f);
+}
+
 uint GetSimplifiedPathName(char *fullPath, uint len){
     uint c = len > 2 ? len - 2 : 0;
     while(c > 0){
@@ -154,6 +158,13 @@ vec4f ColorFromHexf(uint hex){
     vec4i c = ColorFromHex(hex);
     return vec4f(c.x * kInv255, c.y * kInv255,
                  c.z * kInv255, c.w * kInv255);
+}
+
+vec4i ColorFromRGBA(vec4f color){
+    return vec4i((uint)(ColorClamp(color.x) * 256.0f),
+                 (uint)(ColorClamp(color.y) * 256.0f),
+                 (uint)(ColorClamp(color.z) * 256.0f),
+                 (uint)(ColorClamp(color.w) * 256.0f));
 }
 
 void OUTPUT(int j, char *y, int m){
