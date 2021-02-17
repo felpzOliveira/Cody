@@ -11,6 +11,7 @@
 #include <chrono>
 #include <thread>
 #include <app.h>
+#include <vector>
 //NOTE: We do have access to glad should we keep it or imlement it?
 #include <glad/glad.h>
 #include <sstream>
@@ -106,7 +107,7 @@ static vec2ui ScreenToGL(vec2ui u, OpenGLState * state){
 }
 
 static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
-    buffer->vertex = AllocatorGetN(Float, n);
+    buffer->vertex = AllocatorGetN(Float, 2 * n);
     buffer->colors = AllocatorGetN(Float, 4 * n);
     buffer->size = n;
     buffer->length = 0;
@@ -313,22 +314,25 @@ void Graphics_LinePush(OpenGLState *state, vec2ui p0, vec2ui p1, vec4f color){
     _OpenGLBufferPushVertex(lines, p1.x, p1.y, color);
 }
 
-void Graphics_QuadFlush(OpenGLState *state){
+void Graphics_QuadFlush(OpenGLState *state, int blend = 1){
     OpenGLBuffer *quad = &state->glQuadBuffer;
     if(quad->length > 0){
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        if(blend){
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        }
+        
         glBindVertexArray(quad->vertexArray);
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float), quad->vertex, 
-                     GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float),
+                     quad->vertex, GL_DYNAMIC_DRAW);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
         
         glEnableVertexAttribArray(1);
         glBindBuffer(GL_ARRAY_BUFFER, quad->colorBuffer);
-        glBufferData(GL_ARRAY_BUFFER, quad->length * 4 * sizeof(Float), quad->colors, 
-                     GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, quad->length * 4 * sizeof(Float),
+                     quad->colors, GL_DYNAMIC_DRAW);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
         
         glDrawArrays(GL_TRIANGLES, 0, quad->length);
@@ -341,11 +345,12 @@ void Graphics_QuadFlush(OpenGLState *state){
     quad->length = 0;
 }
 
-void Graphics_LineFlush(OpenGLState *state){
+void Graphics_LineFlush(OpenGLState *state, int blend = 1){
     OpenGLBuffer *lines = &state->glLineBuffer;
     if(lines->length > 0){
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
         glBindVertexArray(lines->vertexArray);
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, lines->vertexBuffer);
@@ -437,10 +442,12 @@ void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
     int previousGlyph = -1;
     
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
+    
     int spacing = DigitCount(BufferView_GetLineCount(view));
     int ncount = DigitCount(lineNr+1);
-    vec4ui *start = view->startNest;
-    vec4ui *end   = view->endNest;
+    
+    NestPoint *start = view->startNest;
+    NestPoint *end   = view->endNest;
     uint it = Max(view->startNestCount, view->endNestCount);
     
     memset(linen, ' ', spacing-ncount);
@@ -495,22 +502,24 @@ void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
                 if(BufferView_CursorNestIsValid(view)){
                     for(uint f = 0; f < it; f++){
                         if(f < view->startNestCount){
-                            if(start[f].w){ // is valid
-                                if((lineNr == start[f].x && i == start[f].y)){
-                                    //TODO: pick color
-                                    col = GetNestColor(&defaultTheme, 
-                                                       (TokenId)start[f].z, 0);
+                            if(start[f].valid){ // is valid
+                                if((lineNr == start[f].position.x && 
+                                    i == start[f].position.y))
+                                {
+                                    col = GetNestColor(&defaultTheme, start[f].id,
+                                                       start[f].depth);
                                     break;
                                 }
                             }
                         }
                         
                         if(f < view->endNestCount){
-                            if(end[f].w){ // is valid
-                                if((lineNr == end[f].x && i == end[f].y)){
-                                    //TODO: pick color
-                                    col = GetNestColor(&defaultTheme, 
-                                                       (TokenId)end[f].z, 0);
+                            if(end[f].valid){ // is valid
+                                if((lineNr == end[f].position.x && 
+                                    i == end[f].position.y))
+                                {
+                                    col = GetNestColor(&defaultTheme, end[f].id,
+                                                       start[f].depth);
                                     break;
                                 }
                             }
@@ -552,8 +561,6 @@ void _Graphics_RenderTextBlock(OpenGLFont *font, BufferView *view, Float baseHei
     glUseProgram(font->shader.id);
     Shader_UniformMatrix4(font->shader, "projection", &projection->m);
     Shader_UniformMatrix4(font->shader, "modelView", &model->m);
-    
-    BufferView_UpdateCursorNesting(view);
     
     for(int i = lines.x; i < lines.y; i++){
         OpenGLRenderLine(view, font, x, y, i);
@@ -599,6 +606,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
         Shader_UniformInteger(font->cursorShader, "isCursor", 0);
         Float g = 0.8705882; //TODO: add this to theme
         //Float g = 0.4705882;
+        
         Graphics_QuadPush(state, vec2ui(bufferView->lineOffset, p.y), 
                           vec2ui(bufferView->lineOffset+lineSpan, p.w), 
                           vec4f(g, g, 2 * g, 0.18)
@@ -655,8 +663,146 @@ void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
                                    ghostcursor, lines, &state->scale, projection);
 }
 
+void Graphics_RenderScopeSections(OpenGLState *state, BufferView *view, Float lineSpan,
+                                  Transform *projection, Transform *model, Theme *theme)
+{
+    if(BufferView_CursorNestIsValid(view)){
+        OpenGLFont *font = &state->font;
+        NestPoint *start = view->startNest;
+        NestPoint *end   = view->endNest;
+        vec2ui visibleLines = BufferView_GetViewRange(view);
+        Float minY = 0;
+        Float maxY = view->currentMaxRange * font->fontMath.fontSizeAtRenderCall;
+        
+        struct _Quad{
+            vec2ui left, right;
+            vec4f color;
+            int depth;
+        };
+        
+        std::vector<_Quad> quads;
+        
+        if(view->descLocation == DescriptionTop){
+            minY = font->fontMath.fontSizeAtRenderCall;
+            maxY += font->fontMath.fontSizeAtRenderCall;
+        }
+        
+        glUseProgram(font->cursorShader.id);
+        Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+        Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+        Shader_UniformInteger(font->cursorShader, "isCursor", 1);
+        
+        uint it = view->startNestCount;
+        for(uint f = 0; f < it; f++){
+            NestPoint v = start[f];
+            if(v.valid && v.id == TOKEN_ID_BRACE_OPEN){ // valid
+                NestPoint e = end[v.comp];
+                Buffer *bStart = BufferView_GetBufferAt(view, v.position.x);
+                Buffer *bEnd   = BufferView_GetBufferAt(view, e.position.x);
+                
+                uint l0 = AppComputeLineIndentLevel(bStart);
+                uint l1 = AppComputeLineIndentLevel(bEnd);
+                
+                // only do it for aligned stuff
+                if(l0 == l1 && e.position.x > v.position.x + 1){
+                    // check if their non empty token match position
+                    vec2ui p0(0, 0);
+                    vec2ui p1(0, 0);
+                    uint n = Max(bStart->tokenCount, bEnd->tokenCount);
+                    for(uint i = 0; i < n; i++){
+                        if(i < bStart->tokenCount && p0.y == 0){
+                            Token *t = &bStart->tokens[i];
+                            if(t->identifier != TOKEN_ID_SPACE){
+                                p0.x = t->position;
+                                p0.y = 1;
+                            }
+                        }
+                        
+                        if(i < bEnd->tokenCount && p1.y == 0){
+                            Token *t = &bEnd->tokens[i];
+                            if(t->identifier != TOKEN_ID_SPACE){
+                                p1.x = t->position;
+                                p1.y = 1;
+                            }
+                        }
+                        
+                        if(p1.y != 0 && p0.y != 0) break;
+                    }
+                    
+                    if((p1.y == 0 || p0.y == 0) || (p1.x != p0.x)){
+                        continue;
+                    }
+                    
+                    // looks like this thing needs rendering
+                    Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+                    int pGlyph = -1;
+                    char *p = &bStart->data[0];
+                    
+                    //TODO: UTF-8
+                    x0 = fonsComputeStringAdvance(font->fsContext, p, p0.x, &pGlyph);
+                    x1 = fonsComputeStringAdvance(font->fsContext, &p[p0.x], 1, &pGlyph);
+                    
+                    Float topX = x0 + 0.5f * x1 + view->lineOffset;
+                    Float botX = topX;
+                    y0 = ((Float)v.position.x - (Float)visibleLines.x + 2) *
+                        font->fontMath.fontSizeAtRenderCall;
+                    
+                    y1 = y0 + (e.position.x - v.position.x - 1) *
+                        font->fontMath.fontSizeAtRenderCall;
+                    
+                    y0 = Max(y0, minY);
+                    y1 = Min(y1, maxY);
+                    
+                    Graphics_LinePush(state, vec2ui(topX, y0), vec2ui(botX, y1),
+                                      vec4f(0.5,0.5,0.5, 0.18));
+                }
+                
+                // render the quads no matter what
+                Float qy0 = 0, qy1 = 0, qx0 = 0, qx1 = 0;
+                qy0 = ((Float)v.position.x - (Float)visibleLines.x + 1) *
+                    font->fontMath.fontSizeAtRenderCall;
+                
+                qy1 = qy0 + (e.position.x - v.position.x + 1) *
+                    font->fontMath.fontSizeAtRenderCall;
+                qx0 = view->lineOffset;
+                qx1 = qx0 + lineSpan;
+                
+                qy0 = Max(qy0, minY);
+                qy1 = Min(qy1, maxY);
+                
+                vec4f color = GetNestColorf(theme, TOKEN_ID_SCOPE,
+                                            v.depth);
+                quads.push_back({
+                                    .left = vec2ui(qx0, qy0),
+                                    .right = vec2ui(qx1, qy1),
+                                    .color = color,
+                                    .depth = v.depth
+                                });
+            }
+        }
+        
+        int quadLen = quads.size();
+        if(quadLen > 0){
+            _Quad quad = quads.at(quadLen-1);
+            Graphics_QuadPush(state, quad.left, quad.right,
+                              quad.color);
+        }
+#if 0
+        for(int i = quadLen - 1; i >= 0; i--){
+            _Quad quad = quads.at(i);
+            Graphics_QuadPush(state, quad.left, quad.right,
+                              quad.color
+                              //vec4f(0.05)
+                              );
+        }
+#endif
+        Graphics_QuadFlush(state);
+        Graphics_LineFlush(state);
+    }
+}
+
 void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
-                          Transform *projection, Theme *theme)
+                          Transform *projection, Float lineSpan, Theme *theme)
 {
     OpenGLFont *font = &state->font;
     OpenGLBuffer *quad = &state->glQuadBuffer;
@@ -767,13 +913,17 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
         Graphics_LinePush(state, vec2ui(u.x, l.y), l, color);
         Graphics_LineFlush(state);
 #endif
+        
+        //Graphics_RenderScopeSections(state, view, lineSpan, projection, model, theme);
     }
 }
 
 int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     Float ones[] = {1,1,1,1};
+    OpenGLState *state = &GlobalGLState;
     OpenGLFont *font = &GlobalGLState.font;
     Geometry *geometry = &view->geometry;
+    
     vec2ui bufferRes = geometry->upper - geometry->lower;
     Float width = geometry->upper.x - geometry->lower.x;
     Float scaledWidth = width * font->fontMath.invReduceScale;
@@ -808,9 +958,8 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     SetAlpha(view->isActive ? 0 : 1);
     
     if(!BufferView_IsAnimating(view)){
-        Graphics_RenderTextBlock(&GlobalGLState, view, baseHeight, &projection);
-        Graphics_RenderCursorElements(&GlobalGLState, view, scaledWidth, baseHeight,
-                                      &projection);
+        Graphics_RenderTextBlock(state, view, baseHeight, &projection);
+        Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight, &projection);
     }else{
         vec2ui range;
         vec2ui cursorAt;
@@ -838,18 +987,23 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
             model = GlobalGLState.scale * translate;
             ghostcursor = BufferView_GetGhostCursorPosition(view);
             _Graphics_RenderTextBlock(font, view, baseHeight, &projection, &model, range);
-            _Graphics_RenderCursorElements(&GlobalGLState, view, scaledWidth, baseHeight,
+            _Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight,
                                            cursorAt, ghostcursor, range, &model,
                                            &projection);
         }else{
-            Graphics_RenderTextBlock(&GlobalGLState, view, baseHeight, &projection);
-            Graphics_RenderCursorElements(&GlobalGLState, view, scaledWidth, baseHeight,
+            Graphics_RenderTextBlock(state, view, baseHeight, &projection);
+            Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight,
                                           &projection);
         }
         is_animating = 1;
     }
     
-    Graphics_RenderFrame(&GlobalGLState, view, &projection, theme);
+    Graphics_RenderFrame(state, view, &projection, scaledWidth, theme);
+    if(view->isActive){
+        // render alignment and scoped quads first to not need to blend this thing
+        Graphics_RenderScopeSections(state, view, scaledWidth, &projection,
+                                     &state->scale, theme);
+    }
     
     glDisable(GL_SCISSOR_TEST);
     return is_animating;
@@ -894,9 +1048,12 @@ void OpenGLEntry(){
         glClearBufferfv(GL_COLOR, 0, fcol);
         glClearBufferfv(GL_DEPTH, 0, ones);
         
+        AppUpdateViews();
+        
         int c = AppGetBufferViewCount();
         for(int i = 0; i < c; i++){
             BufferView *view = AppGetBufferView(i);
+            BufferView_UpdateCursorNesting(view);
             animating |= Graphics_RenderBufferView(view, &defaultTheme, dt);
         }
         

@@ -5,6 +5,7 @@
 #include <geometry.h>
 
 struct BufferView;
+struct Buffer;
 
 typedef struct{
     int tabSpacing;
@@ -23,5 +24,8 @@ void AppClickPosition(int x, int y);
 
 BufferView *AppGetBufferView(int i);
 int AppGetBufferViewCount();
+
+uint AppComputeLineIndentLevel(Buffer *buffer);
+void AppUpdateViews();
 
 #endif //APP_H

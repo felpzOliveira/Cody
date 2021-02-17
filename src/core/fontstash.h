@@ -1419,7 +1419,7 @@ FONS_DEF int fonsComputeStringOffsetCount(FONScontext* stash, const char *e, flo
     char *str = (char *)e;
     char *end = (char *)e + strlen(e);
     
-    if (stash == NULL) return 0;
+    if (stash == NULL || str == NULL) return 0;
 	if (state->font < 0 || state->font >= stash->nfonts) return 0;
 	font = stash->fonts[state->font];
 	if (font->data == NULL) return 0;
@@ -1473,7 +1473,7 @@ FONS_DEF float fonsComputeStringAdvance(FONScontext* stash, const char *e, int n
     char *str = (char *)e;
     char *end = (char *)&str[n];
     
-    if (stash == NULL) return 0;
+    if (stash == NULL || str == NULL) return 0;
 	if (state->font < 0 || state->font >= stash->nfonts) return 0;
 	font = stash->fonts[state->font];
 	if (font->data == NULL) return 0;
@@ -1533,7 +1533,7 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
 	FONSfont* font;
 	float width;
     
-	if (stash == NULL) return x;
+	if (stash == NULL || str == NULL) return x;
 	if (state->font < 0 || state->font >= stash->nfonts) return x;
 	font = stash->fonts[state->font];
 	if (font->data == NULL) return x;
@@ -1602,7 +1602,7 @@ FONS_DEF float fonsDrawText(FONScontext* stash,
 	FONSfont* font;
 	float width;
     
-	if (stash == NULL) return x;
+	if (stash == NULL || str == NULL) return x;
 	if (state->font < 0 || state->font >= stash->nfonts) return x;
 	font = stash->fonts[state->font];
 	if (font->data == NULL) return x;

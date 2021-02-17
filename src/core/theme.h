@@ -26,13 +26,11 @@ typedef struct{
     vec4i preprocessorColor;
     vec4i preprocessorDefineColor;
     vec4i borderColor;
-    vec4i parenthesis0;
-    vec4i parenthesis1;
-    vec4i parenthesis2;
-    vec4i parenthesis3;
     vec4i braces;
     vec4i cursorColor;
     vec4i ghostCursorColor;
+    vec4i parenthesis[4];
+    vec4i backTextColors[3];
     
     vec4i testColor;
 }Theme;
@@ -41,6 +39,7 @@ extern Theme defaultTheme;
 
 void SetAlpha(int acitve);
 vec4i GetNestColor(Theme *theme, TokenId id, int level);
+vec4f GetNestColorf(Theme *theme, TokenId id, int level);
 vec4i GetColor(Theme *theme, TokenId id);
 vec4f GetColorf(Theme *theme, TokenId id);
 vec4i GetUIColor(Theme *theme, UIElement id);

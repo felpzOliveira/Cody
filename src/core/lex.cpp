@@ -36,6 +36,15 @@ inline void TokenizerConsumeCacheIfPossible(Tokenizer *tokenizer){
     }
 }
 
+inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
+    if(token->identifier == TOKEN_ID_BRACE_OPEN){
+        tokenizer->runningIndentLevel++;
+    }else if(token->identifier == TOKEN_ID_BRACE_CLOSE){
+        uint n = tokenizer->runningIndentLevel;
+        tokenizer->runningIndentLevel = n > 0 ? n - 1 : 0;
+    }
+}
+
 inline int Lex_IsTokenReserved(Token *token){
     TokenId id = token->identifier;
     return (id == TOKEN_ID_COMMENT || id == TOKEN_ID_RESERVED ||
@@ -458,7 +467,7 @@ LEX_PROCESSOR(Lex_Number){
             rLen ++;
             (*p)++;
             goto _number_start;
-        }else if(**p == 'f'){
+        }else if(**p == 'f' && xCount == 0){
             if(dotCount < 1){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
@@ -1005,6 +1014,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
             }
             
             TokenizerConsumeCacheIfPossible(tokenizer);
+            TokenizerUpdateState(tokenizer, token);
             tokenizer->lastToken = *token;
             return offset + len;
         }
@@ -1028,6 +1038,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
                     tokenizer->autoIncrementor + offset;
                 
                 tokenizer->linePosition += offset + len;
+                TokenizerUpdateState(tokenizer, token);
                 tokenizer->lastToken = *token;
                 return offset + len;
             }else if(rv == TOKENIZER_OP_FINISHED){
@@ -1041,6 +1052,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
                 }
                 
                 TokenizerConsumeCacheIfPossible(tokenizer);
+                TokenizerUpdateState(tokenizer, token);
                 tokenizer->lastToken = *token;
                 return offset + len;
             }
@@ -1282,6 +1294,7 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols){
     tokenizer->aggregate = 0;
     tokenizer->type = 0;
     tokenizer->inclusion = 0;
+    tokenizer->runningIndentLevel = 0;
     
     tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
                                               tokenizer->contextCount);
@@ -1326,6 +1339,7 @@ void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *c
     context->inclusion = tokenizer->inclusion;
     context->aggregate = tokenizer->aggregate;
     context->type = tokenizer->type;
+    context->indentLevel = tokenizer->runningIndentLevel;
     BoundedStack_Copy(&context->procStack, tokenizer->procStack);
     if(tokenizer->unfinishedContext >= 0){
         context->backTrack = tokenizer->linesAggregated+1;
@@ -1341,6 +1355,7 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
     tokenizer->inclusion = context->inclusion;
     tokenizer->aggregate = context->aggregate;
     tokenizer->type = context->type;
+    tokenizer->runningIndentLevel = context->indentLevel;
     BoundedStack_Copy(tokenizer->procStack, &context->procStack);
     //printf("Stack size: %d\n", BoundedStack_Size(tokenizer->procStack));
 }

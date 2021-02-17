@@ -24,12 +24,15 @@ typedef enum{
     CHANGE_NEWLINE,
     CHANGE_MERGE,
     CHANGE_BLOCK_REMOVE,
+    CHANGE_BLOCK_INSERT,
 }ChangeID;
 
 typedef struct{
     vec2ui bufferInfo;
     vec2ui bufferInfoEnd;
     Buffer *buffer;
+    char *text;
+    uint size;
     ChangeID change;
 }BufferChange;
 
@@ -105,6 +108,11 @@ void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor);
 * Pushes into the stack a comand to remove a block of text pasted.
 */
 void UndoRedoUndoPushRemoveBlock(UndoRedo *redo, vec2ui start, vec2ui end);
+
+/*
+* Pushes into the stack a command to insert a block of text removed.
+*/
+void UndoRedoUndoPushInsertBlock(UndoRedo *redo, vec2ui start, char *text, uint size);
 
 /*
 * Moves one entry of the undo stack to the redo stack.

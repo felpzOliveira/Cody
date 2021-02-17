@@ -174,6 +174,9 @@ typedef struct{
     uint forwardTrack;
     BoundedStack procStack; 
     
+    // utility for faster nest computation and identation
+    uint indentLevel;
+    
     // Comment parsing
     int aggregate;
     int type;
@@ -206,6 +209,9 @@ struct Tokenizer{
     SymbolTable symbolTable;
     uint commitedSyms[TOKENIZER_MAX_CACHE_SIZE];
     uint commitedSymsCount;
+    
+    // help bufferview with information about nest at start of line
+    uint runningIndentLevel;
     
     // Comment parsing
     int aggregate;

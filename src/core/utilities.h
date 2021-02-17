@@ -12,6 +12,8 @@
 #define MAX_BOUNDED_STACK_SIZE 16
 #define DebugBreak() raise(SIGTRAP)
 
+#define BUG() printf("=========== BUG ===========\n");
+
 #define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }
 
 const Float kInv255 = 0.003921569;

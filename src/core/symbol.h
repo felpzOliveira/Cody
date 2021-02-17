@@ -38,6 +38,7 @@ typedef enum{
     TOKEN_ID_INCLUDE,
     TOKEN_ID_MATH,
     TOKEN_ID_SPACE,
+    TOKEN_ID_SCOPE, // used only for graphical part to get region from theme
     TOKEN_ID_NONE,
     
     /* user defined tokens */

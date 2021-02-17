@@ -2,6 +2,7 @@
 #include <types.h>
 #include <utilities.h>
 #include <buffers.h>
+#include <string.h>
 
 typedef struct{
     Buffer **bufferPool;
@@ -109,6 +110,8 @@ void _UndoRedoPushMerge(UndoRedo *redo, vec2ui baseU8, int is_undo){
     BufferChange bufferChange = {
         .bufferInfo = baseU8,
         .buffer = nullptr,
+        .text = nullptr,
+        .size = 0,
         .change = CHANGE_MERGE,
     };
     
@@ -122,6 +125,8 @@ void _UndoRedoUndoPushNewLine(UndoRedo *redo, vec2ui baseU8, int is_undo){
     BufferChange bufferChange = {
         .bufferInfo = baseU8,
         .buffer = nullptr,
+        .text = nullptr,
+        .size = 0,
         .change = CHANGE_NEWLINE,
     };
     if(is_undo)
@@ -134,6 +139,8 @@ void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
         .buffer = nullptr,
+        .text = nullptr,
+        .size = 0,
         .change = CHANGE_INSERT,
     };
     
@@ -147,6 +154,8 @@ void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
         .buffer = nullptr,
+        .text = nullptr,
+        .size = 0,
         .change = CHANGE_REMOVE,
     };
     
@@ -161,7 +170,21 @@ void UndoRedoUndoPushRemoveBlock(UndoRedo *redo, vec2ui start, vec2ui end){
         .bufferInfo = start,
         .bufferInfoEnd = end,
         .buffer = nullptr,
+        .text = nullptr,
+        .size = 0,
         .change = CHANGE_BLOCK_REMOVE,
+    };
+    
+    DoStack_Push(redo->undoStack, &bufferChange);
+}
+
+void UndoRedoUndoPushInsertBlock(UndoRedo *redo, vec2ui start, char *text, uint size){
+    BufferChange bufferChange = {
+        .bufferInfo = start,
+        .buffer = nullptr,
+        .text = strdup(text),
+        .size = size,
+        .change = CHANGE_BLOCK_INSERT,
     };
     
     DoStack_Push(redo->undoStack, &bufferChange);

@@ -67,7 +67,14 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
 //TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     if(!(rawp <= buffer->taken)){
+        BUG();
         printf("BUG tracked:\n");
+        if(buffer->data == nullptr){
+            printf("Buffer is empty (nullptr), recovering\n");
+            // attempt a recover
+            Buffer_Init(buffer, DefaultAllocatorSize);
+            return 0;
+        }
         Buffer_DebugStdoutData(buffer);
         printf("Queried for UTF-8 location at %u\n", rawp);
     }
@@ -95,7 +102,11 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
 //TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
     if(!(u8p <= buffer->taken)){
+        BUG();
         printf("BUG tracked:\n");
+        if(buffer->data == nullptr){
+            printf("Buffer is empty (nullptr)\n");
+        }
         Buffer_DebugStdoutData(buffer);
         printf("Queried for UTF-8 translation at %u\n", u8p);
     }
@@ -336,7 +347,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         buffer->taken += len;
         buffer->count = Buffer_GetUtf8Count(buffer);
         buffer->data[buffer->taken] = 0;
-    }else if(buffer->size == 0){
+    }else if(buffer->size == 0 || buffer->data == nullptr){
         Buffer_Init(buffer, DefaultAllocatorSize);
     }
     
@@ -710,8 +721,6 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
 }
 
-//TODO: Needs to copy initial buffer and final buffer.
-// implement debug routines, this is becoming annoying.
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
                                 uint base, uint u8offset, Tokenizer *tokenizer,
                                 uint *offset)
@@ -721,7 +730,9 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
 * We need to get the content from the position forward in the buffer. Move all
 * the buffers bellow to the amount of lines inserted. Add the first line to the
 * of the original buffer, insert the rest of the lines and finally the original
-* text from the position.
+* text from the position. Because we will make multiple line movements
+* it is faster if we directly move the buffers than to perform line insertion
+* with 'LineBuffer_InsertLineAt'.
 */
     
     // 1 - Count the amount of lines so we can shift the file in a single pass
@@ -731,12 +742,11 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     uint bId = base;
     Buffer *lastBuffer = lineBuffer->lines[base];
     char *firstLine = nullptr;
-    uint isEndPoint = lastBuffer->count == u8offset ? 1 : 0;
     for(uint i = 0; i < size; i++){
         if(text[i] == '\n') nLines++;
     }
     
-    LineBuffer_DebugPrintRange(lineBuffer, vec2i((int)base-2, nLines+2));
+    //LineBuffer_DebugPrintRange(lineBuffer, vec2i((int)base-2, nLines+2));
     
     // 2 - Create nLines buffers for the file
     if(!(lineBuffer->lineCount + nLines < lineBuffer->size)){
@@ -760,9 +770,6 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
         Buffer_CopyReferences(bufferEnd, bufferSt);
         if(!(startp > base + nLines)){
             Buffer_Release(bufferSt);
-            // TODO: This initialization can be restricted to null buffers only
-            //       _after_ insertion, figure it out!
-            Buffer_Init(bufferSt, DefaultAllocatorSize);
         }
         startp--;
         endp--;
@@ -773,6 +780,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     uint at = u8offset;
     int pp = -1;
     uint lineSize = 0;
+    uint inc = 0;
     uint proc = 0;
     lastBuffer = lineBuffer->lines[base];
     uint firstP = 0;
@@ -809,11 +817,11 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
         }
     }
     
+    // If we did not finish at '\n' than manually copy the missing content
     if(lineSize > 0){
         lastBuffer = lineBuffer->lines[base];
         uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, 1);
         at += n;
-        base++;
         //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
     }
     
@@ -826,101 +834,36 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             at = lastBuffer->taken;
             Buffer_InsertRawStringAt(lastBuffer, lastBuffer->taken, 
                                      &firstLine[firstP], toCopy, 0);
-            if(isEndPoint){
-                base++;
-            }
         }
     }
     
-    // 6 - Jump to next line in case there is none
+    // 6 - In case our copy was empty return to 0
     if(lineSize == 0){
         at = 0;
-        base++;
+        
+        // End of file handling
+        Buffer *b = lineBuffer->lines[base];
+        if(b->data == nullptr) Buffer_Init(b, DefaultAllocatorSize);
+    }
+    
+    uint lineCount = lineBuffer->lineCount-1;
+    lineBuffer->lineCount += (base - bId);
+    
+    //printf("Added %u lines\n", base - bId);
+    
+    // 7 - Check the file ending is correct as we cannot have nullptrs
+    for(uint i = lineCount; i < lineBuffer->lineCount; i++){
+        Buffer *b = lineBuffer->lines[i];
+        if(b->data == nullptr) Buffer_Init(b, DefaultAllocatorSize);
     }
     
     *offset = Buffer_Utf8RawPositionToPosition(lastBuffer, at);
     
     AllocatorFree(firstLine);
     
-    LineBuffer_DebugPrintRange(lineBuffer, vec2i((int)bId-2, nLines+5));
-    
-    return base - bId;
+    //LineBuffer_DebugPrintRange(lineBuffer, vec2i((int)bId-2, nLines+20));
+    return base - bId + inc;
 }
-
-uint LineBuffer_InsertRawTextAt2(LineBuffer *lineBuffer, char *text, uint size,
-                                 uint base, uint u8offset, Tokenizer *tokenizer,
-                                 uint *offset)
-{
-    //TODO: Lets implement the slow method first, if that sucks too much
-    //      implement one that solves both tokens and paste in a single pass
-    
-    //////// SLOW METHOD
-    //1 - Insert by line breaks
-    uint processed = 0;
-    char *p = text;
-    char *lineStart = p;
-    uint lineSize = 0;
-    uint bufId = base;
-    int is_first = 1;
-    uint refId = base;
-    Buffer *buffer = nullptr;
-    uint startPos = 0;
-    while(p != NULL && *p != EOF && processed < size){
-        char v = p[processed];
-        if(v == '\r'){
-            processed++;
-        }
-        
-        if(v == '\n'){
-            p[processed] = 0;
-            buffer = LineBuffer_GetBufferAt(lineBuffer, base);
-            if(is_first){ // need to append to buffer
-                if(lineSize > 0 && buffer){
-                    startPos = u8offset;
-                    Buffer_InsertStringAt(buffer, u8offset, lineStart, lineSize, 1);
-                }else if(buffer == nullptr){
-                    LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize, 1);
-                }
-                is_first = 0;
-            }else{
-                startPos = 0;
-                LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize, 1);
-            }
-            // we must get the buffer here in case it is a _last_line_ insertion
-            buffer = LineBuffer_GetBufferAt(lineBuffer, base);
-            p[processed] = v;
-            lineStart = &p[processed+1];
-            lineSize = 0;
-            processed++;
-            base++;
-        }else{
-            lineSize += 1;
-            processed++;
-        }
-    }
-    
-    if(lineSize > 0){
-        buffer = LineBuffer_GetBufferAt(lineBuffer, base);
-        if(is_first && buffer != nullptr){
-            startPos = u8offset;
-            Buffer_InsertStringAt(buffer, u8offset, lineStart, lineSize, 1);
-        }
-        else{
-            startPos = 0;
-            LineBuffer_InsertLineAt(lineBuffer, base, lineStart, lineSize, 1);
-            buffer = LineBuffer_GetBufferAt(lineBuffer, base);
-        }
-        base++;
-    }
-    
-    //2 - Retokenize this thing now
-    LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, refId, base-refId);
-    
-    *offset = Buffer_Utf8RawPositionToPosition(buffer, lineSize+startPos);
-    
-    return base - refId;
-}
-
 
 void LineBuffer_InitEmpty(LineBuffer *lineBuffer){
     LineBuffer_InitBlank(lineBuffer);
@@ -1026,7 +969,7 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
     data[ic++] = 0;
     
     *ptr = data;
-    return ic;
+    return ic-1;
 }
 
 Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint at){

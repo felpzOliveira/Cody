@@ -31,6 +31,14 @@ typedef struct{
     int is_down;
 }AnimationProps;
 
+typedef struct{
+    vec2ui position;
+    TokenId id;
+    int valid;
+    int comp;
+    int depth;
+}NestPoint;
+
 /*
 * TODO: Since this is only one of the views of a file we might
 *       need to keep a pointer here instead of a copy so that
@@ -60,8 +68,8 @@ struct BufferView{
     int isActive;
     int renderLineNbs;
     int activeNestPoint; // to allow jumping, -1 = none, 0 = start, 1 = end
-    vec4ui startNest[64];
-    vec4ui endNest[64];
+    NestPoint startNest[64];
+    NestPoint endNest[64];
     int startNestCount;
     int endNestCount;
 };
@@ -240,6 +248,12 @@ uint BufferView_GetLineCount(BufferView *view);
 * cursor at the head while 1 is at the end of the file.
 */
 Float BufferView_GetDescription(BufferView *view, char *content, uint size);
+
+/*
+* Allows the bufferview 'view' to synchronize and avoid out of bounds
+* errors in case 'source' changed properties of the 'view'.
+*/
+void BufferView_SynchronizeWith(BufferView *view, BufferView *source);
 
 void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

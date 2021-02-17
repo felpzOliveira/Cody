@@ -3,7 +3,7 @@
 
 Theme defaultTheme = {
     //.backgroundColor = ColorFromHex(0xFF161616),
-    .backgroundColor = ColorFromHex(0xFF000000),
+    .backgroundColor = ColorFromHex(0xFF0C0C0C),
     .operatorColor   = ColorFromHex(0xCCCD950C),
     .datatypeColor   = ColorFromHex(0xCCCD950C),
     .commentColor    = ColorFromHex(0xFF7D7D7D),
@@ -18,13 +18,21 @@ Theme defaultTheme = {
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     //.preprocessorDefineColor = ColorFromHex(0xFFDD1A01),
     .borderColor = ColorFromHex(0xFFFF7F50),
-    .parenthesis0 = ColorFromHex(0xFFFF0000),
-    .parenthesis1 = ColorFromHex(0xFF00FF00),
-    .parenthesis2 = ColorFromHex(0xFF0000FF),
-    .parenthesis3 = ColorFromHex(0xFFAAAA00),
     .braces = ColorFromHex(0xFF00FFFF),
     .cursorColor = ColorFromHex(0xFF40FF40),
     .ghostCursorColor = ColorFromHex(0xFF5B4D3C),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0x08AAAAAA),
+        //ColorFromHex(0xFF130707),
+        ColorFromHex(0xFF071007),
+        ColorFromHex(0xFF070710),
+    },
     .testColor = ColorFromHex(0xCCCD950C),
 };
 
@@ -34,22 +42,40 @@ void SetAlpha(int acitve){
 }
 
 vec4i GetNestColor(Theme *theme, TokenId id, int level){
-    level = level % 4;
     if(id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE)
     {
         return theme->braces;
     }else if(id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE){
-        switch(level){
-            case 0: return theme->parenthesis0;
-            case 1: return theme->parenthesis1;
-            case 2: return theme->parenthesis2;
-            case 3: return theme->parenthesis3;
-            default: return theme->parenthesis0;
-        }
+        level = level % 4;
+        return theme->parenthesis[level];
+    }else if(id == TOKEN_ID_SCOPE){
+        //level = Clamp(level, 0, 3);
+        level = 0;
+        return theme->backTextColors[level];
     }
     
     AssertErr(0, "Invalid theme query for nesting color");
     return vec4i(255, 255, 0, 255);
+}
+
+vec4f GetNestColorf(Theme *theme, TokenId id, int level){
+    vec4i col(255);
+    if(id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE)
+    {
+        col = theme->braces;
+    }else if(id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE){
+        level = level % 4;
+        col = theme->parenthesis[level];
+    }else if(id == TOKEN_ID_SCOPE){
+        //level = Clamp(level, 0, 3);
+        level = 0;
+        col = theme->backTextColors[level];
+    }
+    
+    vec4f c = vec4f(col.x * kInv255, col.y * kInv255,
+                    col.z * kInv255, col.w * kInv255);
+    
+    return c;
 }
 
 vec4f GetColorf(Theme *theme, TokenId id){

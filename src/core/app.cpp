@@ -70,7 +70,7 @@ void AppEarlyInitialize(){
     appContext.activeId = 1;
     
     appGlobalConfig.tabSpacing = 4;
-    appGlobalConfig.useTabs = 1;
+    appGlobalConfig.useTabs = 0;
 }
 
 int AppGetBufferViewCount(){
@@ -94,6 +94,17 @@ void AppSetActiveBufferView(int i){
     appContext.activeBufferView->isActive = 1;
     appContext.activeId = i;
 }
+
+void AppUpdateViews(){
+    BufferView *view = AppGetActiveBufferView();
+    for(uint i = 0; i < appContext.viewsCount; i++){
+        BufferView *other = &appContext.views[i];
+        if(i != appContext.activeId && view->lineBuffer == other->lineBuffer){
+            BufferView_SynchronizeWith(other, view);
+        }
+    }
+}
+
 
 void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
@@ -340,12 +351,18 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
         
         // merge start and end
         LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, start.x);
+        bufferView->lineBuffer->is_dirty = 1;
     }
 }
 
 vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
+    char *lineHelper = nullptr;
     LineBuffer *lineBuffer = BufferView_GetLineBuffer(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, at.x);
+    Buffer *bufferp1 = BufferView_GetBufferAt(bufferView, at.x+1);
+    TokenizerStateContext *ctx = &bufferp1->stateContext;
+    
+    uint len = appGlobalConfig.tabSpacing * ctx->indentLevel;
     
     int toNextLine = Max((int)buffer->count - (int)at.y, 0);
     char *dataptr = nullptr;
@@ -355,7 +372,21 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
         toNextLine = buffer->taken - p;
     }
     
-    LineBuffer_InsertLineAt(lineBuffer, at.x+1, dataptr, toNextLine, 0);
+    if(len + toNextLine > 0){
+        lineHelper = AllocatorGetN(char, (len + toNextLine) * sizeof(char));
+    }
+    
+    if(len > 0){
+        char indentChar = ' ';
+        if(appGlobalConfig.useTabs) indentChar = '\t';
+        Memset(lineHelper, indentChar, sizeof(char) * len);
+    }
+    
+    if(toNextLine > 0){
+        Memcpy(&lineHelper[len], dataptr, toNextLine * sizeof(char));
+    }
+    
+    LineBuffer_InsertLineAt(lineBuffer, at.x+1, lineHelper, len+toNextLine, 0);
     if(toNextLine > 0){
         buffer = BufferView_GetBufferAt(bufferView, at.x);
         Buffer_RemoveRange(buffer, at.y, buffer->count);
@@ -364,8 +395,10 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
     RemountTokensBasedOn(bufferView, at.x, 1);
     buffer = BufferView_GetBufferAt(bufferView, at.x);
     
+    AllocatorFree(lineHelper);
+    
     at.x += 1;
-    at.y = 0;
+    at.y = Buffer_Utf8RawPositionToPosition(bufferp1, len);
     return at;
 }
 
@@ -373,6 +406,8 @@ void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     uint at = cursor.y;
+    Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
+    
     cursor = AppCommandNewLine(bufferView, cursor);
     
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
@@ -429,6 +464,9 @@ void AppCommandUndo(){
                 LineBuffer_MergeConsecutiveLines(lineBuffer, bChange->bufferInfo.x);
                 cursor.x = bChange->bufferInfo.x;
                 cursor.y = bChange->bufferInfo.y;
+                Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
+                Buffer_RemoveRange(buffer, cursor.y, buffer->count);
+                
                 RemountTokensBasedOn(bufferView, cursor.x);
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
                 //UndoRedoRedoPushNewLine(&lineBuffer->undoRedo, bChange->bufferInfo);
@@ -470,6 +508,27 @@ void AppCommandUndo(){
                 RemountTokensBasedOn(bufferView, cursor.x, 1);
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
                 
+            } break;
+            case CHANGE_BLOCK_INSERT:{
+                vec2ui start = bChange->bufferInfo;
+                char *text = bChange->text;
+                uint size = bChange->size;
+                if(text && size > 0){
+                    uint off = 0;
+                    uint startBuffer = start.x;
+                    uint n = LineBuffer_InsertRawTextAt(bufferView->lineBuffer, text, size, 
+                                                        start.x, start.y, 
+                                                        bufferView->tokenizer, &off);
+                    
+                    uint endx = start.x + n;
+                    uint endy = off;
+                    LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(-1, -1));
+                    RemountTokensBasedOn(bufferView, startBuffer, n);
+                    cursor.x = endx;
+                    cursor.y = endy;
+                    UndoRedoPopUndo(&lineBuffer->undoRedo);
+                    AllocatorFree(text);
+                }
             } break;
             default:{ printf("Unknow undo command\n"); }
         }
@@ -521,6 +580,7 @@ void AppCommandLineQuicklyDisplay(){
 void AppCommandSaveBufferView(){
     BufferView *bufferView = AppGetActiveBufferView();
     LineBuffer_SaveToStorage(bufferView->lineBuffer);
+    bufferView->lineBuffer->is_dirty = 0;
 }
 
 void AppCommandCopy(){
@@ -541,7 +601,7 @@ void AppCommandJumpNesting(){
     BufferView *view = AppGetActiveBufferView();
     BufferView_GetCursor(view, &cursor);
     
-    if(cursor->nestValid){
+    if(BufferView_CursorNestIsValid(view)){
         //TODO: Create toogle
         if(view->activeNestPoint == -1){
             view->activeNestPoint = 0;
@@ -551,7 +611,28 @@ void AppCommandJumpNesting(){
         
         vec2ui p = view->activeNestPoint == 0 ? cursor->nestStart : cursor->nestEnd;
         Buffer *buffer = BufferView_GetBufferAt(view, p.x);
-        BufferView_CursorToPosition(view, p.x, buffer->tokens[p.y].position);
+        uint pos = Buffer_Utf8RawPositionToPosition(buffer, buffer->tokens[p.y].position);
+        BufferView_CursorToPosition(view, p.x, pos);
+    }
+}
+
+void AppCommandCut(){
+    vec2ui start, end;
+    uint size = 0;
+    char *ptr = nullptr;
+    BufferView *view = AppGetActiveBufferView();
+    
+    if(BufferView_GetCursorSelectionRange(view, &start, &end)){
+        size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
+        ClipboardSetStringX11(ptr);
+        printf("Copied %s === \n", ptr);
+        
+        UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
+        AppCommandRemoveTextBlock(view, start, end);
+        
+        RemountTokensBasedOn(view, start.x, 1);
+        BufferView_CursorToPosition(view, start.x, start.y);
+        view->lineBuffer->is_dirty = 1;
     }
 }
 
@@ -568,7 +649,6 @@ void AppCommandPaste(){
                                             cursor.x, cursor.y, view->tokenizer, &off);
         
         uint endx = cursor.x + n;
-        endx = endx > 1 ? endx - 1 : endx;
         uint endy = off;
         
         UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
@@ -580,6 +660,112 @@ void AppCommandPaste(){
         cursor.x = endx;
         cursor.y = endy;
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
+        view->lineBuffer->is_dirty = 1;
+    }
+}
+
+uint AppComputeLineIndentLevel(Buffer *buffer){
+    TokenizerStateContext *ctx = &buffer->stateContext;
+    uint l = ctx->indentLevel;
+    for(uint i = 0; i < buffer->tokenCount; i++){
+        Token *token = &buffer->tokens[i];
+        if(token->identifier != TOKEN_ID_SPACE){
+            if(token->identifier == TOKEN_ID_BRACE_CLOSE){
+                l = l > 0 ? l - 1 : 0;
+            }
+            
+            break;
+        }
+    }
+    
+    return l;
+}
+
+void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
+    char *lineHelper = nullptr;
+    uint tabSize = appGlobalConfig.tabSpacing;
+    char indentChar = ' ';
+    int changes = 0;
+    vec2ui cursor = BufferView_GetCursorPosition(view);
+    if(appGlobalConfig.useTabs){
+        indentChar = '\t';
+    }
+    
+    // Grab the maximum line size in this range
+    uint maxSize = 0;
+    for(uint i = start.x; i < end.x; i++){
+        Buffer *buffer = BufferView_GetBufferAt(view, i);
+        maxSize = Max(buffer->taken, maxSize);
+    }
+    
+    lineHelper = AllocatorGetN(char, maxSize);
+    
+    for(uint i = start.x; i < end.x; i++){
+        Buffer *buffer = BufferView_GetBufferAt(view, i);
+        TokenizerStateContext *ctx = &buffer->stateContext;
+        // 1- Remove all empty tokens at start of the buffer,
+        //    this is usually 1 because our lex groups spaces
+        //    but just in case loop this thing.
+        uint targetP = 0;
+        uint foundNonSpace = 0;
+        uint indentLevel = ctx->indentLevel;
+        for(uint k = 0; k < buffer->tokenCount; k++){
+            Token *token = &buffer->tokens[k];
+            if(token->identifier != TOKEN_ID_SPACE){
+                targetP = token->position;
+                foundNonSpace = 1;
+                //TODO: Is this sufficient?
+                if(token->identifier == TOKEN_ID_BRACE_CLOSE){
+                    indentLevel = indentLevel > 0 ? indentLevel - 1 : 0;
+                }
+                break;
+            }
+        }
+        
+        // 2- Add the indentation sequence the amount of times required
+        uint len = indentLevel * tabSize;
+        uint llen = buffer->taken - targetP;
+        
+        // Skip lines made entirely of spaces
+        if(!foundNonSpace){
+            llen = 0;
+            len = 0;
+        }
+        
+        if(len+llen > maxSize){
+            maxSize = len + llen;
+            lineHelper = AllocatorExpand(char, lineHelper, maxSize);
+        }
+        
+        // insert spacing only when there is actually a token
+        if(len > 0 && foundNonSpace)
+            Memset(lineHelper, indentChar, len * sizeof(char));
+        // insert rest of the line
+        if(llen > 0)
+            Memcpy(&lineHelper[len], &buffer->data[targetP], llen * sizeof(char));
+        
+        // Save undo - redo stuff as simple inserts
+        UndoRedoUndoPushInsert(&view->lineBuffer->undoRedo, buffer, vec2ui(i, 0));
+        
+        Buffer_RemoveRange(buffer, 0, buffer->count);
+        if(len + llen > 0)
+            Buffer_InsertRawStringAt(buffer, 0, lineHelper, len+llen, 0);
+        changes = 1;
+    }
+    
+    if(changes){
+        RemountTokensBasedOn(view, start.x, end.x - start.x);
+    }
+    
+    AllocatorFree(lineHelper);
+}
+
+void AppCommandIndent(){
+    vec2ui start, end;
+    BufferView *view = AppGetActiveBufferView();
+    if(BufferView_GetCursorSelectionRange(view, &start, &end)){
+        AppCommandIndentRegion(view, start, end);
+        view->lineBuffer->is_dirty = 1;
     }
 }
 
@@ -684,6 +870,9 @@ void AppInitialize(){
     //RegisterRepeatableEvent(mapping, AppCommandRedo, Key_LeftControl, Key_R);
     
     RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_B);
+    RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
+    RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
+    RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
     
     appContext.freeTypeMapping = mapping;
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
