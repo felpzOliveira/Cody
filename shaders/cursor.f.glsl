@@ -44,8 +44,12 @@ void main(){
         contrast = 2.1;
     }
     
-    gl_FragColor = brightnessMatrix( brightness ) *
-        contrastMatrix( contrast ) * 
-        saturationMatrix( saturation ) * 
-        col;
+    if(isCursor != 3){
+        gl_FragColor = brightnessMatrix( brightness ) *
+            contrastMatrix( contrast ) * 
+            saturationMatrix( saturation ) * 
+            col;
+    }else{
+        gl_FragColor = col;
+    }
 }

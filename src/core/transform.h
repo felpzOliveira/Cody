@@ -1,76 +1,6 @@
 #pragma once
 #include <geometry.h>
 
-struct Matrix3x3{
-    Float m[3][3];
-    
-    Matrix3x3(){
-        m[0][0] = m[1][1] = m[2][2] = 1.f;
-        m[0][1] = m[1][0] = m[0][2] = 0.f;
-        m[1][0] = m[1][2] = 0.f;
-        m[2][0] = m[2][1] = 0.f;
-    }
-    
-    Matrix3x3(Float mat[3][3]){
-        m[0][0] = mat[0][0]; m[1][0] = mat[1][0]; m[2][0] = mat[2][0];
-        m[0][1] = mat[0][1]; m[1][1] = mat[1][1]; m[2][1] = mat[2][1];
-        m[0][2] = mat[0][2]; m[1][2] = mat[1][2]; m[2][2] = mat[2][2];
-    }
-    
-    Matrix3x3(Float t00, Float t01, Float t02, 
-              Float t10, Float t11, Float t12,
-              Float t20, Float t21, Float t22)
-    {
-        m[0][0] = t00; m[0][1] = t01; m[0][2] = t02;
-        m[1][0] = t10; m[1][1] = t11; m[1][2] = t12;
-        m[2][0] = t20; m[2][1] = t21; m[2][2] = t22;
-    }
-    
-    friend Matrix3x3 Transpose(const Matrix3x3 &o){
-        return Matrix3x3(o.m[0][0], o.m[1][0], o.m[2][0],
-                         o.m[0][1], o.m[1][1], o.m[2][1],
-                         o.m[0][2], o.m[1][2], o.m[2][2]);
-    }
-    
-    static Matrix3x3 Mul(const Matrix3x3 &m1, const Matrix3x3 &m2){
-        Matrix3x3 r;
-        for(int i = 0; i < 3; i++)
-            for(int j = 0; j < 3; j++)
-            r.m[i][j] = m1.m[i][0]*m2.m[0][j]+m1.m[i][1]*m2.m[1][j]+m1.m[i][2]*m2.m[2][j];
-        return r;
-    }
-    
-    friend Matrix3x3 Inverse(const Matrix3x3 &o){
-        Float det = (o.m[0][0] * (o.m[1][1] * o.m[2][2] - o.m[1][2] * o.m[2][1]) -
-                     o.m[0][1] * (o.m[1][0] * o.m[2][2] - o.m[1][2] * o.m[2][0]) +
-                     o.m[0][2] * (o.m[1][0] * o.m[2][1] - o.m[1][1] * o.m[2][0]));
-        
-        AssertA(!IsZero(det), "Zero determinant on matrix inverse");
-        Float invDet = 1.f / det;
-        Float a00 = (o.m[1][1] * o.m[2][2] - o.m[2][1] * o.m[1][2]) * invDet;
-        Float a01 = (o.m[0][2] * o.m[2][1] - o.m[2][2] * o.m[0][1]) * invDet;
-        Float a02 = (o.m[0][1] * o.m[1][2] - o.m[1][1] * o.m[0][2]) * invDet;
-        Float a10 = (o.m[1][2] * o.m[2][0] - o.m[2][2] * o.m[1][0]) * invDet;
-        Float a11 = (o.m[0][0] * o.m[2][2] - o.m[2][0] * o.m[0][2]) * invDet;
-        Float a12 = (o.m[0][2] * o.m[1][0] - o.m[1][2] * o.m[0][0]) * invDet;
-        Float a20 = (o.m[1][0] * o.m[2][1] - o.m[2][0] * o.m[1][1]) * invDet;
-        Float a21 = (o.m[0][1] * o.m[2][0] - o.m[2][1] * o.m[0][0]) * invDet;
-        Float a22 = (o.m[0][0] * o.m[1][1] - o.m[1][0] * o.m[0][1]) * invDet;
-        return Matrix3x3(a00, a01, a02, a10, a11, a12, a20, a21, a22);
-    }
-    
-    void PrintSelf(){
-        for(int i = 0; i < 3; i++){
-            printf("[ ");
-            for(int j = 0; j < 3; j++){
-                printf("%g ", m[i][j]);
-            }
-            
-            printf("]\n");
-        }
-    }
-};
-
 struct Matrix4x4{
     Float m[4][4];
     
@@ -110,43 +40,6 @@ struct Matrix4x4{
     }
 };
 
-class Transform2{
-    public:
-    Matrix3x3 m, mInv;
-    Transform2(){}
-    Transform2(const Matrix3x3 &m) : m(m), mInv(Inverse(m)){}
-    Transform2(const Matrix3x3 &mat, const Matrix3x3 &inv): m(mat), mInv(inv){}
-    friend Transform2 Inverse(const Transform2 &t){
-        return Transform2(t.mInv, t.m);
-    }
-    
-    vec2f Vector(const vec2f &p) const{
-        Float x = p.x, y = p.y;
-        Float xp = m.m[0][0] * x + m.m[0][1] * y;
-        Float yp = m.m[1][0] * x + m.m[1][1] * y;
-        return vec2f(xp, yp);
-    }
-    
-    vec2f Point(const vec2f &p) const{
-        Float x = p.x, y = p.y;
-        Float xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2];
-        Float yp = m.m[1][0] * x + m.m[1][1] * y + m.m[1][2];
-        Float wp = m.m[2][0] * x + m.m[2][1] * y + m.m[2][2];
-        
-        if(IsZero(wp - 1.)){
-            return vec2f(xp, yp);
-        }else{
-            AssertA(!IsZero(wp), "Invalid homogeneous coordinate normalization");
-            return vec2f(xp, yp) / wp;
-        }
-    }
-};
-
-Transform2 Scale2(Float u);
-Transform2 Scale2(Float x, Float y);
-Transform2 Translate2(Float u);
-Transform2 Translate2(Float x, Float y);
-
 class Transform{
     public:
     Matrix4x4 m, mInv;
@@ -173,17 +66,31 @@ class Transform{
     
     template<typename T> vec3<T> Vector(const vec3<T> &v) const{
         T x = v.x, y = v.y, z = v.z;
-        return vec3<T>(m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z,
-                       m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z,
-                       m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z);
+        return vec3<T>(m.m[0][0] * x + m.m[1][0] * y + m.m[2][0] * z,
+                       m.m[0][1] * x + m.m[1][1] * y + m.m[2][1] * z,
+                       m.m[0][2] * x + m.m[1][2] * y + m.m[2][2] * z);
+    }
+    
+    template<typename T> vec2<T> Point(const vec2<T> &p) const{
+        T x = p.x, y = p.y, z = T(0);
+        T xp = m.m[0][0] * x + m.m[1][0] * y + m.m[2][0] * z + m.m[3][0];
+        T yp = m.m[0][1] * x + m.m[1][1] * y + m.m[2][1] * z + m.m[3][1];
+        T zp = m.m[0][2] * x + m.m[1][2] * y + m.m[2][2] * z + m.m[3][2];
+        T wp = m.m[0][3] * x + m.m[1][3] * y + m.m[2][3] * z + m.m[3][3];
+        if (wp == 1)
+            return vec2<T>(xp, yp);
+        else{
+            AssertA(!IsZero(wp), "Zero transform wp [Point2f]");
+            return vec2<T>(xp, yp) / wp;
+        }
     }
     
     template<typename T> vec3<T> Point(const vec3<T> &p) const{
         T x = p.x, y = p.y, z = p.z;
-        T xp = m.m[0][0] * x + m.m[0][1] * y + m.m[0][2] * z + m.m[0][3];
-        T yp = m.m[1][0] * x + m.m[1][1] * y + m.m[1][2] * z + m.m[1][3];
-        T zp = m.m[2][0] * x + m.m[2][1] * y + m.m[2][2] * z + m.m[2][3];
-        T wp = m.m[3][0] * x + m.m[3][1] * y + m.m[3][2] * z + m.m[3][3];
+        T xp = m.m[0][0] * x + m.m[1][0] * y + m.m[2][0] * z + m.m[3][0];
+        T yp = m.m[0][1] * x + m.m[1][1] * y + m.m[2][1] * z + m.m[3][1];
+        T zp = m.m[0][2] * x + m.m[1][2] * y + m.m[2][2] * z + m.m[3][2];
+        T wp = m.m[0][3] * x + m.m[1][3] * y + m.m[2][3] * z + m.m[3][3];
         if (wp == 1)
             return vec3<T>(xp, yp, zp);
         else{
@@ -192,7 +99,11 @@ class Transform{
         }
     }
     
-    bool IsIdentity() const {
+    bool HasTranslation() const{
+        return !IsZero(m.m[3][0]) || !IsZero(m.m[3][1]) || !IsZero(m.m[3][2]);
+    }
+    
+    bool IsIdentity() const{
         return (m.m[0][0] == 1.f && m.m[0][1] == 0.f && m.m[0][2] == 0.f &&
                 m.m[0][3] == 0.f && m.m[1][0] == 0.f && m.m[1][1] == 1.f &&
                 m.m[1][2] == 0.f && m.m[1][3] == 0.f && m.m[2][0] == 0.f &&
@@ -219,5 +130,3 @@ Transform RotateZ(Float theta);
 Transform Rotate(Float theta, const vec3f &axis);
 Transform Orthographic(Float left, Float right, Float bottom, Float top,
                        Float zNear, Float zFar);
-bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], Float *x0,
-                          Float *x1);

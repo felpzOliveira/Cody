@@ -30,7 +30,7 @@ typedef struct{
     vec4i cursorColor;
     vec4i ghostCursorColor;
     vec4i parenthesis[4];
-    vec4i backTextColors[3];
+    vec4i backTextColors[4];
     
     vec4i testColor;
 }Theme;

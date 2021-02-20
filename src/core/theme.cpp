@@ -28,30 +28,39 @@ Theme defaultTheme = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0x08AAAAAA),
-        //ColorFromHex(0xFF130707),
-        ColorFromHex(0xFF071007),
-        ColorFromHex(0xFF070710),
+        //ColorFromHex(0x08AAAAAA),
+        ColorFromHex(0xFF130707),
+        ColorFromHex(0xFF071307),
+        ColorFromHex(0xFF070713),
+        ColorFromHex(0xFF131307),
     },
     .testColor = ColorFromHex(0xCCCD950C),
 };
 
 static int globalActive = 0;
-void SetAlpha(int acitve){
-    globalActive = acitve;
+void SetAlpha(int active){
+    globalActive = active;
+}
+
+template<typename T>
+static T ApplyAlpha(T color){
+    T s = color;
+    if(globalActive) s.w *= kAlphaReduceInactive;
+    else s.w *= kAlphaReduceDefault;
+    return s;
 }
 
 vec4i GetNestColor(Theme *theme, TokenId id, int level){
     if(id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE)
     {
-        return theme->braces;
+        return ApplyAlpha(theme->braces);
     }else if(id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE){
         level = level % 4;
-        return theme->parenthesis[level];
+        return ApplyAlpha(theme->parenthesis[level]);
     }else if(id == TOKEN_ID_SCOPE){
-        //level = Clamp(level, 0, 3);
-        level = 0;
-        return theme->backTextColors[level];
+        level = Clamp(level, 0, 3);
+        //level = 0;
+        return ApplyAlpha(theme->backTextColors[level]);
     }
     
     AssertErr(0, "Invalid theme query for nesting color");
@@ -67,15 +76,15 @@ vec4f GetNestColorf(Theme *theme, TokenId id, int level){
         level = level % 4;
         col = theme->parenthesis[level];
     }else if(id == TOKEN_ID_SCOPE){
-        //level = Clamp(level, 0, 3);
-        level = 0;
+        level = Clamp(level, 0, 3);
+        //level = 0;
         col = theme->backTextColors[level];
     }
     
     vec4f c = vec4f(col.x * kInv255, col.y * kInv255,
                     col.z * kInv255, col.w * kInv255);
     
-    return c;
+    return ApplyAlpha(c);
 }
 
 vec4f GetColorf(Theme *theme, TokenId id){
@@ -125,12 +134,11 @@ vec4f GetColorf(Theme *theme, TokenId id){
     
     vec4f c = vec4f(col.x * kInv255, col.y * kInv255,
                     col.z * kInv255, col.w * kInv255);
-    if(globalActive) c.w *= 0.7;
-    return c;
+    return ApplyAlpha(c);
 }
 
 vec4i GetUIColor(Theme *theme, UIElement id){
-#define COLOR_RET(i, v) case i : return theme->v;
+#define COLOR_RET(i, v) case i : return ApplyAlpha(theme->v);
     switch(id){
         COLOR_RET(UIBorder, borderColor);
         COLOR_RET(UICursor, cursorColor);
@@ -145,7 +153,7 @@ vec4i GetUIColor(Theme *theme, UIElement id){
 
 vec4f GetUIColorf(Theme *theme, UIElement id){
     vec4i col;
-#define COLOR_RET(i, v) case i : col =  theme->v; break;
+#define COLOR_RET(i, v) case i : col = theme->v; break;
     switch(id){
         COLOR_RET(UIBorder, borderColor);
         COLOR_RET(UICursor, cursorColor);
@@ -157,8 +165,8 @@ vec4f GetUIColorf(Theme *theme, UIElement id){
     }
 #undef COLOR_RET
     
-    return vec4f(col.x * kInv255, col.y * kInv255,
-                 col.z * kInv255, col.w * kInv255);
+    return ApplyAlpha(vec4f(col.x * kInv255, col.y * kInv255,
+                            col.z * kInv255, col.w * kInv255));
 }
 
 
@@ -208,6 +216,5 @@ vec4i GetColor(Theme *theme, TokenId id){
     
 #undef COLOR_RET
     
-    if(globalActive) c.w *= 0.7;
-    return c;
+    return ApplyAlpha(c);
 }

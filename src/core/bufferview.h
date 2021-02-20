@@ -39,17 +39,11 @@ typedef struct{
     int depth;
 }NestPoint;
 
-/*
-* TODO: Since this is only one of the views of a file we might
-*       need to keep a pointer here instead of a copy so that
-*       we can share data and better perform stuff (LineBuffer).
-*       Also it might not be a good idea to make the BufferView
-*       being responsable to read and parse a file (Tokenizer),
-*       It might be better to simply allow the BufferView to work
-*       on a already processed LineBuffer, and than every time 
-*       a screen is divided we create a BufferView and simply
-*       change its LineBuffer when files are swapped.
-*/
+typedef struct{
+    Float currX;
+    Transform horizontal;
+}Scroll;
+
 struct BufferView{
     LineBuffer *lineBuffer;
     Tokenizer *tokenizer;
@@ -64,6 +58,7 @@ struct BufferView{
     /*
 * Rendering properties of the BufferView, defined by the renderer
 */
+    Scroll scroll;
     Float lineOffset;
     int isActive;
     int renderLineNbs;
@@ -72,6 +67,7 @@ struct BufferView{
     NestPoint endNest[64];
     int startNestCount;
     int endNestCount;
+    
 };
 
 Float InterpolateValueCubic(Float dt, Float remaining,
@@ -97,6 +93,11 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *
 * Sets the geometry of a bufferview.
 */
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight);
+
+/*
+* Gets the geometry of a bufferview.
+*/
+void BufferView_GetGeometry(BufferView *view, Geometry *geometry);
 
 /*
 * Queries the bufferview if it is _at_this_moment_ in an animation state.
@@ -131,10 +132,21 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **token);
 */
 int BufferView_LocatePreviousCursorToken(BufferView *view, Token **token);
 
-void BufferView_ScrollViewRange(BufferView *view, uint lineCount, int is_up);
+/*
+* Forces the cursor of the given bufferview to update its position based on
+* a specific range of visible lines.
+*/
 void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
 
+/*
+* Computes the line number corresponding to a screen position, returns -1
+* if no line is available.
+*/
 int BufferView_ComputeTextLine(BufferView *view, Float screenY);
+
+/*
+* Moves the cursor to a specific position in a given bufferview.
+*/
 void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col);
 
 /*

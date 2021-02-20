@@ -88,29 +88,6 @@ Matrix4x4 Inverse(const Matrix4x4 &m){
     return Matrix4x4(minv);
 }
 
-Transform2 Scale2(Float u){
-    return Scale2(u, u);
-}
-
-Transform2 Scale2(Float x, Float y){
-    AssertA(!IsZero(x) && !IsZero(y), "Zero scale Matrix3x3");
-    Float ix = 1.0 / x;
-    Float iy = 1.0 / y;
-    Matrix3x3 m(x, 0, 0, 0, y, 0, 0, 0, 1);
-    Matrix3x3 inv(ix, 0, 0, 0, iy, 0, 0, 0, 1);
-    return Transform2(m, inv);
-}
-
-Transform2 Translate2(Float x, Float y){
-    Matrix3x3 m(1, 0, x, 0, 1, y, 0, 0, 1);
-    Matrix3x3 inv(1, 0, -x, 0, 1, -y, 0, 0, 1);
-    return Transform2(m, inv);
-}
-
-Transform2 Translate2(Float u){
-    return Translate2(u, u);
-}
-
 Transform Translate(const vec3f &delta) {
     Matrix4x4 m(1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, delta.x, delta.y, delta.z,
                 1);

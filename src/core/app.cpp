@@ -52,7 +52,9 @@ void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
 }
 
 void AppEarlyInitialize(){
-    BufferView *view = &appContext.views[0];
+    BufferView *view = nullptr;
+#if 1
+    view = &appContext.views[0];
     appContext.activeBufferView = view;
     view->geometry.extensionX = vec2f(0.f, 0.5f);
     view->geometry.extensionY = vec2f(0.f, 1.0f);
@@ -64,10 +66,18 @@ void AppEarlyInitialize(){
     view->geometry.extensionY = vec2f(0.f, 1.0f);
     view->isActive = 0;
     appContext.viewsCount = 2;
-    
+#else
+    view = &appContext.views[0];
+    appContext.activeBufferView = view;
+    view->geometry.extensionX = vec2f(0.f, 0.5f);
+    view->geometry.extensionY = vec2f(0.f, 1.0f);
+    view->geometry.lower = vec2ui();
+    view->isActive = 0;
+    appContext.viewsCount = 1;
+#endif
     appContext.activeBufferView = view;
     appContext.activeBufferView->isActive = 1;
-    appContext.activeId = 1;
+    appContext.activeId = 0;
     
     appGlobalConfig.tabSpacing = 4;
     appGlobalConfig.useTabs = 0;
@@ -108,7 +118,7 @@ void AppUpdateViews(){
 
 void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
-    
+    vec2ui visible = BufferView_GetViewRange(bufferView);
     Token *token = nullptr;
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     switch(direction){

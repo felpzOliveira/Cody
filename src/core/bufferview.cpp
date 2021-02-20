@@ -31,7 +31,7 @@ Float InterpolateValueCubic(Float dt, Float remaining,
     
     Float b0 = *initialValue;
     Float b1 = *initialValue + (remaining / 3.0f) * (*velocity);
-    Float b2 = finalValue - (remaining / 3.0f) * (*velocity);
+    Float b2 = finalValue;
     Float b3 = finalValue;
     
     *initialValue = c0 * b0 + c1 * b1 + c2 * b2 + c3 * b3;
@@ -152,6 +152,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
     view->activeNestPoint = -1;
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;
+    view->scroll.currX = 0;
     view->transitionAnim.transition = TransitionNone;
     view->transitionAnim.isAnimating = 0;
     view->transitionAnim.duration = 0.0f;
@@ -408,9 +409,9 @@ void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float durat
         view->transitionAnim.duration = duration;
         view->transitionAnim.startLine = view->cursor.textPosition.x;
         view->transitionAnim.endLine = lineNo;
-        view->transitionAnim.velocity = 0;
         view->transitionAnim.runningPosition = (Float)view->cursor.textPosition.x;
         view->transitionAnim.is_down = view->cursor.textPosition.x < lineNo;
+        view->transitionAnim.velocity = view->transitionAnim.is_down ? 10 : -10;
     }else{
         //AssertA(0, "Invalid transition requested");
     }
@@ -482,13 +483,13 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
     
     return 0;
     __set_end_transition:
-    BufferView_CursorToPosition(view, anim->endLine, 0);
     rRange->x = view->visibleRect.x;
     rRange->y = view->visibleRect.y;
     cursorAt->x = view->cursor.textPosition.x;
     cursorAt->y = view->cursor.textPosition.y;
     *transform = Transform();
     anim->isAnimating = 0;
+    BufferView_CursorToPosition(view, anim->endLine, 0);
     return 1;
 }
 
@@ -564,7 +565,7 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
             TokenizerStateContext *ctx = &buffer->stateContext;
             if(ctx->indentLevel == 0){
                 zeroContext++;
-                if(zeroContext > 1) done = 1;
+                if(zeroContext > kMaximumIndentEmptySearch) done = 1;
             }else{
                 zeroContext = 0;
             }
@@ -626,7 +627,7 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
             TokenizerStateContext *ctx = &buffer->stateContext;
             if(ctx->indentLevel == 0){
                 zeroContext++;
-                if(zeroContext > 1) done = 1;
+                if(zeroContext > kMaximumIndentEmptySearch) done = 1;
             }else{
                 zeroContext = 0;
             }
@@ -752,6 +753,10 @@ uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui 
     *start = s;
     *end = e;
     return 1;
+}
+
+void BufferView_GetGeometry(BufferView *view, Geometry *geometry){
+    *geometry = view->geometry;
 }
 
 void BufferView_GetCursor(BufferView *view, DoubleCursor **cursor){

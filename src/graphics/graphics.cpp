@@ -32,7 +32,7 @@
 
 #define MODULE_NAME "Render"
 
-#define TRANSITION_DURATION_SCROLL 0.2
+#define TRANSITION_DURATION_SCROLL 0.15
 #define TRANSITION_DURATION_JUMP   0.1
 
 typedef struct{
@@ -52,6 +52,15 @@ typedef struct{
 }OpenGLFont;
 
 typedef struct{
+    vec2f pMin;
+    vec2f pMax;
+    int valid;
+    int pGlyph;
+    vec2ui textPos;
+    Float currentDif;
+}OpenGLCursor;
+
+typedef struct{
     //Data stuff
     Float *vertex;
     Float *colors;
@@ -68,10 +77,12 @@ typedef struct{
     OpenGLFont font;
     OpenGLBuffer glQuadBuffer;
     OpenGLBuffer glLineBuffer;
+    OpenGLCursor glCursor, glGhostCursor;
     int running, width, height;
     Bounds2f windowBounds;
     Transform projection;
     Transform scale;
+    Transform model;
 }OpenGLState;
 
 static OpenGLState GlobalGLState;
@@ -85,6 +96,12 @@ static OpenGLState GlobalGLState;
 *               font->fontMath.invReduceScale
 */
 
+static Float ComputeTransformOf(Float x, Transform *transform){
+    vec3f p(x, 0, 0);
+    p = transform->Point(p);
+    return p.x;
+}
+
 static Transform ComputeScreenToGLTransform(OpenGLState *state, Float lineHeight){
     OpenGLFont *font = &state->font;
     FontMath *fMath = &font->fontMath;
@@ -94,14 +111,20 @@ static Transform ComputeScreenToGLTransform(OpenGLState *state, Float lineHeight
 
 static Float ScreenToGL(Float x, OpenGLState *state){
     vec3f p(x, 0, 0);
-    Transform inv = Inverse(state->scale);
+    Transform inv = Inverse(state->model);
     p = inv.Point(p);
+    return p.x;
+}
+
+static Float GLToScreen(Float x, OpenGLState *state){
+    vec3f p(x, 0, 0);
+    p = state->model.Point(p);
     return p.x;
 }
 
 static vec2ui ScreenToGL(vec2ui u, OpenGLState * state){
     vec3f p(u.x, u.y, 0);
-    Transform inv = Inverse(state->scale);
+    Transform inv = Inverse(state->model);
     p = inv.Point(p);
     return vec2ui((uint)p.x, (uint)p.y);
 }
@@ -143,6 +166,39 @@ static void _OpenGLStateInitialize(OpenGLState *state){
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
 }
 
+void OpenGLComputeCursorProjection(OpenGLState *state, OpenGLCursor *glCursor,
+                                   Transform *transform, Float lineWidth,
+                                   BufferView *view)
+{
+#if 1
+    if(glCursor->valid){
+        Scroll *scroll = &view->scroll;
+        Transform model = state->scale * scroll->horizontal;
+        Float dif = 0;
+        Float cursorMaxX = ComputeTransformOf(glCursor->pMax.x, &model);
+        Float cursorMinX = ComputeTransformOf(glCursor->pMin.x, &model);
+        
+        if(cursorMaxX > lineWidth){
+            cursorMaxX = ComputeTransformOf(glCursor->pMax.x, &state->scale);
+            dif = cursorMaxX - lineWidth;
+            scroll->horizontal = Translate(-dif, 0, 0);
+        }else if(cursorMinX < 0){
+            dif = ComputeTransformOf(glCursor->pMin.x, &state->scale);
+            scroll->horizontal = Translate(-dif, 0, 0);
+        }
+        
+        //TODO: I'm unsure how to reset the view, this seems to work for now
+        if(glCursor->textPos.y == 0){
+            scroll->horizontal = Transform();
+        }
+        
+        *transform = scroll->horizontal;
+    }
+#else
+    *transform = Transform();
+#endif
+}
+
 void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float width = (Float)(upper.x - lower.x);
     Float height = (Float)(upper.y - lower.y);
@@ -150,8 +206,8 @@ void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float zNear = -range;
     Float zFar = range;
     *transform = Orthographic(0, width, height, 0, zNear, zFar);
+    
 }
-
 static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
     BufferView *bufferView = AppGetActiveBufferView();
     Float range = width * 2.0f;
@@ -171,16 +227,18 @@ static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
     AppSetViewingGeometry(geometry, font->fontMath.fontSizeAtDisplay);
 }
 
+//TODO: Timing system.
+double lastTime;
 void WindowOnSizeChange(int width, int height){
     _OpenGLUpdateProjections(&GlobalGLState, width, height);
 }
 
-void WindowOnScroll(int is_up){
-    int scrollRange = 6;
+void WindowOnScroll(int is_up){ 
+    int scrollRange = 5;
     BufferView *bufferView = AppGetActiveBufferView();
     BufferView_StartScrollViewTransition(bufferView, is_up ? -scrollRange : scrollRange,
                                          TRANSITION_DURATION_SCROLL);
-    
+    lastTime = GetElapsedTime();
     //BufferView_StartCursorTransition(bufferView, 100, TRANSITION_DURATION_JUMP);
 #if 0
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -388,6 +446,58 @@ void OpenGLRenderEmptyCursorRect(OpenGLState *state, vec2f lower, vec2f upper, v
     Graphics_QuadPush(state, vec2ui(x1+w, y0+w), vec2ui(x0+0, y0+0), color);
 }
 
+void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor, 
+                         Buffer *buffer, vec2ui cursor, Float cursorOffset, 
+                         Float baseHeight, vec2ui visibleLines)
+{
+    Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    uint rawp = 0;
+    int utf8Len = 1;
+    int pUtf8Len = 1;
+    char *ptr = buffer->data;
+    
+    glCursor->pGlyph = -1;
+    glCursor->valid = 0;
+    glCursor->textPos = cursor;
+    
+    if(cursor.x >= visibleLines.x && cursor.x < visibleLines.y){
+        glCursor->valid = 1;
+        if(cursor.y > 0){
+            rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y-1, &utf8Len);
+            x0 = fonsComputeStringAdvance(state->font.fsContext, ptr,
+                                          rawp+utf8Len, &glCursor->pGlyph);
+        }
+        
+        rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &pUtf8Len);
+        x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[rawp],
+                                           pUtf8Len, &glCursor->pGlyph);
+        
+        y0 = (cursor.x - visibleLines.x) * state->font.fontMath.fontSizeAtRenderCall;
+        y1 = y0 + state->font.fontMath.fontSizeAtRenderCall;
+        y0 += baseHeight;
+        y1 += baseHeight;
+        
+        x0 += cursorOffset;
+        x1 += cursorOffset;
+        
+        glCursor->pMin = vec2f(x0, y0);
+        glCursor->pMax = vec2f(x1, y1);
+    }
+}
+
+void OpenGLRenderCursor(OpenGLState *state, OpenGLCursor *glCursor, vec4f color,
+                        uint thickness, int isActive)
+{
+    Float x0 = glCursor->pMin.x, x1 = glCursor->pMax.x;
+    Float y0 = glCursor->pMin.y, y1 = glCursor->pMax.y;
+    if(isActive){
+        Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), color);
+    }else{
+        OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x1, y1), 
+                                    color, thickness);
+    }
+}
+
 vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
                          Float cursorOffset, Float baseHeight, vec2ui visibleLines,
                          int *prevGlyph, int isActive, vec4f color, uint thickness)
@@ -421,6 +531,7 @@ vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
     
     x0 += cursorOffset;
     x1 += cursorOffset;
+    
     if(isActive){
         if(quad->length + 6 > quad->size){
             Graphics_QuadFlush(state);
@@ -435,34 +546,38 @@ vec4f OpenGLRenderCursor(OpenGLState *state, Buffer *buffer, vec2ui cursor,
     return vec4f(x0, y0, x1, y1);
 }
 
-void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
+void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
+                            Float &x, Float &y, uint lineNr, char linen[32])
+{
+    if(view->renderLineNbs){
+        int previousGlyph = -1;
+        int spacing = DigitCount(BufferView_GetLineCount(view));
+        int ncount = DigitCount(lineNr+1);
+        memset(linen, ' ', spacing-ncount);
+        snprintf(&linen[spacing-ncount], 32, "%u ", lineNr+1);
+        
+        
+        vec4i col = ColorFromHex(0xFD450C);//TODO: theme
+        vec4i cc(col.x, col.y, col.z, 100);
+        x = fonsStashMultiTextColor(font->fsContext, x, y, cc.ToUnsigned(), 
+                                    linen, NULL, &previousGlyph);
+    }
+}
+
+void OpenGLRenderLine(BufferView *view, OpenGLState *state,
                       Float &x, Float &y, uint lineNr)
 {
-    char linen[32];
+    
     int previousGlyph = -1;
-    
+    OpenGLFont *font = &state->font;
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
-    
-    int spacing = DigitCount(BufferView_GetLineCount(view));
-    int ncount = DigitCount(lineNr+1);
     
     NestPoint *start = view->startNest;
     NestPoint *end   = view->endNest;
     uint it = Max(view->startNestCount, view->endNestCount);
     
-    memset(linen, ' ', spacing-ncount);
-    snprintf(&linen[spacing-ncount], 32, "%u ", lineNr+1);
+    x = view->lineOffset;
     
-    if(view->renderLineNbs){
-        vec4i col = ColorFromHex(0xFD450C);//TODO: theme
-        vec4i cc(col.x, col.y, col.z, 100);
-        x = fonsStashMultiTextColor(font->fsContext, x, y, cc.ToUnsigned(), 
-                                    linen, NULL, &previousGlyph);
-    }else{
-        x = fonsComputeStringAdvance(font->fsContext, " ", 1, &previousGlyph) * 0.5;
-    }
-    
-    view->lineOffset = x;
     //TODO: This is where we would wrap?
     if(buffer->taken > 0){
         uint pos = 0;
@@ -525,31 +640,25 @@ void OpenGLRenderLine(BufferView *view, OpenGLFont *font,
                             }
                         }
                     }
-                    
-#if 0
-                    vec2ui s = view->cursor.nestStart;
-                    vec2ui e = view->cursor.nestEnd;
-                    if((lineNr == s.x && i == s.y) || (lineNr == e.x && i == e.y)){
-                        col = vec4i(0, 255, 255, 255);
-                    }
-                    
-#endif
                 }
                 
                 pos += token->size;
                 x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
                                             p, e, &previousGlyph);
+                
             }
         }
     }
 }
 
-void _Graphics_RenderTextBlock(OpenGLFont *font, BufferView *view, Float baseHeight,
+void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseHeight,
                                Transform *projection, Transform *model, vec2ui lines)
 {
     Float x0 = 2.0f;
     Float x = x0;
     Float y = baseHeight;
+    char linen[32];
+    OpenGLFont *font = &state->font;
     
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
@@ -560,10 +669,22 @@ void _Graphics_RenderTextBlock(OpenGLFont *font, BufferView *view, Float baseHei
     
     glUseProgram(font->shader.id);
     Shader_UniformMatrix4(font->shader, "projection", &projection->m);
-    Shader_UniformMatrix4(font->shader, "modelView", &model->m);
+    Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
     
+    // split the rendering so we can batch line numbers
     for(int i = lines.x; i < lines.y; i++){
-        OpenGLRenderLine(view, font, x, y, i);
+        OpenGLRenderLineNumber(view, font, x, y, i, linen);
+        x = x0;
+        y += font->fontMath.fontSizeAtRenderCall;
+    }
+    
+    fonsStashFlush(font->fsContext);
+    Shader_UniformMatrix4(font->shader, "modelView", &state->model.m);
+    
+    x = x0;
+    y = baseHeight;
+    for(int i = lines.x; i < lines.y; i++){
+        OpenGLRenderLine(view, state, x, y, i);
         x = x0;
         y += font->fontMath.fontSizeAtRenderCall;
     }
@@ -573,14 +694,12 @@ void _Graphics_RenderTextBlock(OpenGLFont *font, BufferView *view, Float baseHei
 }
 
 void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
-                                    Float lineSpan, Float baseHeight, 
-                                    vec2ui cursor, vec2ui ghostcursor,
-                                    vec2ui lines, Transform *model, Transform *projection)
+                                    Transform *model, Transform *projection)
 {
     int pGlyph = -1;
-    int dummyGlyph = -1;
     OpenGLFont *font = &state->font;
-    Buffer *buffer = LineBuffer_GetBufferAt(bufferView->lineBuffer, cursor.x);
+    OpenGLCursor *cursor = &state->glCursor;
+    Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor->textPos.x);
     
     glUseProgram(font->cursorShader.id);
     Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
@@ -588,38 +707,27 @@ void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
     Shader_UniformInteger(font->cursorShader, "isCursor", 1);
     
     glDisable(GL_BLEND);
+    OpenGLRenderCursor(state, &state->glCursor, GetUIColorf(&defaultTheme, UICursor),
+                       4, bufferView->isActive);
     
-    vec4f p = OpenGLRenderCursor(state, buffer, cursor, bufferView->lineOffset, 
-                                 baseHeight, lines, &pGlyph, bufferView->isActive,
-                                 GetUIColorf(&defaultTheme, UICursor), 4);
-    if(bufferView->isActive && ghostcursor.x >= lines.x && ghostcursor.x < lines.y){
+    if(state->glGhostCursor.valid){
         Float g = 0.5;
         Float a = 0.6;
-        Buffer *b = LineBuffer_GetBufferAt(bufferView->lineBuffer, ghostcursor.x);
-        (void) OpenGLRenderCursor(state, b, ghostcursor, bufferView->lineOffset, 
-                                  baseHeight, lines, &dummyGlyph, 0, vec4f(g, g, g, a), 2);
+        OpenGLRenderCursor(state, &state->glGhostCursor, vec4f(g, g, g, a), 2, 0);
     }
     
     if(bufferView->isActive){
-        Graphics_QuadFlush(state);
-        glEnable(GL_BLEND);
-        Shader_UniformInteger(font->cursorShader, "isCursor", 0);
-        Float g = 0.8705882; //TODO: add this to theme
-        //Float g = 0.4705882;
-        
-        Graphics_QuadPush(state, vec2ui(bufferView->lineOffset, p.y), 
-                          vec2ui(bufferView->lineOffset+lineSpan, p.w), 
-                          vec4f(g, g, 2 * g, 0.18)
-                          //vec4f(g, g, g, 0.2)
-                          );
-        Graphics_QuadFlush(state);
         /* Redraw whatever character we are on top of */
-        if(cursor.y < buffer->count){
+        // TODO: Why do we need to flush the quad buffer here in order to render
+        //       the last character?
+        Graphics_QuadFlush(state);
+        if(cursor->textPos.y < buffer->count){
+            vec2f p = state->glCursor.pMin;
+            pGlyph = state->glCursor.pGlyph;
             int len = 0;
-            uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &len);
+            uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len);
             char *chr = &buffer->data[rawp];
             if(*chr != '\t'){
-                
                 glEnable(GL_BLEND);
                 glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
                 
@@ -627,11 +735,9 @@ void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView,
                 Shader_UniformMatrix4(font->shader, "projection", &projection->m);
                 Shader_UniformMatrix4(font->shader, "modelView", &model->m);
                 
-                //printf("Cursor at: %u, %u\n", rawp, cursor.y);
                 float f = fonsStashMultiTextColor(font->fsContext, p.x, p.y, 
                                                   glfonsRGBA(0, 0, 0, 255),
                                                   chr, chr+len, &pGlyph);
-                
                 fonsStashFlush(font->fsContext);
             }
         }
@@ -644,160 +750,181 @@ void Graphics_RenderTextBlock(OpenGLState *state, BufferView *bufferView,
                               Float baseHeight, Transform *projection)
 {
     vec2ui lines;
-    OpenGLFont *font = &state->font;
     lines = BufferView_GetViewRange(bufferView);
-    
-    //Transform translate = state->scale * Translate(0, 18, 0);
-    _Graphics_RenderTextBlock(font, bufferView, baseHeight,
-                              projection, &state->scale, lines);
+    _Graphics_RenderTextBlock(state, bufferView, baseHeight,
+                              projection, &state->model, lines);
 }
 
 void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
-                                   Float lineSpan, Float baseHeight, Transform *projection)
+                                   Transform *projection)
 {
     //Transform translate = state->scale * Translate(0, 18, 0);
-    vec2ui cursor = BufferView_GetCursorPosition(bufferView);
-    vec2ui ghostcursor = BufferView_GetGhostCursorPosition(bufferView);
-    vec2ui lines = BufferView_GetViewRange(bufferView);
-    _Graphics_RenderCursorElements(state, bufferView, lineSpan, baseHeight, cursor, 
-                                   ghostcursor, lines, &state->scale, projection);
+    _Graphics_RenderCursorElements(state, bufferView, &state->model, projection);
 }
 
 void Graphics_RenderScopeSections(OpenGLState *state, BufferView *view, Float lineSpan,
                                   Transform *projection, Transform *model, Theme *theme)
 {
-    if(BufferView_CursorNestIsValid(view)){
+    if(view->isActive){
         OpenGLFont *font = &state->font;
-        NestPoint *start = view->startNest;
-        NestPoint *end   = view->endNest;
+        vec2ui cursor = BufferView_GetCursorPosition(view);
         vec2ui visibleLines = BufferView_GetViewRange(view);
-        Float minY = 0;
-        Float maxY = view->currentMaxRange * font->fontMath.fontSizeAtRenderCall;
-        
-        struct _Quad{
-            vec2ui left, right;
-            vec4f color;
-            int depth;
-        };
-        
-        std::vector<_Quad> quads;
-        
-        if(view->descLocation == DescriptionTop){
-            minY = font->fontMath.fontSizeAtRenderCall;
-            maxY += font->fontMath.fontSizeAtRenderCall;
-        }
         
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-        Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+        
+        Shader_UniformInteger(font->cursorShader, "isCursor", 3);
+        
+        if(BufferView_CursorNestIsValid(view)){
+            NestPoint *start = view->startNest;
+            NestPoint *end   = view->endNest;
+            Float minY = 0;
+            Float maxY = view->currentMaxRange * font->fontMath.fontSizeAtRenderCall;
+            struct _Quad{
+                vec2ui left, right;
+                vec4f color;
+                int depth;
+            };
+            
+            std::vector<_Quad> quads;
+            
+            if(view->descLocation == DescriptionTop){
+                minY = font->fontMath.fontSizeAtRenderCall;
+                maxY += font->fontMath.fontSizeAtRenderCall;
+            }
+            
+            uint it = view->startNestCount;
+            for(uint f = 0; f < it; f++){
+                NestPoint v = start[f];
+                if(v.valid && v.id == TOKEN_ID_BRACE_OPEN){ // valid
+                    NestPoint e = end[v.comp];
+                    Buffer *bStart = BufferView_GetBufferAt(view, v.position.x);
+                    Buffer *bEnd   = BufferView_GetBufferAt(view, e.position.x);
+                    
+                    uint l0 = AppComputeLineIndentLevel(bStart);
+                    uint l1 = AppComputeLineIndentLevel(bEnd);
+                    
+                    // only do it for aligned stuff
+                    if(l0 == l1 && e.position.x > v.position.x + 1){
+                        // check if their non empty token match position
+                        vec2ui p0(0, 0);
+                        vec2ui p1(0, 0);
+                        uint n = Max(bStart->tokenCount, bEnd->tokenCount);
+                        for(uint i = 0; i < n; i++){
+                            if(i < bStart->tokenCount && p0.y == 0){
+                                Token *t = &bStart->tokens[i];
+                                if(t->identifier != TOKEN_ID_SPACE){
+                                    p0.x = t->position;
+                                    p0.y = 1;
+                                }
+                            }
+                            
+                            if(i < bEnd->tokenCount && p1.y == 0){
+                                Token *t = &bEnd->tokens[i];
+                                if(t->identifier != TOKEN_ID_SPACE){
+                                    p1.x = t->position;
+                                    p1.y = 1;
+                                }
+                            }
+                            
+                            if(p1.y != 0 && p0.y != 0) break;
+                        }
+                        
+                        if((p1.y == 0 || p0.y == 0) || (p1.x != p0.x)){
+                            continue;
+                        }
+                        
+                        // looks like this thing needs rendering
+                        Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+                        int pGlyph = -1;
+                        char *p = &bStart->data[0];
+                        
+                        //TODO: UTF-8
+                        x0 = fonsComputeStringAdvance(font->fsContext, p, p0.x, &pGlyph);
+                        x1 = fonsComputeStringAdvance(font->fsContext, &p[p0.x], 1, &pGlyph);
+                        
+                        Float topX = x0 + 0.5f * x1 + view->lineOffset;
+                        Float botX = topX;
+                        y0 = ((Float)v.position.x - (Float)visibleLines.x + 2) *
+                            font->fontMath.fontSizeAtRenderCall;
+                        
+                        y1 = y0 + (e.position.x - v.position.x - 1) *
+                            font->fontMath.fontSizeAtRenderCall;
+                        
+                        y0 = Max(y0, minY);
+                        y1 = Min(y1, maxY);
+                        
+                        Graphics_LinePush(state, vec2ui(topX, y0), vec2ui(botX, y1),
+                                          vec4f(0.5,0.5,0.5, 0.18));
+                    }
+                    
+                    // render the quads no matter what
+                    Float qy0 = 0, qy1 = 0, qx0 = 0, qx1 = 0;
+                    qy0 = ((Float)v.position.x - (Float)visibleLines.x + 1) *
+                        font->fontMath.fontSizeAtRenderCall;
+                    
+                    qy1 = qy0 + (e.position.x - v.position.x + 1) *
+                        font->fontMath.fontSizeAtRenderCall;
+                    
+                    //TODO: Review this, this adds spacing for initialization of the scoped
+                    //      quads
+                    //qx0 = view->lineOffset;
+                    qx1 = qx0 + lineSpan;
+                    
+                    qy0 = Max(qy0, minY);
+                    qy1 = Min(qy1, maxY);
+                    
+                    vec4f color = GetNestColorf(theme, TOKEN_ID_SCOPE,
+                                                v.depth);
+                    quads.push_back({
+                                        .left = vec2ui(qx0, qy0),
+                                        .right = vec2ui(qx1, qy1),
+                                        .color = color,
+                                        .depth = v.depth
+                                    });
+                }
+            }
+            
+            int quadLen = quads.size();
+#if 0
+            if(quadLen > 0){
+                _Quad quad = quads.at(quadLen-1);
+                Graphics_QuadPush(state, quad.left, quad.right,
+                                  quad.color);
+            }
+#else
+            for(int i = quadLen - 1; i >= 0; i--){
+                _Quad quad = quads.at(i);
+                Graphics_QuadPush(state, quad.left, quad.right,
+                                  quad.color);
+            }
+#endif
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            Graphics_QuadFlush(state, 0);
+        }
+        
+        
         Shader_UniformInteger(font->cursorShader, "isCursor", 1);
         
-        uint it = view->startNestCount;
-        for(uint f = 0; f < it; f++){
-            NestPoint v = start[f];
-            if(v.valid && v.id == TOKEN_ID_BRACE_OPEN){ // valid
-                NestPoint e = end[v.comp];
-                Buffer *bStart = BufferView_GetBufferAt(view, v.position.x);
-                Buffer *bEnd   = BufferView_GetBufferAt(view, e.position.x);
-                
-                uint l0 = AppComputeLineIndentLevel(bStart);
-                uint l1 = AppComputeLineIndentLevel(bEnd);
-                
-                // only do it for aligned stuff
-                if(l0 == l1 && e.position.x > v.position.x + 1){
-                    // check if their non empty token match position
-                    vec2ui p0(0, 0);
-                    vec2ui p1(0, 0);
-                    uint n = Max(bStart->tokenCount, bEnd->tokenCount);
-                    for(uint i = 0; i < n; i++){
-                        if(i < bStart->tokenCount && p0.y == 0){
-                            Token *t = &bStart->tokens[i];
-                            if(t->identifier != TOKEN_ID_SPACE){
-                                p0.x = t->position;
-                                p0.y = 1;
-                            }
-                        }
-                        
-                        if(i < bEnd->tokenCount && p1.y == 0){
-                            Token *t = &bEnd->tokens[i];
-                            if(t->identifier != TOKEN_ID_SPACE){
-                                p1.x = t->position;
-                                p1.y = 1;
-                            }
-                        }
-                        
-                        if(p1.y != 0 && p0.y != 0) break;
-                    }
-                    
-                    if((p1.y == 0 || p0.y == 0) || (p1.x != p0.x)){
-                        continue;
-                    }
-                    
-                    // looks like this thing needs rendering
-                    Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
-                    int pGlyph = -1;
-                    char *p = &bStart->data[0];
-                    
-                    //TODO: UTF-8
-                    x0 = fonsComputeStringAdvance(font->fsContext, p, p0.x, &pGlyph);
-                    x1 = fonsComputeStringAdvance(font->fsContext, &p[p0.x], 1, &pGlyph);
-                    
-                    Float topX = x0 + 0.5f * x1 + view->lineOffset;
-                    Float botX = topX;
-                    y0 = ((Float)v.position.x - (Float)visibleLines.x + 2) *
-                        font->fontMath.fontSizeAtRenderCall;
-                    
-                    y1 = y0 + (e.position.x - v.position.x - 1) *
-                        font->fontMath.fontSizeAtRenderCall;
-                    
-                    y0 = Max(y0, minY);
-                    y1 = Min(y1, maxY);
-                    
-                    Graphics_LinePush(state, vec2ui(topX, y0), vec2ui(botX, y1),
-                                      vec4f(0.5,0.5,0.5, 0.18));
-                }
-                
-                // render the quads no matter what
-                Float qy0 = 0, qy1 = 0, qx0 = 0, qx1 = 0;
-                qy0 = ((Float)v.position.x - (Float)visibleLines.x + 1) *
-                    font->fontMath.fontSizeAtRenderCall;
-                
-                qy1 = qy0 + (e.position.x - v.position.x + 1) *
-                    font->fontMath.fontSizeAtRenderCall;
-                qx0 = view->lineOffset;
-                qx1 = qx0 + lineSpan;
-                
-                qy0 = Max(qy0, minY);
-                qy1 = Min(qy1, maxY);
-                
-                vec4f color = GetNestColorf(theme, TOKEN_ID_SCOPE,
-                                            v.depth);
-                quads.push_back({
-                                    .left = vec2ui(qx0, qy0),
-                                    .right = vec2ui(qx1, qy1),
-                                    .color = color,
-                                    .depth = v.depth
-                                });
-            }
-        }
+        Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+        //Float g = 0.8705882; //TODO: add this to theme
+        vec4f col = ColorFromHexf(0xFF272729);
+        Float cy0 = ((Float)cursor.x - (Float)visibleLines.x + 1) *
+            font->fontMath.fontSizeAtRenderCall;
+        Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
+        Float start = view->lineOffset;
+        Graphics_QuadPush(state, vec2ui(start, cy0), 
+                          vec2ui(view->lineOffset+lineSpan, cy1), 
+                          col
+                          //vec4f(g, g, 2 * g, 1.0)
+                          //vec4f(g, g, g, 0.2)
+                          );
         
-        int quadLen = quads.size();
-        if(quadLen > 0){
-            _Quad quad = quads.at(quadLen-1);
-            Graphics_QuadPush(state, quad.left, quad.right,
-                              quad.color);
-        }
-#if 0
-        for(int i = quadLen - 1; i >= 0; i--){
-            _Quad quad = quads.at(i);
-            Graphics_QuadPush(state, quad.left, quad.right,
-                              quad.color
-                              //vec4f(0.05)
-                              );
-        }
-#endif
-        Graphics_QuadFlush(state);
+        Graphics_QuadFlush(state, 0);
+        
+        Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
         Graphics_LineFlush(state);
+        
     }
 }
 
@@ -807,7 +934,7 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
     OpenGLFont *font = &state->font;
     OpenGLBuffer *quad = &state->glQuadBuffer;
     Geometry *geometry = &view->geometry;
-    Transform *model = &state->scale;
+    Transform *model = &state->model;
     int dummyGlyph = -1;
     vec2ui l = vec2ui(0, 0);
     vec2ui u = ScreenToGL(geometry->upper - geometry->lower, state);
@@ -832,7 +959,7 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
     
     //vec3f col = ColorRGB(theme->backgroundColor);
     //vec3f col(0.6);
-    Float a = 0.18;
+    Float a = 0.12;
     Float g = 0.8705882; //TODO: add this to theme
     vec3f col = vec3f(g, g, 2 * g);
     
@@ -845,7 +972,7 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
     
     Graphics_QuadPush(state, a0, a1, vec4f(col.x, col.y, col.z, a));
     
-    a = 0.1;
+    a = 0.07;
     col = vec3f(2 * g, 2 * g, g);
     vec2f b0 = vec2f((Float)a0.x + (Float)(a1.x - a0.x) * pc, (Float)a0.y);
     Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y),
@@ -913,13 +1040,12 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
         Graphics_LinePush(state, vec2ui(u.x, l.y), l, color);
         Graphics_LineFlush(state);
 #endif
-        
-        //Graphics_RenderScopeSections(state, view, lineSpan, projection, model, theme);
     }
 }
 
 int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     Float ones[] = {1,1,1,1};
+    char linen[32];
     OpenGLState *state = &GlobalGLState;
     OpenGLFont *font = &GlobalGLState.font;
     Geometry *geometry = &view->geometry;
@@ -928,6 +1054,7 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     Float width = geometry->upper.x - geometry->lower.x;
     Float scaledWidth = width * font->fontMath.invReduceScale;
     Transform projection;
+    Transform translate;
     
     vec4i backgroundColor = theme->backgroundColor;
     Float fcol[] = {(Float)backgroundColor.x / 255.0f,
@@ -936,7 +1063,19 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     };
     
     int is_animating = 0;
+    vec2ui cursor = BufferView_GetCursorPosition(view);
+    vec2ui visibleLines = BufferView_GetViewRange(view);
+    Buffer *cursorBuffer = BufferView_GetBufferAt(view, cursor.x);
+    
     OpenGLComputeProjection(geometry->lower, geometry->upper, &projection);
+    int n = snprintf(linen, sizeof(linen), "%u ", BufferView_GetLineCount(view));
+    int pGlyph = -1;
+    if(view->renderLineNbs){
+        view->lineOffset = fonsComputeStringAdvance(font->fsContext, linen, n, &pGlyph);
+    }else{
+        view->lineOffset = fonsComputeStringAdvance(font->fsContext, " ",
+                                                    1, &pGlyph) * 0.5;
+    }
     
     glViewport(geometry->lower.x, geometry->lower.y,
                geometry->upper.x - geometry->lower.x, 
@@ -955,15 +1094,34 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
         baseHeight = font->fontMath.fontSizeAtRenderCall;
     }
     
+    OpenGLComputeCursor(state, &state->glCursor, cursorBuffer,
+                        cursor, view->lineOffset, baseHeight, visibleLines);
+    
+    OpenGLComputeCursorProjection(state, &state->glCursor, &translate, width, view);
+    state->model = state->scale * translate;
+    
+    if(view->isActive){
+        cursor = BufferView_GetGhostCursorPosition(view);
+        cursorBuffer = BufferView_GetBufferAt(view, cursor.x);
+        OpenGLComputeCursor(state, &state->glGhostCursor, cursorBuffer,
+                            cursor, view->lineOffset, baseHeight, visibleLines);
+    }else{
+        state->glGhostCursor.valid = 0;
+    }
+    
+    // Sets the alpha for the current view rendering stages, makes the dimm effect
     SetAlpha(view->isActive ? 0 : 1);
+    
+    // render alignment and scoped quads first to not need to blend this thing
+    Graphics_RenderScopeSections(state, view, scaledWidth, &projection,
+                                 &state->model, theme);
     
     if(!BufferView_IsAnimating(view)){
         Graphics_RenderTextBlock(state, view, baseHeight, &projection);
-        Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight, &projection);
+        Graphics_RenderCursorElements(state, view, &projection);
     }else{
         vec2ui range;
         vec2ui cursorAt;
-        vec2ui ghostcursor;
         Transform translate;
         Transform model;
         Transition tr = BufferView_GetTransitionType(view);
@@ -984,26 +1142,23 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
             default:{}
         }
         if(manual){
-            model = GlobalGLState.scale * translate;
-            ghostcursor = BufferView_GetGhostCursorPosition(view);
-            _Graphics_RenderTextBlock(font, view, baseHeight, &projection, &model, range);
-            _Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight,
-                                           cursorAt, ghostcursor, range, &model,
-                                           &projection);
+            model = state->scale * translate;
+            translate = Transform();
+            cursorBuffer = BufferView_GetBufferAt(view, cursorAt.x);
+            
+            OpenGLComputeCursor(state, &state->glCursor, cursorBuffer, cursorAt,
+                                view->lineOffset, baseHeight, range);
+            
+            _Graphics_RenderTextBlock(state, view, baseHeight, &projection, &model, range);
+            _Graphics_RenderCursorElements(state, view, &model, &projection);
         }else{
             Graphics_RenderTextBlock(state, view, baseHeight, &projection);
-            Graphics_RenderCursorElements(state, view, scaledWidth, baseHeight,
-                                          &projection);
+            Graphics_RenderCursorElements(state, view, &projection);
         }
         is_animating = 1;
     }
     
     Graphics_RenderFrame(state, view, &projection, scaledWidth, theme);
-    if(view->isActive){
-        // render alignment and scoped quads first to not need to blend this thing
-        Graphics_RenderScopeSections(state, view, scaledWidth, &projection,
-                                     &state->scale, theme);
-    }
     
     glDisable(GL_SCISSOR_TEST);
     return is_animating;
@@ -1028,13 +1183,15 @@ void OpenGLEntry(){
                              GlobalGLState.height);
     
     BufferView_CursorTo(bufferView, 0);
-    double lastTime = GetElapsedTime();
+    lastTime = GetElapsedTime();
     while(!WindowShouldCloseX11(GlobalGLState.window)){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
         Float width = GlobalGLState.width;
         Float height = GlobalGLState.height;
+        
+        double fps = 1.0 / dt;
         
         vec4i backgroundColor = defaultTheme.backgroundColor;
         Float fcol[] = {(Float)backgroundColor.x / 255.0f,
@@ -1065,7 +1222,7 @@ void OpenGLEntry(){
         }
         
         //glfwWaitEvents();
-        usleep(10000);
+        //usleep(10000);
     }
     
     DEBUG_MSG("Finalizing OpenGL graphics\n");

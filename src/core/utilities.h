@@ -17,6 +17,9 @@
 #define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }
 
 const Float kInv255 = 0.003921569;
+const Float kAlphaReduceDefault = 0.86;
+const Float kAlphaReduceInactive = 0.5;
+const int kMaximumIndentEmptySearch = 9;
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
