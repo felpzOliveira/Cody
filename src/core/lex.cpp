@@ -4,6 +4,7 @@
 #include <sstream>
 #include <utilities.h>
 #include <vector>
+#include <buffers.h>
 
 #define MODULE_NAME "Lex"
 
@@ -42,15 +43,20 @@ inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
     }else if(token->identifier == TOKEN_ID_BRACE_CLOSE){
         uint n = tokenizer->runningIndentLevel;
         tokenizer->runningIndentLevel = n > 0 ? n - 1 : 0;
+    }else if(token->identifier == TOKEN_ID_PARENTHESE_OPEN){
+        tokenizer->runningParenIndentLevel++;
+    }else if(token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
+        uint n = tokenizer->runningParenIndentLevel;
+        tokenizer->runningParenIndentLevel = n > 0 ? n - 1 : 0;
     }
 }
 
 inline int Lex_IsTokenReserved(Token *token){
     TokenId id = token->identifier;
-    return (id == TOKEN_ID_COMMENT || id == TOKEN_ID_RESERVED ||
+    return (id == TOKEN_ID_RESERVED ||
             id == TOKEN_ID_PREPROCESSOR || id == TOKEN_ID_PREPROCESSOR_DEFINE ||
             id == TOKEN_ID_PREPROCESSOR_DEFINITION || id == TOKEN_ID_INCLUDE_SEL ||
-            id == TOKEN_ID_INCLUDE || id == TOKEN_ID_OPERATOR);
+            id == TOKEN_ID_INCLUDE);
 }
 
 inline int Lex_IsHexValue(char v){
@@ -298,7 +304,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
 LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     /*
 * struct A;
-* struct A{ <Anythng> };
+* struct A{ <Anything> };
 */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
@@ -390,12 +396,14 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
                 proc->currentState = 3;
             }
         }else if(proc->currentState == 3 && token->identifier == TOKEN_ID_NONE){
-            token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
+            //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
+            token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
             grabbed = 1;
         }else if(token->identifier == TOKEN_ID_NONE && 
                  proc->nestedLevel == 0 && proc->currentState == 1)
         {
-            token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
+            //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
+            token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
             grabbed = 1;
         }else if(proc->currentState == 2 && token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
             proc->currentState = 1;
@@ -818,6 +826,12 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
+    token->source = LEX_CONTEXT_ID_EXEC_CODE;
+    
+    if(n == 1 && **p == '\\'){
+        rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }
     
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
@@ -849,6 +863,10 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     
     end:
     *offset = len;
+    context->has_pending_work = 0;
+    if(rv == TOKENIZER_OP_UNFINISHED){
+        context->has_pending_work = 1;
+    }
     return rv;
 }
 
@@ -865,6 +883,12 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
+    token->source = LEX_CONTEXT_ID_PREPROCESSOR;
+    
+    if(n == 1 && **p == '\\'){
+        rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }
     
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
@@ -1063,6 +1087,95 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     return -1;
 }
 
+//TODO: Translate the tokens into a more robust expression
+static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
+    *found = 0;
+    while(i < buffer->tokenCount){
+        Token *token = &buffer->tokens[i];
+        if(token->identifier != TOKEN_ID_SPACE && 
+           token->identifier != TOKEN_ID_ASTERISK)
+        {
+            *found = 1;
+            break;
+        }
+        i++;
+    }
+    
+    return i;
+}
+
+// TODO: This does not work, needs a symbol table
+void Lex_TokenizerReviewClassification(Tokenizer *tokenizer, Buffer *buffer){
+    return;
+    struct SecondPassContext{
+        uint start;
+    };
+    
+    SecondPassContext context = {
+        .start = 1,
+    };
+    
+    TokenizerStateContext *ctx = &buffer->stateContext;
+    uint plevel = ctx->parenLevel;
+    uint blevel = ctx->indentLevel;
+    
+    
+    if(buffer->tokenCount > 0){
+        Token *token = &buffer->tokens[0];
+        if(token->source == LEX_CONTEXT_ID_PREPROCESSOR) return;
+    }
+    
+    for(uint i = 0; i < buffer->tokenCount; i++){
+        int found = 0;
+        i = QueryNextNonReservedToken(buffer, i, &found);
+        if(found){
+            Token *token = &buffer->tokens[i];
+            if(blevel > 0 || plevel > 0){
+                if((token->identifier == TOKEN_ID_NONE) && context.start == 1){
+                    int s = QueryNextNonReservedToken(buffer, i+1, &found);
+                    if(found){
+                        Token *nextToken = &buffer->tokens[s];
+                        if(nextToken->identifier == TOKEN_ID_NONE ||
+                           nextToken->identifier == TOKEN_ID_PARENTHESE_CLOSE)
+                        {
+                            //TODO: Perform symbol table query?
+                            token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
+                            i = s;
+                        }
+                    }
+                    
+                    context.start = 0;
+                }else if(token->identifier == TOKEN_ID_SEMICOLON ||
+                         token->identifier == TOKEN_ID_PARENTHESE_OPEN ||
+                         token->identifier == TOKEN_ID_COMMA)
+                {
+                    context.start = 1;
+                }else{
+                    context.start = 0;
+                }
+            }else if(token->identifier == TOKEN_ID_PARENTHESE_OPEN){
+                plevel++;
+            }else if(token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
+                uint k = plevel;
+                plevel = k > 0 ? k - 1 : 0;
+            }else if(token->identifier == TOKEN_ID_BRACE_OPEN){
+                blevel++;
+            }else if(token->identifier == TOKEN_ID_BRACE_CLOSE){
+                uint k = blevel;
+                blevel = k > 0 ? k - 1 : 0;
+            }else{
+                // TODO: this is either a user defined macro or datatype at beginning
+                // of a function, without consulting a symbol table it is not
+                // possible to distinguish. Until we decide if we are going
+                // to pursue the symbol table or not let this be a datatype.
+                if(token->identifier == TOKEN_ID_NONE){
+                    token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
+                }
+            }
+        }
+    }
+}
+
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
                      uint refLine, void *prv)
 {
@@ -1117,22 +1230,72 @@ typedef struct{
 /* C/C++ tokens that can happen inside a preprocessor */
 std::vector<std::vector<GToken>> cppReservedPreprocessor = {
     {{ .value = "#", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "+", .identifier = TOKEN_ID_MATH }, { .value = "-", .identifier = TOKEN_ID_MATH },
+        { .value = ">", .identifier = TOKEN_ID_MORE }, { .value = "<", .identifier = TOKEN_ID_LESS },
+        { .value = "/", .identifier = TOKEN_ID_MATH }, { .value = "%", .identifier = TOKEN_ID_MATH },
+        { .value = "!", .identifier = TOKEN_ID_MATH }, { .value = "=", .identifier = TOKEN_ID_MATH },
+        { .value = "*", .identifier = TOKEN_ID_ASTERISK }, { .value = "&", .identifier = TOKEN_ID_MATH },
+        { .value = "|", .identifier = TOKEN_ID_MATH }, { .value = "^", .identifier = TOKEN_ID_MATH },
+        { .value = "~", .identifier = TOKEN_ID_MATH }, { .value = ",", .identifier = TOKEN_ID_COMMA },
+        { .value = ";", .identifier = TOKEN_ID_SEMICOLON }, { .value = ".", .identifier = TOKEN_ID_MATH },
         { .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN }, { .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
         { .value = "{", .identifier = TOKEN_ID_BRACE_OPEN }, { .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
-        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE }},
-    {{ .value = "if", .identifier = TOKEN_ID_PREPROCESSOR },},
-    {{ .value = "line", .identifier = TOKEN_ID_PREPROCESSOR },
-        {.value = "else", .identifier = TOKEN_ID_PREPROCESSOR },},
-    {{ .value = "undef", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "ifdef", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "error", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "endif", .identifier = TOKEN_ID_PREPROCESSOR },},
+        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE }, 
+        { .value = ":", .identifier = TOKEN_ID_MATH }},
+    
+    {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "new", .identifier = TOKEN_ID_OPERATOR },{ .value = "and", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "this", .identifier = TOKEN_ID_OPERATOR },{ .value = "char", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "long", .identifier = TOKEN_ID_DATATYPE },{ .value = "NULL", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "case", .identifier = TOKEN_ID_OPERATOR },{ .value = "true", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "else", .identifier = TOKEN_ID_PREPROCESSOR },{ .value = "line", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "goto", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "bool", .identifier = TOKEN_ID_DATATYPE },{ .value = "void", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "enum", .identifier = TOKEN_ID_DATATYPE_ENUM_DEF },{ .value = "auto", .identifier = TOKEN_ID_DATATYPE },},
+    {{ .value = "short", .identifier = TOKEN_ID_DATATYPE },{ .value = "const", .identifier = TOKEN_ID_DATATYPE  },
+        { .value = "undef", .identifier = TOKEN_ID_PREPROCESSOR },{ .value = "ifdef", .identifier = TOKEN_ID_PREPROCESSOR }, 
+        { .value = "error", .identifier = TOKEN_ID_PREPROCESSOR }, { .value = "endif", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "union", .identifier = TOKEN_ID_OPERATOR },{ .value = "using", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "class", .identifier = TOKEN_ID_DATATYPE_CLASS_DEF },{ .value = "final", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "false", .identifier = TOKEN_ID_OPERATOR },{ .value = "float", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "catch", .identifier = TOKEN_ID_OPERATOR },{ .value = "throw", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "while", .identifier = TOKEN_ID_OPERATOR },{ .value = "break", .identifier = TOKEN_ID_OPERATOR },},
     {{ .value = "define", .identifier = TOKEN_ID_PREPROCESSOR_DEFINE },
         { .value = "ifndef", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR}},
+        { .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR},
+        { .value = "friend", .identifier = TOKEN_ID_OPERATOR },{ .value = "inline", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "static", .identifier = TOKEN_ID_OPERATOR },{ .value = "sizeof", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "and_eq", .identifier = TOKEN_ID_OPERATOR },{ .value = "signed", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "delete", .identifier = TOKEN_ID_OPERATOR },{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "typeid", .identifier = TOKEN_ID_OPERATOR },{ .value = "export", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "return", .identifier = TOKEN_ID_OPERATOR },{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "public", .identifier = TOKEN_ID_OPERATOR },{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },},
     {{ .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
         { .value = "defined", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },}
+        { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "mutable", .identifier = TOKEN_ID_OPERATOR },{ .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "alignas", .identifier = TOKEN_ID_OPERATOR },{ .value = "wchar_t", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "virtual", .identifier = TOKEN_ID_OPERATOR },{ .value = "default", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF },},
+    {{ .value = "decltype", .identifier = TOKEN_ID_OPERATOR },{ .value = "operator", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "template", .identifier = TOKEN_ID_OPERATOR }, { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "register", .identifier = TOKEN_ID_OPERATOR },{ .value = "requires", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "override", .identifier = TOKEN_ID_OPERATOR },{ .value = "typename", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },{ .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "continue", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "namespace", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },{ .value = "thread_local", .identifier = TOKEN_ID_OPERATOR },},
+    {{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }},
+    {{ .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR }}
 };
 
 /* C/C++ tokens that can happen inside a code and are not preprocessor */
@@ -1144,10 +1307,11 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "*", .identifier = TOKEN_ID_ASTERISK }, { .value = "&", .identifier = TOKEN_ID_MATH },
         { .value = "|", .identifier = TOKEN_ID_MATH }, { .value = "^", .identifier = TOKEN_ID_MATH },
         { .value = "~", .identifier = TOKEN_ID_MATH }, { .value = ",", .identifier = TOKEN_ID_COMMA },
-        { .value = ";", .identifier = TOKEN_ID_SEMICOLON },
+        { .value = ";", .identifier = TOKEN_ID_SEMICOLON }, { .value = ".", .identifier = TOKEN_ID_MATH },
         { .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN }, { .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
         { .value = "{", .identifier = TOKEN_ID_BRACE_OPEN }, { .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
-        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE } },
+        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE }, 
+        { .value = ":", .identifier = TOKEN_ID_MATH }},
     {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
     {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
         { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
@@ -1295,6 +1459,7 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols){
     tokenizer->type = 0;
     tokenizer->inclusion = 0;
     tokenizer->runningIndentLevel = 0;
+    tokenizer->runningParenIndentLevel = 0;
     
     tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
                                               tokenizer->contextCount);
@@ -1340,6 +1505,7 @@ void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *c
     context->aggregate = tokenizer->aggregate;
     context->type = tokenizer->type;
     context->indentLevel = tokenizer->runningIndentLevel;
+    context->parenLevel = tokenizer->runningParenIndentLevel;
     BoundedStack_Copy(&context->procStack, tokenizer->procStack);
     if(tokenizer->unfinishedContext >= 0){
         context->backTrack = tokenizer->linesAggregated+1;
@@ -1356,6 +1522,7 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
     tokenizer->aggregate = context->aggregate;
     tokenizer->type = context->type;
     tokenizer->runningIndentLevel = context->indentLevel;
+    tokenizer->runningParenIndentLevel = context->parenLevel;
     BoundedStack_Copy(tokenizer->procStack, &context->procStack);
     //printf("Stack size: %d\n", BoundedStack_Size(tokenizer->procStack));
 }

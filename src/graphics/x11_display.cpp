@@ -949,7 +949,7 @@ void ProcessEventX11(XEvent *event){
         } break;
         
         default:{
-            printf("Pending\n");
+            printf("Pending X11 event %d\n", (int)event->type);
         }
     }
 }

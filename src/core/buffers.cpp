@@ -555,6 +555,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].size = token.size;
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
+            workContext->workTokenList[head].source = token.source;
             workContext->workTokenListHead++;
 #if DEBUG_TOKENS != 0
             char *h = &s[token.position];
@@ -582,6 +583,8 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, lineNr-1);
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
+    
+    Lex_TokenizerReviewClassification(tokenizer, buffer);
     
 }
 
@@ -637,6 +640,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             workContext->workTokenList[head].size = token.size;
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
+            workContext->workTokenList[head].source = token.source;
             workContext->workTokenListHead++;
             
             size = totalSize - token.position - token.size;
@@ -645,6 +649,8 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     
     Buffer_UpdateTokens(buffer, workContext->workTokenList,
                         workContext->workTokenListHead);
+    
+    Lex_TokenizerReviewClassification(tokenizer, buffer);
     
     if(Lex_TokenizerHasPendingWork(tokenizer)){
         int r = tokenizerContext.backTrack;

@@ -1,9 +1,51 @@
 #include <theme.h>
 #include <utilities.h>
 
-Theme defaultTheme = {
-    //.backgroundColor = ColorFromHex(0xFF161616),
+Theme themeYavid = {
+    .backgroundColor = ColorFromHex(0xFF16191C),
+    .backgroundLineNumbers = ColorFromHex(0xFF192023),
+    .lineNumberColor = ColorFromHex(0xFF4C4D4E),
+    .lineNumberHighlitedColor = ColorFromHex(0xFFF9F901),
+    .cursorLineHighlight = ColorFromHex(0xFF272729),
+    .operatorColor   = ColorFromHex(0xCCD38545),
+    .datatypeColor   = ColorFromHex(0xCC719FAE),
+    .commentColor    = ColorFromHex(0xFF7D7D7D),
+    .stringColor     = ColorFromHex(0xFF6B8E23),
+    .numberColor     = ColorFromHex(0xFF6B8E23),
+    .reservedColor   = ColorFromHex(0xFF6B8E23),
+    .functionColor   = ColorFromHex(0xFFDFDA77),
+    .includeColor    = ColorFromHex(0xFF6B8E23),
+    .mathColor       = ColorFromHex(0xFFD2D2D3),
+    .tokensColor     = ColorFromHex(0xFFD2D2D3),
+    .preprocessorColor = ColorFromHex(0xFFDAB98F),
+    .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    .braces = ColorFromHex(0xFF00FFFF),
+    .cursorColor = ColorFromHex(0xFF40FF40),
+    .ghostCursorColor = ColorFromHex(0xFF5B4D3C),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFF26292C),
+        ColorFromHex(0xFF071307),
+        ColorFromHex(0xFF070713),
+        ColorFromHex(0xFF131307),
+    },
+    .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
+    .testColor = ColorFromHex(0xCCCD950C),
+    .backTextCount = 1,
+};
+
+Theme theme4Coder = {
     .backgroundColor = ColorFromHex(0xFF0C0C0C),
+    .backgroundLineNumbers = ColorFromHex(0xFF171717),
+    .lineNumberColor = ColorFromHex(0xFF4C4D4E),
+    .lineNumberHighlitedColor = ColorFromHex(0xFFF9F901),
+    .cursorLineHighlight = ColorFromHex(0xFF272729),
     .operatorColor   = ColorFromHex(0xCCCD950C),
     .datatypeColor   = ColorFromHex(0xCCCD950C),
     .commentColor    = ColorFromHex(0xFF7D7D7D),
@@ -34,8 +76,13 @@ Theme defaultTheme = {
         ColorFromHex(0xFF070713),
         ColorFromHex(0xFF131307),
     },
-    .testColor = ColorFromHex(0xCCCD950C),
+    
+    .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
+    .testColor = ColorFromHex(0xCCE91E63),
+    .backTextCount = 4,
 };
+
+Theme *defaultTheme = &theme4Coder;
 
 static int globalActive = 0;
 void SetAlpha(int active){
@@ -58,117 +105,18 @@ vec4i GetNestColor(Theme *theme, TokenId id, int level){
         level = level % 4;
         return ApplyAlpha(theme->parenthesis[level]);
     }else if(id == TOKEN_ID_SCOPE){
-        level = Clamp(level, 0, 3);
-        //level = 0;
+        if(theme->backTextCount > 1){
+            level = Clamp(level, 0, theme->backTextCount-1);
+        }else{
+            level = 0;
+        }
+        
         return ApplyAlpha(theme->backTextColors[level]);
     }
     
     AssertErr(0, "Invalid theme query for nesting color");
     return vec4i(255, 255, 0, 255);
 }
-
-vec4f GetNestColorf(Theme *theme, TokenId id, int level){
-    vec4i col(255);
-    if(id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE)
-    {
-        col = theme->braces;
-    }else if(id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE){
-        level = level % 4;
-        col = theme->parenthesis[level];
-    }else if(id == TOKEN_ID_SCOPE){
-        level = Clamp(level, 0, 3);
-        //level = 0;
-        col = theme->backTextColors[level];
-    }
-    
-    vec4f c = vec4f(col.x * kInv255, col.y * kInv255,
-                    col.z * kInv255, col.w * kInv255);
-    
-    return ApplyAlpha(c);
-}
-
-vec4f GetColorf(Theme *theme, TokenId id){
-    vec4i col;
-#define COLOR_RET(i, v) case i : col =  theme->v; break;
-    switch(id){
-        COLOR_RET(TOKEN_ID_OPERATOR, operatorColor);
-        COLOR_RET(TOKEN_ID_DATATYPE, datatypeColor);
-        COLOR_RET(TOKEN_ID_COMMENT, commentColor);
-        COLOR_RET(TOKEN_ID_STRING, stringColor);
-        COLOR_RET(TOKEN_ID_NUMBER, numberColor);
-        COLOR_RET(TOKEN_ID_RESERVED, reservedColor);
-        COLOR_RET(TOKEN_ID_FUNCTION, functionColor);
-        COLOR_RET(TOKEN_ID_INCLUDE, includeColor);
-        COLOR_RET(TOKEN_ID_MATH, mathColor);
-        COLOR_RET(TOKEN_ID_ASTERISK, mathColor);
-        COLOR_RET(TOKEN_ID_NONE, tokensColor);
-        COLOR_RET(TOKEN_ID_PREPROCESSOR, preprocessorColor);
-        COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINE, preprocessorColor);
-        COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINITION, preprocessorDefineColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_STRUCT_DEF, operatorColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_TYPEDEF_DEF, operatorColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_CLASS_DEF, operatorColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_ENUM_DEF, operatorColor);
-        COLOR_RET(TOKEN_ID_BRACE_OPEN, tokensColor);
-        COLOR_RET(TOKEN_ID_BRACE_CLOSE, tokensColor);
-        COLOR_RET(TOKEN_ID_PARENTHESE_OPEN, tokensColor);
-        COLOR_RET(TOKEN_ID_PARENTHESE_CLOSE, tokensColor);
-        COLOR_RET(TOKEN_ID_BRACKET_OPEN, tokensColor);
-        COLOR_RET(TOKEN_ID_BRACKET_CLOSE, tokensColor);
-        COLOR_RET(TOKEN_ID_MORE, operatorColor);
-        COLOR_RET(TOKEN_ID_LESS, operatorColor);
-        
-        COLOR_RET(TOKEN_ID_COMMA, tokensColor);
-        COLOR_RET(TOKEN_ID_SEMICOLON, tokensColor);
-        
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_STRUCT, preprocessorDefineColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, testColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM, preprocessorDefineColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, testColor);
-        default:{
-            AssertA(0, "Unknown mapping for id");
-            return vec4f(0);
-        }
-    }
-#undef COLOR_RET
-    
-    vec4f c = vec4f(col.x * kInv255, col.y * kInv255,
-                    col.z * kInv255, col.w * kInv255);
-    return ApplyAlpha(c);
-}
-
-vec4i GetUIColor(Theme *theme, UIElement id){
-#define COLOR_RET(i, v) case i : return ApplyAlpha(theme->v);
-    switch(id){
-        COLOR_RET(UIBorder, borderColor);
-        COLOR_RET(UICursor, cursorColor);
-        COLOR_RET(UIGhostCursor, ghostCursorColor);
-        default:{
-            AssertA(0, "Unknown mapping for id");
-            return vec4i(255);
-        }
-    }
-#undef COLOR_RET
-}
-
-vec4f GetUIColorf(Theme *theme, UIElement id){
-    vec4i col;
-#define COLOR_RET(i, v) case i : col = theme->v; break;
-    switch(id){
-        COLOR_RET(UIBorder, borderColor);
-        COLOR_RET(UICursor, cursorColor);
-        COLOR_RET(UIGhostCursor, ghostCursorColor);
-        default:{
-            AssertA(0, "Unknown mapping for id");
-            return vec4f(1);
-        }
-    }
-#undef COLOR_RET
-    
-    return ApplyAlpha(vec4f(col.x * kInv255, col.y * kInv255,
-                            col.z * kInv255, col.w * kInv255));
-}
-
 
 vec4i GetColor(Theme *theme, TokenId id){
     vec4i c;
@@ -187,13 +135,13 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_NONE, tokensColor);
         COLOR_RET(TOKEN_ID_PREPROCESSOR, preprocessorColor);
         COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINE, preprocessorColor);
-        COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINITION, preprocessorDefineColor);
+        
         COLOR_RET(TOKEN_ID_DATATYPE_STRUCT_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_TYPEDEF_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_CLASS_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_ENUM_DEF, operatorColor);
-        COLOR_RET(TOKEN_ID_MORE, operatorColor);
-        COLOR_RET(TOKEN_ID_LESS, operatorColor);
+        COLOR_RET(TOKEN_ID_MORE, mathColor);
+        COLOR_RET(TOKEN_ID_LESS, mathColor);
         
         COLOR_RET(TOKEN_ID_COMMA, tokensColor);
         COLOR_RET(TOKEN_ID_SEMICOLON, tokensColor);
@@ -205,9 +153,12 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_BRACKET_CLOSE, tokensColor);
         
         COLOR_RET(TOKEN_ID_DATATYPE_USER_STRUCT, preprocessorDefineColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_DATATYPE, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, testColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, testColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM, preprocessorDefineColor);
+        
+        COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINITION, testColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);
@@ -215,6 +166,46 @@ vec4i GetColor(Theme *theme, TokenId id){
     }
     
 #undef COLOR_RET
-    
     return ApplyAlpha(c);
+}
+
+vec4i GetUIColor(Theme *theme, UIElement id){
+#define COLOR_RET(i, v) case i : return ApplyAlpha(theme->v);
+    switch(id){
+        COLOR_RET(UILineNumberBackground, backgroundLineNumbers);
+        COLOR_RET(UIBackground, backgroundColor);
+        COLOR_RET(UICursorLineHight, cursorLineHighlight);
+        COLOR_RET(UILineNumberHighlighted, lineNumberHighlitedColor);
+        COLOR_RET(UILineNumbers, lineNumberColor);
+        COLOR_RET(UIBorder, borderColor);
+        COLOR_RET(UICursor, cursorColor);
+        COLOR_RET(UIGhostCursor, ghostCursorColor);
+        default:{
+            AssertA(0, "Unknown mapping for id");
+            return vec4i(255);
+        }
+    }
+#undef COLOR_RET
+}
+
+vec4f GetUIColorf(Theme *theme, UIElement id){
+    vec4i col = GetUIColor(theme, id);
+    return ApplyAlpha(vec4f(col.x * kInv255, col.y * kInv255,
+                            col.z * kInv255, col.w * kInv255));
+}
+
+vec4f GetColorf(Theme *theme, TokenId id){
+    vec4i col = GetColor(theme, id);
+    return ApplyAlpha(vec4f(col.x * kInv255, col.y * kInv255,
+                            col.z * kInv255, col.w * kInv255));
+}
+
+vec4f GetNestColorf(Theme *theme, TokenId id, int level){
+    vec4i col = GetNestColor(theme, id, level);
+    return ApplyAlpha(vec4f(col.x * kInv255, col.y * kInv255,
+                            col.z * kInv255, col.w * kInv255));
+}
+
+short GetBackTextCount(Theme *theme){
+    return theme->backTextCount;
 }

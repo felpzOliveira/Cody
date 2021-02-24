@@ -43,6 +43,7 @@ typedef enum{
     
     /* user defined tokens */
     TOKEN_ID_DATATYPE_USER_STRUCT,
+    TOKEN_ID_DATATYPE_USER_DATATYPE,
     TOKEN_ID_DATATYPE_USER_TYPEDEF,
     TOKEN_ID_DATATYPE_USER_ENUM,
     TOKEN_ID_DATATYPE_USER_CLASS
@@ -92,6 +93,7 @@ inline const char *Symbol_GetIdString(int id){
         STR_CASE(TOKEN_ID_DATATYPE_USER_TYPEDEF);
         STR_CASE(TOKEN_ID_DATATYPE_USER_ENUM);
         STR_CASE(TOKEN_ID_DATATYPE_USER_CLASS);
+        STR_CASE(TOKEN_ID_DATATYPE_USER_DATATYPE);
         default: return "Invalid";
     }
 #undef STR_CASE

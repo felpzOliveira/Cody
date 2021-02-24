@@ -6,6 +6,11 @@
 #include <lex.h>
 
 typedef enum{
+    UIBackground,
+    UILineNumberBackground,
+    UILineNumbers,
+    UILineNumberHighlighted,
+    UICursorLineHight,
     UIBorder,
     UICursor,
     UIGhostCursor,
@@ -13,6 +18,10 @@ typedef enum{
 
 typedef struct{
     vec4i backgroundColor;
+    vec4i backgroundLineNumbers;
+    vec4i lineNumberColor;
+    vec4i lineNumberHighlitedColor;
+    vec4i cursorLineHighlight;
     vec4i operatorColor;
     vec4i datatypeColor;
     vec4i commentColor;
@@ -31,11 +40,12 @@ typedef struct{
     vec4i ghostCursorColor;
     vec4i parenthesis[4];
     vec4i backTextColors[4];
-    
+    vec4i userDatatypeColor;
     vec4i testColor;
+    short backTextCount;
 }Theme;
 
-extern Theme defaultTheme;
+extern Theme *defaultTheme;
 
 void SetAlpha(int acitve);
 vec4i GetNestColor(Theme *theme, TokenId id, int level);
@@ -44,5 +54,5 @@ vec4i GetColor(Theme *theme, TokenId id);
 vec4f GetColorf(Theme *theme, TokenId id);
 vec4i GetUIColor(Theme *theme, UIElement id);
 vec4f GetUIColorf(Theme *theme, UIElement id);
-
+short GetBackTextCount(Theme *theme);
 #endif //THEME_H

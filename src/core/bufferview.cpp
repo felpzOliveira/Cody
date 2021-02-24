@@ -148,7 +148,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
     view->cursor.nestStart = vec2ui(0, 0);
     view->cursor.nestEnd = vec2ui(0, 0);
     view->cursor.nestValid = 0;
-    view->renderLineNbs = 0;
+    view->renderLineNbs = 1;
     view->activeNestPoint = -1;
     view->visibleRect = vec2ui(0, 0);
     view->lineHeight = 0;

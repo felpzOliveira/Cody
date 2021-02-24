@@ -78,11 +78,17 @@ struct Token;
 struct TokenizerContext;
 struct Tokenizer;
 struct LogicalProcessor;
+struct Buffer;
 
 typedef LEX_TOKENIZER_ENTRY_CONTEXT(Lex_ContextEntry);
 typedef LEX_TOKENIZER_EXEC_CONTEXT(Lex_ContextExec);
 typedef LEX_LOGICAL_PROCESSOR(Lex_LogicalExec);
 
+
+typedef enum{
+    LEX_CONTEXT_ID_PREPROCESSOR,
+    LEX_CONTEXT_ID_EXEC_CODE
+}ContextID;
 
 /*
 * Basic component for Token information, i.e.: reserved and dynamic generated
@@ -94,6 +100,7 @@ typedef LEX_LOGICAL_PROCESSOR(Lex_LogicalExec);
 struct Token{
     int size;
     int position;
+    ContextID source;
     TokenId identifier;
 };
 
@@ -172,10 +179,11 @@ typedef struct{
     int activeWorkProcessor;
     uint backTrack;
     uint forwardTrack;
-    BoundedStack procStack; 
+    BoundedStack procStack;
     
     // utility for faster nest computation and identation
     uint indentLevel;
+    uint parenLevel;
     
     // Comment parsing
     int aggregate;
@@ -212,6 +220,7 @@ struct Tokenizer{
     
     // help bufferview with information about nest at start of line
     uint runningIndentLevel;
+    uint runningParenIndentLevel;
     
     // Comment parsing
     int aggregate;
@@ -252,7 +261,7 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
 /*
 * Builds a tokenizer from default tables.
 */
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols=0);
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols=1);
 
 /*
 * Pushes a new token into the given lookup table.
@@ -289,6 +298,11 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext
 */
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer);
 
+/*
+* Allow tokenizer to perform a review of the classification of a already tokenized
+* buffer. Attempting to perform limited analysis of the expression.
+*/
+void Lex_TokenizerReviewClassification(Tokenizer *tokenizer, Buffer *buffer);
 
 /* Fixed memory Stack for logical processors */
 BoundedStack *BoundedStack_Create();

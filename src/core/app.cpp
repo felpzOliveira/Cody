@@ -75,6 +75,8 @@ void AppEarlyInitialize(){
     view->isActive = 0;
     appContext.viewsCount = 1;
 #endif
+    
+    view = &appContext.views[0];
     appContext.activeBufferView = view;
     appContext.activeBufferView->isActive = 1;
     appContext.activeId = 0;
