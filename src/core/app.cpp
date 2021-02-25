@@ -245,6 +245,27 @@ void RemountTokensBasedOn(BufferView *view, uint base, uint offset=0){
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, base, offset);
 }
 
+void AppOnModifiedToken(BufferView *view, Buffer *buffer, Token *modifiedToken){
+    Tokenizer *tokenizer = view->tokenizer;
+    SymbolTable *symTable = tokenizer->symbolTable;
+    if(modifiedToken){
+        if(Lex_IsUserToken(modifiedToken)){
+            /*
+* It could happen that this token has no inner value because it is
+* broken statement like 'enum class X' where one is defined but the
+* other never gets a value.
+*/
+            if(modifiedToken->reserved != nullptr){
+                char *label = (char *)modifiedToken->reserved;
+                SymbolTable_Remove(symTable, label, modifiedToken->size,
+                                   modifiedToken->identifier);
+                AllocatorFree(modifiedToken->reserved);
+                modifiedToken->reserved = nullptr;
+            }
+        }
+    }
+}
+
 void AppCommandRemoveOne(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -259,12 +280,28 @@ void AppCommandRemoveOne(){
                                        vec2i((int)cursor.x, OPERATION_REMOVE_CHAR));
         }
         
+        uint tid = Buffer_GetTokenAt(buffer, cursor.y-1);
+        Token *token = &buffer->tokens[tid];
+        AppOnModifiedToken(bufferView, buffer, token);
+        
         Buffer_RemoveRange(buffer, cursor.y-1, cursor.y);
         RemountTokensBasedOn(bufferView, cursor.x);
         cursor.y -= 1;
         
     }else if(cursor.x > 0){
         int offset = buffer->count;
+        
+        if(buffer->tokenCount > 0){
+            Token *token = &buffer->tokens[0];
+            AppOnModifiedToken(bufferView, buffer, token);
+        }
+        
+        Buffer *pBuffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
+        if(pBuffer->tokenCount > 0){
+            Token *token = &pBuffer->tokens[pBuffer->tokenCount-1];
+            AppOnModifiedToken(bufferView, pBuffer, token);
+        }
+        
         LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, cursor.x-1);
         buffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
         RemountTokensBasedOn(bufferView, cursor.x-1);
@@ -348,17 +385,44 @@ void AppCommandInsertTab(){
 void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end){
     Buffer *buffer = BufferView_GetBufferAt(bufferView, start.x);
     if(start.x == end.x){
+        if(buffer->tokenCount > 0){
+            uint si = Buffer_GetTokenAt(buffer, start.y);
+            uint ei = Max(Buffer_GetTokenAt(buffer, end.y), buffer->tokenCount-1);
+            for(uint i = si; i <= ei; i++){
+                Token *token = &buffer->tokens[i];
+                AppOnModifiedToken(bufferView, buffer, token);
+            }
+        }
+        
         Buffer_RemoveRange(buffer, start.y, end.y);
     }else{
         uint rmov = 0;
+        uint si = Buffer_GetTokenAt(buffer, start.y);
+        for(uint i = si; i < buffer->tokenCount; i++){
+            Token *token = &buffer->tokens[i];
+            AppOnModifiedToken(bufferView, buffer, token);
+        }
+        
         Buffer_RemoveRange(buffer, start.y, buffer->count);
         for(uint i = start.x + 1; i < end.x; i++){
+            Buffer *b0 = BufferView_GetBufferAt(bufferView, start.x+1);
+            for(uint j = 0; j < b0->tokenCount; j++){
+                Token *token = &b0->tokens[j];
+                AppOnModifiedToken(bufferView, b0, token);
+            }
+            
             LineBuffer_RemoveLineAt(bufferView->lineBuffer, start.x+1);
             rmov++;
         }
         
         // remove end now
         buffer = BufferView_GetBufferAt(bufferView, end.x - rmov);
+        uint ei = Buffer_GetTokenAt(buffer, end.y);
+        for(uint i = 0; i <= ei; i++){
+            Token *token = &buffer->tokens[i];
+            AppOnModifiedToken(bufferView, buffer, token);
+        }
+        
         Buffer_RemoveRange(buffer, 0, end.y);
         
         // merge start and end
@@ -471,6 +535,7 @@ void AppCommandUndo(){
     if(bChange){
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
         //TODO: Redo
+        printf("[APP] Undo for %s\n", UndoRedo_GetStringID(bChange->change));
         switch(bChange->change){
             case CHANGE_MERGE:{
                 LineBuffer_MergeConsecutiveLines(lineBuffer, bChange->bufferInfo.x);
@@ -493,16 +558,30 @@ void AppCommandUndo(){
             case CHANGE_REMOVE:
             case CHANGE_INSERT:{
                 Buffer *b = bChange->buffer;
+                TokenizerStateContext *context = &b->stateContext;
+                
+                uint fTrack = context->forwardTrack;
+                uint bTrack = context->backTrack;
+                
                 Buffer *buffer = LineBuffer_ReplaceBufferAt(bufferView->lineBuffer, b,
                                                             bChange->bufferInfo.x);
-                printf("Giving buffer %p\n", b);
+                
+                context = &buffer->stateContext;
+                fTrack = Max(fTrack, context->forwardTrack);
+                bTrack = Max(bTrack, context->backTrack);
+                
+                for(uint i = 0; i < buffer->tokenCount; i++){
+                    Token *token = &buffer->tokens[i];
+                    AppOnModifiedToken(bufferView, buffer, token);
+                }
                 
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
                 UndoSystemTakeBuffer(buffer);
                 
                 cursor.x = bChange->bufferInfo.x;
                 cursor.y = bChange->bufferInfo.y;
-                RemountTokensBasedOn(bufferView, cursor.x);
+                uint base = cursor.x > bTrack ? cursor.x - bTrack : 0;
+                RemountTokensBasedOn(bufferView, base, fTrack);
                 // restore the active buffer and let stack grow again
                 LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(-1,-1));
             } break;
@@ -653,10 +732,30 @@ void AppCommandPaste(){
     const char *p = ClipboardGetStringX11(&size);
     if(size > 0 && p){
         Buffer *buffer = nullptr;
+        Token *mToken = nullptr;
         uint off = 0;
         BufferView *view = AppGetActiveBufferView();
         vec2ui cursor = BufferView_GetCursorPosition(view);
         uint startBuffer = cursor.x;
+        buffer = BufferView_GetBufferAt(view, cursor.x);
+        
+        // check first token
+        if(cursor.y > 0){
+            uint tid = Buffer_GetTokenAt(buffer, cursor.y-1);
+            mToken = &buffer->tokens[tid];
+        }else if(buffer->tokenCount > 0){
+            mToken = &buffer->tokens[0];
+        }
+        
+        AppOnModifiedToken(view, buffer, mToken);
+        
+        // check the next token as well
+        if(buffer->tokenCount > 0){
+            uint tid = Buffer_GetTokenAt(buffer, cursor.y);
+            mToken = &buffer->tokens[tid];
+            AppOnModifiedToken(view, buffer, mToken);
+        }
+        
         uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
                                             cursor.x, cursor.y, view->tokenizer, &off);
         
@@ -711,7 +810,6 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
     }
     
     lineHelper = AllocatorGetN(char, maxSize);
-    
     for(uint i = start.x; i < end.x; i++){
         Buffer *buffer = BufferView_GetBufferAt(view, i);
         TokenizerStateContext *ctx = &buffer->stateContext;
@@ -720,15 +818,20 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         //    but just in case loop this thing.
         uint targetP = 0;
         uint foundNonSpace = 0;
+        int indentStyle = 0;
         uint indentLevel = ctx->indentLevel;
         for(uint k = 0; k < buffer->tokenCount; k++){
             Token *token = &buffer->tokens[k];
             if(token->identifier != TOKEN_ID_SPACE){
                 targetP = token->position;
                 foundNonSpace = 1;
-                //TODO: Is this sufficient?
+                //TODO: Is this sufficient to detect ending of a nest level?
                 if(token->identifier == TOKEN_ID_BRACE_CLOSE){
                     indentLevel = indentLevel > 0 ? indentLevel - 1 : 0;
+                }else if(token->identifier == TOKEN_ID_PREPROCESSOR){
+                    indentStyle = 1;
+                }else if(token->identifier == TOKEN_ID_COMMENT){
+                    indentStyle = 2;
                 }
                 break;
             }
@@ -742,6 +845,16 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         if(!foundNonSpace){
             llen = 0;
             len = 0;
+        }
+        
+        // if this line is a preprocessor align to edge of file
+        if(indentStyle == 1){
+            len = 0;
+        }
+        
+        // don't attempt to configure user comment format
+        if(indentStyle == 2){
+            continue;
         }
         
         if(len+llen > maxSize){
@@ -759,13 +872,14 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         // Save undo - redo stuff as simple inserts
         UndoRedoUndoPushInsert(&view->lineBuffer->undoRedo, buffer, vec2ui(i, 0));
         
+        // Re-insert the line in raw mode to avoid processing
         Buffer_RemoveRange(buffer, 0, buffer->count);
         if(len + llen > 0)
             Buffer_InsertRawStringAt(buffer, 0, lineHelper, len+llen, 0);
         changes = 1;
     }
     
-    if(changes){
+    if(changes){ // unfortunatelly we need to retokenize to adjust tokens offsets
         RemountTokensBasedOn(view, start.x, end.x - start.x);
     }
     
@@ -786,6 +900,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
         int off = 0;
         int cp = StringToCodepoint(utf8Data, utf8Size, &off);
         if(Font_SupportsCodepoint(cp)){
+            Token *token = nullptr;
             BufferView *bufferView = AppGetActiveBufferView();
             vec2ui cursor = BufferView_GetCursorPosition(bufferView);
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -798,6 +913,14 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                                            vec2i((int)cursor.x, OPERATION_INSERT_CHAR));
             }
             
+            if(cursor.y > 0){
+                uint tid = Buffer_GetTokenAt(buffer, cursor.y-1);
+                token = &buffer->tokens[tid];
+            }else if(buffer->tokenCount > 0){
+                token = &buffer->tokens[0];
+            }
+            
+            AppOnModifiedToken(bufferView, buffer, token);
             Buffer_InsertStringAt(buffer, cursor.y, utf8Data, utf8Size);
             
             RemountTokensBasedOn(bufferView, cursor.x);

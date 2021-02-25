@@ -102,6 +102,7 @@ struct Token{
     int position;
     ContextID source;
     TokenId identifier;
+    void *reserved;
 };
 
 /*
@@ -157,6 +158,7 @@ struct LogicalProcessor{
     Lex_LogicalExec *proc;
     uint nestedLevel;
     uint currentState;
+    vec2ui range;
 };
 
 /*
@@ -213,10 +215,7 @@ struct Tokenizer{
     BoundedStack *procStack;
     uint runningLine;
     int givenTokens;
-    int trackSymbols;
-    SymbolTable symbolTable;
-    uint commitedSyms[TOKENIZER_MAX_CACHE_SIZE];
-    uint commitedSymsCount;
+    SymbolTable *symbolTable;
     
     // help bufferview with information about nest at start of line
     uint runningIndentLevel;
@@ -261,7 +260,7 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
 /*
 * Builds a tokenizer from default tables.
 */
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols=1);
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable);
 
 /*
 * Pushes a new token into the given lookup table.
@@ -299,10 +298,10 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer);
 
 /*
-* Allow tokenizer to perform a review of the classification of a already tokenized
-* buffer. Attempting to perform limited analysis of the expression.
+* Checks if a token is derived from a user definition and not a pre-defined
+* table definition.
 */
-void Lex_TokenizerReviewClassification(Tokenizer *tokenizer, Buffer *buffer);
+int Lex_IsUserToken(Token *token);
 
 /* Fixed memory Stack for logical processors */
 BoundedStack *BoundedStack_Create();

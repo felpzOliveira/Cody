@@ -607,8 +607,8 @@ void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
         int spacing = DigitCount(BufferView_GetLineCount(view));
         int ncount = DigitCount(lineNr+1);
         memset(linen, ' ', spacing-ncount);
-        snprintf(&linen[spacing-ncount], 32, "%u", lineNr+1);
-        
+        int k = snprintf(&linen[spacing-ncount], 32, "%u", lineNr+1);
+        linen[spacing-ncount + k] = 0;
         vec4i col = GetUIColor(theme, UILineNumbers);
         if(lineNr == cursor.x){
             col = GetUIColor(theme, UILineNumberHighlighted);
@@ -659,6 +659,8 @@ void OpenGLRenderLine(BufferView *view, OpenGLState *state,
     
     int previousGlyph = -1;
     OpenGLFont *font = &state->font;
+    Tokenizer *tokenizer = view->tokenizer;
+    SymbolTable *symTable = tokenizer->symbolTable;
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
     
     NestPoint *start = view->startNest;
@@ -701,7 +703,13 @@ void OpenGLRenderLine(BufferView *view, OpenGLState *state,
                 char *p = &buffer->data[token->position];
                 char *e = &buffer->data[token->position + token->size];
                 vec4i col = GetColor(defaultTheme, token->identifier);
-                if(BufferView_CursorNestIsValid(view)){
+                
+                if(token->identifier == TOKEN_ID_NONE){
+                    SymbolNode *node = SymbolTable_Search(symTable, p, token->size);
+                    if(node){
+                        col = GetColor(defaultTheme, node->id);
+                    }
+                }else if(BufferView_CursorNestIsValid(view)){
                     for(uint f = 0; f < it; f++){
                         if(f < view->startNestCount){
                             if(start[f].valid){ // is valid
@@ -732,7 +740,6 @@ void OpenGLRenderLine(BufferView *view, OpenGLState *state,
                 pos += token->size;
                 x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
                                             p, e, &previousGlyph);
-                
             }
         }
     }
@@ -834,7 +841,6 @@ void Graphics_RenderTextBlock(OpenGLState *state, BufferView *bufferView,
 void Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
                                    Transform *projection)
 {
-    //Transform translate = state->scale * Translate(0, 18, 0);
     _Graphics_RenderCursorElements(state, bufferView, &state->model, projection);
 }
 
@@ -929,7 +935,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, BufferView *view, Float li
                         y1 = Min(y1, maxY);
                         
                         Graphics_LinePush(state, vec2ui(topX, y0), vec2ui(botX, y1),
-                                          vec4f(0.5,0.5,0.5, 0.18));
+                                          vec4f(0.5,0.5,0.5, 0.5));
                     }
                     
                     // render the quads no matter what
@@ -948,8 +954,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, BufferView *view, Float li
                     qy0 = Max(qy0, minY);
                     qy1 = Min(qy1, maxY);
                     
-                    vec4f color = GetNestColorf(theme, TOKEN_ID_SCOPE,
-                                                v.depth);
+                    vec4f color = GetNestColorf(theme, TOKEN_ID_SCOPE, v.depth);
                     quads.push_back({
                                         .left = vec2ui(qx0, qy0),
                                         .right = vec2ui(qx1, qy1),
@@ -980,7 +985,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, BufferView *view, Float li
         
         Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
         //Float g = 0.8705882; //TODO: add this to theme
-        vec4f col = GetUIColorf(theme, UICursorLineHight);
+        vec4f col = GetUIColorf(theme, UICursorLineHighlight);
         Float cy0 = ((Float)cursor.x - (Float)visibleLines.x + 1) *
             font->fontMath.fontSizeAtRenderCall;
         Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
@@ -1024,8 +1029,8 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
     
     //vec3f col = ColorRGB(theme->backgroundColor);
     //vec3f col(0.6);
-    Float a = 0.12;
-    Float g = 0.8705882; //TODO: add this to theme
+    Float a = 0.42;
+    Float g = 0.1705882; //TODO: add this to theme
     vec3f col = vec3f(g, g, 2 * g);
     
     if(view->descLocation == DescriptionTop){
@@ -1037,11 +1042,12 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
     
     Graphics_QuadPush(state, a0, a1, vec4f(col.x, col.y, col.z, a));
     
-    a = 0.07;
-    col = vec3f(2 * g, 2 * g, g);
+    a = 0.42;
+    //col = vec3f(1.8 * g, 2 * g, g);
+    vec4f cc = ColorFromHexf(0xff353f25);
     vec2f b0 = vec2f((Float)a0.x + (Float)(a1.x - a0.x) * pc, (Float)a0.y);
     Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y),
-                      a1, vec4f(col.x, col.y, col.z, a));
+                      a1, cc);
     
     Graphics_QuadFlush(state);
     
@@ -1076,7 +1082,7 @@ void Graphics_RenderFrame(OpenGLState *state, BufferView *view,
         Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
         
 #if 0
-        int w = 2;
+        Float w = 1;
         vec2ui p = vec2ui(0, 0);
         vec2ui s = geometry->upper - geometry->lower;
         vec2ui k0, k1;
@@ -1152,11 +1158,12 @@ int Graphics_RenderBufferView(BufferView *view, Theme *theme, Float dt){
     
     // Decouple the line numbering for the text viewing, this allows for horizontal
     // scrolling to not affect line numbers.
-    
-    ActivateViewportAndProjection(state, view, ViewportLineNumbers);
-    glClearBufferfv(GL_COLOR, 0, fcolLN);
-    
-    OpenGLRenderAllLineNumbers(state, view, theme);
+    if(view->renderLineNbs){
+        ActivateViewportAndProjection(state, view, ViewportLineNumbers);
+        glClearBufferfv(GL_COLOR, 0, fcolLN);
+        
+        OpenGLRenderAllLineNumbers(state, view, theme);
+    }
     
     geometry.lower.x += view->lineOffset * font->fontMath.reduceScale;
     Float width = geometry.upper.x - geometry.lower.x;

@@ -1,123 +1,157 @@
 #include <symbol.h>
-#include <types.h>
+#include <hash.h>
 #include <utilities.h>
+#include <string.h>
 
-void SymbolTableRow_Initialize(SymbolTableRow *row){
-    row->symbols = AllocatorGetN(Symbol, DefaultAllocatorSize);
-    row->size = vec3ui(0, DefaultAllocatorSize, 0);
-    row->id = TOKEN_ID_IGNORE;
-    row->labelLen = 0;
+inline int _symbol_table_sym_node_matches(SymbolNode *node, char *label, 
+                                          uint labelLen, TokenId id)
+{
+    if(node == nullptr) return 0;
+    if(node->label == nullptr || label == nullptr) return 0;
+    if(node->labelLen != labelLen) return 0;
+    if(node->id != id) return 0;
+    return StringEqual(node->label, label, labelLen);
+}
+
+inline uint _symbol_table_hash(SymbolTable *symTable, char *label, uint labelLen){
+    return MurmurHash3(label, labelLen, symTable->seed);
 }
 
 void SymbolTable_Initialize(SymbolTable *symTable){
-    symTable->table = AllocatorGetN(SymbolTableRow, DefaultAllocatorSize);
-    symTable->elements = 0;
-    symTable->maxSize = DefaultAllocatorSize;
-    for(uint i = 0; i < symTable->maxSize; i++){
-        SymbolTableRow_Initialize(&symTable->table[i]);
-    }
+    symTable->table = AllocatorGetN(SymbolNode*, SYMBOL_TABLE_SIZE);
+    symTable->tableSize = SYMBOL_TABLE_SIZE;
+    symTable->seed = 0x811c9dc5; // TODO: rand
+    Memset(symTable->table, 0x00, sizeof(SymbolNode*) * SYMBOL_TABLE_SIZE);
 }
 
-void SymbolTable_Free(SymbolTable *symTable){
-    for(uint i = symTable->maxSize-1; i >= 0 ; i--){
-        if(symTable->table[i].symbols)
-            AllocatorFree(symTable->table[i].symbols);
+void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
+    uint insert_id = 0;
+    SymbolNode *newNode = nullptr;
+    uint hash = _symbol_table_hash(symTable, label, labelLen);
+    uint index = hash % symTable->tableSize;
+    
+    SymbolNode *node = symTable->table[index];
+    SymbolNode *prev = nullptr;
+    
+    while(node != nullptr){
+        if(_symbol_table_sym_node_matches(node, label, labelLen, id)){
+            return;
+        }
+        
+        prev = node;
+        node = node->next;
+        insert_id++;
     }
     
-    AllocatorFree(symTable->table);
+    // create a new entry
+    newNode = AllocatorGetN(SymbolNode, 1);
+    newNode->label = StringDup(label, labelLen);
+    newNode->labelLen = labelLen;
+    newNode->id = id;
+    newNode->next = nullptr;
+    newNode->prev = nullptr;
+    
+    if(insert_id > 0){
+        prev->next = newNode;
+        newNode->prev = prev;
+    }else{
+        symTable->table[index] = newNode;
+    }
+    
+    //printf("Inserted %s\n", newNode->label);
 }
 
-uint SymbolTable_PushSymbol(SymbolTable *symTable, Symbol *symbol, char *label,
-                            uint labelLen, TokenId id)
+void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
+    int matched = 0;
+    uint tableIndex;
+    SymbolNode *node = SymbolTable_GetEntry(symTable, label, labelLen, id, &tableIndex);
+    if(node){
+        SymbolNode *prev = node->prev;
+        if(prev == nullptr){ // head
+            symTable->table[tableIndex] = node->next;
+        }else{ // middle
+            prev->next = node->next;
+        }
+        
+        //printf("Removed %s\n", node->label);
+        
+        node->next = nullptr;
+        AllocatorFree(node->label);
+        AllocatorFree(node);
+    }
+}
+
+SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelLen,
+                                 TokenId id, uint *tableIndex)
 {
-    SymbolTableRow *row = nullptr;
-    uint is_new = 0;
-    uint rid = 0;
-    // 1 - Attempt to find a row
-    for(uint i = 0; i < symTable->elements; i++){
-        SymbolTableRow *r = &symTable->table[i];
-        if(r->id == id && r->labelLen == labelLen){
-            if(StringEqual((char *)r->label, label, labelLen)){
-                row = r;
-                rid = i;
-                break;
-            }
-        }
-    }
+    SymbolNode *nodeRes = nullptr;
+    uint hash = _symbol_table_hash(symTable, label, labelLen);
+    uint index = hash % symTable->tableSize;
+    SymbolNode *node = symTable->table[index];
     
-    // 2 - If no entry was found create a new one
-    if(!row){
-        is_new = 1;
-        // 2a - check if can borrow a row or need to expand
-        if(!(symTable->maxSize > symTable->elements+1)){
-            uint newSize = symTable->maxSize + DefaultAllocatorSize;
-            symTable->table = AllocatorExpand(SymbolTableRow, symTable->table, newSize);
-            for(uint i = symTable->maxSize; i < newSize; i++){
-                SymbolTableRow_Initialize(&symTable->table[i]);
-            }
-            symTable->maxSize = newSize;
-        }
-        
-        rid = symTable->elements;
-        row = &symTable->table[symTable->elements];
-    }
+    *tableIndex = index;
     
-    vec3ui s = row->size;
-    uint p = s.z;
-    if(s.z > s.y){ // not enough space, expand
-        uint n = s.y + DefaultAllocatorSize;
-        row->symbols = AllocatorExpand(Symbol, row->symbols, n);
-        for(uint i = s.y; i < n; i++){
-            row->symbols[i].id = TOKEN_ID_IGNORE;
-        }
-        
-        s = vec3ui(s.x + 1, n, s.x + 1);
-        p = row->size.x + 1;
-    }else{ // find next empty
-        uint found = 0;
-        for(uint k = s.z+1; k < s.y; k++){
-            if(row->symbols[k].id == TOKEN_ID_IGNORE){
-                s.z = k;
-                found = 1;
-                break;
+    while(node != nullptr){
+        if(node->label){
+            if(node->labelLen == labelLen && node->id == id){
+                if(StringEqual(label, node->label, labelLen)){
+                    nodeRes = node;
+                    break;
+                }
             }
         }
         
-        s.x += 1;
-        if(found == 0) s.z = s.y + 1;
+        node = node->next;
     }
     
-    // copy token
-    row->symbols[p].bufferId = symbol->bufferId;
-    row->symbols[p].tokenId =  symbol->tokenId;
-    row->symbols[p].id = symbol->id;
+    return nodeRes;
+}
+
+SymbolNode *SymbolTable_Search(SymbolTable *symTable, char *label, uint labelLen){
+    SymbolNode *nodeRes = nullptr;
+    uint hash = _symbol_table_hash(symTable, label, labelLen);
+    uint index = hash % symTable->tableSize;
+    SymbolNode *node = symTable->table[index];
     
-    if(is_new){ // if new also copy label
-        row->labelLen = Min(labelLen, sizeof(row->label));
-        Memcpy(row->label, label, row->labelLen);
-        row->id = id;
-        symTable->elements += 1;
+    while(node != nullptr){
+        if(node->label){
+            if(node->labelLen == labelLen){
+                if(StringEqual(label, node->label, labelLen)){
+                    nodeRes = node;
+                    break;
+                }
+            }
+        }
+        
+        node = node->next;
     }
     
-    row->size = s;
-    return rid;
+    return nodeRes;
+}
+
+SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode){
+    SymbolNode *node = nullptr;
+    if(symNode){
+        node = symNode->next;
+    }
+    return node;
 }
 
 void SymbolTable_DebugPrint(SymbolTable *symTable){
-    printf("Symbol table has %u elements\n", symTable->elements);
-    printf("Symbol table max size %u\n", symTable->maxSize);
-    
-    for(uint i = 0; i < symTable->elements; i++){
-        SymbolTableRow *row = &symTable->table[i];
-        vec3ui size = row->size;
-        printf("Row %u ( %u %u %u ) %s %s: ", i, size.x, size.y, size.z,
-               Symbol_GetIdString(row->id), row->label);
-        
-        for(uint k = 0; k < size.x; k++){
-            Symbol *s = &row->symbols[k];
-            printf(" ( %u %u )  ", s->bufferId, s->tokenId);
+    uint n = symTable->tableSize;
+    for(uint i = 0; i < n; i++){
+        SymbolNode *node = symTable->table[i];
+        if(node){
+            if(node->id != TOKEN_ID_NONE && node->label != nullptr){
+                printf("[%u] ", i);
+                while(node != nullptr){
+                    printf("%s (%s)", node->label, Symbol_GetIdString(node->id));
+                    
+                    node = node->next;
+                }
+                
+                printf("\n");
+            }
         }
-        
-        printf("\n");
     }
 }

@@ -7,6 +7,33 @@
 
 #define MODULE_NAME "Buffer"
 
+inline void DuplicateToken(Token *dst, Token *src){
+    dst->size = src->size;
+    dst->position = src->position;
+    dst->source = src->source;
+    dst->identifier = src->identifier;
+    if(dst->reserved){
+        AllocatorFree(dst->reserved);
+        dst->reserved = nullptr;
+    }
+    
+    if(src->reserved){
+        dst->reserved = StringDup((char *)src->reserved, src->size);
+    }
+}
+
+inline void CopyToken(Token *dst, Token *src){
+    dst->size = src->size;
+    dst->position = src->position;
+    dst->source = src->source;
+    dst->identifier = src->identifier;
+    if(dst->reserved){
+        AllocatorFree(dst->reserved);
+        dst->reserved = nullptr;
+    }
+    dst->reserved = src->reserved;
+}
+
 void Buffer_CopyReferences(Buffer *dst, Buffer *src){
     if(dst != nullptr && src != nullptr){
         dst->data = src->data;
@@ -40,7 +67,11 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
         }
         
         if(src->tokenCount > 0){
-            Memcpy(dst->tokens, src->tokens, src->tokenCount * sizeof(Token));
+            for(uint i = 0; i < src->tokenCount; i++){
+                Token *srcToken = &src->tokens[i];
+                Token *dstToken = &dst->tokens[i];
+                DuplicateToken(dstToken, srcToken);
+            }
         }
         
         dst->count = src->count;
@@ -53,7 +84,6 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
 
 uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8);
-    int found = 0;
     for(uint i = 0; i < buffer->tokenCount; i++){
         Token *token = &buffer->tokens[i];
         if(token->position <= pos && token->size+token->position > pos){
@@ -175,13 +205,28 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size){
         if(buffer->tokenCount < size){
             if(buffer->tokens){
                 buffer->tokens = AllocatorExpand(Token, buffer->tokens, size);
+                for(uint i = buffer->tokenCount; i < size; i++){
+                    buffer->tokens[i].reserved = nullptr;
+                }
+                
             }else{
                 buffer->tokens = AllocatorGetN(Token, size);
             }
         }
         
+        for(uint i = 0; i < buffer->tokenCount; i++){
+            Token *token = &buffer->tokens[i];
+            if(token->reserved != nullptr) AllocatorFree(token->reserved);
+            token->reserved = nullptr;
+        }
+        
         buffer->tokenCount = size;
-        Memcpy(buffer->tokens, tokens, size * sizeof(Token));
+        for(uint i = 0; i < size; i++){
+            Token *dstToken = &buffer->tokens[i];
+            Token *srcToken = &tokens[i];
+            CopyToken(dstToken, srcToken);
+            srcToken->reserved = nullptr;
+        }
     }
 }
 
@@ -538,6 +583,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     current = at;
     do{
         Token token;
+        token.reserved = nullptr;
         int rc = Lex_TokenizeNext(p, iSize, &token, tokenizer, 0);
         if(rc < 0){
             iSize = 0;
@@ -556,6 +602,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
             workContext->workTokenList[head].source = token.source;
+            workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
 #if DEBUG_TOKENS != 0
             char *h = &s[token.position];
@@ -583,8 +630,6 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, lineNr-1);
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
-    
-    Lex_TokenizerReviewClassification(tokenizer, buffer);
     
 }
 
@@ -623,6 +668,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     
     do{
         Token token;
+        token.reserved = nullptr;
         int rc = Lex_TokenizeNext(&p, size, &token, tokenizer, 1);
         if(rc < 0){
             size = 0;
@@ -641,6 +687,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
             workContext->workTokenList[head].source = token.source;
+            workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
             
             size = totalSize - token.position - token.size;
@@ -649,8 +696,6 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     
     Buffer_UpdateTokens(buffer, workContext->workTokenList,
                         workContext->workTokenListHead);
-    
-    Lex_TokenizerReviewClassification(tokenizer, buffer);
     
     if(Lex_TokenizerHasPendingWork(tokenizer)){
         int r = tokenizerContext.backTrack;
@@ -666,6 +711,7 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
     uint i = 0;
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, base);
     TokenizerStateContext *stateContext = &buffer->stateContext;
+    SymbolTable *symTable = tokenizer->symbolTable;
     uint start = base - stateContext->backTrack;
     AssertA(start < lineBuffer->lineCount, "BUG: Overflow during backtrack computation");
     
@@ -680,6 +726,19 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
     while((i < expectedEnd || Lex_TokenizerHasPendingWork(tokenizer))){
         currentID = i;
         buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        // Before re-tokenizing check for user tokens and allow symbol table
+        // to remove them
+        for(uint s = 0; s < buffer->tokenCount; s++){
+            Token *token = &buffer->tokens[s];
+            if(token){
+                if(Lex_IsUserToken(token) && token->reserved != nullptr){
+                    SymbolTable_Remove(symTable, (char *)token->reserved,
+                                       token->size, token->identifier);
+                    AllocatorFree(token->reserved);
+                    token->reserved = nullptr;
+                }
+            }
+        }
         LineBuffer_RemountBuffer(lineBuffer, buffer, tokenizer, i);
         
         i++;

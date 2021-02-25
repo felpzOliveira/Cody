@@ -250,6 +250,12 @@ int StringEqual(char *s0, char *s1, uint maxn){
     return 1;
 }
 
+char *StringDup(char *s0, uint len){
+    char *s = AllocatorGetN(char, len+1);
+    Memcpy(s, s0, len);
+    return s;
+}
+
 int TerminatorChar(char v){
     if((int)v < 0) return 0; // utf-8
     return (v < 48 || (v > 57 && v < 64) || 

@@ -10,7 +10,7 @@ typedef enum{
     UILineNumberBackground,
     UILineNumbers,
     UILineNumberHighlighted,
-    UICursorLineHight,
+    UICursorLineHighlight,
     UIBorder,
     UICursor,
     UIGhostCursor,
@@ -41,6 +41,7 @@ typedef struct{
     vec4i parenthesis[4];
     vec4i backTextColors[4];
     vec4i userDatatypeColor;
+    vec4i userDatatypeEnum;
     vec4i testColor;
     short backTextCount;
 }Theme;

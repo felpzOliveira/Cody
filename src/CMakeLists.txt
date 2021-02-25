@@ -1,4 +1,5 @@
 file(GLOB MH_CORE core/*.cpp
+				  languages/*.cpp
 				  graphics/*.cpp
 				  external/glad/src/glad.c)
 

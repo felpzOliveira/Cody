@@ -5,37 +5,11 @@
 #include <utilities.h>
 #include <vector>
 #include <buffers.h>
+#include <languages.h>
 
 #define MODULE_NAME "Lex"
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
-
-inline void TokenizerCacheSym(uint id, Tokenizer *tokenizer){
-    AssertErr(tokenizer->commitedSymsCount+1 < TOKENIZER_MAX_CACHE_SIZE,
-              "Tokenizer cache is out of memory");
-    tokenizer->commitedSyms[tokenizer->commitedSymsCount++] = id;
-}
-
-inline void TokenizerCommitCache(Tokenizer *tokenizer){
-    if(tokenizer->trackSymbols){
-        for(uint i = 0; i < tokenizer->commitedSymsCount; i++){
-            uint rid = tokenizer->commitedSyms[i];
-            SymbolTableRow *row = &tokenizer->symbolTable.table[rid];
-            for(int i = 0; i < tokenizer->contextCount; i++){
-                Lex_PushTokenIntoTable(tokenizer->contexts[i].lookup, row->label,
-                                       row->labelLen, row->id);
-            }
-        }
-        
-        tokenizer->commitedSymsCount = 0;
-    }
-}
-
-inline void TokenizerConsumeCacheIfPossible(Tokenizer *tokenizer){
-    if(BoundedStack_IsEmpty(tokenizer->procStack)){
-        TokenizerCommitCache(tokenizer);
-    }
-}
 
 inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
     if(token->identifier == TOKEN_ID_BRACE_OPEN){
@@ -56,7 +30,9 @@ inline int Lex_IsTokenReserved(Token *token){
     return (id == TOKEN_ID_RESERVED ||
             id == TOKEN_ID_PREPROCESSOR || id == TOKEN_ID_PREPROCESSOR_DEFINE ||
             id == TOKEN_ID_PREPROCESSOR_DEFINITION || id == TOKEN_ID_INCLUDE_SEL ||
-            id == TOKEN_ID_INCLUDE);
+            id == TOKEN_ID_INCLUDE || id == TOKEN_ID_OPERATOR ||
+            id == TOKEN_ID_DATATYPE_TYPEDEF_DEF || id == TOKEN_ID_DATATYPE_STRUCT_DEF ||
+            id == TOKEN_ID_DATATYPE_CLASS_DEF || id == TOKEN_ID_DATATYPE_ENUM_DEF);
 }
 
 inline int Lex_IsHexValue(char v){
@@ -98,7 +74,7 @@ static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback
     return 0;
 }
 
-inline int Lex_IsUserToken(Token *token){
+int Lex_IsUserToken(Token *token){
     return (token->identifier >= TOKEN_ID_DATATYPE_USER_STRUCT ? 1 : 0);
 }
 
@@ -148,7 +124,11 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
 int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token, 
                            LogicalProcessor *proc, TokenId refId, char **p)
 {
-    if(token->identifier == refId) return 1;
+    if(token->identifier == refId){
+        proc->range.x = tokenizer->runningLine;
+        return 1;
+    }
+    
     int filtered = 1;
     switch(token->identifier){
         /* templates */
@@ -163,6 +143,7 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
         /* possible end of declaration */
         case TOKEN_ID_SEMICOLON:{
             if(proc->nestedLevel == 0){ // finished declaration
+                proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 filtered = 2;
             }
@@ -194,6 +175,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
             if(proc->nestedLevel == 0){
+                proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 1;
                 filter = 2;
@@ -203,6 +185,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
         case TOKEN_ID_NONE:{
             if(proc->nestedLevel == 0 && proc->currentState == 0){
                 token->identifier = TOKEN_ID_DATATYPE_USER_CLASS;
+                proc->range.y = tokenizer->runningLine;
                 proc->currentState = 1;
                 grabbed = 1;
             }else if(proc->nestedLevel == 0 && proc->currentState == 1){
@@ -211,6 +194,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
 * this is most likely a construction of either invalid struct
 * or a forward declaration.
 */
+                printf("Emited!\n");
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
@@ -232,17 +216,9 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
         }
     }
     
-    if(grabbed && tokenizer->trackSymbols){
-        Symbol s = {
-            .bufferId = tokenizer->runningLine,
-            .tokenId = (uint)tokenizer->givenTokens,
-            .id = token->identifier,
-        };
-        
-        uint rid = SymbolTable_PushSymbol(&tokenizer->symbolTable, &s, h, token->size,
-                                          token->identifier);
-        
-        TokenizerCacheSym(rid, tokenizer);
+    if(grabbed){
+        token->reserved = StringDup(h, token->size);
+        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
     }
     
     return filter > 1 ? 0 : 1;
@@ -252,11 +228,14 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
 LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
     /*
 * enum A{ <Anything> };
-* 
+* The way we did this thing we will never be able to capture
+* 'enum class <Something>{ <Anything> };' because class will consume
+* <Something> 
 */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_STRUCT_DEF, p);
+    
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
             if(proc->nestedLevel == 0){
@@ -279,6 +258,15 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
+            }else if(proc->nestedLevel == 1){
+                /*
+* We got one of the values inside the enum, this is a very soft test tho
+*/
+                char *h = (*p) - token->size;
+                token->identifier = TOKEN_ID_DATATYPE_USER_ENUM_VALUE;
+                token->reserved = StringDup(h, token->size);
+                SymbolTable_Insert(tokenizer->symbolTable, h, 
+                                   token->size, token->identifier);
             }
         } break;
         
@@ -315,6 +303,7 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
             if(proc->nestedLevel == 0){
+                proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 1;
                 filter = 2;
@@ -323,6 +312,7 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
         /* possible token */
         case TOKEN_ID_NONE:{
             if(proc->nestedLevel == 0 && proc->currentState == 0){
+                proc->range.y = tokenizer->runningLine;
                 token->identifier = TOKEN_ID_DATATYPE_USER_STRUCT;
                 proc->currentState = 1;
                 grabbed = 1;
@@ -353,15 +343,9 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
         }
     }
     
-    if(grabbed && tokenizer->trackSymbols){
-        Symbol s = {
-            .bufferId = tokenizer->runningLine,
-            .tokenId = (uint)tokenizer->givenTokens,
-            .id = token->identifier,
-        };
-        uint rid = SymbolTable_PushSymbol(&tokenizer->symbolTable, &s, h, token->size,
-                                          token->identifier);
-        TokenizerCacheSym(rid, tokenizer);
+    if(grabbed){
+        token->reserved = StringDup(h, token->size);
+        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
     }
     
     
@@ -398,12 +382,14 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
         }else if(proc->currentState == 3 && token->identifier == TOKEN_ID_NONE){
             //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
             token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
+            proc->range.y = tokenizer->runningLine;
             grabbed = 1;
         }else if(token->identifier == TOKEN_ID_NONE && 
                  proc->nestedLevel == 0 && proc->currentState == 1)
         {
             //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
             token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
+            proc->range.y = tokenizer->runningLine;
             grabbed = 1;
         }else if(proc->currentState == 2 && token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
             proc->currentState = 1;
@@ -416,16 +402,9 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
         proc->currentState = 1;
     }
     
-    if(grabbed && tokenizer->trackSymbols){
-        Symbol s = {
-            .bufferId = tokenizer->runningLine,
-            .tokenId = (uint)tokenizer->givenTokens,
-            .id = token->identifier,
-        };
-        
-        uint rid = SymbolTable_PushSymbol(&tokenizer->symbolTable, &s, h, token->size,
-                                          token->identifier);
-        TokenizerCacheSym(rid, tokenizer);
+    if(grabbed){
+        token->reserved = StringDup(h, token->size);
+        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
     }
     
     return filter > 1 ? 0 : 1;
@@ -730,7 +709,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     }
     
     // 1- select token
-    while(*p != nullptr && length < n){
+    while(*p != nullptr && length <= n){
         (*p)++;
         if(TerminatorChar(**p)){
             goto consume;
@@ -774,39 +753,29 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR_DEFINE){
                 // this thing is comming after a #define, mark it as another token?
                 token->identifier = TOKEN_ID_PREPROCESSOR_DEFINITION;
-                if(tokenizer->trackSymbols){
-                    Symbol s = {
-                        .bufferId = tokenizer->runningLine,
-                        .tokenId = (uint)tokenizer->givenTokens,
-                        .id = token->identifier,
-                    };
-                    
-                    uint rid = SymbolTable_PushSymbol(&tokenizer->symbolTable, &s, h, 
-                                                      length,TOKEN_ID_PREPROCESSOR_DEFINITION);
-                    TokenizerCacheSym(rid, tokenizer);
-                }
+                token->reserved = StringDup(h, length);
+                SymbolTable_Insert(tokenizer->symbolTable, h, length,
+                                   TOKEN_ID_PREPROCESSOR_DEFINITION);
+                
             }else if(!(length == 1 && TerminatorChar(**p))){
                 uint maxn = n - length;
                 char nextC = Lex_LookAhead(*p, length, maxn, fetcher);
                 if(nextC == '('){
-                    token->identifier = TOKEN_ID_FUNCTION;
+                    if(tokenizer->runningIndentLevel > 0){
+                        token->identifier = TOKEN_ID_FUNCTION;
+                    }else{
+                        token->identifier = TOKEN_ID_FUNCTION_DECLARATION;
+                    }
                 }
             }
         }
     }else{ // Add logical processors
         if(!Lex_ProcStackInsert(tokenizer, token)){
             // check matched object for symbol table
-            if(Lex_IsUserToken(token) && tokenizer->trackSymbols){
+            if(Lex_IsUserToken(token)){
+                printf("Untested condition\n");
                 // push this token as a duplicate
-                
-                Symbol s = {
-                    .bufferId = tokenizer->runningLine,
-                    .tokenId = (uint)tokenizer->givenTokens,
-                    .id = token->identifier,
-                };
-                
-                SymbolTable_PushSymbol(&tokenizer->symbolTable, &s, h, length,
-                                       token->identifier);
+                SymbolTable_Insert(tokenizer->symbolTable, h, length, token->identifier);
             }
         }
     }
@@ -929,6 +898,14 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     if(token->identifier == TOKEN_ID_INCLUDE_SEL){
         token->identifier = TOKEN_ID_PREPROCESSOR;
         tokenizer->inclusion = 1;
+    }else if(token->identifier == TOKEN_ID_PREPROCESSOR_IF){
+        if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR && 
+           tokenizer->lastToken.size == 1)
+        {
+            token->identifier = TOKEN_ID_PREPROCESSOR;
+        }else{
+            token->identifier = TOKEN_ID_OPERATOR;
+        }
     }
     
     end:
@@ -1037,7 +1014,6 @@ LEX_TOKENIZER(Lex_TokenizeNext){
                 (void) proc->proc(tokenizer, token, proc, p);
             }
             
-            TokenizerConsumeCacheIfPossible(tokenizer);
             TokenizerUpdateState(tokenizer, token);
             tokenizer->lastToken = *token;
             return offset + len;
@@ -1075,7 +1051,6 @@ LEX_TOKENIZER(Lex_TokenizeNext){
                     (void) proc->proc(tokenizer, token, proc, p);
                 }
                 
-                TokenizerConsumeCacheIfPossible(tokenizer);
                 TokenizerUpdateState(tokenizer, token);
                 tokenizer->lastToken = *token;
                 return offset + len;
@@ -1102,78 +1077,6 @@ static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
     }
     
     return i;
-}
-
-// TODO: This does not work, needs a symbol table
-void Lex_TokenizerReviewClassification(Tokenizer *tokenizer, Buffer *buffer){
-    return;
-    struct SecondPassContext{
-        uint start;
-    };
-    
-    SecondPassContext context = {
-        .start = 1,
-    };
-    
-    TokenizerStateContext *ctx = &buffer->stateContext;
-    uint plevel = ctx->parenLevel;
-    uint blevel = ctx->indentLevel;
-    
-    
-    if(buffer->tokenCount > 0){
-        Token *token = &buffer->tokens[0];
-        if(token->source == LEX_CONTEXT_ID_PREPROCESSOR) return;
-    }
-    
-    for(uint i = 0; i < buffer->tokenCount; i++){
-        int found = 0;
-        i = QueryNextNonReservedToken(buffer, i, &found);
-        if(found){
-            Token *token = &buffer->tokens[i];
-            if(blevel > 0 || plevel > 0){
-                if((token->identifier == TOKEN_ID_NONE) && context.start == 1){
-                    int s = QueryNextNonReservedToken(buffer, i+1, &found);
-                    if(found){
-                        Token *nextToken = &buffer->tokens[s];
-                        if(nextToken->identifier == TOKEN_ID_NONE ||
-                           nextToken->identifier == TOKEN_ID_PARENTHESE_CLOSE)
-                        {
-                            //TODO: Perform symbol table query?
-                            token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
-                            i = s;
-                        }
-                    }
-                    
-                    context.start = 0;
-                }else if(token->identifier == TOKEN_ID_SEMICOLON ||
-                         token->identifier == TOKEN_ID_PARENTHESE_OPEN ||
-                         token->identifier == TOKEN_ID_COMMA)
-                {
-                    context.start = 1;
-                }else{
-                    context.start = 0;
-                }
-            }else if(token->identifier == TOKEN_ID_PARENTHESE_OPEN){
-                plevel++;
-            }else if(token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
-                uint k = plevel;
-                plevel = k > 0 ? k - 1 : 0;
-            }else if(token->identifier == TOKEN_ID_BRACE_OPEN){
-                blevel++;
-            }else if(token->identifier == TOKEN_ID_BRACE_CLOSE){
-                uint k = blevel;
-                blevel = k > 0 ? k - 1 : 0;
-            }else{
-                // TODO: this is either a user defined macro or datatype at beginning
-                // of a function, without consulting a symbol table it is not
-                // possible to distinguish. Until we decide if we are going
-                // to pursue the symbol table or not let this be a datatype.
-                if(token->identifier == TOKEN_ID_NONE){
-                    token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
-                }
-            }
-        }
-    }
 }
 
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
@@ -1221,142 +1124,6 @@ LEX_TOKENIZER_ENTRY_CONTEXT(Lex_PreprocessorEntry){
 }
 
 /* Slow code */
-// auxiliary structure for building the token table.
-typedef struct{
-    const char *value;
-    TokenId identifier;
-}GToken; // TODO:At least TRY to parse from this and see if it is ok
-
-/* C/C++ tokens that can happen inside a preprocessor */
-std::vector<std::vector<GToken>> cppReservedPreprocessor = {
-    {{ .value = "#", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "+", .identifier = TOKEN_ID_MATH }, { .value = "-", .identifier = TOKEN_ID_MATH },
-        { .value = ">", .identifier = TOKEN_ID_MORE }, { .value = "<", .identifier = TOKEN_ID_LESS },
-        { .value = "/", .identifier = TOKEN_ID_MATH }, { .value = "%", .identifier = TOKEN_ID_MATH },
-        { .value = "!", .identifier = TOKEN_ID_MATH }, { .value = "=", .identifier = TOKEN_ID_MATH },
-        { .value = "*", .identifier = TOKEN_ID_ASTERISK }, { .value = "&", .identifier = TOKEN_ID_MATH },
-        { .value = "|", .identifier = TOKEN_ID_MATH }, { .value = "^", .identifier = TOKEN_ID_MATH },
-        { .value = "~", .identifier = TOKEN_ID_MATH }, { .value = ",", .identifier = TOKEN_ID_COMMA },
-        { .value = ";", .identifier = TOKEN_ID_SEMICOLON }, { .value = ".", .identifier = TOKEN_ID_MATH },
-        { .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN }, { .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
-        { .value = "{", .identifier = TOKEN_ID_BRACE_OPEN }, { .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
-        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE }, 
-        { .value = ":", .identifier = TOKEN_ID_MATH }},
-    
-    {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "new", .identifier = TOKEN_ID_OPERATOR },{ .value = "and", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "this", .identifier = TOKEN_ID_OPERATOR },{ .value = "char", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "long", .identifier = TOKEN_ID_DATATYPE },{ .value = "NULL", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "case", .identifier = TOKEN_ID_OPERATOR },{ .value = "true", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "else", .identifier = TOKEN_ID_PREPROCESSOR },{ .value = "line", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "goto", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "bool", .identifier = TOKEN_ID_DATATYPE },{ .value = "void", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "enum", .identifier = TOKEN_ID_DATATYPE_ENUM_DEF },{ .value = "auto", .identifier = TOKEN_ID_DATATYPE },},
-    {{ .value = "short", .identifier = TOKEN_ID_DATATYPE },{ .value = "const", .identifier = TOKEN_ID_DATATYPE  },
-        { .value = "undef", .identifier = TOKEN_ID_PREPROCESSOR },{ .value = "ifdef", .identifier = TOKEN_ID_PREPROCESSOR }, 
-        { .value = "error", .identifier = TOKEN_ID_PREPROCESSOR }, { .value = "endif", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "union", .identifier = TOKEN_ID_OPERATOR },{ .value = "using", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "class", .identifier = TOKEN_ID_DATATYPE_CLASS_DEF },{ .value = "final", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "false", .identifier = TOKEN_ID_OPERATOR },{ .value = "float", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "catch", .identifier = TOKEN_ID_OPERATOR },{ .value = "throw", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "while", .identifier = TOKEN_ID_OPERATOR },{ .value = "break", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "define", .identifier = TOKEN_ID_PREPROCESSOR_DEFINE },
-        { .value = "ifndef", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR},
-        { .value = "friend", .identifier = TOKEN_ID_OPERATOR },{ .value = "inline", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "static", .identifier = TOKEN_ID_OPERATOR },{ .value = "sizeof", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "and_eq", .identifier = TOKEN_ID_OPERATOR },{ .value = "signed", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "delete", .identifier = TOKEN_ID_OPERATOR },{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "typeid", .identifier = TOKEN_ID_OPERATOR },{ .value = "export", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "return", .identifier = TOKEN_ID_OPERATOR },{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "public", .identifier = TOKEN_ID_OPERATOR },{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },},
-    {{ .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
-        { .value = "defined", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },
-        { .value = "mutable", .identifier = TOKEN_ID_OPERATOR },{ .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "alignas", .identifier = TOKEN_ID_OPERATOR },{ .value = "wchar_t", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "virtual", .identifier = TOKEN_ID_OPERATOR },{ .value = "default", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF },},
-    {{ .value = "decltype", .identifier = TOKEN_ID_OPERATOR },{ .value = "operator", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "template", .identifier = TOKEN_ID_OPERATOR }, { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "register", .identifier = TOKEN_ID_OPERATOR },{ .value = "requires", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "override", .identifier = TOKEN_ID_OPERATOR },{ .value = "typename", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },{ .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "continue", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "namespace", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },{ .value = "thread_local", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }},
-    {{ .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR }}
-};
-
-/* C/C++ tokens that can happen inside a code and are not preprocessor */
-std::vector<std::vector<GToken>> cppReservedTable = {
-    {{ .value = "+", .identifier = TOKEN_ID_MATH }, { .value = "-", .identifier = TOKEN_ID_MATH },
-        { .value = ">", .identifier = TOKEN_ID_MORE }, { .value = "<", .identifier = TOKEN_ID_LESS },
-        { .value = "/", .identifier = TOKEN_ID_MATH }, { .value = "%", .identifier = TOKEN_ID_MATH },
-        { .value = "!", .identifier = TOKEN_ID_MATH }, { .value = "=", .identifier = TOKEN_ID_MATH },
-        { .value = "*", .identifier = TOKEN_ID_ASTERISK }, { .value = "&", .identifier = TOKEN_ID_MATH },
-        { .value = "|", .identifier = TOKEN_ID_MATH }, { .value = "^", .identifier = TOKEN_ID_MATH },
-        { .value = "~", .identifier = TOKEN_ID_MATH }, { .value = ",", .identifier = TOKEN_ID_COMMA },
-        { .value = ";", .identifier = TOKEN_ID_SEMICOLON }, { .value = ".", .identifier = TOKEN_ID_MATH },
-        { .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN }, { .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
-        { .value = "{", .identifier = TOKEN_ID_BRACE_OPEN }, { .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
-        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN }, { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE }, 
-        { .value = ":", .identifier = TOKEN_ID_MATH }},
-    {{ .value = "do", .identifier = TOKEN_ID_OPERATOR },{ .value = "if", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "asm", .identifier = TOKEN_ID_OPERATOR },{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "try", .identifier = TOKEN_ID_OPERATOR },{ .value = "int", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "new", .identifier = TOKEN_ID_OPERATOR },{ .value = "and", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "this", .identifier = TOKEN_ID_OPERATOR },{ .value = "char", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "long", .identifier = TOKEN_ID_DATATYPE },{ .value = "NULL", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "case", .identifier = TOKEN_ID_OPERATOR },{ .value = "true", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "else", .identifier = TOKEN_ID_OPERATOR },{ .value = "goto", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "bool", .identifier = TOKEN_ID_DATATYPE },{ .value = "void", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "enum", .identifier = TOKEN_ID_DATATYPE_ENUM_DEF },{ .value = "auto", .identifier = TOKEN_ID_DATATYPE },},
-    {{ .value = "short", .identifier = TOKEN_ID_DATATYPE },{ .value = "const", .identifier = TOKEN_ID_DATATYPE  },
-        { .value = "union", .identifier = TOKEN_ID_OPERATOR },{ .value = "using", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "class", .identifier = TOKEN_ID_DATATYPE_CLASS_DEF },{ .value = "final", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "false", .identifier = TOKEN_ID_OPERATOR },{ .value = "float", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "catch", .identifier = TOKEN_ID_OPERATOR },{ .value = "throw", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "while", .identifier = TOKEN_ID_OPERATOR },{ .value = "break", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "friend", .identifier = TOKEN_ID_OPERATOR },{ .value = "inline", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "static", .identifier = TOKEN_ID_OPERATOR },{ .value = "sizeof", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "and_eq", .identifier = TOKEN_ID_OPERATOR },{ .value = "signed", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "delete", .identifier = TOKEN_ID_OPERATOR },{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "typeid", .identifier = TOKEN_ID_OPERATOR },{ .value = "export", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "return", .identifier = TOKEN_ID_OPERATOR },{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "public", .identifier = TOKEN_ID_OPERATOR },{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },},
-    {{ .value = "mutable", .identifier = TOKEN_ID_OPERATOR },{ .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "alignas", .identifier = TOKEN_ID_OPERATOR },{ .value = "wchar_t", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "virtual", .identifier = TOKEN_ID_OPERATOR },{ .value = "default", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF },},
-    {{ .value = "decltype", .identifier = TOKEN_ID_OPERATOR },{ .value = "operator", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "template", .identifier = TOKEN_ID_OPERATOR }, { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "register", .identifier = TOKEN_ID_OPERATOR },{ .value = "requires", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "override", .identifier = TOKEN_ID_OPERATOR },{ .value = "typename", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },{ .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
-        { .value = "continue", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "namespace", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },{ .value = "thread_local", .identifier = TOKEN_ID_OPERATOR },},
-    {{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }},
-    {{ .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR }},
-};
 
 void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
                                std::vector<std::vector<GToken>> *cppTable)
@@ -1393,57 +1160,7 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     lookupTable->nSize = elements;
 }
 
-void Lex_PushTokenIntoTable(TokenLookupTable *lookup, char *value,
-                            uint size, TokenId id)
-{
-    LookupToken *tokenList = nullptr;
-    if(size == 0) return;
-    
-    size = Min(TOKEN_MAX_LENGTH, size);
-    vec3i l;
-    int tableIndex = -1;
-    for(uint i = 0; i < lookup->nSize; i++){
-        if(size == lookup->sizes[i].y){
-            tableIndex = i;
-            break;
-        }
-    }
-    
-    if(tableIndex < 0){
-        // Check if we need to expand the table
-        if(!(lookup->nSize + 1 < lookup->realSize)){ // need to expand
-            uint oldSize = lookup->realSize;
-            lookup->realSize += DefaultAllocatorSize;
-            lookup->table = AllocatorExpand(LookupToken *, lookup->table, lookup->realSize);
-            lookup->sizes = AllocatorExpand(vec3i, lookup->sizes, lookup->realSize);
-        }
-        
-        tokenList = lookup->table[lookup->nSize];
-        if(tokenList == NULL){
-            tokenList = AllocatorGetN(LookupToken, DefaultAllocatorSize);
-        }
-        tableIndex = lookup->nSize;
-        l = vec3i(0, size, DefaultAllocatorSize);
-        lookup->nSize++;
-    }else{
-        tokenList = lookup->table[tableIndex];
-        l = lookup->sizes[tableIndex];
-        if(!(l.x + 1 < l.z)){
-            l.z += DefaultAllocatorSize;
-            tokenList = AllocatorExpand(LookupToken, tokenList, l.z);
-        }
-    }
-    
-    Memcpy(tokenList[l.x].value, value, size);
-    tokenList[l.x].identifier = id;
-    tokenList[l.x].size = size;
-    l.x += 1;
-    
-    lookup->sizes[tableIndex] = l;
-    lookup->table[tableIndex] = tokenList;
-}
-
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols){
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable){
     TokenLookupTable *tables = nullptr;
     TokenizerWorkContext *workContext = nullptr;
     TokenLookupTable *ax = nullptr;
@@ -1486,13 +1203,8 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, int trackSymbols){
     tokenizer->contexts[1].exec = Lex_TokenizeExecCode;
     tokenizer->unfinishedContext = -1;
     tokenizer->runningLine = 0;
-    
-    tokenizer->trackSymbols = trackSymbols;
+    tokenizer->symbolTable = symTable;
     tokenizer->procStack = BoundedStack_Create();
-    tokenizer->commitedSymsCount = 0;
-    if(tokenizer->trackSymbols){
-        SymbolTable_Initialize(&tokenizer->symbolTable);
-    }
 }
 
 void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *context){

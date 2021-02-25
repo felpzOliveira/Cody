@@ -12,6 +12,7 @@
 
 Tokenizer tokenizer = TOKENIZER_INITIALIZER;
 LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
+SymbolTable symbolTable;
 
 void test_hash(const char *filename){
     uint filesize = 0;
@@ -25,7 +26,9 @@ void test_hash(const char *filename){
         filesize = 1;
     }
     
-    Lex_BuildTokenizer(&tokenizer, appGlobalConfig.tabSpacing);
+    SymbolTable_Initialize(&symbolTable);
+    
+    Lex_BuildTokenizer(&tokenizer, appGlobalConfig.tabSpacing, &symbolTable);
     LineBuffer_Init(&lineBuffer, &tokenizer, content, filesize);
     LineBuffer_SetStoragePath(&lineBuffer, (char *)"tmpfile.h", len);
     
@@ -134,11 +137,15 @@ void test_tokenizer(const char *filename){
         filesize = 1;
     }
     
-    Lex_BuildTokenizer(&tokenizer, appGlobalConfig.tabSpacing);
+    SymbolTable_Initialize(&symbolTable);
+    
+    Lex_BuildTokenizer(&tokenizer, appGlobalConfig.tabSpacing, &symbolTable);
     LineBuffer_Init(&lineBuffer, &tokenizer, content, filesize);
     LineBuffer_SetStoragePath(&lineBuffer, (char *)"tmpfile.h", len);
     
     AllocatorFree(content);
+    
+    //SymbolTable_DebugPrint(tokenizer.symbolTable);
 #if 0
     clock_t start = clock();
     uint s = LineBuffer_DebugLoopAllTokens(&lineBuffer, "sqlite3", 7);

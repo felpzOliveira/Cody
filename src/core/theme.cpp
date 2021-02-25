@@ -45,8 +45,9 @@ Theme theme4Coder = {
     .backgroundLineNumbers = ColorFromHex(0xFF171717),
     .lineNumberColor = ColorFromHex(0xFF4C4D4E),
     .lineNumberHighlitedColor = ColorFromHex(0xFFF9F901),
-    .cursorLineHighlight = ColorFromHex(0xFF272729),
+    .cursorLineHighlight = ColorFromHex(0xFF232338),
     .operatorColor   = ColorFromHex(0xCCCD950C),
+    
     .datatypeColor   = ColorFromHex(0xCCCD950C),
     .commentColor    = ColorFromHex(0xFF7D7D7D),
     .stringColor     = ColorFromHex(0xFF6B8E23),
@@ -77,8 +78,12 @@ Theme theme4Coder = {
         ColorFromHex(0xFF131307),
     },
     
-    .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
-    .testColor = ColorFromHex(0xCCE91E63),
+    //.userDatatypeColor = ColorFromHex(0xCC8EE7BF),
+    .userDatatypeColor = ColorFromHex(0xCCEFAC0C),
+    .userDatatypeEnum = ColorFromHex(0xCCd8ffbd),
+    //.userDatatypeColor = ColorFromHex(0xCC00CCCC),
+    //.testColor = ColorFromHex(0xCCE91E63),
+    .testColor = ColorFromHex(0xAADAB98F),
     .backTextCount = 4,
 };
 
@@ -129,6 +134,7 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_NUMBER, numberColor);
         COLOR_RET(TOKEN_ID_RESERVED, reservedColor);
         COLOR_RET(TOKEN_ID_FUNCTION, functionColor);
+        COLOR_RET(TOKEN_ID_FUNCTION_DECLARATION, functionColor);
         COLOR_RET(TOKEN_ID_INCLUDE, includeColor);
         COLOR_RET(TOKEN_ID_MATH, mathColor);
         COLOR_RET(TOKEN_ID_ASTERISK, mathColor);
@@ -152,10 +158,11 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_BRACKET_OPEN, tokensColor);
         COLOR_RET(TOKEN_ID_BRACKET_CLOSE, tokensColor);
         
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_STRUCT, preprocessorDefineColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_STRUCT, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_DATATYPE, userDatatypeColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, testColor);
-        COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, testColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, userDatatypeColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, userDatatypeColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM_VALUE, userDatatypeEnum);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM, preprocessorDefineColor);
         
         COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINITION, testColor);
@@ -174,7 +181,7 @@ vec4i GetUIColor(Theme *theme, UIElement id){
     switch(id){
         COLOR_RET(UILineNumberBackground, backgroundLineNumbers);
         COLOR_RET(UIBackground, backgroundColor);
-        COLOR_RET(UICursorLineHight, cursorLineHighlight);
+        COLOR_RET(UICursorLineHighlight, cursorLineHighlight);
         COLOR_RET(UILineNumberHighlighted, lineNumberHighlitedColor);
         COLOR_RET(UILineNumbers, lineNumberColor);
         COLOR_RET(UIBorder, borderColor);

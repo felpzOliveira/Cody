@@ -49,6 +49,21 @@ typedef struct{
     DoStack *redoStack;
 }UndoRedo;
 
+inline const char *UndoRedo_GetStringID(ChangeID id){
+#define STR_CASE(x) case x : return #x
+    switch(id){
+        STR_CASE(CHANGE_NONE);
+        STR_CASE(CHANGE_INSERT);
+        STR_CASE(CHANGE_REMOVE);
+        STR_CASE(CHANGE_NEWLINE);
+        STR_CASE(CHANGE_MERGE);
+        STR_CASE(CHANGE_BLOCK_REMOVE);
+        STR_CASE(CHANGE_BLOCK_INSERT);
+        default:return "Unknown";
+    }
+#undef STR_CASE
+}
+
 /*
 * Creates a new do stack.
 */

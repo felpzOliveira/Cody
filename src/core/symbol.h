@@ -6,7 +6,12 @@
 #include <geometry.h>
 
 #define TOKEN_MAX_LENGTH 64
+#define SYMBOL_TABLE_SIZE 50000
 
+/*
+* We have a few tokens that usually you wouldn't need but these help our
+* lexer to its thing and to better work with the symbol table.
+*/
 typedef enum{
     TOKEN_ID_IGNORE = 0,
     TOKEN_ID_OPERATOR,
@@ -31,8 +36,10 @@ typedef enum{
     TOKEN_ID_NUMBER,
     TOKEN_ID_RESERVED,
     TOKEN_ID_FUNCTION,
+    TOKEN_ID_FUNCTION_DECLARATION,
     TOKEN_ID_PREPROCESSOR,
     TOKEN_ID_PREPROCESSOR_DEFINE,
+    TOKEN_ID_PREPROCESSOR_IF,
     TOKEN_ID_PREPROCESSOR_DEFINITION,
     TOKEN_ID_INCLUDE_SEL,
     TOKEN_ID_INCLUDE,
@@ -46,6 +53,7 @@ typedef enum{
     TOKEN_ID_DATATYPE_USER_DATATYPE,
     TOKEN_ID_DATATYPE_USER_TYPEDEF,
     TOKEN_ID_DATATYPE_USER_ENUM,
+    TOKEN_ID_DATATYPE_USER_ENUM_VALUE,
     TOKEN_ID_DATATYPE_USER_CLASS
 }TokenId;
 
@@ -80,8 +88,10 @@ inline const char *Symbol_GetIdString(int id){
         STR_CASE(TOKEN_ID_NUMBER);
         STR_CASE(TOKEN_ID_PREPROCESSOR);
         STR_CASE(TOKEN_ID_PREPROCESSOR_DEFINE);
+        STR_CASE(TOKEN_ID_PREPROCESSOR_IF);
         STR_CASE(TOKEN_ID_PREPROCESSOR_DEFINITION);
         STR_CASE(TOKEN_ID_FUNCTION);
+        STR_CASE(TOKEN_ID_FUNCTION_DECLARATION);
         STR_CASE(TOKEN_ID_INCLUDE);
         STR_CASE(TOKEN_ID_MATH);
         STR_CASE(TOKEN_ID_ASTERISK);
@@ -92,6 +102,7 @@ inline const char *Symbol_GetIdString(int id){
         STR_CASE(TOKEN_ID_DATATYPE_USER_STRUCT);
         STR_CASE(TOKEN_ID_DATATYPE_USER_TYPEDEF);
         STR_CASE(TOKEN_ID_DATATYPE_USER_ENUM);
+        STR_CASE(TOKEN_ID_DATATYPE_USER_ENUM_VALUE);
         STR_CASE(TOKEN_ID_DATATYPE_USER_CLASS);
         STR_CASE(TOKEN_ID_DATATYPE_USER_DATATYPE);
         default: return "Invalid";
@@ -99,30 +110,18 @@ inline const char *Symbol_GetIdString(int id){
 #undef STR_CASE
 }
 
-typedef struct{
-    uint bufferId;
-    uint tokenId;
-    TokenId id;
-}Symbol;
-
-/*
-* Size is:
-*         x - number of current elements;
-*         y - maximum size of the symbol array;
-*         z - position of the first clean element;
-*/
-typedef struct{
-    Symbol *symbols;
-    vec3ui size;
-    TokenId id;
-    char label[TOKEN_MAX_LENGTH];
+typedef struct symbol_node_t{
+    char *label;
     uint labelLen;
-}SymbolTableRow;
+    TokenId id;
+    struct symbol_node_t *next;
+    struct symbol_node_t *prev;
+}SymbolNode;
 
 typedef struct{
-    SymbolTableRow *table;
-    uint elements;
-    uint maxSize;
+    SymbolNode **table;
+    uint tableSize;
+    uint seed;
 }SymbolTable;
 
 /*
@@ -131,17 +130,35 @@ typedef struct{
 void SymbolTable_Initialize(SymbolTable *symTable);
 
 /*
-* Releases the memory related to a symbol table.
+* Pushes a new symbol into the symbol table.
 */
-void SymbolTable_Free(SymbolTable *symTable);
+void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
 
 /*
-* Pushes a new entry into the symbol table. Returns the row id inserted.
+* Removes an entry from the symbol table matching the contents and location.
 */
-uint SymbolTable_PushSymbol(SymbolTable *symTable, Symbol *symbol, char *label,
-                            uint labelLen, TokenId id);
+void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
 
-/* Debug stuff */
+/*
+* Queries a symbol table for the first matching hashed node.
+*/
+SymbolNode *SymbolTable_Search(SymbolTable *symTable, char *label, uint labelLen);
+
+/*
+* Queries a symbol table for a specific entry matching the input data.
+*/
+SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelLen,
+                                 TokenId id, uint *tableIndex);
+
+/*
+* Gets the next symbol in the symbol table given a specific already hashed symbol.
+* Returns nullptr in case no one is available.
+*/
+SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode);
+
+/*
+* Debug routines.
+*/
 void SymbolTable_DebugPrint(SymbolTable *symTable);
 
 #endif //SYMBOL_H

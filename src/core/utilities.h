@@ -51,6 +51,10 @@ int TerminatorChar(char v);
 */
 int StringEqual(char *s0, char *s1, uint maxn);
 
+/*
+* Duplicates a string.
+*/
+char *StringDup(char *s0, uint len);
 
 int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
 
