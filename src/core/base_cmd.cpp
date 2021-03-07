@@ -312,7 +312,7 @@ int SwitchBufferCommandEntry(QueryBar *queryBar, View *view){
 int SwitchBufferCommandStart(View *view){
     AssertA(view != nullptr, "Invalid view pointer");
     LineBuffer *lineBuffer = nullptr;
-    FileBuffer *ax = nullptr;
+    List<FileBuffer> *list = nullptr;
     const char *header = "Switch Buffer";
     uint hlen = strlen(header);
     FileBufferList *fBuffers = AppGetFileBufferList();
@@ -321,16 +321,22 @@ int SwitchBufferCommandStart(View *view){
     lineBuffer = AllocatorGetN(LineBuffer, 1);
     LineBuffer_InitBlank(lineBuffer);
     
-    ax = fBuffers->head;
-    while(ax != nullptr){
-        if(ax->lineBuffer){
-            char *ptr = ax->lineBuffer->filePath;
-            uint n = GetSimplifiedPathName(ptr, ax->lineBuffer->filePathSize);
-            LineBuffer_InsertLine(lineBuffer, &ptr[n], ax->lineBuffer->filePathSize - n, 0);
+    list = fBuffers->fList;
+    
+    auto filler = [&](FileBuffer *buf) -> int{
+        if(buf){
+            if(buf->lineBuffer){
+                char *ptr = buf->lineBuffer->filePath;
+                uint len = buf->lineBuffer->filePathSize;
+                uint n = GetSimplifiedPathName(ptr, len);
+                LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n, 0);
+            }
         }
         
-        ax = ax->next;
-    }
+        return 1;
+    };
+    
+    List_Transverse<FileBuffer>(list, filler);
     
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SwitchBufferCommandEntry, SwitchBufferCommandCancel,

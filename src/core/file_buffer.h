@@ -3,6 +3,7 @@
 #ifndef FILE_BUFFER_H
 #define FILE_BUFFER_H
 #include <buffers.h>
+#include <utilities.h>
 
 /*
 * FileBuffers are storage reserved to maintain LineBuffers opened but
@@ -11,14 +12,10 @@
 */
 typedef struct file_buffer_t{
     LineBuffer *lineBuffer;
-    struct file_buffer_t *next;
-    struct file_buffer_t *prev;
 }FileBuffer;
 
 typedef struct{
-    FileBuffer *head;
-    FileBuffer *tail;
-    uint count;
+    List<FileBuffer> *fList;
 }FileBufferList;
 
 /*

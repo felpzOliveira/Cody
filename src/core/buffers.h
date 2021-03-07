@@ -27,6 +27,7 @@ struct Buffer{
     char *data;
     Token *tokens;
     uint tokenCount;
+    bool is_ours;
     TokenizerStateContext stateContext;
 };
 
@@ -46,7 +47,7 @@ struct LineBuffer{
 };
 
 /* For static initialization */
-#define BUFFER_INITIALIZER {.size = 0, .count = 0, .taken = 0, .data = nullptr, .tokens = nullptr, .tokenCount = 0 }
+#define BUFFER_INITIALIZER {.size = 0, .count = 0, .taken = 0, .data = nullptr, .tokens = nullptr, .tokenCount = 0, .is_ours = false }
 #define LINE_BUFFER_INITIALIZER {.lines = nullptr, .lineCount = 0, .size = 0,}
 
 /*
@@ -61,6 +62,14 @@ struct LineBuffer{
 * Initializes a previously allocated Buffer to the size specified in 'size'.
 */
 void Buffer_Init(Buffer *buffer, uint size);
+
+/*
+* Marks this buffer as being modified by our editor. While we automatically call
+* this function in several places during editing because of the nature of this
+* operation it is better for you to call this manually when you are about to edit
+* a buffer. This is used to better format a output file when writing to disk.
+*/
+void Buffer_Claim(Buffer *buffer);
 
 /*
 * Locates the first non empty token inside a given buffer.

@@ -170,10 +170,10 @@ void Memcpy(void *dst, void *src, uint size);
 /* memset */
 void Memset(void *dst, unsigned char v, uint size);
 
-/* Data structures */
+/* Data structures - Structures create their own copy of the item so you can free yours*/
 
 /*
-* Basic linked list.
+* Doubly linked list.
 */
 template<typename T>
 struct ListNode{
@@ -200,6 +200,8 @@ template<typename T> inline List<T> *List_Create(){
 
 template<typename T> inline 
 T *List_Find(List<T> *list, std::function<int(T *)> call){
+    if(!list) return nullptr;
+    
     ListNode<T> *ax = list->head;
     int found = 0;
     while(ax != nullptr && found == 0){
@@ -210,6 +212,54 @@ T *List_Find(List<T> *list, std::function<int(T *)> call){
     }
     
     return ax ? ax->item : nullptr;
+}
+
+template<typename T> inline
+void List_Transverse(List<T> *list, std::function<int(T *)> transverse){
+    if(!list) return;
+    ListNode<T> *ax = list->head;
+    while(ax != nullptr){
+        if(transverse(ax->item) == 0){
+            break;
+        }
+        
+        ax = ax->next;
+    }
+}
+
+template<typename T> inline
+void List_Erase(List<T> *list, std::function<int(T *)> finder){
+    if(!list) return;
+    ListNode<T> *ax = list->head;
+    int ht = list->head == list->tail ? 1 : 0;
+    while(ax != nullptr){
+        if(finder(ax->item)){
+            ListNode<T> *prev = ax->prev;
+            if(ax == list->head){
+                list->head = ax->next;
+                if(ht) list->tail = list->head;
+            }
+            
+            if(ax == list->tail && !ht){
+                list->tail = ax->prev;
+            }
+            
+            if(ax->next != nullptr){
+                ax->next->prev = ax->prev;
+            }
+            
+            if(ax->prev != nullptr){
+                ax->prev->next = ax->next;
+            }
+            
+            AllocatorFree(ax->item);
+            AllocatorFree(ax);
+            list->size--;
+            break;
+        }
+        
+        ax = ax->next;
+    }
 }
 
 template<typename T> inline void List_Push(List<T> *list, T *item){
@@ -234,7 +284,7 @@ template<typename T> inline void List_Push(List<T> *list, T *item){
 }
 
 template<typename T> inline void List_Pop(List<T> *list){
-    if(list->size > 0){
+    if(list->size > 0 && list->head){
         if(list->size == 1){
             AllocatorFree(list->head->item);
             AllocatorFree(list->head);

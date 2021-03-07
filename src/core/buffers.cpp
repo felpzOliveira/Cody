@@ -49,6 +49,7 @@ void Buffer_CopyReferences(Buffer *dst, Buffer *src){
         dst->tokenCount = src->tokenCount;
         dst->tokens = src->tokens;
         dst->stateContext = src->stateContext;
+        dst->is_ours = src->is_ours;
     }
 }
 
@@ -98,6 +99,7 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
             }
         }
         
+        dst->is_ours = src->is_ours;
         dst->count = src->count;
         dst->taken = src->taken;
         dst->tokenCount = src->tokenCount;
@@ -224,6 +226,12 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
     return r;
 }
 
+void Buffer_Claim(Buffer *buffer){
+    if(buffer){
+        buffer->is_ours = true;
+    }
+}
+
 uint Buffer_GetUtf8Count(Buffer *buffer){
     uint r = 0;
     if(buffer->taken > 0){
@@ -286,6 +294,7 @@ void Buffer_Init(Buffer *buffer, uint size){
     buffer->stateContext.activeWorkProcessor = -1;
     buffer->stateContext.backTrack = 0;
     buffer->stateContext.forwardTrack = 0;
+    buffer->is_ours = false;
 }
 
 void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
@@ -335,6 +344,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
     buffer->stateContext.backTrack = 0;
     buffer->stateContext.forwardTrack = 0;
     buffer->count = Buffer_GetUtf8Count(buffer);
+    buffer->is_ours = false;
 }
 
 int Buffer_IsBlank(Buffer *buffer){
@@ -936,6 +946,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
                 pp = 0;
             }
             
+            Buffer_Claim(lastBuffer);
             text[proc] = s;
             base++;
             proc++;
@@ -952,6 +963,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     if(lineSize > 0){
         lastBuffer = lineBuffer->lines[base];
         uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, 1);
+        Buffer_Claim(lastBuffer);
         at += n;
         //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
     }
@@ -965,6 +977,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             at = lastBuffer->taken;
             Buffer_InsertRawStringAt(lastBuffer, lastBuffer->taken, 
                                      &firstLine[firstP], toCopy, 0);
+            Buffer_Claim(lastBuffer);
         }
     }
     
@@ -1147,9 +1160,14 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     for(i = 0; i < lines; i++){
         Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
         char *ptr = buffer->data;
+        bool process = true;
         uint c = 0;
         ic = 0;
-        while(buffer->taken > c){
+        if(buffer->is_ours){
+            process = !Buffer_IsBlank(buffer);
+        }
+        
+        while(buffer->taken > c && process){
             linePtr[ic++] = *ptr;
             if(*ptr == '\t'){
                 for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){

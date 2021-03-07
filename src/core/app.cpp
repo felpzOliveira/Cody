@@ -563,6 +563,8 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
     // get the buffer again in case it was end of a file
     bufferp1 = BufferView_GetBufferAt(bufferView, at.x+1);
     
+    Buffer_Claim(buffer);
+    Buffer_Claim(bufferp1);
     at.x += 1;
     at.y = Buffer_Utf8RawPositionToPosition(bufferp1, len);
     return at;
@@ -1115,7 +1117,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 AppOnModifiedToken(bufferView, buffer, token);
 #endif
                 Buffer_InsertStringAt(buffer, cursor.y, utf8Data, utf8Size);
-                
+                Buffer_Claim(buffer);
                 RemountTokensBasedOn(bufferView, cursor.x);
                 
                 cursor.y += 1;

@@ -5,7 +5,7 @@ static AutoCompleteBruteForce autoComplete_brute;
 
 void AutoComplete_Initialize(){
     autoComplete_brute.alphabetList = List_Create<AutoCompleteEntry>();
-    SymbolTable_Initialize(&autoComplete_brute.symTable);
+    SymbolTable_Initialize(&autoComplete_brute.symTable, true);
 }
 
 void AutoComplete_Search(char *value, uint valuelen){
