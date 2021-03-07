@@ -11,6 +11,8 @@
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 
+//TODO: What happens when user insert a new } or ) or whatever and we simply retokenize
+//      that line? Do all other parts work?
 inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
     if(token->identifier == TOKEN_ID_BRACE_OPEN){
         tokenizer->runningIndentLevel++;
@@ -194,7 +196,18 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
 * this is most likely a construction of either invalid struct
 * or a forward declaration.
 */
-                printf("Emited!\n");
+                BoundedStack_Pop(tokenizer->procStack);
+                emitWarningToken = 2;
+                filter = 2;
+            }
+        } break;
+        
+        case TOKEN_ID_BRACE_OPEN:{
+            if(proc->nestedLevel == 1 && proc->currentState == 1){
+                /*
+* We got our token but there is a definition following, allow
+* outter components to process.
+*/
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
@@ -217,8 +230,13 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
     }
     
     if(grabbed){
-        token->reserved = StringDup(h, token->size);
-        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
+        if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                              token->size, token->identifier) == 0)
+        {
+            token->identifier = TOKEN_ID_NONE;
+        }else{
+            token->reserved = StringDup(h, token->size);
+        }
     }
     
     return filter > 1 ? 0 : 1;
@@ -234,7 +252,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
 */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
-                                        TOKEN_ID_DATATYPE_STRUCT_DEF, p);
+                                        TOKEN_ID_DATATYPE_ENUM_DEF, p);
     
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
@@ -264,9 +282,13 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
 */
                 char *h = (*p) - token->size;
                 token->identifier = TOKEN_ID_DATATYPE_USER_ENUM_VALUE;
-                token->reserved = StringDup(h, token->size);
-                SymbolTable_Insert(tokenizer->symbolTable, h, 
-                                   token->size, token->identifier);
+                if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                                      token->size, token->identifier) == 0)
+                {
+                    token->identifier = TOKEN_ID_NONE;
+                }else{
+                    token->reserved = StringDup(h, token->size);
+                }
             }
         } break;
         
@@ -344,8 +366,13 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     }
     
     if(grabbed){
-        token->reserved = StringDup(h, token->size);
-        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
+        if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                              token->size, token->identifier) == 0)
+        {
+            token->identifier = TOKEN_ID_NONE;
+        }else{
+            token->reserved = StringDup(h, token->size);
+        }
     }
     
     
@@ -403,8 +430,13 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
     }
     
     if(grabbed){
-        token->reserved = StringDup(h, token->size);
-        SymbolTable_Insert(tokenizer->symbolTable, h, token->size, token->identifier);
+        if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                              token->size, token->identifier) == 0)
+        {
+            token->identifier = TOKEN_ID_NONE;
+        }else{
+            token->reserved = StringDup(h, token->size);
+        }
     }
     
     return filter > 1 ? 0 : 1;
@@ -420,6 +452,8 @@ LEX_PROCESSOR(Lex_Number){
     int rLen = 0;
     int iValue = 0;
     int exValue = 0;
+    int uCount = 0;
+    int lCount = 0;
     *len = 0;
     *head = *p;
     
@@ -443,7 +477,27 @@ LEX_PROCESSOR(Lex_Number){
         _number_start:
         iValue = (**p) - '0';
         exValue = (int)(**p);
-        if(**p == '.'){
+        if(uCount == 1 && (**p == 'L' || **p == 'l') && lCount < 2){
+            lCount++;
+            rLen ++;
+            (*p)++;
+            goto _number_start;
+        }else if(uCount == 1 && (**p == 'L' || **p == 'l') && lCount >= 2){
+            LEX_DEBUG("\'L\' found many times\n");
+            goto end;
+        }else if(uCount == 1 && !(**p == 'L' || **p == 'l')){
+            LEX_DEBUG("\'U\' marks termination \n");
+            goto end;
+        }else if(**p == 'U' || **p == 'u'){
+            if(uCount > 0){
+                LEX_DEBUG("\'U\' found many times\n");
+                goto end;
+            }
+            uCount++;
+            rLen ++;
+            (*p)++;
+            goto _number_start;
+        }else if(**p == '.'){
             dotCount ++;
             if(dotCount > 1){
                 LEX_DEBUG("Multiple dot values\n");
@@ -484,7 +538,7 @@ LEX_PROCESSOR(Lex_Number){
             }else{
                 goto end;
             }
-        }else if(**p == 'e' || **p == 'E'){
+        }else if((**p == 'e' || **p == 'E') && xCount == 0){
             if(rLen < 1){
                 LEX_DEBUG("Found \'e\' at first token position\n");
                 return 0;
@@ -583,6 +637,7 @@ LEX_PROCESSOR(Lex_Inclusion){
     return rLen > 0 ? 1 : 0;
 }
 
+//TODO: This does not capture the pattern: R"<*>(...)<*>"
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_String){
     int level = 0;
@@ -741,13 +796,6 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
         }
     }
     
-    //TODO: Check for other cases
-    //      1 - Entering level '{'
-    //      2 - Exiting  level '}'
-    //      3 - Entering a function '('
-    //      4 - Exiting a function ')'
-    // do we need to parse these or can we simply loop during execution?
-    // going to check for '(' to at least detect functions
     if(!matched){
         if(length > 0){
             if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR_DEFINE){
@@ -765,6 +813,10 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
                         token->identifier = TOKEN_ID_FUNCTION;
                     }else{
                         token->identifier = TOKEN_ID_FUNCTION_DECLARATION;
+#if 0
+                        SymbolTable_Insert(tokenizer->symbolTable, h, length,
+                                           TOKEN_ID_FUNCTION_DECLARATION);
+#endif
                     }
                 }
             }
@@ -775,7 +827,11 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             if(Lex_IsUserToken(token)){
                 printf("Untested condition\n");
                 // push this token as a duplicate
-                SymbolTable_Insert(tokenizer->symbolTable, h, length, token->identifier);
+                if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                                      length, token->identifier) == 0)
+                {
+                    token->identifier = TOKEN_ID_NONE;
+                }
             }
         }
     }
@@ -931,6 +987,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     
     tokenizer->lineBeginning = 0;
     tokenizer->unfinishedContext = -1;
+    token->reserved = nullptr;
     
     // Compute the amount of lines being grouped by unfinished work
     if(lineBeginning){
@@ -1205,6 +1262,33 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTa
     tokenizer->runningLine = 0;
     tokenizer->symbolTable = symTable;
     tokenizer->procStack = BoundedStack_Create();
+}
+
+void Lex_TokenizerContextReset(Tokenizer *tokenizer){
+    tokenizer->unfinishedContext = 0;
+    tokenizer->linesAggregated = 0;
+    tokenizer->linePosition = 0;
+    tokenizer->lineBeginning = 0;
+    tokenizer->aggregate = 0;
+    tokenizer->type = 0;
+    tokenizer->inclusion = 0;
+    tokenizer->runningIndentLevel = 0;
+    tokenizer->runningParenIndentLevel = 0;
+    tokenizer->runningLine = 0;
+    tokenizer->unfinishedContext = -1;
+    BoundedStack_SetDefault(tokenizer->procStack);
+}
+
+void Lex_TokenizerContextEmpty(TokenizerStateContext *context){
+    context->state = TOKENIZER_STATE_CLEAN;
+    context->activeWorkProcessor = -1;
+    context->backTrack = 0;
+    context->inclusion = 0;
+    context->aggregate = 0;
+    context->indentLevel = 0;
+    context->parenLevel = 0;
+    context->type = 0;
+    BoundedStack_SetDefault(&context->procStack);
 }
 
 void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *context){

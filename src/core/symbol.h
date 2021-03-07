@@ -36,11 +36,9 @@ typedef enum{
     TOKEN_ID_NUMBER,
     TOKEN_ID_RESERVED,
     TOKEN_ID_FUNCTION,
-    TOKEN_ID_FUNCTION_DECLARATION,
     TOKEN_ID_PREPROCESSOR,
     TOKEN_ID_PREPROCESSOR_DEFINE,
     TOKEN_ID_PREPROCESSOR_IF,
-    TOKEN_ID_PREPROCESSOR_DEFINITION,
     TOKEN_ID_INCLUDE_SEL,
     TOKEN_ID_INCLUDE,
     TOKEN_ID_MATH,
@@ -50,12 +48,20 @@ typedef enum{
     
     /* user defined tokens */
     TOKEN_ID_DATATYPE_USER_STRUCT,
+    TOKEN_ID_PREPROCESSOR_DEFINITION,
     TOKEN_ID_DATATYPE_USER_DATATYPE,
     TOKEN_ID_DATATYPE_USER_TYPEDEF,
     TOKEN_ID_DATATYPE_USER_ENUM,
     TOKEN_ID_DATATYPE_USER_ENUM_VALUE,
-    TOKEN_ID_DATATYPE_USER_CLASS
+    TOKEN_ID_DATATYPE_USER_CLASS,
+    TOKEN_ID_FUNCTION_DECLARATION,
 }TokenId;
+
+inline int Symbol_IsTokenNest(TokenId id){
+    return (id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE ||
+            id == TOKEN_ID_BRACKET_OPEN || id == TOKEN_ID_BRACKET_CLOSE ||
+            id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE);
+}
 
 inline int Symbol_AreTokensComplementary(TokenId id0, TokenId id1){
     return ((id0 == TOKEN_ID_PARENTHESE_OPEN && id1 == TOKEN_ID_PARENTHESE_CLOSE) ||
@@ -130,9 +136,10 @@ typedef struct{
 void SymbolTable_Initialize(SymbolTable *symTable);
 
 /*
-* Pushes a new symbol into the symbol table.
+* Pushes a new symbol into the symbol table, returns 1 in case the symbol
+* was accepted or 0 otherwise.
 */
-void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
+int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
 
 /*
 * Removes an entry from the symbol table matching the contents and location.

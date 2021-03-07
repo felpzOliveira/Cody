@@ -95,17 +95,24 @@ void DoStack_Push(DoStack *stack, BufferChange *item);
 BufferChange *DoStack_Peek(DoStack *stack);
 
 /*
-* Gets a new buffer.
+* Gets a new buffer from the undo system.
 */
 Buffer *UndoSystemGetBuffer();
 
+/*
+* Feeds a buffer into the undo system. You can choose not to use this function
+* as no matter what the undo system will allocate buffers to store information.
+* However if you are processing a buffer and decides to swap a buffer from a BufferView
+* or a LineBuffer instead of freeing you can feed it back into the undo system
+* to minimize the amount of memory operations it is forced to do.
+*/
 void UndoSystemTakeBuffer(Buffer *buffer);
 
 /*
 * Pushes into the stack a command to destroy/create a merge.
 */
-void UndoRedoUndoPushMerge(UndoRedo *redo, vec2ui baseU8);
-void UndoRedoRedoPushMerge(UndoRedo *redo, vec2ui baseU8);
+void UndoRedoUndoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor);
+void UndoRedoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor);
 
 /*
  * Pushes into the stack a command to create/destroy new lines.
@@ -148,5 +155,13 @@ BufferChange *UndoRedoGetNextUndo(UndoRedo *redo);
 * Gets the next redo operation (peek).
 */
 BufferChange *UndoRedoGetNextRedo(UndoRedo *redo);
+
+/*
+* Perform cleanup of the stacks in use for undo and redo.
+* Warning: Once called there will be no way to roll back changes into
+* the LineBuffer holding this instance of UndoRedo, use only when certain
+* no operations will be required from this instance.
+*/
+void UndoRedoCleanup(UndoRedo *redo);
 
 #endif //UNDO_H

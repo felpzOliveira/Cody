@@ -79,11 +79,13 @@ typedef struct{
 #define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y)
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h)
 #define ON_FOCUS_CHANGE_CALLBACK(name) void name()
+#define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
 typedef ON_MOUSE_CLICK_CALLBACK(onMouseClickCallback);
 typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
 typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
+typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
 
 typedef struct{
     Colormap colormap;
@@ -99,6 +101,7 @@ typedef struct{
     
     onScrollCallback *onScrollCall;
     onMouseClickCallback *onMouseClickCall;
+    onMouseMotionCallback *onMouseMotionCall;
     onSizeChangeCallback *onSizeChangeCall;
     onFocusChangeCallback *onFocusChangeCall;
 }WindowX11;
@@ -160,6 +163,7 @@ void WaitForEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
 void DestroyWindowX11(WindowX11 *window);
 void TerminateX11();
+void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y);
 
 double GetElapsedTime();
 
@@ -170,5 +174,6 @@ void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
 void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);
 void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback);
 void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback);
+void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback);
 
 #endif //X11_DISPLAY_H

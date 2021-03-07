@@ -29,7 +29,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+#define FONS_DEFAULT_X_SPACING 0
     // To make the implementation private to the file that generates the implementation
 #ifdef FONS_STATIC
 #define FONS_DEF static
@@ -1445,6 +1445,7 @@ FONS_DEF int fonsComputeStringOffsetCount(FONScontext* stash, const char *e, flo
         if(glyph != NULL){
             fons__getQuad(stash, font, prevGlyphIndex, glyph, scale, 
                           state->spacing, &x, &y, &q);
+            x += FONS_DEFAULT_X_SPACING;
             if(x > x1) return curr;
         }
         
@@ -1499,6 +1500,8 @@ FONS_DEF float fonsComputeStringAdvance(FONScontext* stash, const char *e, int n
         if(glyph != NULL){
             fons__getQuad(stash, font, prevGlyphIndex, glyph, scale, 
                           state->spacing, &x, &y, &q);
+            
+            x += FONS_DEFAULT_X_SPACING;
         }
         
         prevGlyphIndex = glyph != NULL ? glyph->index : -1;
@@ -1573,6 +1576,8 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* stash,
 			fons__vertex(stash, q.x0, q.y0, q.s0, q.t0, color);
 			fons__vertex(stash, q.x0, q.y1, q.s0, q.t1, color);
 			fons__vertex(stash, q.x1, q.y1, q.s1, q.t1, color);
+            
+            x += FONS_DEFAULT_X_SPACING;
 		}
 		prevGlyphIndex = glyph != NULL ? glyph->index : -1;
 	}
@@ -1642,6 +1647,8 @@ FONS_DEF float fonsDrawText(FONScontext* stash,
 			fons__vertex(stash, q.x0, q.y0, q.s0, q.t0, state->color);
 			fons__vertex(stash, q.x0, q.y1, q.s0, q.t1, state->color);
 			fons__vertex(stash, q.x1, q.y1, q.s1, q.t1, state->color);
+            
+            x += FONS_DEFAULT_X_SPACING;
 		}
 		prevGlyphIndex = glyph != NULL ? glyph->index : -1;
 	}

@@ -947,12 +947,24 @@ Bounds2<T> Expand(const Bounds2<T> &b, U delta){
                       b.pMax + vec2<T>(delta, delta));
 }
 
-typedef struct{
-    vec2ui lower;
-    vec2ui upper;
-    vec2f extensionX;
-    vec2f extensionY;
-}Geometry;
+class Geometry{
+    public:
+    vec2ui lower; // lower position in pixels inside a viewport
+    vec2ui upper; // upper position in pixels inside a viewport
+    vec2f extensionX; // fraction of the window being used in the X-axis
+    vec2f extensionY; // fraction of the window being used in the Y-axis
+    
+    Geometry(){
+        lower = vec2ui(0, 0);
+        upper = vec2ui(0, 0);
+        extensionX = vec2f(0, 0);
+        extensionY = vec2f(0, 0);
+    }
+    
+    void PrintSelf(){
+        printf("Lower %u %u, Upper: %u %u\n", lower.x, lower.y, upper.x, upper.y);
+    }
+};
 
 typedef struct{
     vec2ui textPosition;
@@ -960,6 +972,7 @@ typedef struct{
     int is_dirty;
     vec2ui nestStart;
     vec2ui nestEnd;
+    vec2ui relativeDistance;
     int nestValid;
 }DoubleCursor;
 

@@ -7,19 +7,46 @@
 #include <string>
 #include <fstream>
 #include <signal.h>
+#include <limits.h>
+#include <unistd.h>
+#include <functional>
 
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
 #define DebugBreak() raise(SIGTRAP)
+#define MAX_DECRIPTOR_LENGTH 256
+#define CHDIR(x) chdir(x)
 
-#define BUG() printf("=========== BUG ===========\n");
-
-#define BreakIf(x, msg) if(!(x)){ printf("Break: %s: %s\n", #x, msg); DebugBreak(); }
+#define BUG() printf("=========== BUG ===========\nLine:%d\n", __LINE__);
+#define NullRet(x) if(!(x)) return
 
 const Float kInv255 = 0.003921569;
-const Float kAlphaReduceDefault = 0.9;
+const Float kAlphaReduceDefault = 1.0;
 const Float kAlphaReduceInactive = 0.6;
 const int kMaximumIndentEmptySearch = 9;
+const Float kTransitionScrollInterval = 0.15;
+const Float kTransitionJumpInterval = 0.1;
+const Float kViewSelectableListScaling = 2.0;
+const Float kViewSelectableListOffset = 0.05;
+const Float kOnes[] = {1,1,1,1};
+
+typedef enum{
+    DescriptorFile = 0,
+    DescriptorDirectory,
+}FileType;
+
+struct String{
+    char *data;
+    uint size;
+};
+
+/* Representation of a file, path holds the file name with regards to its base directory */
+struct FileEntry{
+    char path[MAX_DECRIPTOR_LENGTH];
+    uint pLen;
+    FileType type;
+    int isLoaded;
+};
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
@@ -55,8 +82,52 @@ int StringEqual(char *s0, char *s1, uint maxn);
 * Duplicates a string.
 */
 char *StringDup(char *s0, uint len);
+String *StringMake(char *s0, uint len);
 
-int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
+/*
+* Checks if a string contains only digits.
+*/
+int StringIsDigits(char *s0, uint len);
+
+/*
+* Converts a string into a unsigned integer, clamping if required.
+*/
+uint StringToUnsigned(char *s0, uint len);
+
+/*
+* Generates a list of the files and directories present in 'basePath',
+* return >= 0 in case of success, -1 in case it could not read 'basePath'.
+* Warning: In case *entries != nullptr this function might realloc its pointer
+* to fit all files present in 'basePath'. The number of elements discovered
+* is returned in 'n' while 'size' records the length of the FileEntry list
+* at the end of the procedure.
+*/
+int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size);
+
+/*
+* Gets the current working directory, 'dir' should be of size 'len' = PATH_MAX.
+*/
+void GetCurrentWorkingDirectory(char *dir, uint len);
+
+/*
+* Find the first ocurrency of s0 into s1. Returns -1 in case no one is found.
+* (Brute-force)
+*/
+int StringSearch(char *s0, char *s1, uint s0len, uint s1len);
+
+/*
+* Find the last ocurrency of s0 into s1. Returns -1 in case no one is found.
+* (Brute-force)
+*/
+int ReverseStringSearch(char *s0, char *s1, uint s0len, uint s1len);
+
+/*
+* Perform an accelerated string search algorithm looking for string s0 inside s1.
+* Warning: This is currently using a 255 table size, it will not match all UTF-8 chars.
+*/
+//TODO: UTF-8
+void FastStringSearchInit(char *s0, uint s0len);
+int  FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
 
 /*
 * Gets the name path of the file without the full path.
@@ -98,5 +169,147 @@ int ExtensionStringContains(const char *string, const char *extensions);
 void Memcpy(void *dst, void *src, uint size);
 /* memset */
 void Memset(void *dst, unsigned char v, uint size);
+
+/* Data structures */
+
+/*
+* Basic linked list.
+*/
+template<typename T>
+struct ListNode{
+    T *item;
+    struct ListNode<T> *prev;
+    struct ListNode<T> *next;
+};
+
+template<typename T>
+struct List{
+    ListNode<T> *head;
+    ListNode<T> *tail;
+    uint size;
+};
+
+template<typename T> inline List<T> *List_Create(){
+    List<T> *list = AllocatorGetN(List<T>, 1);
+    AssertA(list != nullptr, "Failed to get list memory");
+    list->size = 0;
+    list->head = nullptr;
+    list->tail = nullptr;
+    return list;
+}
+
+template<typename T> inline 
+T *List_Find(List<T> *list, std::function<int(T *)> call){
+    ListNode<T> *ax = list->head;
+    int found = 0;
+    while(ax != nullptr && found == 0){
+        found = call(ax->item);
+        if(found == 0){
+            ax = ax->next;
+        }
+    }
+    
+    return ax ? ax->item : nullptr;
+}
+
+template<typename T> inline void List_Push(List<T> *list, T *item){
+    ListNode<T> *node = AllocatorGetN(ListNode<T>, 1);
+    AssertA(node != nullptr, "Failed to get node memory");
+    node->item = AllocatorGetN(T, 1);
+    Memcpy(node->item, item, sizeof(T));
+    node->prev = nullptr;
+    node->next = nullptr;
+    
+    if(list->size == 0){
+        list->head = node;
+        list->tail = node;
+    }else{
+        list->tail->next = node;
+        node->prev = list->tail;
+        list->tail = node;
+    }
+    
+    list->tail = node;
+    list->size++;
+}
+
+template<typename T> inline void List_Pop(List<T> *list){
+    if(list->size > 0){
+        if(list->size == 1){
+            AllocatorFree(list->head->item);
+            AllocatorFree(list->head);
+            list->tail = nullptr;
+            list->head = nullptr;
+        }else{
+            ListNode<T> *l = list->head;
+            list->head = list->head->next;
+            AllocatorFree(l->item);
+            AllocatorFree(l);
+        }
+        
+        list->size--;
+    }
+}
+
+template<typename T> inline void List_Clear(List<T> *list){
+    while(list->size > 0){
+        List_Pop<T>(list);
+    }
+}
+
+template<typename T> inline void List_Top(List<T> *list, T *item){
+    if(item && list){
+        item = list->head;
+    }
+}
+
+/*
+* Fixed length stack.
+*/
+template<typename T>
+struct FixedStack{
+    T items[MAX_STACK_SIZE];
+    int capacity;
+    int top;
+};
+
+template<typename T> inline FixedStack<T> *FixedStack_Create(){
+    FixedStack<T> *stack = (FixedStack<T> *)AllocatorGet(sizeof(FixedStack<T>));
+    AssertA(stack != nullptr, "Failed to get stack memory");
+    stack->top = -1;
+    stack->capacity = MAX_STACK_SIZE;
+    return stack;
+}
+
+template<typename T> inline int FixedStack_IsFull(FixedStack<T> *stack){
+    return stack->top == stack->capacity - 1;
+}
+
+template<typename T> inline int FixedStack_Size(FixedStack<T> *stack){
+    return stack->top + 1;
+}
+
+template<typename T> inline int FixedStack_IsEmpty(FixedStack<T> *stack){
+    return stack->top == -1;
+}
+
+template<typename T> inline void FixedStack_Push(FixedStack<T> *stack, T *item){
+    AssertA(!FixedStack_IsFull(stack), "Stack is full");
+    Memcpy(&stack->items[++stack->top], item, sizeof(T));
+}
+
+template<typename T> inline T *FixedStack_Peek(FixedStack<T> *stack){
+    if(FixedStack_IsEmpty(stack)){
+        return nullptr;
+    }else{
+        return &stack->items[stack->top];
+    }
+}
+
+template<typename T> inline void FixedStack_Pop(FixedStack<T> *stack){
+    if(!FixedStack_IsEmpty(stack)){
+        stack->top--;
+    }
+}
 
 #endif //UTILITIES_H

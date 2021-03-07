@@ -6,30 +6,12 @@
 #include <geometry.h>
 #include <buffers.h>
 #include <transform.h>
-
-typedef enum{
-    TransitionNone,
-    TransitionCursor,
-    TransitionScroll,
-    TransitionNumbers,
-}Transition;
+#include <scroll_controller.h>
 
 typedef enum{
     DescriptionTop,
     DescriptionBottom
 }DescriptionLocation;
-
-typedef struct{
-    Transition transition;
-    int isAnimating;
-    Float passedTime;
-    Float duration;
-    Float velocity;
-    Float runningPosition;
-    uint startLine;
-    uint endLine; // this is in screen space, i.e.: 1 <= endLine <= N
-    int is_down;
-}AnimationProps;
 
 typedef struct{
     vec2ui position;
@@ -47,13 +29,8 @@ typedef struct{
 struct BufferView{
     LineBuffer *lineBuffer;
     Tokenizer *tokenizer;
-    DoubleCursor cursor;
-    vec2ui visibleRect;
-    uint currentMaxRange;
-    Float lineHeight;
-    AnimationProps transitionAnim;
+    VScroll sController;
     Geometry geometry;
-    DescriptionLocation descLocation;
     
     /*
 * Rendering properties of the BufferView, defined by the renderer
@@ -88,6 +65,11 @@ int Geometry_IsPointInside(Geometry *geometry, vec2ui p);
 * for updates.
 */
 void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer);
+
+/*
+* Makes a bufferview uses a linebuffer for file reference.
+*/
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer);
 
 /*
 * Sets the geometry of a bufferview.
@@ -142,7 +124,7 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range);
 * Computes the line number corresponding to a screen position, returns -1
 * if no line is available.
 */
-int BufferView_ComputeTextLine(BufferView *view, Float screenY);
+int BufferView_ComputeTextLine(BufferView *view, Float screenY, DescriptionLocation desc);
 
 /*
 * Moves the cursor to a specific position in a given bufferview.
@@ -214,7 +196,8 @@ int BufferView_GetNumbersShowTransition(BufferView *view, Float dt);
 /*
 * Starts a animation on the cursor.
 */
-void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration);
+void BufferView_StartCursorTransition(BufferView *view, uint lineNo,
+                                      uint col, Float duration);
 
 /*
 * Queries the bufferview for the state of a started cursor animation after the time
@@ -263,9 +246,9 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size);
 
 /*
 * Allows the bufferview 'view' to synchronize and avoid out of bounds
-* errors in case 'source' changed properties of the 'view'.
+* errors in case the underlying linebuffer changed.
 */
-void BufferView_SynchronizeWith(BufferView *view, BufferView *source);
+void BufferView_Synchronize(BufferView *view);
 
 void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

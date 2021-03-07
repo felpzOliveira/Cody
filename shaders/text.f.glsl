@@ -43,9 +43,14 @@ void main() {
     float alpha = texture2D(diffuse, interpolatedTexCoord).a;
     vec4 textColor = clamp(interpolatedColor, 0.0, 1.0);
     vec4 col = vec4(textColor.rgb * textColor.a, textColor.a) * alpha; // Premultiplied alpha.
+#if 1
     gl_FragColor = brightnessMatrix( brightness ) *
         contrastMatrix( contrast ) * 
         saturationMatrix( saturation ) * 
         col;
-    
+#else
+    alpha = col.a;
+    col *= 1.3;
+    gl_FragColor = vec4(col.rgb, alpha);
+#endif
 }

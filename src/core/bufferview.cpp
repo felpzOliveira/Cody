@@ -47,54 +47,68 @@ Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
     return intervalFract * (finalValue - initialValue) + initialValue;
 }
 
-
-inline int Animation_Finished(AnimationProps *anim){
+int Animation_Finished(AnimationProps *anim){
     return IsZero(anim->passedTime - anim->duration) || (anim->passedTime > anim->duration);
 }
 
-inline int BufferView_IsCursorVisible(BufferView *view, vec2ui range){
-    return (range.x <= view->cursor.textPosition.x &&
-            range.y >= view->cursor.textPosition.x) ? 1 : 0;
+inline int BufferView_IsPositionVisible(BufferView *view, vec2ui position){
+    VScroll *ss = &view->sController;
+    return (ss->visibleRect.x < position.x && ss->visibleRect.y > position.x) ? 1 : 0;
 }
+
 
 void BufferView_AdjustGhostCursorIfOut(BufferView *view){
-    Buffer *b = BufferView_GetBufferAt(view, view->cursor.ghostPosition.x);
-    if(b == nullptr){ // in case there was a delete this will be nullptr
-        BufferView_GhostCursorFollow(view);
-    }else if(!(view->cursor.ghostPosition.y < b->count)){
-        BufferView_GhostCursorFollow(view);
+    VScroll_AdjustGhostIfNeeded(&view->sController, view->lineBuffer);
+}
+
+void BufferView_CursorTo(BufferView *view, uint lineNo){
+    if(view->lineBuffer){
+        VScroll_CursorTo(&view->sController, lineNo, view->lineBuffer);
     }
 }
 
-//TODO: Add as needed
-void BufferView_SynchronizeWith(BufferView *view, BufferView *source){
-    // 1- Check if cursor is out of bounds
-    vec2ui cursor = view->cursor.textPosition;
-    vec2ui visible = BufferView_GetViewRange(view);
-    int remap = 1;
-    if(cursor.x >= visible.x && cursor.x < visible.y){
-        Buffer *buffer = BufferView_GetBufferAt(view, cursor.x);
-        if(buffer){
-            if(cursor.y <= buffer->count){
-                remap = 0;
-            }
+void BufferView_Synchronize(BufferView *view){
+    if(view->lineBuffer){
+        VScroll *ss = &view->sController;
+        // 1- Check if our cursor is within allowed limits
+        vec2ui cursor = ss->cursor.textPosition;
+        cursor.x = Clamp(cursor.x, 0, view->lineBuffer->lineCount-1);
+        Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, cursor.x);
+        if(buffer == nullptr){
+            BUG();
+            printf("Null buffer inside a valid linebuffer line %p\n", view->lineBuffer);
+            ss->cursor.textPosition = vec2ui(0);
+            return;
         }
-    }
-    
-    if(remap){
-        view->cursor = source->cursor;
+        
+        vec2ui rDist(cursor.x, view->lineBuffer->lineCount - cursor.x);
+        if(rDist.y > ss->cursor.relativeDistance.y){ // insertion of line up
+            cursor.x += rDist.y - ss->cursor.relativeDistance.y;
+        }else if(rDist.y < ss->cursor.relativeDistance.y){ // removal of line up
+            cursor.x -= ss->cursor.relativeDistance.y - rDist.y;
+        }
+        
+        // we don't need to care about insertion bellow
+        
+        cursor.y = Clamp(cursor.y, 0, buffer->count);
+        // 2- Update the scroll controller so that viewing range also gets updated
+        VScroll_CursorToPosition(ss, cursor.x, cursor.y, view->lineBuffer);
+    }else{ // our buffer got killed
+        BufferView_SwapBuffer(view, nullptr);
     }
 }
 
 void BufferView_GhostCursorFollow(BufferView *view){
-    view->cursor.ghostPosition = view->cursor.textPosition;
+    VScroll_GhostCursorFollow(&view->sController);
 }
 
 int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
     AssertA(view != nullptr, "Invalid bufferview pointer");
-    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, view->cursor.textPosition.x);
+    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer,
+                                            view->sController.cursor.textPosition.x);
     int tokenID = -1;
-    uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
+    uint pos = Buffer_Utf8PositionToRawPosition(buffer,
+                                                view->sController.cursor.textPosition.y);
     if(pos < buffer->taken){
         for(int i = 0; i < (int)buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
@@ -114,9 +128,11 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
 
 int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     AssertA(view != nullptr, "Invalid bufferview pointer");
-    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, view->cursor.textPosition.x);
+    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer,
+                                            view->sController.cursor.textPosition.x);
     int tokenID = -1;
-    uint pos = Buffer_Utf8PositionToRawPosition(buffer, view->cursor.textPosition.y);
+    uint pos = Buffer_Utf8PositionToRawPosition(buffer, 
+                                                view->sController.cursor.textPosition.y);
     if(pos > 0){
         for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
             Token *token = &buffer->tokens[i];
@@ -141,246 +157,88 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
             "Invalid initialization");
     view->lineBuffer = lineBuffer;
     view->tokenizer = tokenizer;
-    view->descLocation = DescriptionTop;
-    view->cursor.textPosition  = vec2ui(0, 0);
-    view->cursor.ghostPosition = vec2ui(0, 0);
-    view->cursor.is_dirty = 1;
-    view->cursor.nestStart = vec2ui(0, 0);
-    view->cursor.nestEnd = vec2ui(0, 0);
-    view->cursor.nestValid = 0;
     view->renderLineNbs = 1;
     view->activeNestPoint = -1;
-    view->visibleRect = vec2ui(0, 0);
-    view->lineHeight = 0;
     view->scroll.currX = 0;
-    view->transitionAnim.transition = TransitionNone;
-    view->transitionAnim.isAnimating = 0;
-    view->transitionAnim.duration = 0.0f;
-    view->transitionAnim.endLine = 0;
-    view->transitionAnim.velocity = 0;
+    VScroll_Init(&view->sController);
+}
+
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer){
+    // We need to reset geometry because scroll actually holds visible range
+    Float lineHeight = view->sController.lineHeight;
+    view->lineBuffer = lineBuffer;
+    view->scroll.currX = 0;
+    view->activeNestPoint = -1;
+    VScroll_Init(&view->sController);
+    BufferView_SetGeometry(view, view->geometry, lineHeight);
 }
 
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){
     Float height = geometry.upper.y - geometry.lower.y;
     view->geometry = geometry;
-    view->lineHeight = lineHeight;
-    uint yRange = (uint)floor(height / view->lineHeight) - 1;
-    view->currentMaxRange = yRange;
-    view->visibleRect.y = view->visibleRect.x + yRange;
-    BufferView_CursorTo(view, view->cursor.textPosition.x);
+    view->sController.lineHeight = lineHeight;
+    uint yRange = (uint)floor(height / view->sController.lineHeight) - 1;
+    view->sController.currentMaxRange = yRange;
+    view->sController.visibleRect.y = view->sController.visibleRect.x + yRange;
+    if(view->lineBuffer){
+        VScroll_CursorTo(&view->sController, view->sController.cursor.textPosition.x,
+                         view->lineBuffer);
+    }
 }
 
 vec2ui BufferView_GetViewRange(BufferView *view){
-    return vec2ui(view->visibleRect.x, Min(view->visibleRect.y,
-                                           view->lineBuffer->lineCount));
+    return vec2ui(view->sController.visibleRect.x, 
+                  Min(view->sController.visibleRect.y, view->lineBuffer->lineCount));
 }
 
-void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
-    Buffer *buffer = nullptr;
-    vec2ui cCoord = view->cursor.textPosition;
-    int X = (int)range.x;
-    int Y = (int)range.y;
-    int lineNo = (int)cCoord.x;
-    int gap = 2;
-    if(!(lineNo < Y - gap && lineNo > X + gap)){
-        if(lineNo < X + gap){
-            lineNo = Min(view->lineBuffer->lineCount-1, X + gap);
-        }else if(lineNo > Y - gap){
-            lineNo = Max(Y - gap, 0);
+int BufferView_ComputeTextLine(BufferView *view, Float screenY, DescriptionLocation desc){
+    if(view->lineBuffer){
+        Buffer *buffer = nullptr;
+        Float lStart = view->sController.visibleRect.x;
+        if(desc == DescriptionTop){
+            screenY -= view->sController.lineHeight;
         }
-    }
-    
-    buffer = LineBuffer_GetBufferAt(view->lineBuffer, lineNo);
-    
-    view->cursor.textPosition.x = lineNo;
-    if(buffer->tokenCount > 0){
-        uint lastP = buffer->tokens[buffer->tokenCount-1].position;
-        uint lastX = lastP + buffer->tokens[buffer->tokenCount-1].size;
         
-        if(view->cursor.textPosition.y < buffer->tokens[0].position){
-            view->cursor.textPosition.y = buffer->tokens[0].position;
-        }else if(view->cursor.textPosition.y > lastX){
-            view->cursor.textPosition.y = lastX;
-        }
-    }else{
-        view->cursor.textPosition.y = 0;
-    }
-    
-    view->cursor.is_dirty = 1;
-}
-
-void BufferView_CursorTo(BufferView *view, uint lineNo){
-    AssertA(view != nullptr, "Invalid bufferview pointer");
-    int gap = 1;
-    vec2ui visibleRect = view->visibleRect;
-    uint lineRangeSize = view->currentMaxRange;
-    if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
-        // Outside screen
-        if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
-            int iLine = (int)lineNo;
-            iLine = Max(0, iLine - gap);
-            visibleRect.x = (uint)iLine;
-            visibleRect.y = Min(visibleRect.x + lineRangeSize,
-                                view->lineBuffer->lineCount);
-        }else if(lineNo >= visibleRect.y - gap){ // going down
-            visibleRect.y = Min(lineNo + gap + 1, view->lineBuffer->lineCount);
-            visibleRect.x = visibleRect.y - lineRangeSize;
+        Float fline = lStart + floor(screenY / view->sController.lineHeight);
+        if((uint)fline < view->lineBuffer->lineCount){
+            return (int)fline;
         }
     }
-    
-    view->visibleRect = visibleRect;
-    if(lineNo < view->lineBuffer->lineCount){
-        view->cursor.textPosition.x = lineNo;
-    }
-    
-    view->cursor.is_dirty = 1;
-}
-
-int BufferView_ComputeTextLine(BufferView *view, Float screenY){
-    Buffer *buffer = nullptr;
-    Float lStart = view->visibleRect.x;
-    if(view->descLocation == DescriptionTop){
-        screenY -= view->lineHeight;
-    }
-    
-    Float fline = lStart + floor(screenY / view->lineHeight);
-    if((uint)fline < view->lineBuffer->lineCount){
-        return (int)fline;
-    }
-    
     return -1;
 }
 
+//TODO: It seems we have a bug when constantly pressing for this animation during
+//      searching, debug it.
 void BufferView_CursorToPosition(BufferView *view, uint lineNo, uint col){
-    Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, (uint)lineNo);
-    if(buffer){
-        if(buffer->count > 0)
-            col = Clamp(col, 0, buffer->count);
-        else
-            col = 0;
-        
-        BufferView_CursorTo(view, (uint)lineNo);
-        view->cursor.textPosition.y = col;
-        
-    }
+    return VScroll_CursorToPosition(&view->sController, lineNo, col,
+                                    view->lineBuffer);
 }
 
 void BufferView_StartScrollViewTransition(BufferView *view, int lineDiffs, Float duration){
     AssertA(view != nullptr, "Invalid bufferview pointer");
-    //AssertA(view->transitionAnim.isAnimating == 0, "Only one animation at a time");
-    
-    int expectedEnd = (int)view->visibleRect.x + lineDiffs;
-    if(view->transitionAnim.isAnimating == 0){
-        if(lineDiffs < 0){ // going up
-            expectedEnd = Max(0, expectedEnd);
-        }else{ // going down
-            expectedEnd = Min(view->lineBuffer->lineCount - 1, expectedEnd);
-        }
-        
-        view->transitionAnim.isAnimating = 1;
-        view->transitionAnim.transition = TransitionScroll;
-        view->transitionAnim.passedTime = 0;
-        view->transitionAnim.duration = duration;
-        view->transitionAnim.endLine = expectedEnd;
-        view->transitionAnim.velocity = 0;
-        view->transitionAnim.startLine = view->visibleRect.x;
-        view->transitionAnim.runningPosition = (Float)view->visibleRect.x;
-        view->transitionAnim.is_down = lineDiffs > 0;
-    }else if(view->transitionAnim.transition == TransitionScroll){
-        expectedEnd = view->transitionAnim.endLine + lineDiffs;
-        if(lineDiffs < 0){ // going up
-            expectedEnd = Max(0, expectedEnd);
-        }else{ // going down
-            expectedEnd = Min(view->lineBuffer->lineCount - 1, expectedEnd);
-        }
-        
-        int is_down = expectedEnd > view->transitionAnim.endLine;
-        view->transitionAnim.endLine = expectedEnd;
-        view->transitionAnim.is_down = is_down;
-    }
+    return VScroll_StartScrollViewTransition(&view->sController, lineDiffs,
+                                             duration, view->lineBuffer);
 }
 
 int BufferView_GetScrollViewTransition(BufferView *view, Float dt, vec2ui *rRange,
                                        vec2ui *cursorAt, Transform *transform)
 {
-    AnimationProps *anim = &view->transitionAnim;
-    vec2ui oldP = view->cursor.textPosition;
-    vec2ui vRect = view->visibleRect;
-    uint range = view->currentMaxRange;
-    
-    AssertA(anim->transition == TransitionScroll, "Incorrect transition query");
-    
-    view->cursor.is_dirty = 1;
-    anim->passedTime += Max(0, dt);
-    if(Animation_Finished(anim)){
-        goto __set_end_transition;
-    }else{
-#if 0
-        Float lak = InterpolateValueLinear(anim->passedTime, anim->duration,
-                                           (Float)anim->startLine, (Float)anim->endLine);
-#else
-        Float remaining = anim->duration - anim->passedTime;
-        Float lak = InterpolateValueCubic(dt, remaining, &anim->runningPosition,
-                                          (Float)anim->endLine, &anim->velocity);
-#endif
-        view->visibleRect.x = Max(0, Floor(lak));
-        view->visibleRect.y = Min(view->visibleRect.x + range,
-                                  view->lineBuffer->lineCount);
-        
-        rRange->x = view->visibleRect.x;
-        rRange->y = view->visibleRect.y;
-        
-        if(!BufferView_IsCursorVisible(view, *rRange)){
-            BufferView_FitCursorToRange(view, view->visibleRect);
-        }
-        
-        Float dif = Absf(lak - rRange->x);
-        if(anim->is_down){
-            if(view->cursor.textPosition.x < oldP.x){
-                view->cursor.textPosition = oldP;
-            }
-            *transform = Translate(0, dif, 0);
-        }else{
-            if(view->cursor.textPosition.x > oldP.x){
-                view->cursor.textPosition = oldP;
-            }
-            *transform = Translate(0, -dif, 0);
-        }
-        
-        cursorAt->x = view->cursor.textPosition.x;
-        cursorAt->y = view->cursor.textPosition.y;
-        
-        if(view->visibleRect.x == anim->endLine) goto __set_end_transition;
-    }
-    
-    return 0;
-    __set_end_transition:
-    view->visibleRect.x = anim->endLine;
-    view->visibleRect.y = Min(view->visibleRect.x + range,
-                              view->lineBuffer->lineCount);
-    BufferView_FitCursorToRange(view, view->visibleRect);
-    cursorAt->x = view->cursor.textPosition.x;
-    cursorAt->y = view->cursor.textPosition.y;
-    rRange->x = view->visibleRect.x;
-    rRange->y = view->visibleRect.y;
-    
-    anim->isAnimating = 0;
-    *transform = Transform();
-    return 1;
+    return VScroll_GetScrollViewTransition(&view->sController, dt, rRange,
+                                           cursorAt, transform, view->lineBuffer);
 }
 
 void BufferView_StartNumbersShowTransition(BufferView *view, Float duration){
     AssertA(view != nullptr, "Invalid bufferview pointer");
     if(view->renderLineNbs == 0){
-        view->transitionAnim.isAnimating = 1;
-        view->transitionAnim.transition = TransitionNumbers;
-        view->transitionAnim.passedTime = 0;
-        view->transitionAnim.duration = duration;
+        view->sController.transitionAnim.isAnimating = 1;
+        view->sController.transitionAnim.transition = TransitionNumbers;
+        view->sController.transitionAnim.passedTime = 0;
+        view->sController.transitionAnim.duration = duration;
     }
 }
 
 int BufferView_GetNumbersShowTransition(BufferView *view, Float dt){
-    AnimationProps *anim = &view->transitionAnim;
+    AnimationProps *anim = &view->sController.transitionAnim;
     AssertA(anim->transition == TransitionNumbers, "Incorrect transition query");
     anim->passedTime += Max(0, dt);
     if(anim->passedTime < anim->duration){
@@ -396,115 +254,35 @@ int BufferView_GetNumbersShowTransition(BufferView *view, Float dt){
     return view->renderLineNbs == 0 ? 1 : 0;
 }
 
-void BufferView_StartCursorTransition(BufferView *view, uint lineNo, Float duration){
+void BufferView_StartCursorTransition(BufferView *view, uint lineNo,
+                                      uint col, Float duration)
+{
     AssertA(view != nullptr, "Invalid bufferview pointer");
-    lineNo = Clamp(lineNo, 0, view->lineBuffer->lineCount-1);
-    if(IsZero(duration) || duration < 0){ // if no interval is given simply move
-        BufferView_CursorTo(view, lineNo);
-    }else if(view->cursor.textPosition.x != lineNo){ // actual animation
-        AssertA(view->transitionAnim.isAnimating == 0, "Only one animation at a time");
-        view->transitionAnim.isAnimating = 1;
-        view->transitionAnim.transition = TransitionCursor;
-        view->transitionAnim.passedTime = 0;
-        view->transitionAnim.duration = duration;
-        view->transitionAnim.startLine = view->cursor.textPosition.x;
-        view->transitionAnim.endLine = lineNo;
-        view->transitionAnim.runningPosition = (Float)view->cursor.textPosition.x;
-        view->transitionAnim.is_down = view->cursor.textPosition.x < lineNo;
-        view->transitionAnim.velocity = view->transitionAnim.is_down ? 10 : -10;
-    }else{
-        //AssertA(0, "Invalid transition requested");
-    }
+    return VScroll_StartCursorTransition(&view->sController, lineNo, col,
+                                         duration, view->lineBuffer);
 }
 
 int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
                                    vec2ui *cursorAt, Transform *transform)
 {
-    int gap = 2;
-    AnimationProps *anim = &view->transitionAnim;
-    AssertA(anim->transition == TransitionCursor, "Incorrect transition query");
-    view->cursor.is_dirty = 1;
-    anim->passedTime += Max(0, dt);
-    if(Animation_Finished(anim)){
-        // This transition is done
-        goto __set_end_transition;
-    }else{
-        Buffer *buffer = nullptr;
-        vec2ui rect = view->visibleRect;
-        uint range = view->currentMaxRange;
-#if 0
-        Float lak = InterpolateValueLinear(anim->passedTime, anim->duration,
-                                           (Float)anim->startLine, (Float)anim->endLine);
-#else
-        Float remaining = anim->duration - anim->passedTime;
-        Float lak = InterpolateValueCubic(dt, remaining, &anim->runningPosition,
-                                          (Float)anim->endLine, &anim->velocity);
-#endif
-        cursorAt->x = (uint)Max(0, round(lak));
-        buffer = LineBuffer_GetBufferAt(view->lineBuffer, cursorAt->x);
-        if(buffer){
-            uint initialp = 0;
-            if(buffer->tokenCount > 0) initialp = buffer->tokens[0].position;
-            cursorAt->y = Clamp(view->cursor.textPosition.y,initialp, buffer->count-1);
-        }
-        
-        if(anim->is_down){
-            if(!(cursorAt->x < rect.y - gap)){
-                rRange->y = Min(cursorAt->x + gap + 1, view->lineBuffer->lineCount-1);
-                int minV = (int)rRange->y - (int)range;
-                
-                rRange->x = (uint)Max(0, minV);
-                *transform = Translate(0, Fract(lak), 0);
-            }else{
-                rRange->x = rect.x;
-                rRange->y = rect.y;
-                *transform = Transform();
-            }
-            
-            if(cursorAt->x >= anim->endLine){ // incorrect interpolation, end transition
-                goto __set_end_transition;
-            }
-        }else{
-            if(!(cursorAt->x > rect.x + gap)){
-                rRange->x = Max(0, cursorAt->x - gap - 1);
-                rRange->y = Min(rRange->x + range + 1, view->lineBuffer->lineCount-1);
-                *transform = Translate(0, -Fract(lak), 0);
-            }else{
-                rRange->x = rect.x;
-                rRange->y = rect.y;
-                *transform = Transform();
-            }
-            
-            if(cursorAt->x <= anim->endLine){ // incorrect interpolation, end transition
-                goto __set_end_transition;
-            }
-        }
-    }
-    
-    return 0;
-    __set_end_transition:
-    rRange->x = view->visibleRect.x;
-    rRange->y = view->visibleRect.y;
-    cursorAt->x = view->cursor.textPosition.x;
-    cursorAt->y = view->cursor.textPosition.y;
-    *transform = Transform();
-    anim->isAnimating = 0;
-    BufferView_CursorToPosition(view, anim->endLine, 0);
-    return 1;
+    AssertA(view != nullptr, "Invalid bufferview pointer");
+    return VScroll_GetCursorTransition(&view->sController, dt, rRange,
+                                       cursorAt, transform, view->lineBuffer);
 }
 
 Float BufferView_GetDescription(BufferView *view, char *content, uint size){
+    vec2ui pos = VScroll_GetCursorPosition(&view->sController);
     uint lineCount = view->lineBuffer->lineCount;
-    Float pct = ((Float) view->cursor.textPosition.x) / ((Float) lineCount);
+    Float pct = ((Float) pos.x) / ((Float) lineCount);
     uint st = GetSimplifiedPathName(view->lineBuffer->filePath,
                                     view->lineBuffer->filePathSize);
     
     if(view->lineBuffer->is_dirty == 0){
         snprintf(content, size, " %s - Row: %u Col: %u", &view->lineBuffer->filePath[st],
-                 view->cursor.textPosition.x+1, view->cursor.textPosition.y+1);
+                 pos.x+1, pos.y+1);
     }else{
         snprintf(content, size, " %s - Row: %u Col: %u *", &view->lineBuffer->filePath[st],
-                 view->cursor.textPosition.x+1, view->cursor.textPosition.y+1);
+                 pos.x+1, pos.y+1);
     }
     
     return pct;
@@ -640,17 +418,17 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
 }
 
 int BufferView_CursorNestIsValid(BufferView *view){
-    return view->cursor.nestValid;
-    //return view->startNestCount > 0 && view->endNestCount;
+    return view->sController.cursor.nestValid;
 }
 
 void BufferView_UpdateCursorNesting(BufferView *view){
-    if(view->cursor.is_dirty){
-        view->cursor.is_dirty = 0;
-        view->cursor.nestValid = 0;
+    VScroll *ss = &view->sController;
+    if(ss->cursor.is_dirty){
+        ss->cursor.is_dirty = 0;
+        ss->cursor.nestValid = 0;
         
         int is_first = 1;
-        vec2ui s = view->cursor.textPosition;
+        vec2ui s = VScroll_GetCursorPosition(ss);
         
         TokenId ids[]  = { TOKEN_ID_BRACE_OPEN, TOKEN_ID_PARENTHESE_OPEN };
         TokenId cids[] = { TOKEN_ID_BRACE_CLOSE, TOKEN_ID_PARENTHESE_CLOSE };
@@ -677,11 +455,11 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                     
                     eid = k + 1;
                     if(is_first){ // the first one is the closest to the cursor
-                        view->cursor.nestStart = vec2ui(view->startNest[i].position.x,
-                                                        view->startNest[i].position.y);
-                        view->cursor.nestEnd = vec2ui(view->endNest[k].position.x,
-                                                      view->endNest[k].position.y);
-                        view->cursor.nestValid = 1;
+                        ss->cursor.nestStart = vec2ui(view->startNest[i].position.x,
+                                                      view->startNest[i].position.y);
+                        ss->cursor.nestEnd = vec2ui(view->endNest[k].position.x,
+                                                    view->endNest[k].position.y);
+                        ss->cursor.nestValid = 1;
                         is_first = 0;
                     }
                     break;
@@ -734,25 +512,7 @@ void BufferView_UpdateCursorNesting(BufferView *view){
 }
 
 uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){
-    vec2ui s = view->cursor.textPosition;
-    vec2ui e = view->cursor.ghostPosition;
-    
-    if(s.x > e.x){ // ghost cursor is behind
-        s = view->cursor.ghostPosition;
-        e = view->cursor.textPosition;
-    }else if(s.x == e.x){ // same line
-        if(s.y == e.y){ // range is 0
-            return 0;
-        }
-        if(s.y > e.y){ // cursor is foward in line
-            s = view->cursor.ghostPosition;
-            e = view->cursor.textPosition;
-        }
-    }
-    
-    *start = s;
-    *end = e;
-    return 1;
+    return VScroll_GetCursorSelection(&view->sController, start, end);
 }
 
 void BufferView_GetGeometry(BufferView *view, Geometry *geometry){
@@ -760,19 +520,19 @@ void BufferView_GetGeometry(BufferView *view, Geometry *geometry){
 }
 
 void BufferView_GetCursor(BufferView *view, DoubleCursor **cursor){
-    *cursor = &view->cursor;
+    *cursor = &view->sController.cursor;
 }
 
 vec2ui BufferView_GetCursorPosition(BufferView *view){
-    return view->cursor.textPosition;
+    return view->sController.cursor.textPosition;
 }
 
 vec2ui BufferView_GetGhostCursorPosition(BufferView *view){
-    return view->cursor.ghostPosition;
+    return view->sController.cursor.ghostPosition;
 }
 
 int BufferView_IsAnimating(BufferView *view){
-    return view->transitionAnim.isAnimating;
+    return view->sController.transitionAnim.isAnimating;
 }
 
 uint BufferView_GetLineCount(BufferView *view){
@@ -780,7 +540,7 @@ uint BufferView_GetLineCount(BufferView *view){
 }
 
 Transition BufferView_GetTransitionType(BufferView *view){
-    return view->transitionAnim.transition;
+    return view->sController.transitionAnim.transition;
 }
 
 LineBuffer *BufferView_GetLineBuffer(BufferView *view){

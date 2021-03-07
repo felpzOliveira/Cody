@@ -34,19 +34,19 @@ struct Buffer{
 * Basic description of a structured file. A list of lines with the available size and
 * current line count.
 */
-typedef struct{
+struct LineBuffer{
     Buffer **lines;
-    char filePath[256];
+    char filePath[PATH_MAX];
     uint filePathSize;
     uint lineCount;
     uint size;
     uint is_dirty;
     UndoRedo undoRedo;
     vec2i activeBuffer;
-}LineBuffer;
+};
 
 /* For static initialization */
-#define BUFFER_INITIALIZER {.size = 0, .count = 0, .data = nullptr, .tokens = nullptr, .tokenCount = 0}
+#define BUFFER_INITIALIZER {.size = 0, .count = 0, .taken = 0, .data = nullptr, .tokens = nullptr, .tokenCount = 0 }
 #define LINE_BUFFER_INITIALIZER {.lines = nullptr, .lineCount = 0, .size = 0,}
 
 /*
@@ -61,6 +61,11 @@ typedef struct{
 * Initializes a previously allocated Buffer to the size specified in 'size'.
 */
 void Buffer_Init(Buffer *buffer, uint size);
+
+/*
+* Locates the first non empty token inside a given buffer.
+*/
+int Buffer_FindFirstNonEmptyToken(Buffer *buffer);
 
 /*
 * Initializes a previously allocated Buffer from a string pointer given in 'head'
@@ -94,9 +99,15 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size);
 
 /*
 * Removes a range of the given Buffer. Indexes are given by 'start' and 'end' such
-* that start < end.
+* that start < end. Range is given in UTF-8 positions.
 */
 void Buffer_RemoveRange(Buffer *buffer, uint start, uint end);
+
+/*
+* Removes a range of the given Buffer. Range is given in raw position inside the
+* buffer.
+*/
+void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end);
 
 /*
 * Checks whether a buffer is visually empty.
@@ -123,7 +134,8 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len=nullptr
 
 /*
 * Get the UTF-8 position inside this buffer matching a raw position. This is mostly
-* usefull if you want to get the rendering position of a token.
+* usefull if you want to get the rendering position of a token or adjust a cursor
+* movement based on the rendering property of a encoded character.
 */
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
 

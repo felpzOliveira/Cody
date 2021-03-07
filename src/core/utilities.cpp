@@ -8,13 +8,86 @@
 #include <string.h>
 #include <lex.h>
 #include <app.h>
+#include <limits.h>
+#include <dirent.h>
 
 Float ColorClamp(Float val){
     return Clamp(val, 0.0f, 0.9999f);
 }
 
+void GetCurrentWorkingDirectory(char *dir, uint len){
+    if(getcwd(dir, len) == nullptr){
+        printf("Failed to get CWD\n");
+    }
+}
+
+int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
+    AssertA(n != nullptr && entries != nullptr && basePath != nullptr,
+            "Invalid query pointers");
+    FileEntry *lEntries = nullptr;
+    uint base = 8;
+    uint count = 0;
+    uint currSize = 0;
+    DIR *dir = opendir(basePath);
+    struct dirent *entry = nullptr;
+    
+    if(dir == nullptr) return -1;
+    
+    if(*n == 0 || *entries == nullptr){
+        lEntries = AllocatorGetN(FileEntry, base);
+        currSize = base;
+    }else{
+        lEntries = *entries;
+        currSize = *n;
+    }
+    
+    do{
+        entry = readdir(dir);
+        if(entry != nullptr){
+            if(entry->d_type == DT_DIR || entry->d_type == DT_REG){
+                int keep = 1;
+                char *p = entry->d_name;
+                uint reclen = strlen(p);
+                if(reclen == 1){
+                    keep = p[0] != '.' ? 1 : 0;
+                }else if(reclen == 2){
+                    keep = (p[0] == '.' && p[1] == '.') ? 0 : 1;
+                }
+                
+                if(keep){
+                    if(!(currSize > count + 1)){
+                        lEntries = AllocatorExpand(FileEntry, lEntries,
+                                                   currSize+base, currSize);
+                        currSize += base;
+                    }
+                    
+                    if(entry->d_type == DT_DIR){
+                        lEntries[count].type = DescriptorDirectory;
+                        //printf("Directory %s (len = %d)\n", entry->d_name, (int) reclen);
+                    }else{
+                        lEntries[count].type = DescriptorFile;
+                        //printf("File %s\n", entry->d_name);
+                    }
+                    
+                    Memcpy(lEntries[count].path, p, reclen);
+                    lEntries[count].path[reclen] = 0;
+                    lEntries[count].pLen = reclen;
+                    lEntries[count].isLoaded = 0;
+                    count++;
+                }
+            }
+        }
+    }while(entry != nullptr);
+    closedir(dir);
+    
+    *entries = lEntries;
+    *n = count;
+    *size = currSize;
+    return 1;
+}
+
 uint GetSimplifiedPathName(char *fullPath, uint len){
-    uint c = len > 2 ? len - 2 : 0;
+    uint c = len > 0 ? len - 1 : 0;
     while(c > 0){
         char h = fullPath[c];
         if(h == '\\' || h == '/'){
@@ -167,78 +240,96 @@ vec4i ColorFromRGBA(vec4f color){
                  (uint)(ColorClamp(color.w) * 256.0f));
 }
 
-void OUTPUT(int j, char *y, int m){
-    char s = y[j + m];
-    y[j + m] = 0;
-    printf("Found at : %d ( %s )\n", j, y + j);
-    y[j + m] = s;
-}
-
-void preMp(char *x, int m, int mpNext[]) {
+const int XSIZE = 255;
+int mpNext[XSIZE];
+void FastStringSearchInit(char *x, uint m){
     int i, j;
-    
     i = 0;
     j = mpNext[0] = -1;
-    while (i < m) {
-        while (j > -1 && x[i] != x[j])
+    while(i < m){
+        while(j > -1 && x[i] != x[j])
             j = mpNext[j];
         mpNext[++i] = ++j;
     }
 }
 
-
-void MP(char *x, int m, char *y, int n) {
-    const int XSIZE = 255;
-    int i, j, mpNext[XSIZE];
-    
-    /* Preprocessing */
-    preMp(x, m, mpNext);
-    
-    /* Searching */
+int MP(char *x, int m, char *y, int n){
+    int i, j;
     i = j = 0;
-    while (j < n) {
-        while (i > -1 && x[i] != y[j])
+    while(j < n){
+        while(i > -1 && x[i] != y[j])
             i = mpNext[i];
         i++;
         j++;
-        if (i >= m) {
-            OUTPUT(j - i, y, m);
-            i = mpNext[i];
+        if(i >= m){
+            return j-i;
         }
     }
+    
+    return -1;
 }
 
-
-void preQsBc(char *x, int m, int qsBc[], const int ASIZE) {
-    int i;
-    
-    for (i = 0; i < ASIZE; ++i)
-        qsBc[i] = m + 1;
-    for (i = 0; i < m; ++i)
-        qsBc[x[i]] = m - i;
-}
-
-
-void QS(char *x, int m, char *y, int n) {
-    const int ASIZE = 255;
-    int j, qsBc[ASIZE];
-    
-    /* Preprocessing */
-    preQsBc(x, m, qsBc, ASIZE);
-    
-    /* Searching */
-    j = 0;
+int QS(char *x, int m, char *y, int n) {
+    int j = 0;
     while (j <= n - m) {
-        if(memcmp(x, y + j, m) == 0){
-            OUTPUT(j, y, m);
+        if(StringEqual(x, y + j, m)){
+            return j;
         }
-        j += qsBc[y[j + m]];               /* shift */
+        j++;
     }
+    
+    return -1;
+}
+
+int RQS(char *x, int m, char *y, int n){
+    int j = n - m;
+    while(j >= 0){
+        if(StringEqual(x, y + j, m)){
+            return j;
+        }
+        j--;
+    }
+    return -1;
+}
+
+int ReverseStringSearch(char *s0, char *s1, uint s0len, uint s1len){
+    return RQS(s0, s0len, s1, s1len);
+}
+
+int StringSearch(char *s0, char *s1, uint s0len, uint s1len){
+    return QS(s0, s0len, s1, s1len);
 }
 
 int FastStringSearch(char *s0, char *s1, uint s0len, uint s1len){
-    MP(s0, s0len, s1, s1len);
-    return 0;
+    return MP(s0, s0len, s1, s1len);
+}
+
+int StringIsDigits(char *s0, uint len){
+    for(uint i = 0; i < len; i++){
+        char v = s0[i] - '0';
+        if(!(v >= 0 && v <= 9)) return 0;
+    }
+    
+    return 1;
+}
+
+uint StringToUnsigned(char *s0, uint len){
+    uint n = 0;
+    unsigned long maxn = UINT_MAX-1;
+    unsigned long test = 0;
+    char *ptr = nullptr;
+    test = strtoul(s0, &ptr, 10);
+    if(ptr == s0){
+        printf("invalid number conversion (%s)\n", s0);
+    }else if((test == LONG_MIN || test == LONG_MAX) && errno == ERANGE){
+        printf("invalid number conversion (range) (%s)\n", s0);
+    }else if(test > maxn){
+        n = maxn;
+    }else{
+        n = (uint)test;
+    }
+    
+    return n;
 }
 
 int StringEqual(char *s0, char *s1, uint maxn){
@@ -248,6 +339,13 @@ int StringEqual(char *s0, char *s1, uint maxn){
         }
     }
     return 1;
+}
+
+String *StringMake(char *s0, uint len){
+    String *str = AllocatorGetN(String, 1);
+    str->data = StringDup(s0, len);
+    str->size = len;
+    return str;
 }
 
 char *StringDup(char *s0, uint len){
@@ -346,6 +444,12 @@ BoundedStack *BoundedStack_Create(){
     stack->top = -1;
     stack->capacity = MAX_BOUNDED_STACK_SIZE;
     return stack;
+}
+
+void BoundedStack_SetDefault(BoundedStack *stack){
+    AssertA(stack != nullptr, "Invalid stack pointer");
+    stack->top = -1;
+    stack->capacity = MAX_BOUNDED_STACK_SIZE;
 }
 
 void BoundedStack_Copy(BoundedStack *dst, BoundedStack *src){

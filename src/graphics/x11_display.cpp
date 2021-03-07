@@ -354,6 +354,10 @@ void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *cal
     window->onFocusChangeCall = callback;
 }
 
+void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback){
+    window->onMouseMotionCall = callback;
+}
+
 WindowX11 *CreateWindowX11(int width, int height, const char *title){
     WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
     _CreateWindowX11(width, height, title, &x11Framebuffer,
@@ -688,6 +692,13 @@ void ClipboardSetStringX11(char *str){
     }
 }
 
+void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y){
+    if(window){
+        if(x) *x = window->lastCursorPosX;
+        if(y) *y = window->lastCursorPosY;
+    }
+}
+
 void WaitForEventsX11(){
     while(!XPending(x11Helper.display))
         waitForEvent(NULL);
@@ -784,6 +795,9 @@ void ProcessEventMotionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     int y = event->xmotion.y;
     window->lastCursorPosX = x;
     window->lastCursorPosY = y;
+    if(window->onMouseMotionCall){
+        window->onMouseMotionCall(x, y);
+    }
 }
 
 void ProcessEventConfigureX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){

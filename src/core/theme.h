@@ -7,17 +7,27 @@
 
 typedef enum{
     UIBackground,
+    UISelectorBackground,
+    UISearchBackground,
+    UISearchWord,
     UILineNumberBackground,
     UILineNumbers,
     UILineNumberHighlighted,
     UICursorLineHighlight,
     UIBorder,
     UICursor,
+    UIQueryBarCursor,
+    UISelectableListBackground,
     UIGhostCursor,
+    UIScopeLine,
 }UIElement;
 
 typedef struct{
     vec4i backgroundColor;
+    vec4i selectorBackground;
+    vec4i searchBackgroundColor;
+    vec4i selectableListBackground;
+    vec4i searchWordColor;
     vec4i backgroundLineNumbers;
     vec4i lineNumberColor;
     vec4i lineNumberHighlitedColor;
@@ -37,13 +47,17 @@ typedef struct{
     vec4i borderColor;
     vec4i braces;
     vec4i cursorColor;
+    vec4i querybarCursorColor;
     vec4i ghostCursorColor;
     vec4i parenthesis[4];
     vec4i backTextColors[4];
     vec4i userDatatypeColor;
     vec4i userDatatypeEnum;
+    vec4i scopeLineColor;
     vec4i testColor;
     short backTextCount;
+    Float lineBorderWidth;
+    short alphaDimm;
 }Theme;
 
 extern Theme *defaultTheme;
@@ -55,5 +69,6 @@ vec4i GetColor(Theme *theme, TokenId id);
 vec4f GetColorf(Theme *theme, TokenId id);
 vec4i GetUIColor(Theme *theme, UIElement id);
 vec4f GetUIColorf(Theme *theme, UIElement id);
+Float GetLineBorderWidth(Theme *theme);
 short GetBackTextCount(Theme *theme);
 #endif //THEME_H

@@ -24,7 +24,7 @@ void SymbolTable_Initialize(SymbolTable *symTable){
     Memset(symTable->table, 0x00, sizeof(SymbolNode*) * SYMBOL_TABLE_SIZE);
 }
 
-void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
+int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
     uint insert_id = 0;
     SymbolNode *newNode = nullptr;
     uint hash = _symbol_table_hash(symTable, label, labelLen);
@@ -35,7 +35,7 @@ void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, Token
     
     while(node != nullptr){
         if(_symbol_table_sym_node_matches(node, label, labelLen, id)){
-            return;
+            return 0;
         }
         
         prev = node;
@@ -58,7 +58,8 @@ void SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, Token
         symTable->table[index] = newNode;
     }
     
-    //printf("Inserted %s\n", newNode->label);
+    //printf("Inserted %s - %s\n", newNode->label, Symbol_GetIdString(newNode->id));
+    return 1;
 }
 
 void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
@@ -69,11 +70,15 @@ void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, Token
         SymbolNode *prev = node->prev;
         if(prev == nullptr){ // head
             symTable->table[tableIndex] = node->next;
+            if(node->next)
+                node->next->prev = nullptr;
         }else{ // middle
             prev->next = node->next;
+            if(node->next)
+                node->next->prev = prev;
         }
         
-        //printf("Removed %s\n", node->label);
+        printf("Removed %s - %s\n", node->label, Symbol_GetIdString(node->id));
         
         node->next = nullptr;
         AllocatorFree(node->label);

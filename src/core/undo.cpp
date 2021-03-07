@@ -4,6 +4,8 @@
 #include <buffers.h>
 #include <string.h>
 
+#define MODULE_NAME "UndoRedo"
+
 typedef struct{
     Buffer **bufferPool;
     uint size;
@@ -49,8 +51,7 @@ void DoStack_Push(DoStack *stack, BufferChange *item){
     Memcpy(&stack->items[stack->top], item, sizeof(BufferChange));
     stack->top = (stack->top + 1) % stack->capacity;
     stack->elements = Min(stack->elements+1, stack->capacity);
-    printf("[PUSH]Stack len: %u, freeing %u ( %p )\n",
-           stack->elements, toFree, item->buffer);
+    //printf("[PUSH]Stack len: %u, freeing %u ( %p )\n", stack->elements, toFree, item->buffer);
 }
 
 BufferChange *DoStack_Peek(DoStack *stack){
@@ -66,11 +67,11 @@ void DoStack_Pop(DoStack *stack){
     stack->top = (stack->top + stack->capacity - 1) % stack->capacity;
     stack->elements = stack->elements > 0 ? stack->elements-1 : 0;
     DoStack_ReleaseIfNeeded(&stack->items[stack->top]);
-    printf("[POP]Stack len: %u, releasing %u ( %p )\n",
-           stack->elements, stack->top, stack->items[stack->top].buffer);
+    //printf("[POP]Stack len: %u, releasing %u ( %p )\n",stack->elements, stack->top, stack->items[stack->top].buffer);
 }
 
 void UndoSystemGetMemory(){
+    static long int count = 0;
     uSystem.bufferPool = (Buffer **)AllocatorGet(sizeof(Buffer *) * MAX_DO_STACK_SIZE);
     uSystem.head = 0;
     uSystem.size = MAX_DO_STACK_SIZE;
@@ -84,6 +85,9 @@ void UndoSystemGetMemory(){
         buffer->tokenCount = 0;
         uSystem.bufferPool[i] = buffer;
     }
+    count += uSystem.size;
+    DEBUG_MSG("Allocated %d more buffers, current: %ld\n",
+              MAX_DO_STACK_SIZE, count);
 }
 
 void UndoSystemTakeBuffer(Buffer *buffer){
@@ -91,6 +95,7 @@ void UndoSystemTakeBuffer(Buffer *buffer){
         uint h = uSystem.head-1;
         uSystem.bufferPool[h] = buffer;
         uSystem.head--;
+        DEBUG_MSG("Grabbed buffer, head: %u, size: %u\n", uSystem.head, uSystem.size);
     }else{ // cannot hold this buffer, free it
         Buffer_Free(buffer);
         AllocatorFree(buffer);
@@ -106,14 +111,24 @@ Buffer *UndoSystemGetBuffer(){
     return uSystem.bufferPool[h];
 }
 
-void _UndoRedoPushMerge(UndoRedo *redo, vec2ui baseU8, int is_undo){
+void _UndoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor, int is_undo){
     BufferChange bufferChange = {
-        .bufferInfo = baseU8,
+        .bufferInfo = cursor,
         .buffer = nullptr,
         .text = nullptr,
         .size = 0,
         .change = CHANGE_MERGE,
     };
+    
+    Buffer *b = UndoSystemGetBuffer();
+    if(b == nullptr){
+        BUG();
+        printf("Undo system retrieved nullptr\n");
+        return;
+    }
+    
+    Buffer_CopyDeep(b, buffer);
+    bufferChange.buffer = b;
     
     if(is_undo)
         DoStack_Push(redo->undoStack, &bufferChange);
@@ -153,7 +168,7 @@ void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
 void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
-        .buffer = nullptr,
+        .buffer = buffer,
         .text = nullptr,
         .size = 0,
         .change = CHANGE_REMOVE,
@@ -198,12 +213,12 @@ void UndoRedoRedoPushNewLine(UndoRedo *redo, vec2ui baseU8){
     _UndoRedoUndoPushNewLine(redo, baseU8, 0);
 }
 
-void UndoRedoUndoPushMerge(UndoRedo *redo, vec2ui baseU8){
-    _UndoRedoPushMerge(redo, baseU8, 1);
+void UndoRedoUndoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
+    _UndoRedoPushMerge(redo, buffer, cursor, 1);
 }
 
-void UndoRedoRedoPushMerge(UndoRedo *redo, vec2ui baseU8){
-    _UndoRedoPushMerge(redo, baseU8, 0);
+void UndoRedoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
+    _UndoRedoPushMerge(redo, buffer, cursor, 0);
 }
 
 void UndoRedoPopUndo(UndoRedo *redo){
@@ -219,5 +234,26 @@ BufferChange *UndoRedoGetNextRedo(UndoRedo *redo){
 }
 
 BufferChange *UndoRedoGetNextUndo(UndoRedo *redo){
-    return DoStack_Peek(redo->undoStack);
+    BufferChange *bChange = DoStack_Peek(redo->undoStack);
+    if(bChange){
+        DEBUG_MSG("[UNDO] Undo for %s - Stack size: %u\n",
+                  UndoRedo_GetStringID(bChange->change), redo->undoStack->elements);
+    }
+    return bChange;
+}
+
+void UndoRedoCleanup(UndoRedo *redo){
+    BufferChange *bChange = UndoRedoGetNextUndo(redo);
+    while(bChange != nullptr){
+        DoStack_FreeIfNeeded(bChange);
+        UndoRedoPopUndo(redo);
+        bChange = UndoRedoGetNextUndo(redo);
+    }
+    
+    bChange = UndoRedoGetNextRedo(redo);
+    while(bChange != nullptr){
+        DoStack_FreeIfNeeded(bChange);
+        UndoRedoPopRedo(redo);
+        bChange = UndoRedoGetNextRedo(redo);
+    }
 }

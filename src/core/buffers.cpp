@@ -4,10 +4,16 @@
 #include <utilities.h>
 #include <app.h>
 #include <string.h>
+#include <autocomplete.h>
 
 #define MODULE_NAME "Buffer"
 
 inline void DuplicateToken(Token *dst, Token *src){
+    if(dst == nullptr){
+        printf("Null token given\n");
+        return;
+    }
+    
     dst->size = src->size;
     dst->position = src->position;
     dst->source = src->source;
@@ -51,15 +57,23 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
         if(dst->data == nullptr){
             uint len = Max(src->size, DefaultAllocatorSize);
             dst->data = (char *)AllocatorGet(len * sizeof(char));
-        }else if(dst->size < dst->taken){
-            dst->data = AllocatorExpand(char, dst->data, src->size);
+            dst->size = len;
+        }
+        
+        if(src->taken > dst->size){
+            dst->data = AllocatorExpand(char, dst->data, src->size, dst->size);
+            dst->size = src->size;
         }
         
         if(dst->tokens == nullptr && src->tokenCount > 0){
             dst->tokens = (Token *)AllocatorGet(src->tokenCount * sizeof(Token));
         }else if(dst->tokenCount < src->tokenCount){
-            dst->tokens = (Token *)AllocatorExpand(Token, dst->tokens,
-                                                   src->tokenCount * sizeof(Token));
+            if(dst->tokens == nullptr){
+                dst->tokens = AllocatorGetN(Token, src->tokenCount);
+            }else{
+                dst->tokens = AllocatorExpand(Token, dst->tokens, src->tokenCount,
+                                              dst->tokenCount);
+            }
         }
         
         if(src->taken > 0){
@@ -70,16 +84,36 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
             for(uint i = 0; i < src->tokenCount; i++){
                 Token *srcToken = &src->tokens[i];
                 Token *dstToken = &dst->tokens[i];
+                if(!(i < dst->tokenCount)){
+                    // If dstToken was outside of the scope of the dst buffer
+                    // it could happen that it contains garbage in its memory
+                    // because its data was not dependent on its definition.
+                    // So we manually need to force its reserve field to nullptr
+                    // to avoid the duplication routine to mistakenly attempt to free
+                    // its content.
+                    dstToken->reserved = nullptr;
+                }
+                
                 DuplicateToken(dstToken, srcToken);
             }
         }
         
         dst->count = src->count;
         dst->taken = src->taken;
-        dst->size = src->size;
         dst->tokenCount = src->tokenCount;
         dst->stateContext = src->stateContext;
     }
+}
+
+int Buffer_FindFirstNonEmptyToken(Buffer *buffer){
+    for(uint i = 0; i < buffer->tokenCount; i++){
+        Token *token = &buffer->tokens[i];
+        if(token->identifier != TOKEN_ID_SPACE){
+            return (int)i;
+        }
+    }
+    
+    return -1;
 }
 
 uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
@@ -107,9 +141,9 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
         }
         Buffer_DebugStdoutData(buffer);
         printf("Queried for UTF-8 location at %u\n", rawp);
+        rawp = buffer->taken;
     }
     
-    BreakIf(rawp <= buffer->taken, "Impossible query");
     uint r = 0;
     if(buffer->taken > 0){
         char *p = buffer->data;
@@ -139,9 +173,9 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
         }
         Buffer_DebugStdoutData(buffer);
         printf("Queried for UTF-8 translation at %u\n", u8p);
+        u8p = buffer->count;
     }
     
-    BreakIf(u8p <= buffer->taken, "Impossible query");
     uint r = 0;
     if(buffer->taken > 0){
         char *p = buffer->data;
@@ -204,7 +238,8 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size){
     if(buffer){
         if(buffer->tokenCount < size){
             if(buffer->tokens){
-                buffer->tokens = AllocatorExpand(Token, buffer->tokens, size);
+                buffer->tokens = AllocatorExpand(Token, buffer->tokens,
+                                                 size, buffer->tokenCount);
                 for(uint i = buffer->tokenCount; i < size; i++){
                     buffer->tokens[i].reserved = nullptr;
                 }
@@ -260,7 +295,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
     }else{
         if(buffer->size < len){
             uint newSize = buffer->size + len + DefaultAllocatorSize;
-            buffer->data = AllocatorExpand(char, buffer->data, newSize);
+            buffer->data = AllocatorExpand(char, buffer->data, newSize, buffer->size);
             buffer->size = newSize;
         }
     }
@@ -360,12 +395,12 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         if(buffer->size < at){
             int diff = at - buffer->size;
             uint newSize = diff + len + DefaultAllocatorSize;
-            buffer->data = AllocatorExpand(char, buffer->data, newSize);
+            buffer->data = AllocatorExpand(char, buffer->data, newSize, buffer->size);
         }
         
         if(buffer->size < buffer->taken + len){
             uint newSize = buffer->size + len + DefaultAllocatorSize;
-            buffer->data = AllocatorExpand(char, buffer->data, newSize);
+            buffer->data = AllocatorExpand(char, buffer->data, newSize, buffer->size);
             buffer->size = newSize;
         }
         
@@ -391,7 +426,10 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         
         buffer->taken += len;
         buffer->count = Buffer_GetUtf8Count(buffer);
-        buffer->data[buffer->taken] = 0;
+        if(buffer->size > buffer->taken){
+            buffer->data[buffer->taken] = 0;
+        }
+        
     }else if(buffer->size == 0 || buffer->data == nullptr){
         Buffer_Init(buffer, DefaultAllocatorSize);
     }
@@ -420,7 +458,16 @@ void Buffer_Release(Buffer *buffer){
 void Buffer_Free(Buffer *buffer){
     if(buffer){
         if(buffer->data) AllocatorFree(buffer->data);
-        if(buffer->tokens) AllocatorFree(buffer->tokens);
+        if(buffer->tokens){
+            for(uint i = 0; i < buffer->tokenCount; i++){
+                Token *token = &buffer->tokens[i];
+                if(token->reserved){
+                    AllocatorFree(token->reserved);
+                    token->reserved = nullptr;
+                }
+            }
+            AllocatorFree(buffer->tokens);
+        }
         Buffer_Release(buffer);
     }
 }
@@ -429,7 +476,8 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
     AssertA(lineBuffer != nullptr, "Invalid line initialization");
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
-        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize);
+        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize,
+                                            lineBuffer->size);
         
         for(uint i = 0; i < DefaultAllocatorSize; i++){
             lineBuffer->lines[lineBuffer->size+i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -480,7 +528,8 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
     // make sure we can hold at least one more line
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
-        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize);
+        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines,
+                                            newSize, lineBuffer->size);
         
         for(uint i = 0; i < DefaultAllocatorSize; i++){
             lineBuffer->lines[lineBuffer->size+i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -584,6 +633,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     do{
         Token token;
         token.reserved = nullptr;
+        char *h = *p;
         int rc = Lex_TokenizeNext(p, iSize, &token, tokenizer, 0);
         if(rc < 0){
             iSize = 0;
@@ -591,10 +641,11 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             uint head   = workContext->workTokenListHead;
             uint length = workContext->workTokenListSize;
             if(head >= length){
-                length += 32;
+                uint inc = 32;
                 workContext->workTokenList = AllocatorExpand(Token, 
                                                              workContext->workTokenList,
-                                                             length);
+                                                             length+inc, length);
+                length += inc;
                 workContext->workTokenListSize = length;
             }
             
@@ -604,6 +655,10 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].source = token.source;
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
+            
+            if(token.identifier != TOKEN_ID_SPACE){
+                AutoComplete_PushString(h, token.size);
+            }
 #if DEBUG_TOKENS != 0
             char *h = &s[token.position];
             char f = s[token.position+token.size];
@@ -676,10 +731,11 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             uint head   = workContext->workTokenListHead;
             uint length = workContext->workTokenListSize;
             if(head >= length){
-                length += 32;
+                uint inc = 32;
                 workContext->workTokenList = AllocatorExpand(Token, 
                                                              workContext->workTokenList,
-                                                             length);
+                                                             length + inc, length);
+                length += inc;
                 workContext->workTokenListSize = length;
             }
             
@@ -777,7 +833,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     
     clock_t end = clock();
     double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
-    DEBUG_MSG("Lines: %u, Took %g\n\n", lineBuffer->lineCount, taken);
+    DEBUG_MSG("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
     activeLineBuffer = nullptr;
     current = 0;
     totalSize = 0;
@@ -816,7 +872,8 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     // 2 - Create nLines buffers for the file
     if(!(lineBuffer->lineCount + nLines < lineBuffer->size)){
         uint newsize = lineBuffer->lineCount + nLines + DefaultAllocatorSize;
-        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newsize);
+        lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines,
+                                            newsize, lineBuffer->size);
         
         for(uint i = 0; i < newsize - lineBuffer->size; i++){
             lineBuffer->lines[lineBuffer->size+i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -934,7 +991,7 @@ void LineBuffer_InitEmpty(LineBuffer *lineBuffer){
     LineBuffer_InitBlank(lineBuffer);
     LineBuffer_InsertLine(lineBuffer, nullptr, 0, 1);
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, 0);
-    buffer->stateContext = TOKENIZER_STATE_INITIALIZER;
+    Lex_TokenizerContextEmpty(&buffer->stateContext);
 }
 
 void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNo, 
@@ -957,6 +1014,11 @@ void LineBuffer_Free(LineBuffer *lineBuffer){
         if(lineBuffer->lines)
             AllocatorFree(lineBuffer->lines);
         
+        UndoRedoCleanup(&lineBuffer->undoRedo);
+        
+        AllocatorFree(lineBuffer->undoRedo.undoStack);
+        AllocatorFree(lineBuffer->undoRedo.redoStack);
+        
         lineBuffer->lines = nullptr;
         lineBuffer->size = 0;
         lineBuffer->lineCount = 0;
@@ -964,8 +1026,10 @@ void LineBuffer_Free(LineBuffer *lineBuffer){
 }
 
 Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
-    if(lineNo < lineBuffer->lineCount){
-        return lineBuffer->lines[lineNo];
+    if(lineBuffer){
+        if(lineNo < lineBuffer->lineCount){
+            return lineBuffer->lines[lineNo];
+        }
     }
     
     return nullptr;
@@ -1090,7 +1154,11 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
         }
         
         linePtr[ic++] = '\n';
-        linePtr[ic+1] = 0;
+        if(ic+1 >= maxSize+2){
+            printf("Invalid write\n");
+        }else{
+            linePtr[ic+1] = 0;
+        }
         
         uint s = fwrite(linePtr, sizeof(char), ic, fp);
         AssertA(s == ic, "Failed to write to file");

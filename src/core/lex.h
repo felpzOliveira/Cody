@@ -72,7 +72,6 @@ typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
 #define TOKENIZER_CONTEXT_INITIALIZER {.entry = nullptr, .lookup = nullptr}
 #define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .tabSpacing = 1, .fetcher = nullptr, .lastToken = TOKEN_INITIALIZER, .procStack = nullptr }
-#define TOKENIZER_STATE_INITIALIZER {.state = TOKENIZER_STATE_CLEAN, .activeWorkProcessor = -1, .backTrack = 0, .forwardTrack = 0}
 
 struct Token;
 struct TokenizerContext;
@@ -127,7 +126,7 @@ struct TokenLookupTable{
 
 /*
 * Tokenizer context, 'entry' must specify if given a line the context
- * wishes to be invoked for token generation, 'exec' asks the context to parse
+* wishes to be invoked for token generation, 'exec' asks the context to parse
 * 1 token that it can accept and return the length of this token. 'lookup'
 * is a storage reserved for a table if the context requires one.
 */
@@ -162,6 +161,7 @@ struct LogicalProcessor{
 };
 
 /*
+* TODO: Port this to the FixedStack?
 * Fixed memory stack.
 */
 struct BoundedStack{
@@ -288,9 +288,20 @@ void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer, uint lineNo);
 void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *context);
 
 /*
+* Sets a tokenizer context to be initialized with default values.
+*/
+void Lex_TokenizerContextEmpty(TokenizerStateContext *context);
+
+/*
 * Restore the tokenizer state from a saved context.
 */
 void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer, TokenizerStateContext *context);
+
+/*
+* Resets the tokenizer state. Usually you want to call this before
+* starting to parse a new file.
+*/
+void Lex_TokenizerContextReset(Tokenizer *tokenizer);
 
 /*
 * Checks if tokenizer has pending work.
@@ -312,3 +323,4 @@ void BoundedStack_Push(BoundedStack *stack, LogicalProcessor *item);
 LogicalProcessor *BoundedStack_Peek(BoundedStack *stack);
 void BoundedStack_Pop(BoundedStack *stack);
 void BoundedStack_Copy(BoundedStack *dst, BoundedStack *src);
+void BoundedStack_SetDefault(BoundedStack *stack);
