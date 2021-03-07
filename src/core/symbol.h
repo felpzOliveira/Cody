@@ -120,6 +120,7 @@ typedef struct symbol_node_t{
     char *label;
     uint labelLen;
     TokenId id;
+    uint duplications;
     struct symbol_node_t *next;
     struct symbol_node_t *prev;
 }SymbolNode;
@@ -128,12 +129,18 @@ typedef struct{
     SymbolNode **table;
     uint tableSize;
     uint seed;
+    bool allow_duplication;
 }SymbolTable;
 
 /*
-* Initializes a symbol table.
+* Initializes a symbol table. By default the symbol table does not allow
+* for duplicated tokens, as even if tokens have the same label they must
+* have different meanings given by their ids. You can however make the
+* symbol table register how many times a token was inserted by setting
+* 'duplicate' = true. Might be usefull if you are using the symbol table
+* to keep track of how many times a token appeared.
 */
-void SymbolTable_Initialize(SymbolTable *symTable);
+void SymbolTable_Initialize(SymbolTable *symTable, bool duplicate=false);
 
 /*
 * Pushes a new symbol into the symbol table, returns 1 in case the symbol
@@ -142,7 +149,10 @@ void SymbolTable_Initialize(SymbolTable *symTable);
 int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
 
 /*
-* Removes an entry from the symbol table matching the contents and location.
+* Removes an entry from the symbol table matching the contents given. If the
+* symbol table allows for duplication this routines only removes the entry if
+* the token duplication is 0. Otherwise the token duplication value is decreased
+* but the entry still persists.
 */
 void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id);
 

@@ -14,13 +14,20 @@ inline int _symbol_table_sym_node_matches(SymbolNode *node, char *label,
 }
 
 inline uint _symbol_table_hash(SymbolTable *symTable, char *label, uint labelLen){
+    /*
+    * NOTE: The MurmurHash3 algorithm has shown to be actually slower than FowlerNollVo
+    *       however it is better in avoiding collisions,
+    *       but feel free to experiment with this.
+    */
+    // return FowlerNollVoStringHash32(label);
     return MurmurHash3(label, labelLen, symTable->seed);
 }
 
-void SymbolTable_Initialize(SymbolTable *symTable){
+void SymbolTable_Initialize(SymbolTable *symTable, bool duplicate){
     symTable->table = AllocatorGetN(SymbolNode*, SYMBOL_TABLE_SIZE);
     symTable->tableSize = SYMBOL_TABLE_SIZE;
     symTable->seed = 0x811c9dc5; // TODO: rand
+    symTable->allow_duplication = duplicate;
     Memset(symTable->table, 0x00, sizeof(SymbolNode*) * SYMBOL_TABLE_SIZE);
 }
 
@@ -35,6 +42,10 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
     
     while(node != nullptr){
         if(_symbol_table_sym_node_matches(node, label, labelLen, id)){
+            if(symTable->allow_duplication){
+                node->duplications++;
+                return 1;
+            }
             return 0;
         }
         
@@ -50,6 +61,7 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
     newNode->id = id;
     newNode->next = nullptr;
     newNode->prev = nullptr;
+    newNode->duplications = 0;
     
     if(insert_id > 0){
         prev->next = newNode;
@@ -67,6 +79,13 @@ void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, Token
     uint tableIndex;
     SymbolNode *node = SymbolTable_GetEntry(symTable, label, labelLen, id, &tableIndex);
     if(node){
+        if(symTable->allow_duplication){
+            if(node->duplications > 0){
+                node->duplications--;
+                return;
+            }
+        }
+        
         SymbolNode *prev = node->prev;
         if(prev == nullptr){ // head
             symTable->table[tableIndex] = node->next;

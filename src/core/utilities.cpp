@@ -429,7 +429,7 @@ char *GetFileContents(const char *path, uint *size){
     
     _error_memory:
     if(ret){
-        free(ret);
+        AllocatorFree(ret);
         ret = nullptr;
     }
     

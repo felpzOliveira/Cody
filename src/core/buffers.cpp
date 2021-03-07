@@ -116,6 +116,15 @@ int Buffer_FindFirstNonEmptyToken(Buffer *buffer){
     return -1;
 }
 
+uint Buffer_FindFirstNonEmptyLocation(Buffer *buffer){
+    if(buffer == nullptr) return 0;
+    
+    int index = Buffer_FindFirstNonEmptyToken(buffer);
+    if(index < 0) return 0;
+    
+    return buffer->tokens[index].position;
+}
+
 uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8);
     for(uint i = 0; i < buffer->tokenCount; i++){

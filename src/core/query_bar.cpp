@@ -328,7 +328,9 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                     uint maxn = BufferView_GetLineCount(bView);
                     target = target > 0 ? target-1 : 0;
                     target = Clamp(target, 0, maxn-1);
-                    BufferView_CursorToPosition(bView, target, 0);
+                    Buffer *buffer = BufferView_GetBufferAt(bView, target);
+                    uint p = Buffer_FindFirstNonEmptyLocation(buffer);
+                    BufferView_CursorToPosition(bView, target, p);
                 }
             } break;
             case QUERY_BAR_CMD_SEARCH:

@@ -12,6 +12,11 @@
 #include <app.h>
 #include <autocomplete.h>
 
+#if defined(MEMORY_DEBUG)
+bool cmpr(void* a, void*b) { return (intptr_t)a < (intptr_t)b; }
+std::map<void*,long,bool(*)(void*, void*)> debug_memory_map(&cmpr);
+#endif
+
 Tokenizer tokenizer = TOKENIZER_INITIALIZER;
 SymbolTable symbolTable;
 
@@ -65,9 +70,9 @@ int main(int argc, char **argv){
     
     //test_autocomplete();
     
-    test_tokenizer("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
+    //test_tokenizer("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
     //test_tokenizer();
-    //test_tokenizer("/home/felipe/Documents/Mayhem/src/core/lex.cpp");
+    test_tokenizer("/home/felipe/Documents/Mayhem/src/core/lex.cpp");
     //test_tokenizer("/home/felipe/Documents/Mayhem/src/core/lex.cpp");
     //test_tokenizer("/home/felipe/Documents/Bubbles/src/boundaries/lnm.h");
     //test_tokenizer("/home/felipe/Documents/Bubbles/src/bubbles.cpp");

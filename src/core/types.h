@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-//#define MEMORY_DEBUG
+#define MEMORY_DEBUG
 
 typedef unsigned char uint8;
 
@@ -36,8 +36,6 @@ typedef struct CharU8{ char x[4]; }CharU8;
 #define Assert(x) 
 #define AssertA(x, msg)
 #else
-#include <execinfo.h>
-#include <signal.h>
 #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
 #define AssertA(x, msg) AssertErr(x, msg)
 #endif
@@ -62,13 +60,23 @@ inline void __assert_check(bool v, const char *name, const char *filename,
 #define AllocatorExpand(type, ptr, n, o) (type*)_expand_memory(sizeof(type)*((n)), sizeof(type)*((o)), ptr, __FILE__, __LINE__)
 #define AllocatorFree(ptr) _free_memory((void **)&(ptr), __FILE__, __LINE__)
 
+#if defined(MEMORY_DEBUG)
+#include <map>
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
+extern std::map<void*,long,bool(*)(void*, void*)> debug_memory_map;
+#endif
+
 inline void _debugger_trace(int sig){
-#if defined(DEBUG_BUILD)
+#if defined(MEMORY_DEBUG)
     void *array[10];
     size_t size = 0;
     size = backtrace(array, 10);
-    fprintf(stdout, "Error signal %d:\n", sig);
-    backtrace_sybols_fd(array, size, STDOUT_FILENO);
+    if(sig != 0){
+        fprintf(stdout, "Error signal %d:\n", sig);
+    }
+    backtrace_symbols_fd(array, size, STDOUT_FILENO);
     exit(1);
 #else
     (void)sig;
@@ -81,7 +89,8 @@ inline void *_get_memory(long size, const char *filename, uint line){
 #endif
     void *ptr = calloc(size, 1);
 #if defined(MEMORY_DEBUG)
-    printf("OK\n");
+    debug_memory_map[ptr] = size;
+    printf("OK - Inserted %p\n", ptr);
 #endif
     if(ptr == NULL){
         printf("Failed to get memory of size: %lx (%s:%u)\n", size, filename, line);
@@ -94,10 +103,17 @@ inline void *_expand_memory(long size, long osize, void *p,
 {
 #if defined(MEMORY_DEBUG)
     printf("REALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
+    if(debug_memory_map.find(p) != debug_memory_map.end()){
+        debug_memory_map.erase(p);
+    }else{
+        printf("Realloc of unknown address %p\n", p);
+        _debugger_trace(0);
+    }
 #endif
     void *ptr = realloc(p, size);
 #if defined(MEMORY_DEBUG)
-    printf("OK\n");
+    debug_memory_map[ptr] = size;
+    printf("OK - Inserted %p\n", ptr);
 #endif
     if(ptr == NULL){
         printf("Failed to expand memory to size: %lx (%s:%u)\n", size, filename, line);
@@ -113,6 +129,12 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
         if(*ptr){
 #if defined(MEMORY_DEBUG)
             printf("FREE %p (%s : %d)...", *ptr, filename, line); fflush(stdout);
+            if(debug_memory_map.find(*ptr) != debug_memory_map.end()){
+                debug_memory_map.erase(*ptr);
+            }else{
+                printf("Freeing pointer outside map %p\n", *ptr);
+                _debugger_trace(0);
+            }
 #endif
             free(*ptr);
 #if defined(MEMORY_DEBUG)
@@ -124,7 +146,7 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
 }
 
 inline void DebuggerRoutines(){
-#if defined(DEBUG_BUILD)
+#if defined(MEMORY_DEBUG)
     signal(SIGSEGV, _debugger_trace);
     signal(SIGABRT, _debugger_trace);
 #else

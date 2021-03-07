@@ -68,6 +68,11 @@ void Buffer_Init(Buffer *buffer, uint size);
 int Buffer_FindFirstNonEmptyToken(Buffer *buffer);
 
 /*
+* Locates the first non empty position inside a given buffer.
+*/
+uint Buffer_FindFirstNonEmptyLocation(Buffer *buffer);
+
+/*
 * Initializes a previously allocated Buffer from a string pointer given in 'head'
 * with size 'len'.
 */
