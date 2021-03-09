@@ -170,7 +170,7 @@ void OpenGLRenderAllLineNumbers(OpenGLState *state, BufferView *view, Theme *the
         Shader_UniformMatrix4(font->shader, "projection", &state->projection.m);
         Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
         
-        for(int i = lines.x; i < lines.y; i++){
+        for(uint i = lines.x; i < lines.y; i++){
             OpenGLRenderLineNumber(view, font, x, y, i, linen, theme);
             x = x0;
             y += font->fontMath.fontSizeAtRenderCall;
@@ -186,7 +186,6 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     Float x0 = 2.0f;
     Float x = x0;
     Float y = baseHeight;
-    char linen[32];
     OpenGLFont *font = &state->font;
     
     Graphics_PrepareTextRendering(state, projection, &state->model);
@@ -194,7 +193,7 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     x = x0;
     y = baseHeight;
     vec4i s(128);
-    for(int i = lines.x; i < lines.y; i++){
+    for(uint i = lines.x; i < lines.y; i++){
         if(OpenGLRenderLine(view, state, x, y, i)){
 #if 0
             int pGlyph  = -1;
@@ -235,8 +234,8 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view,
                            4, bufferView->isActive && vstate == View_FreeTyping);
         
         if(state->glGhostCursor.valid){
-            Float g = 0.5;
-            Float a = 0.6;
+            //Float g = 0.5;
+            //Float a = 0.6;
             OpenGLRenderCursor(state, &state->glGhostCursor,
                                GetUIColorf(defaultTheme, UIGhostCursor), 2, 0);
             //vec4f(g, g, g, a), 2, 0);
@@ -262,9 +261,8 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view,
                 Shader_UniformMatrix4(font->shader, "projection", &projection->m);
                 Shader_UniformMatrix4(font->shader, "modelView", &model->m);
                 
-                float f = fonsStashMultiTextColor(font->fsContext, p.x, p.y, 
-                                                  glfonsRGBA(0, 0, 0, 255),
-                                                  chr, chr+len, &pGlyph);
+                fonsStashMultiTextColor(font->fsContext, p.x, p.y, glfonsRGBA(0, 0, 0, 255),
+                                        chr, chr+len, &pGlyph);
                 fonsStashFlush(font->fsContext);
             }
         }
@@ -488,10 +486,9 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
     //TODO: This is where we would wrap?
     if(buffer->taken > 0){
         uint pos = 0;
-        uint at = 0;
-        for(int i = 0; i < buffer->tokenCount; i++){
+        for(uint i = 0; i < buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
-            while(pos < token->position){
+            while((int)pos < token->position){
                 char v = buffer->data[pos];
                 if(v == '\r' || v == '\n'){
                     pos++;
@@ -515,7 +512,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
             
             if(token->identifier == TOKEN_ID_SPACE){
                 // NOTE: nothing to do
-            }else if(token->position < buffer->taken){
+            }else if(token->position < (int)buffer->taken){
                 char *p = &buffer->data[token->position];
                 char *e = &buffer->data[token->position + token->size];
                 vec4i col = GetColor(defaultTheme, token->identifier);
@@ -529,7 +526,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                          Symbol_IsTokenNest(token->identifier))
                 {
                     for(uint f = 0; f < it; f++){
-                        if(f < view->startNestCount){
+                        if((int)f < view->startNestCount){
                             if(start[f].valid){ // is valid
                                 if((lineNr == start[f].position.x && 
                                     i == start[f].position.y))
@@ -541,7 +538,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                             }
                         }
                         
-                        if(f < view->endNestCount){
+                        if((int)f < view->endNestCount){
                             if(end[f].valid){ // is valid
                                 if((lineNr == end[f].position.x && 
                                     i == end[f].position.y))
@@ -640,12 +637,12 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     
     if(view->isActive){
         //vec4f color(0.78, 0.123, 0.1, 0.6); // TODO: state
-        vec4f c = GetUIColorf(theme, UIBorder);
-        vec4f color = vec4f(c.x, c.y, c.z, 0.7);
+        //vec4f c = GetUIColorf(theme, UIBorder);
+        //vec4f color = vec4f(c.x, c.y, c.z, 0.7);
         
-        glUseProgram(font->cursorShader.id);
-        Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-        Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+        //glUseProgram(font->cursorShader.id);
+        //Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+        //Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
         
 #if 0
         Float w = 1;
@@ -687,6 +684,8 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         return Graphics_RenderDefaultView(view, state, theme, dt);
     }
 }
+
+extern int testHover;
 
 int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Float dt){
     Float ones[] = {1,1,1,1};
@@ -807,7 +806,30 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     
     ActivateViewportAndProjection(state, vview, ViewportAllView);
     Graphics_RenderFrame(state, vview, &state->projection, originalScaleWidth, theme);
-    
+
+    if(testHover && 0){
+        Geometry geometry2;
+        static LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
+        static int xxx = 0;
+        if(xxx == 0){
+            xxx++;
+            LineBuffer_InitEmpty(&lineBuffer);
+            for(uint i = 0; i < 10; i++){
+                char d[256];
+                uint l = snprintf(d, sizeof(d), "STRING-%d", i);
+                LineBuffer_InsertLine(&lineBuffer, d, l, 0);
+            }
+        }
+
+        Float w = geometry.upper.x - geometry.lower.x;
+        Float h = geometry.upper.y - geometry.lower.y;
+        geometry2.upper.x = (geometry.upper.x + geometry.lower.x) * 0.5;
+        geometry2.upper.y = (geometry.upper.y + geometry.lower.y) * 0.5;
+        geometry2.lower.x = geometry2.upper.x - w * 0.25;
+        geometry2.lower.y = geometry2.upper.y - h * 0.25;
+        Graphics_RenderHoverableList(vview, state, theme, &geometry2, &lineBuffer);
+    }
+
     glDisable(GL_SCISSOR_TEST);
     return is_animating;
 }

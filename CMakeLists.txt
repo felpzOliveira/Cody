@@ -6,10 +6,10 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 	message(STATUS "Debug build")
-	set(MH_FLAGS "-g3 -O0 -Wall -std=gnu99 -DBUILD_DEBUG")
+	set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic")
 else()
 	message(STATUS "Release build")
-	set(MH_FLAGS "-O2 -Wall -std=gnu99")
+	set(MH_FLAGS "-O2 -Wall -std=c++11")
 endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"

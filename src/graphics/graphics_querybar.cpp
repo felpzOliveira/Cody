@@ -194,12 +194,8 @@ int Graphics_RenderQueryBar(View *view, OpenGLState *state,
                             Theme *theme, Float dt)
 {
     QueryBar *bar = View_GetQueryBar(view);
-    OpenGLFont *font = &state->font;
     Geometry *geometry = &bar->geometry;
     vec4f cursorColor = GetUIColorf(theme, UIQueryBarCursor);
-    
-    Float lineSize = ((geometry->upper.x - geometry->lower.x) * 
-                      font->fontMath.invReduceScale);
     
     vec4f backgroundColor = GetUIColorf(theme, UISelectorBackground);
     

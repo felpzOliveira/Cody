@@ -89,7 +89,7 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
                     // If dstToken was outside of the scope of the dst buffer
                     // it could happen that it contains garbage in its memory
                     // because its data was not dependent on its definition.
-                    // So we manually need to force its reserve field to nullptr
+                    // So we manually need to force its reserved field to nullptr
                     // to avoid the duplication routine to mistakenly attempt to free
                     // its content.
                     dstToken->reserved = nullptr;
@@ -131,7 +131,9 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8);
     for(uint i = 0; i < buffer->tokenCount; i++){
         Token *token = &buffer->tokens[i];
-        if(token->position <= pos && token->size+token->position > pos){
+		uint p = token->position < 0 ? 0 : token->position;
+		uint size = token->size < 0 ? 0 : token->size;
+        if(p <= pos && size + p > pos){
             return i;
         }
     }
@@ -160,7 +162,7 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
         char *p = buffer->data;
         int c = 0;
         int of = 0;
-        while(c != (int)rawp && buffer->taken > c){
+        while(c != (int)rawp && (int)buffer->taken > c){
             of = 0;
             int rv = StringToCodepoint(&p[c], buffer->taken - c, &of);
             if(rv == -1) break;
@@ -194,7 +196,7 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
         int of = 0;
         
         if(u8p == 0 && len){
-            int rv = StringToCodepoint(&p[c], buffer->taken - c, &of);
+            StringToCodepoint(&p[c], buffer->taken - c, &of);
             *len = of;
             return 0;
         }
@@ -213,7 +215,7 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
         AssertA(r == u8p, "StringToCodepoint failed to decode UTF-8");
         if(len){
             *len = 1;
-            if(buffer->taken > c){
+            if((int)buffer->taken > c){
                 (void)StringToCodepoint(&p[c], buffer->taken - c, &of);
                 *len = of;
             }
@@ -236,7 +238,7 @@ uint Buffer_GetUtf8Count(Buffer *buffer){
     uint r = 0;
     if(buffer->taken > 0){
         char *p = buffer->data;
-        int c = 0;
+        uint c = 0;
         int rv = -1;
         do{
             int of = 0;
@@ -300,7 +302,7 @@ void Buffer_Init(Buffer *buffer, uint size){
 void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
     uint len = leno;
     if(decode_tab){
-        for(int i = 0; i < leno; i++){
+        for(uint i = 0; i < leno; i++){
             if(head[i] == '\t'){
                 len += appGlobalConfig.tabSpacing - 1;
             }
@@ -320,7 +322,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
     
     uint ic = 0;
     if(len > 0){
-        for(int i = 0; i < leno; i++){
+        for(uint i = 0; i < leno; i++){
             if(decode_tab){
                 if(head[i] == '\t'){
                     for(int k = 0; k < appGlobalConfig.tabSpacing; k++){
@@ -349,7 +351,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
 
 int Buffer_IsBlank(Buffer *buffer){
     if(buffer->count == 0) return 1;
-    for(int i = 0; i < buffer->count; i++){
+    for(uint i = 0; i < buffer->count; i++){
         char p = buffer->data[i];
         if(p != ' ' && p != '\r' && p != '\t' && p != '\n') return 0;
     }
@@ -410,11 +412,11 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
             }
         }
         
-        //TODO: Merge both allocations in a single allocation
-        if(buffer->size < at){
-            int diff = at - buffer->size;
-            uint newSize = diff + len + DefaultAllocatorSize;
-            buffer->data = AllocatorExpand(char, buffer->data, newSize, buffer->size);
+        if(buffer->data == nullptr){
+            uint newSize = at + len + DefaultAllocatorSize;
+            buffer->data = AllocatorGetN(char, newSize);
+            buffer->size = newSize;
+            buffer->taken = 0;
         }
         
         if(buffer->size < buffer->taken + len){
@@ -430,7 +432,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
             }
         }
         
-        for(int i = 0; i < len; i++){
+        for(uint i = 0; i < len; i++){
             char v = str[i];
             if(decode_tab && v == '\t'){
                 for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
@@ -476,8 +478,14 @@ void Buffer_Release(Buffer *buffer){
 
 void Buffer_Free(Buffer *buffer){
     if(buffer){
-        if(buffer->data) AllocatorFree(buffer->data);
-        if(buffer->tokens){
+#if defined(MEMORY_DEBUG)
+        if((buffer->data && buffer->size == 0)){
+            printf("[MEM] Buffer has data pointer but 0 size");
+            getchar();
+        }
+#endif
+        if(buffer->data && buffer->size > 0) AllocatorFree(buffer->data);
+        if(buffer->tokens && buffer->tokenCount > 0){
             for(uint i = 0; i < buffer->tokenCount; i++){
                 Token *token = &buffer->tokens[i];
                 if(token->reserved){
@@ -695,7 +703,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
                               workContext->workTokenListHead);
     
     if(Lex_TokenizerHasPendingWork(tokenizer)){
-        int r = tokenizerContext.backTrack;
+        uint r = tokenizerContext.backTrack;
         AssertA(lineNr-1 >= r, "Overflow during forwardtrack computation");
         Buffer *b = LineBuffer_GetBufferAt(lineBuffer, lineNr - 1 - r);
         b->stateContext.forwardTrack = r+2;
@@ -728,7 +736,6 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
-    char *data = buffer->data;
     
     TokenizerWorkContext *workContext = tokenizer->workContext;
     
@@ -773,7 +780,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
                         workContext->workTokenListHead);
     
     if(Lex_TokenizerHasPendingWork(tokenizer)){
-        int r = tokenizerContext.backTrack;
+        uint r = tokenizerContext.backTrack;
         AssertA(base >= r, "Overflow during forwardtrack computation");
         Buffer *b = LineBuffer_GetBufferAt(lineBuffer, base - r);
         b->stateContext.forwardTrack = r+2;
@@ -1029,11 +1036,17 @@ void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNo,
 
 void LineBuffer_Free(LineBuffer *lineBuffer){
     if(lineBuffer){
-        for(int i = lineBuffer->lineCount-1; i >= 0; i--){
+#if defined(MEMORY_DEBUG)
+        if(lineBuffer->lines && lineBuffer->size == 0){
+            printf("[MEM] Linebuffer has lines but 0 size\n");
+            getchar();
+        }
+#endif
+        for(int i = lineBuffer->size-1; i >= 0; i--){
             Buffer_Free(lineBuffer->lines[i]);
             AllocatorFree(lineBuffer->lines[i]);
         }
-        if(lineBuffer->lines)
+        if(lineBuffer->lines && lineBuffer->size > 0)
             AllocatorFree(lineBuffer->lines);
         
         UndoRedoCleanup(&lineBuffer->undoRedo);
@@ -1181,13 +1194,15 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
         }
         
         linePtr[ic++] = '\n';
+        // this is not really a bug it just means we don't have space for \0
         if(ic+1 >= maxSize+2){
-            printf("Invalid write\n");
+            //printf("Invalid write\n");
         }else{
             linePtr[ic+1] = 0;
         }
         
         uint s = fwrite(linePtr, sizeof(char), ic, fp);
+        (void)s;
         AssertA(s == ic, "Failed to write to file");
     }
     
@@ -1200,18 +1215,18 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
 void Buffer_DebugStdoutData(Buffer *buffer){
     printf("Current UTF-8 size: %u\n", buffer->count);
     printf("Current Size: %u\n", buffer->size);
-    for(int j = 0; j < buffer->taken; j++){
+    for(uint j = 0; j < buffer->taken; j++){
         printf("%c", buffer->data[j]);
     }
     
     printf("\n");
-    for(int j = 0; j < buffer->taken; j++){
+    for(uint j = 0; j < buffer->taken; j++){
         printf("%d ", (int)buffer->data[j]);
     }
     
     printf("\n");
     printf(" TOKENS (%d): ", buffer->tokenCount);
-    for(int j = 0; j < buffer->tokenCount; j++){
+    for(uint j = 0; j < buffer->tokenCount; j++){
         Token *t = &buffer->tokens[j];
         char *s = &buffer->data[t->position];
         char x  = s[t->size];
@@ -1231,14 +1246,14 @@ void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo){
 
 void LineBuffer_DebugPrintRange(LineBuffer *lineBuffer, vec2i range){
     int start = Max(0, range.x);
-    int end = Min(range.x + range.y+1, lineBuffer->lineCount);
+    uint end = Min(range.x + range.y+1, lineBuffer->lineCount);
     
     printf("Range %d %d\n", start, end);
     if(start > 0){
         printf(" ( ... )\n");
     }
     
-    for(int i = start; i < end; i++){
+    for(uint i = start; i < end; i++){
         Buffer *buffer = lineBuffer->lines[i];
         printf("(%u) %d - %s\n", buffer->tokenCount, i, buffer->data);
     }
@@ -1255,7 +1270,7 @@ uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint s
         Buffer *buffer = lineBuffer->lines[i];
         for(uint k = 0; k < buffer->tokenCount; k++){
             Token *token = &buffer->tokens[k];
-            if(token->identifier == TOKEN_ID_NONE && token->size == size){
+            if(token->identifier == TOKEN_ID_NONE && (uint)token->size == size){
                 if(StringEqual(&buffer->data[token->position], (char *)m, size)){
                     count ++;
                 }

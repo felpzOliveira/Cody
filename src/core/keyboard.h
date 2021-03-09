@@ -17,7 +17,7 @@ typedef KEY_ENTRY_EVENT(KeyEntryCallback);
 
 #define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, callback, __VA_ARGS__, -1)
 
-#define RegisterRepeatableEvent(map, callback, ...) RegisterKeyboardEventEx(map, 1, callback, __VA_ARGS__, -1)
+#define RegisterRepeatableEvent(map, callback, ...) RegisterKeyboardEventEx(map, 1, #callback, callback, __VA_ARGS__, -1)
 
 typedef enum{
     Key_A = 1,
@@ -94,6 +94,7 @@ typedef struct{
     KeySetEventCallback *callback;
     int keySetSize;
     int supportsRepeat;
+	char bindingname[128];
 }Binding;
 
 typedef struct{
@@ -110,7 +111,7 @@ BindingMap *KeyboardCreateMapping();
 void KeyboardSetActiveMapping(BindingMap *mapping);
 
 void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback);
-void RegisterKeyboardEventEx(BindingMap *mapping, int repeat,
+void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
                              KeySetEventCallback *callback, ...);
 
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,

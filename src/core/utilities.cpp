@@ -99,6 +99,31 @@ uint GetSimplifiedPathName(char *fullPath, uint len){
     return 0;
 }
 
+uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len){
+    char *p = s0;
+    int c = 0;
+    int rv = -1;
+    int of = 0;
+    if(len < 0){
+        len = strlen(s0);
+    }
+
+    do{
+        rv = StringToCodepoint(&p[c], len - c, &of);
+        if(rv != -1){
+            if(c <= (int)at && c + of >= (int)at){
+                break;
+            }
+
+            c += of;
+        }
+    }while(*p && rv >= 0 && len > c);
+
+    Memcpy(chr->x, &p[c], of);
+    chr->x[of] = 0;
+    return (uint)of;
+}
+
 void Memset(void *dst, unsigned char v, uint size){
     unsigned char *udst = (unsigned char *)dst;
     while(size --){
@@ -246,7 +271,7 @@ void FastStringSearchInit(char *x, uint m){
     int i, j;
     i = 0;
     j = mpNext[0] = -1;
-    while(i < m){
+    while(i < (int)m){
         while(j > -1 && x[i] != x[j])
             j = mpNext[j];
         mpNext[++i] = ++j;
@@ -316,14 +341,14 @@ int StringIsDigits(char *s0, uint len){
 uint StringToUnsigned(char *s0, uint len){
     uint n = 0;
     unsigned long maxn = UINT_MAX-1;
-    unsigned long test = 0;
+    long int test = 0;
     char *ptr = nullptr;
     test = strtoul(s0, &ptr, 10);
     if(ptr == s0){
         printf("invalid number conversion (%s)\n", s0);
     }else if((test == LONG_MIN || test == LONG_MAX) && errno == ERANGE){
         printf("invalid number conversion (range) (%s)\n", s0);
-    }else if(test > maxn){
+    }else if((unsigned long) test > maxn){
         n = maxn;
     }else{
         n = (uint)test;
@@ -436,6 +461,171 @@ char *GetFileContents(const char *path, uint *size){
     _error:
     if(fd >= 0) close(fd);
     return ret;
+}
+
+void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuelen){
+    int diff = 0; // keep evaluator as we go down the tree
+    char *p = value;
+    uint pLen = valuelen;
+    TernaryTreeNode *current = nullptr;
+    TernaryTreeNode **pcurrent = nullptr;
+
+    if(root == nullptr || value == nullptr) return nullptr;
+
+    pcurrent = root;
+    int pplen = 0;
+    int off = 0;
+    int cpp = StringToCodepoint(p, pLen, &pplen);
+    while((current = *pcurrent)){
+        diff = cpp - current->codepoint;
+        if(diff == 0){
+            pLen -= pplen;
+            off += pplen;
+            cpp = StringToCodepoint(&p[off], pLen, &pplen);
+
+            if(pLen == 0){
+                current->references++;
+                return (void *)current->mid;
+            }
+            pcurrent = &(current->mid);
+        }else if(diff < 0){
+            pcurrent = &(current->left);
+        }else{
+            pcurrent = &(current->right);
+        }
+    }
+
+    while(1){
+        *pcurrent = AllocatorGetN(TernaryTreeNode, 1);
+        current = *pcurrent;
+        if(pLen > 0){
+            cpp = StringToCodepoint(&p[off], pLen, &pplen);
+            Memcpy(current->key.x, &p[off], pplen);
+            current->u8size = pplen;
+            current->codepoint = cpp;
+        }else{
+            current->u8size = 0;
+            current->codepoint = 0;
+        }
+        current->references = 1;
+        current->left = nullptr;
+        current->right = nullptr;
+        current->mid = nullptr;
+
+        if(!*root){
+            *root = *pcurrent;
+        }
+
+        if(pLen == 0){
+            char *str = StringDup(value, valuelen);
+            current->mid = (TernaryTreeNode *)str; //TODO: Bogus?
+            return (void *)str;
+        }
+
+        pLen -= pplen;
+        off += pplen;
+        pcurrent = &(current->mid);
+    }
+
+    return nullptr;
+}
+
+void TernarySearchTree_Transverse(TernaryTreeNode *node, std::function<void(const char *str)> fn)
+{
+    if(node == nullptr) return;
+    TernarySearchTree_Transverse(node->left, fn);
+    if(node->u8size > 0){
+        TernarySearchTree_Transverse(node->mid, fn);
+    }else{
+        fn((const char*)(node->mid));
+    }
+    TernarySearchTree_Transverse(node->right, fn);
+}
+
+void TernarySearchTree_Suggest(TernaryTreeNode *node, CharU8 chr, uint u8len, uint len,
+                               char **out, int *n, int maxn)
+{
+    if(node == nullptr || *n == maxn) return;
+    TernarySearchTree_Suggest(node->left, chr, u8len, len, out, n, maxn);
+    if(node->u8size > 0){
+        TernarySearchTree_Suggest(node->mid, chr, u8len, len, out, n, maxn);
+    }else{
+        char *ptr = (char *)node->mid;
+        uint psize = strlen(ptr);
+        CharU8 ochr;
+        uint u8l = StringComputeCharU8At(ptr, &ochr, len, psize);
+        if(u8l == u8len){
+            if(StringEqual(chr.x, ochr.x, u8len)){
+                out[(*n)++] = (char *)node->mid;
+            }
+        }
+    }
+
+    TernarySearchTree_Suggest(node->right, chr, u8len, len, out, n, maxn);
+}
+
+void *TernarySearchTree_Guess(TernaryTreeNode *root, char *s, uint plen,
+                              char **out, int *n, int maxn)
+{
+    TernaryTreeNode *current = root;
+    char *p = s;
+    if(!(*s)) return nullptr;
+
+    *n = 0;
+    int off = 0;
+    int pplen = 0;
+    int cpp = StringToCodepoint(p, plen, &pplen);
+
+    while(current){
+        int diff = cpp - current->codepoint;
+        if(diff == 0){
+            off += pplen;
+            cpp = StringToCodepoint(&p[off], plen - off, &pplen);
+            if(off == (int)plen){
+                TernarySearchTree_Suggest(current, current->key, current->u8size,
+                                          plen, out, n, maxn);
+                return (void *)current;
+            }
+            if(p[off] == 0) return (void *)current->mid;
+
+            current = current->mid;
+        }else if(diff < 0){
+            current = current->left;
+        }else{
+            current = current->right;
+        }
+    }
+
+    return nullptr;
+}
+
+void *TernarySearchTree_SearchString(TernaryTreeNode *node, char *value, uint len){
+    TernaryTreeNode *current = node;
+    char *p = value;
+    uint pLen = len;
+    int pplen = 0;
+    int off = 0;
+    int cpp = StringToCodepoint(p, pLen, &pplen);
+    while(current){
+        int diff = cpp - current->codepoint;
+        if(diff == 0){
+            pLen -= pplen;
+            off += pplen;
+            cpp = StringToCodepoint(&p[off], pLen, &pplen);
+
+            if(pLen == 0){
+                return (void *)current->mid;
+            }
+
+            current = current->mid;
+        }else if(diff < 0){
+            current = current->left;
+        }else{
+            current = current->right;
+        }
+    }
+
+    return nullptr;
 }
 
 BoundedStack *BoundedStack_Create(){

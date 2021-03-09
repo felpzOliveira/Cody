@@ -2,6 +2,7 @@
 #include <utilities.h>
 
 static AutoCompleteBruteForce autoComplete_brute;
+TernaryTreeNode *root = nullptr;
 
 void AutoComplete_Initialize(){
     autoComplete_brute.alphabetList = List_Create<AutoCompleteEntry>();
@@ -12,7 +13,7 @@ void AutoComplete_Search(char *value, uint valuelen){
     int size = 0;
     List<AutoCompleteEntry> *searchList = autoComplete_brute.alphabetList;
     AutoCompleteEntry *e = nullptr;
-    int c = StringToCodepoint(value, valuelen, &size);
+    StringToCodepoint(value, valuelen, &size);
     auto locate = [&](AutoCompleteEntry *entry) -> int{
         if(StringEqual(value, entry->key.x, size)){
             return 1;
@@ -23,7 +24,6 @@ void AutoComplete_Search(char *value, uint valuelen){
     e = List_Find<AutoCompleteEntry>(searchList, locate);
     if(e){
         ListNode<String> *ax = e->entries->head;
-        int found = 0;
         while(ax != nullptr){
             String *e0 = ax->item;
             if(e0->size >= valuelen && e0->data){
@@ -39,6 +39,7 @@ void AutoComplete_Search(char *value, uint valuelen){
 }
 
 void AutoComplete_PushString(char *value, uint valuelen){
+    return;
     int size = 0;
     List<AutoCompleteEntry> *searchList = autoComplete_brute.alphabetList;
     SymbolTable *symTable = &autoComplete_brute.symTable;
@@ -49,13 +50,15 @@ void AutoComplete_PushString(char *value, uint valuelen){
     
     if(r == 0) return;
     
-    int c = StringToCodepoint(value, valuelen, &size);
+    StringToCodepoint(value, valuelen, &size);
     auto locate = [&](AutoCompleteEntry *entry) -> int{
         if(StringEqual(value, entry->key.x, size)){
             return 1;
         }
         return 0;
     };
+
+    TernarySearchTree_Insert(&root, value, valuelen);
     
     e = List_Find<AutoCompleteEntry>(searchList, locate);
     if(e){

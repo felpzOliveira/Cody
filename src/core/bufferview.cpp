@@ -72,7 +72,7 @@ void BufferView_Synchronize(BufferView *view){
         VScroll *ss = &view->sController;
         // 1- Check if our cursor is within allowed limits
         vec2ui cursor = ss->cursor.textPosition;
-        cursor.x = Clamp(cursor.x, 0, view->lineBuffer->lineCount-1);
+        cursor.x = Clamp(cursor.x, (uint)0, view->lineBuffer->lineCount-1);
         Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, cursor.x);
         if(buffer == nullptr){
             BUG();
@@ -90,7 +90,7 @@ void BufferView_Synchronize(BufferView *view){
         
         // we don't need to care about insertion bellow
         
-        cursor.y = Clamp(cursor.y, 0, buffer->count);
+        cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
         // 2- Update the scroll controller so that viewing range also gets updated
         VScroll_CursorToPosition(ss, cursor.x, cursor.y, view->lineBuffer);
     }else{ // our buffer got killed
@@ -112,10 +112,10 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
     if(pos < buffer->taken){
         for(int i = 0; i < (int)buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
-            if(token->position + token->size > pos &&
+            if((token->position + token->size > (int)pos &&
                (token->identifier != TOKEN_ID_SPACE &&
-                token->identifier != TOKEN_ID_MATH) ||
-               (i == buffer->tokenCount-1 && token->identifier == TOKEN_ID_SPACE))
+                token->identifier != TOKEN_ID_MATH)) ||
+               (i == (int)buffer->tokenCount-1 && token->identifier == TOKEN_ID_SPACE))
             {
                 *targetToken = token;
                 tokenID = i;
@@ -136,9 +136,9 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     if(pos > 0){
         for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
             Token *token = &buffer->tokens[i];
-            if(token->position < pos && 
+            if((token->position < (int)pos && 
                (token->identifier != TOKEN_ID_SPACE &&
-                token->identifier != TOKEN_ID_MATH) || 
+                token->identifier != TOKEN_ID_MATH)) || 
                (i == 0 && token->identifier == TOKEN_ID_SPACE))
             {
                 *targetToken = token;
@@ -153,8 +153,7 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
 void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
                            Tokenizer *tokenizer)
 {
-    AssertA(view != nullptr && lineBuffer != nullptr && tokenizer != nullptr,
-            "Invalid initialization");
+    AssertA(view != nullptr &&  tokenizer != nullptr, "Invalid initialization");
     view->lineBuffer = lineBuffer;
     view->tokenizer = tokenizer;
     view->renderLineNbs = 1;
@@ -193,7 +192,6 @@ vec2ui BufferView_GetViewRange(BufferView *view){
 
 int BufferView_ComputeTextLine(BufferView *view, Float screenY, DescriptionLocation desc){
     if(view->lineBuffer){
-        Buffer *buffer = nullptr;
         Float lStart = view->sController.visibleRect.x;
         if(desc == DescriptionTop){
             screenY -= view->sController.lineHeight;
@@ -299,14 +297,13 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
     
-    int k = 0;
-    uint len = DefaultAllocatorSize;
+    uint k = 0;
     uint bid = start.x;
     uint startAt = Buffer_GetTokenAt(buffer, start.y);
     int done = 0;
     int is_first = 1;
     uint zeroContext = 0;
-    for(int i = 0; i < nIds; i++){
+    for(uint i = 0; i < nIds; i++){
         n[i] = 0;
     }
     
@@ -363,21 +360,21 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
     
-    int k = 0;
+    uint k = 0;
     int is_first = 1;
     uint bid = start.x;
     uint startAt = Buffer_GetTokenAt(buffer, start.y);
     int done = 0;
     uint zeroContext = 0;
     
-    for(int i = 0; i < nIds; i++){
+    for(uint i = 0; i < nIds; i++){
         n[i] = 0;
     }
     
     do{
         for(int i = (int)startAt; i >= 0; i--){
             Token *token = &buffer->tokens[i];
-            if(token && i < buffer->tokenCount){
+            if(token && i < (int)buffer->tokenCount){
                 for(uint s = 0; s < nIds; s++){
                     if(token->identifier == ids[s] && n[s] == 0){
                         if(!(k < maxN)) return k;
@@ -439,9 +436,9 @@ void BufferView_UpdateCursorNesting(BufferView *view){
         view->endNestCount = BufferView_FindNestsForward(view, s, ids, cids, 2,
                                                          view->endNest, 64, n);
         uint eid = 0;
-        for(uint i = 0; i < view->startNestCount; i++){
+        for(int i = 0; i < view->startNestCount; i++){
             TokenId idst = view->startNest[i].id;
-            for(uint k = eid; k < view->endNestCount; k++){
+            for(int k = eid; k < view->endNestCount; k++){
                 TokenId idend = view->endNest[k].id;
                 if(Symbol_AreTokensComplementary(idst, idend)){
                     view->startNest[i].comp = k;
@@ -469,7 +466,7 @@ void BufferView_UpdateCursorNesting(BufferView *view){
         
         // set nest depth, have to do later because numbers are actually reversed
         // and we can't pre-compute.
-        for(uint i = 0; i < view->startNestCount; i++){
+        for(int i = 0; i < view->startNestCount; i++){
             if(view->startNest[i].valid){
                 int id = view->startNest[i].id == TOKEN_ID_BRACE_OPEN ? 0 : 1;
                 int k = view->startNest[i].comp;

@@ -19,6 +19,11 @@
 #define GL3COREFONTSTASH_H
 #include <string.h>
 #include <geometry.h>
+#include <types.h>
+
+#if !defined(FONS_VERTEX_COUNT)
+#define FONS_VERTEX_COUNT 8192
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -81,29 +86,48 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
 	glBindVertexArray(gl->vertexArray);
 #endif
     
-	if (!gl->vertexBuffer) glGenBuffers(1, &gl->vertexBuffer);
+	if (!gl->vertexBuffer){
+        GL_CHK(glGenBuffers(1, &gl->vertexBuffer));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer));
+        GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * 2 * sizeof(float),
+                            NULL, GL_DYNAMIC_DRAW));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    }
+    
 	if (!gl->vertexBuffer) return 0;
     
-	if (!gl->tcoordBuffer) glGenBuffers(1, &gl->tcoordBuffer);
+	if (!gl->tcoordBuffer){
+        GL_CHK(glGenBuffers(1, &gl->tcoordBuffer));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer));
+        GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * 2 * sizeof(float),
+                            NULL, GL_DYNAMIC_DRAW));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    }
 	if (!gl->tcoordBuffer) return 0;
     
-	if (!gl->colorBuffer) glGenBuffers(1, &gl->colorBuffer);
+	if (!gl->colorBuffer){
+        GL_CHK(glGenBuffers(1, &gl->colorBuffer));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer));
+        GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * sizeof(unsigned int),
+                            NULL, GL_DYNAMIC_DRAW));
+        GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    }
 	if (!gl->colorBuffer) return 0;
     
 	gl->width = width;
 	gl->height = height;
-	glBindTexture(GL_TEXTURE_2D, gl->tex);
+	GL_CHK(glBindTexture(GL_TEXTURE_2D, gl->tex));
     
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	GL_CHK(glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL));
+	GL_CHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+	GL_CHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 #else
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, gl->width, gl->height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	GL_CHK(glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, gl->width, gl->height, 0, GL_RED, GL_UNSIGNED_BYTE, NULL));
+	GL_CHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+	GL_CHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
 	static GLint swizzleRgbaParams[4] = {GL_ONE, GL_ONE, GL_ONE, GL_RED};
-	glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleRgbaParams);
+	GL_CHK(glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleRgbaParams));
 #endif
     
 	return 1;
@@ -122,13 +146,13 @@ static void glfons__renderUpdate(void* userPtr, int* rect, const unsigned char* 
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
 	GLint alignment;
 	glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
-	glBindTexture(GL_TEXTURE_2D, gl->tex);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	GL_CHK(glBindTexture(GL_TEXTURE_2D, gl->tex));
+	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
 	// TODO: for now the whole texture is updated every time. Profile how bad is this.
 	// as ES2 doesn't seem to support GL_UNPACK_ROW_LENGTH the only other option is to make a temp copy of the updated
 	// portion with contiguous memory which is probably even worse.
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data);
-	glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
+	GL_CHK(glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data));
+	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, alignment));
     
 #else
 	// OpenGl desktop/es3 should use this version:
@@ -146,18 +170,18 @@ static void glfons__renderUpdate(void* userPtr, int* rect, const unsigned char* 
     
 	glBindTexture(GL_TEXTURE_2D, gl->tex);
     
-	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, gl->width);
-	glPixelStorei(GL_UNPACK_SKIP_PIXELS, rect[0]);
-	glPixelStorei(GL_UNPACK_SKIP_ROWS, rect[1]);
+	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
+    GL_CHK(glPixelStorei(GL_UNPACK_ROW_LENGTH, gl->width));
+    GL_CHK(glPixelStorei(GL_UNPACK_SKIP_PIXELS, rect[0]));
+    GL_CHK(glPixelStorei(GL_UNPACK_SKIP_ROWS, rect[1]));
     
-	glTexSubImage2D(GL_TEXTURE_2D, 0, rect[0], rect[1], w, h, GL_RED, GL_UNSIGNED_BYTE, data);
+	GL_CHK(glTexSubImage2D(GL_TEXTURE_2D, 0, rect[0], rect[1], w, h, GL_RED, GL_UNSIGNED_BYTE, data));
     
 	// Pop old values
-	glPixelStorei(GL_UNPACK_ALIGNMENT, alignment);
-	glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength);
-	glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels);
-	glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows);
+	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, alignment));
+    GL_CHK(glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength));
+    GL_CHK(glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels));
+    GL_CHK(glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows));
 #endif
     
 }
@@ -165,6 +189,14 @@ static void glfons__renderUpdate(void* userPtr, int* rect, const unsigned char* 
 static void glfons__renderDraw(void* userPtr, const float* verts, const float* tcoords, const unsigned int* colors, int nverts)
 {
 	GLFONScontext* gl = (GLFONScontext*)userPtr;
+    long int vertLen  = nverts * 2 * sizeof(float);
+    long int colorLen = nverts * sizeof(unsigned int);
+    
+    if(nverts >= FONS_VERTEX_COUNT){
+        printf("Attempting to render more than estimated maximum %d\n", nverts);
+        getchar();
+    }
+    
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
 	if (gl->tex == 0) return;
 #else
@@ -174,26 +206,35 @@ static void glfons__renderDraw(void* userPtr, const float* verts, const float* t
 #endif
     
     //printf("Nverts: %d\n", nverts);
+#if defined(MEMORY_DEBUG)
+    //__gpu_gl_get_memory_usage();
+#endif
     
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gl->tex);
     
 	glEnableVertexAttribArray(GLFONS_VERTEX_ATTRIB);
-	glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer);
-	glBufferData(GL_ARRAY_BUFFER, nverts * 2 * sizeof(float), verts, GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(GLFONS_VERTEX_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer));
+    GL_CHK_BINDING(gl->vertexBuffer, vertLen);
+    
+    GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, vertLen, verts));
+    GL_CHK(glVertexAttribPointer(GLFONS_VERTEX_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL));
     
 	glEnableVertexAttribArray(GLFONS_TCOORD_ATTRIB);
-	glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer);
-	glBufferData(GL_ARRAY_BUFFER, nverts * 2 * sizeof(float), tcoords, GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(GLFONS_TCOORD_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer));
+    GL_CHK_BINDING(gl->tcoordBuffer, vertLen);
+    
+    GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, vertLen, tcoords));
+    GL_CHK(glVertexAttribPointer(GLFONS_TCOORD_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL));
     
 	glEnableVertexAttribArray(GLFONS_COLOR_ATTRIB);
-	glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer);
-	glBufferData(GL_ARRAY_BUFFER, nverts * sizeof(unsigned int), colors, GL_DYNAMIC_DRAW);
-	glVertexAttribPointer(GLFONS_COLOR_ATTRIB, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, NULL);
+	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer));
+    GL_CHK_BINDING(gl->colorBuffer, colorLen);
     
-	glDrawArrays(GL_TRIANGLES, 0, nverts);
+    GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, colorLen, colors));
+    GL_CHK(glVertexAttribPointer(GLFONS_COLOR_ATTRIB, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, NULL));
+    
+	GL_CHK(glDrawArrays(GL_TRIANGLES, 0, nverts));
     
 	glDisableVertexAttribArray(GLFONS_VERTEX_ATTRIB);
 	glDisableVertexAttribArray(GLFONS_TCOORD_ATTRIB);
@@ -206,12 +247,15 @@ static void glfons__renderDraw(void* userPtr, const float* verts, const float* t
 
 static void glfons__renderDelete(void* userPtr)
 {
+    /// ???????
 	GLFONScontext* gl = (GLFONScontext*)userPtr;
 	if (gl->tex != 0) {
 		glDeleteTextures(1, &gl->tex);
 		gl->tex = 0;
 	}
     
+    printf("Delete call!\n");
+    return;
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	glBindVertexArray(0);
 #endif

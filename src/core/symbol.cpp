@@ -19,7 +19,7 @@ inline uint _symbol_table_hash(SymbolTable *symTable, char *label, uint labelLen
     *       however it is better in avoiding collisions,
     *       but feel free to experiment with this.
     */
-    // return FowlerNollVoStringHash32(label);
+    //return FowlerNollVoStringHash32(label);
     return MurmurHash3(label, labelLen, symTable->seed);
 }
 
@@ -75,7 +75,6 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
 }
 
 void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
-    int matched = 0;
     uint tableIndex;
     SymbolNode *node = SymbolTable_GetEntry(symTable, label, labelLen, id, &tableIndex);
     if(node){

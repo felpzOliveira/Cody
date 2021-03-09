@@ -27,7 +27,6 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
 {
     char title[32];
     uint len = 0;
-    int restoreCursor = 1;
     uint lastp = queryBar->cursor.textPosition.y - queryBar->writePosU8;
     queryBar->searchCmd.valid = 0;
     queryBar->filter.digitOnly = 0;
@@ -327,7 +326,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                     uint target = StringToUnsigned(number, nLen);
                     uint maxn = BufferView_GetLineCount(bView);
                     target = target > 0 ? target-1 : 0;
-                    target = Clamp(target, 0, maxn-1);
+                    target = Clamp(target, (uint)0, maxn-1);
                     Buffer *buffer = BufferView_GetBufferAt(bView, target);
                     uint p = Buffer_FindFirstNonEmptyLocation(buffer);
                     BufferView_CursorToPosition(bView, target, p);

@@ -100,7 +100,6 @@ int Shader_TranslateShaderContent(const std::string &content, std::string &data)
     for(std::string linebuf; std::getline(iss, linebuf); ){
         RemoveUnwantedLineTerminators(linebuf);
         if(linebuf.empty()) continue;
-        const char *token = linebuf.c_str();
         
         if(linebuf.find("#include") == 0){
             std::string subs = linebuf.substr(8);
@@ -138,8 +137,8 @@ int Shader_CompileFile(const char *path, int type, char *oContent){
     char *str = (char *)v;
     char *p = nullptr;
     
-    if(type != SHADER_TYPE_VERTEX && 
-       type != SHADER_TYPE_FRAGMENT || path == nullptr) return rv;
+    if((type != SHADER_TYPE_VERTEX && 
+       type != SHADER_TYPE_FRAGMENT) || path == nullptr) return rv;
     
     char *content = GetFileContents(path, &filesize);
     if(content == nullptr) return rv;

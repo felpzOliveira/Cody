@@ -140,9 +140,6 @@ int GetMappedKeysCountX11(){
 }
 
 int CreateKeyTableX11(){
-    int key = 0;
-    char name[XkbKeyNameLength + 1];
-    
     for(int scancode = 0; scancode < 256; scancode++){
         keycodes[scancode] = TranslateKeyCodeX11(scancode);
     }

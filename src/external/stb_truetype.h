@@ -463,7 +463,7 @@ int main(int arg, char **argv)
 #define __STB_INCLUDE_STB_TRUETYPE_H__
 
 #ifdef STBTT_STATIC
-#define STBTT_DEF static
+#define STBTT_DEF __attribute__((unused)) static
 #else
 #define STBTT_DEF extern
 #endif
@@ -823,7 +823,7 @@ STBTT_DEF void stbtt_MakeCodepointBitmapSubpixel(const stbtt_fontinfo *info, uns
 // same as stbtt_MakeCodepointBitmap, but you can specify a subpixel
 // shift for the character
 
-STBTT_DEF void stbtt_MakeCodepointBitmapSubpixelPrefilter(const stbtt_fontinfo *info, unsigned char *output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int oversample_x, int oversample_y, float *sub_x, float *sub_y, int codepoint);
+//STBTT_DEF void stbtt_MakeCodepointBitmapSubpixelPrefilter(const stbtt_fontinfo *info, unsigned char *output, int out_w, int out_h, int out_stride, float scale_x, float scale_y, float shift_x, float shift_y, int oversample_x, int oversample_y, float *sub_x, float *sub_y, int codepoint);
 // same as stbtt_MakeCodepointBitmapSubpixel, but prefiltering
 // is performed (see stbtt_PackSetOversampling)
 

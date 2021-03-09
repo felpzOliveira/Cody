@@ -153,6 +153,12 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state,
                                 Theme *theme, Float dt);
 
 /*
+* Renders a linebuffer as a hoverable component.
+*/
+int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
+                                 Geometry *geometry, LineBuffer *lineBuffer);
+
+/*
 * Given a view and a target viewport, prepares the viewport and scissor
 * geometry to perform rendering, also updates the OpenGLState given with the
 * target projection required to performed rendering.

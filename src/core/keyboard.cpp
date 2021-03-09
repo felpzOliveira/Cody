@@ -102,7 +102,7 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
     }
 }
 
-void RegisterKeyboardEventv(BindingMap *mapping, int repeat, 
+void RegisterKeyboardEventv(BindingMap *mapping, int repeat, const char *name,
                             KeySetEventCallback *callback, va_list args)
 {
     int size = 0;
@@ -124,6 +124,9 @@ void RegisterKeyboardEventv(BindingMap *mapping, int repeat,
         int count = counts[id];
         if(count < MAX_BINDINGS_PER_ENTRY){
             Binding *binding = &binds[GetBindingID(id, count)];
+			if(name){
+				memcpy(binding->bindingname, name, strlen(name));
+			}
             Memcpy(binding->keySet, keySet, sizeof(keySet));
             binding->keySetSize = size;
             binding->callback = callback;
@@ -135,12 +138,12 @@ void RegisterKeyboardEventv(BindingMap *mapping, int repeat,
     }
 }
 
-void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, 
+void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
                              KeySetEventCallback *callback, ...)
 {
     va_list args;
     va_start(args, callback);
-    RegisterKeyboardEventv(mapping, repeat, callback, args);
+    RegisterKeyboardEventv(mapping, repeat, name, callback, args);
     va_end(args);
 }
 

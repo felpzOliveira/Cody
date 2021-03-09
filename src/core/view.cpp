@@ -3,11 +3,11 @@
 static void View_SelectableListUpdateRange(View *view){
     SelectableList *list = &view->selectableList;
     uint mIndex = list->viewRange.x + list->currentLineRange;
-    if(list->active >= mIndex){
+    if(list->active >= (int)mIndex){
         uint ry = list->active - mIndex + 1;
         list->viewRange.x += ry;
         list->viewRange.y += ry;
-    }else if(list->active < list->viewRange.x){
+    }else if(list->active < (int)list->viewRange.x){
         uint range = list->viewRange.y - list->viewRange.x;
         list->viewRange.x = list->active;
         list->viewRange.y = list->active + range;
@@ -102,14 +102,13 @@ void View_SelectableListGetItem(View *view, uint i, Buffer **buffer){
         *buffer = nullptr;
         if(i < list->used){
             uint id = list->selectable[i];
-            AssertA(id < view->listBuffer->lineCount, "Invalid id translation");
+            AssertA(id < list->listBuffer->lineCount, "Invalid id translation");
             *buffer = LineBuffer_GetBufferAt(list->listBuffer, id);
         }
     }
 }
 
 void View_SelectableListSwapList(View *view, LineBuffer *sourceBuffer, int release){
-    uint id = 0;
     SelectableList *list = &view->selectableList;
     if(release){
         LineBuffer_Free(list->listBuffer);
@@ -153,7 +152,7 @@ void View_SelectableListPush(View *view, char *item, uint len){
     if(len > 0){
         SelectableList *list = &view->selectableList;
         
-        AssertA(view->state == View_SelectableListSet,
+        AssertA(view->state == View_SelectableList,
                 "Invalid call to View_SelectableListPush");
         
         AssertA(list->selectable != nullptr && list->selectableSize > 0,
@@ -263,7 +262,6 @@ void View_SetActive(View *view, int isActive){
 //TODO: Add as needed
 void View_ReturnToState(View *view, ViewState state){
     if(View_IsQueryBarActive(view)){
-        BufferView *bView = View_GetBufferView(view);
         QueryBar_Reset(&view->queryBar, view, 0);
         //BufferView_StartCursorTransition(bView, source.x, source.y, kTransitionJumpInterval);
     }
@@ -295,7 +293,7 @@ int View_NextItem(View *view){
     }else if(view->state == View_SelectableList){
         SelectableList *list = &view->selectableList;
         if(list->used > 0){
-            if(list->active < list->used-1){
+            if(list->active < (int)list->used-1){
                 list->active++;
             }else{
                 list->active = 0;
@@ -311,7 +309,6 @@ int View_NextItem(View *view){
 int View_CommitToState(View *view, ViewState state){
     int c = 1;
     if(View_IsQueryBarActive(view)){
-        BufferView *bView = View_GetBufferView(view);
         c = QueryBar_Reset(&view->queryBar, view, 1);
     }
     

@@ -16,6 +16,7 @@
 #define DebugBreak() raise(SIGTRAP)
 #define MAX_DECRIPTOR_LENGTH 256
 #define CHDIR(x) chdir(x)
+#define IGNORE(x) (void)!(x)
 
 #define BUG() printf("=========== BUG ===========\nLine:%d\n", __LINE__);
 #define NullRet(x) if(!(x)) return
@@ -135,6 +136,14 @@ int  FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
 uint GetSimplifiedPathName(char *fullPath, uint len);
 
 /*
+* Get the size and content of the of a UTF-8 character at a given position.
+* The string 's0' does not need to be null terminated in which case 'len' should
+* hold its size. In case 'len' = -1 this routine uses standard methods to detect
+* the size of the string 's0'.
+*/
+uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len=-1);
+
+/*
 * Convert colors.
 */
 vec4i ColorFromHex(uint hex);
@@ -171,6 +180,40 @@ void Memcpy(void *dst, void *src, uint size);
 void Memset(void *dst, unsigned char v, uint size);
 
 /* Data structures - Structures create their own copy of the item so you can free yours*/
+
+/*
+* Ternary Search Tree.
+*/
+typedef struct TernaryTreeNode{
+    CharU8 key;
+    uint u8size;
+    int codepoint;
+    uint references;
+    struct TernaryTreeNode *left, *right, *mid;
+}TernaryTreeNode;
+
+/*
+* Inserts a new string inside the search tree and returns the address of the 
+* inserted element, returns nullptr in case of errors.
+*/
+void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuelen);
+
+/*
+* Transverses the ternary search tree and invoke fn on all words.
+*/
+void TernarySearchTree_Transverse(TernaryTreeNode *root, std::function<void(const char *str)> fn);
+
+/*
+* Searches for a string inside the ternary search tree. Returns the string as void pointer
+* in case of success or nullptr in case it could not find.
+*/
+void *TernarySearchTree_SearchString(TernaryTreeNode *root, char *value, uint len);
+
+/*
+* Searches for a prefix inside a ternary search tree.
+*/
+void *TernarySearchTree_Guess(TernaryTreeNode *root, char *s, uint plen,
+                              char **out, int *n, int maxn);
 
 /*
 * Doubly linked list.
@@ -234,7 +277,6 @@ void List_Erase(List<T> *list, std::function<int(T *)> finder){
     int ht = list->head == list->tail ? 1 : 0;
     while(ax != nullptr){
         if(finder(ax->item)){
-            ListNode<T> *prev = ax->prev;
             if(ax == list->head){
                 list->head = ax->next;
                 if(ht) list->tail = list->head;

@@ -37,13 +37,6 @@ static OpenGLState GlobalGLState;
 *               font->fontMath.invReduceScale
 */
 
-static Transform ComputeScreenToGLTransform(OpenGLState *state, Float lineHeight){
-    OpenGLFont *font = &state->font;
-    FontMath *fMath = &font->fontMath;
-    Float scale = lineHeight / fMath->fontSizeAtRenderCall;
-    return Scale(scale, scale, 1);
-}
-
 
 void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float width = (Float)(upper.x - lower.x);
@@ -217,7 +210,6 @@ static void _OpenGLStateInitialize(OpenGLState *state){
 }
 
 static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
-    BufferView *bufferView = AppGetActiveBufferView();
     Float range = width * 2.0f;
     Float zNear = -range;
     Float zFar = range;
@@ -265,7 +257,6 @@ void WindowOnScroll(int is_up){
 }
 
 void WindowOnClick(int x, int y){
-    OpenGLFont *font = &GlobalGLState.font;
     vec2ui mouse = AppActivateViewAt(x, y);
     
     //TODO: States
@@ -276,7 +267,7 @@ void WindowOnClick(int x, int y){
         int lineNo = BufferView_ComputeTextLine(bufferView, mouse.y, view->descLocation);
         if(lineNo < 0) return;
         
-        lineNo = Clamp(lineNo, 0, BufferView_GetLineCount(bufferView)-1);
+        lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
         
         uint colNo = 0;
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
@@ -495,10 +486,8 @@ void test_gl_selector(OpenGLState *state){
 *       the 'translate at end of file' issue we have right now.
 */
 void OpenGLEntry(){
-    Float ones[] = {1,1,1,1};
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
-    OpenGLFont *font = &state->font;
     
     _OpenGLStateInitialize(state);
     OpenGLInitialize(state);
@@ -512,10 +501,6 @@ void OpenGLEntry(){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
-        Float width = state->width;
-        Float height = state->height;
-        
-        double fps = 1.0 / dt;
         
         lastTime = currTime;
         AppUpdateViews();
@@ -529,7 +514,7 @@ void OpenGLEntry(){
             // Sets the alpha for the current view rendering stages, makes the dimm effect
             SetAlpha(view->isActive ? 0 : 1);
             
-            for(int s = 0; s < pipeline->stageCount; s++){
+            for(uint s = 0; s < pipeline->stageCount; s++){
                 state->model = state->scale; // reset model
                 animating |= pipeline->stages[s].renderer(view, state, defaultTheme, dt);
             }

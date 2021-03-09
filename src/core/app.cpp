@@ -10,6 +10,7 @@
 #include <string.h>
 #include <file_buffer.h>
 #include <autocomplete.h>
+#include <types.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -22,7 +23,7 @@ typedef struct{
     BindingMap *freeTypeMapping;
     BindingMap *queryBarMapping;
     View *activeView;
-    int viewsCount;
+    uint viewsCount;
     int activeId;
     
     char cwd[PATH_MAX];
@@ -38,6 +39,7 @@ static App appContext = {
 };
 
 AppConfig appGlobalConfig;
+int testHover = 1;
 
 void AppInitializeFreeTypingBindings();
 void AppInitializeQueryBarBindings();
@@ -46,7 +48,7 @@ BufferView *AppGetActiveBufferView();
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     Float w = (Float)(geometry.upper.x - geometry.lower.x);
     Float h = (Float)(geometry.upper.y - geometry.lower.y);
-    for(int i = 0; i < appContext.viewsCount; i++){
+    for(uint i = 0; i < appContext.viewsCount; i++){
         View *view = &appContext.views[i];
         uint x0 = (uint)(w * view->geometry.extensionX.x);
         uint x1 = (uint)(w * view->geometry.extensionX.y);
@@ -153,7 +155,7 @@ void AppSetBindingsForState(ViewState state){
 }
 
 void AppSetActiveView(int i){
-    AssertA(i >= 0 && i < appContext.viewsCount, "Invalid view id");
+    AssertA(i >= 0 && (uint)i < appContext.viewsCount, "Invalid view id");
     if(appContext.activeView){
         View_SetActive(appContext.activeView, 0);
     }
@@ -174,7 +176,6 @@ void AppUpdateViews(){
 
 void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
-    vec2ui visible = BufferView_GetViewRange(bufferView);
     Token *token = nullptr;
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     switch(direction){
@@ -248,7 +249,7 @@ void AppCommandFreeTypingArrows(int direction){
             }
             
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-            cursor.y = Clamp(cursor.y, 0, buffer->count);
+            cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
             
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
@@ -258,30 +259,30 @@ void AppCommandFreeTypingArrows(int direction){
             int n = Buffer_FindFirstNonEmptyToken(buffer);
             n = n < 0 ? 0 : buffer->tokens[n].position;
             n = Buffer_Utf8RawPositionToPosition(buffer, n);
-            cursor.y = Clamp(cursor.y, n, buffer->count);
+            cursor.y = Clamp(cursor.y, (uint)n, buffer->count);
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_DOWN:{ // Move down
-            cursor.x = Clamp(cursor.x+1, 0, lineCount-1);
+            cursor.x = Clamp(cursor.x+1, (uint)0, lineCount-1);
             
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             int n = Buffer_FindFirstNonEmptyToken(buffer);
             n = n < 0 ? 0 : buffer->tokens[n].position;
             n = Buffer_Utf8RawPositionToPosition(buffer, n);
-            cursor.y = Clamp(cursor.y, n, buffer->count);
+            cursor.y = Clamp(cursor.y, (uint)n, buffer->count);
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         
         case DIRECTION_RIGHT:{ // Move right
             Buffer *buffer = LineBuffer_GetBufferAt(bufferView->lineBuffer, cursor.x);
             if(cursor.y >= buffer->count){ // move down
-                cursor.x = Clamp(cursor.x+1, 0, lineCount-1);
+                cursor.x = Clamp(cursor.x+1, (uint)0, lineCount-1);
             }else{
                 cursor.y += 1;
             }
             
             buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-            cursor.y = Clamp(cursor.y, 0, buffer->count);
+            cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         
@@ -573,7 +574,6 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
 void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
-    uint at = cursor.y;
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
     
     NullRet(buffer);
@@ -781,7 +781,7 @@ void AppCommandEndLine(){
 }
 
 void AppCommandSwapView(){
-    if(appContext.activeId + 1 < appContext.viewsCount){
+    if((uint)appContext.activeId + 1 < appContext.viewsCount){
         AppSetActiveView(appContext.activeId+1);
     }else{
         AppSetActiveView(0);
@@ -833,13 +833,12 @@ void AppCommandSaveBufferView(){
 
 void AppCommandCopy(){
     vec2ui start, end;
-    uint size = 0;
     char *ptr = nullptr;
     BufferView *view = AppGetActiveBufferView();
     NullRet(view->lineBuffer);
     
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
-        size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
+        LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr);
         printf("Copied %s === \n", ptr);
     }
@@ -935,8 +934,15 @@ void AppCommandPaste(){
         
         RemountTokensBasedOn(view, startBuffer, n);
         
+        Buffer *b = LineBuffer_GetBufferAt(view->lineBuffer, endx);
+        
+        if(b == nullptr){
+            BUG();
+            printf("Cursor line is nullptr\n");
+        }
+        
         cursor.x = endx;
-        cursor.y = endy;
+        cursor.y = Clamp(endy, (uint)0, b->count);
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
         view->lineBuffer->is_dirty = 1;
     }
@@ -979,7 +985,6 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
     uint tabSize = appGlobalConfig.tabSpacing;
     char indentChar = ' ';
     int changes = 0;
-    vec2ui cursor = BufferView_GetCursorPosition(view);
     if(appGlobalConfig.useTabs){
         indentChar = '\t';
     }
@@ -1084,7 +1089,6 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
         int off = 0;
         int cp = StringToCodepoint(utf8Data, utf8Size, &off);
         if(Font_SupportsCodepoint(cp)){
-            Token *token = nullptr;
             View *view = AppGetActiveView();
             ViewState state = View_GetState(view);
             if(state == View_FreeTyping){
@@ -1315,6 +1319,16 @@ void AppInitializeQueryBarBindings(){
     appContext.queryBarMapping = mapping;
 }
 
+void AppMemoryDebugFreeze(){
+    __memory_freeze();
+    printf(" === ==== === FREEZED STATE\n");
+}
+
+void AppMemoryDebugCmp(){
+    __memory_compare_state();
+    getchar();
+}
+
 void AppInitializeFreeTypingBindings(){
     BindingMap *mapping = nullptr;
     mapping = KeyboardCreateMapping();
@@ -1322,7 +1336,11 @@ void AppInitializeFreeTypingBindings(){
     RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
-    
+
+    //DEBUG KEYS
+    RegisterRepeatableEvent(mapping, AppMemoryDebugFreeze, Key_LeftControl, Key_1);
+    RegisterRepeatableEvent(mapping, AppMemoryDebugCmp, Key_LeftControl, Key_2);
+
     //TODO: Create basic mappings
     RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
     RegisterRepeatableEvent(mapping, AppCommandRightArrow, Key_Right);

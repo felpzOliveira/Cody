@@ -182,7 +182,7 @@ int ChooseGLXFBConfig(Framebuffer *desired, LibHelperX11 *x11,
     GLXFBConfig *nativeConfigs;
     Framebuffer *usableFbs;
     Framebuffer *closest = NULL;
-    int i, nativeCount, usableCount;
+    int nativeCount, usableCount;
     
     nativeConfigs = glXGetFBConfigs(x11->display, x11->screen, &nativeCount);
     AssertA(nativeConfigs != NULL && nativeCount > 0, "Failed glXGetFBConfigs");

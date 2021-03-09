@@ -3,10 +3,26 @@
 #include <string.h>
 #include <view.h>
 
+int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
+                                 Geometry *geometry, LineBuffer *lineBuffer)
+{
+    //OpenGLFont *font = &state->font;
+    vec4f backColor = ColorFromHexf(0xff2f317c);
+    ActivateViewportAndProjection(state, geometry);
+    //Float lWidth = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale;
+
+    Float fcol[] = {backColor.x, backColor.y, backColor.z, backColor.w};
+    glClearBufferfv(GL_COLOR, 0, fcol);
+    glClearBufferfv(GL_DEPTH, 0, kOnes); //???
+
+
+    glDisable(GL_SCISSOR_TEST);
+    return 0;
+}
+
 int Graphics_RenderListSelector(View *view, OpenGLState *state,
                                 Theme *theme, Float dt)
 {
-    Float ones[] = {1,1,1,1};
     Float scaling = kViewSelectableListScaling;
     OpenGLFont *font = &state->font;
     FileOpener *opener = View_GetFileOpener(view);
@@ -21,7 +37,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state,
     
     ActivateViewportAndProjection(state, view, ViewportFrame);
     glClearBufferfv(GL_COLOR, 0, fcol);
-    glClearBufferfv(GL_DEPTH, 0, ones);
+    glClearBufferfv(GL_DEPTH, 0, kOnes);
     
     Float y0 = 0;
     //
@@ -81,7 +97,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state,
         }
         
         
-        if(i == list->active){
+        if((int)i == list->active){
             Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, 2, scol);
         }
 #endif

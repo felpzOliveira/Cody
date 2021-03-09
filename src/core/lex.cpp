@@ -449,9 +449,8 @@ LEX_PROCESSOR(Lex_Number){
     int dotCount = 0;
     int eCount = 0;
     int xCount = 0;
-    int rLen = 0;
+    size_t rLen = 0;
     int iValue = 0;
-    int exValue = 0;
     int uCount = 0;
     int lCount = 0;
     *len = 0;
@@ -476,7 +475,6 @@ LEX_PROCESSOR(Lex_Number){
     do{
         _number_start:
         iValue = (**p) - '0';
-        exValue = (int)(**p);
         if(uCount == 1 && (**p == 'L' || **p == 'l') && lCount < 2){
             lCount++;
             rLen ++;
@@ -606,8 +604,7 @@ LEX_PROCESSOR(Lex_Number){
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_Inclusion){
     int level = 0;
-    int rLen = 0;
-    int reverseSlash = 0;
+    size_t rLen = 0;
     *len = 0;
     *head = *p;
     LEX_DEBUG("Starting inclusion parser at \'%c\'\n", **p);
@@ -641,7 +638,7 @@ LEX_PROCESSOR(Lex_Inclusion){
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_String){
     int level = 0;
-    int rLen = 0;
+    size_t rLen = 0;
     char lastSep = 0;
     int reverseSlash = 0;
     *len = 0;
@@ -682,7 +679,7 @@ LEX_PROCESSOR(Lex_Comments){
     int type = tokenizer->type;
     //token->identifier = TOKEN_ID_COMMENT;
     
-    int rLen = 0;
+    size_t rLen = 0;
     char prev = 0;
     *len = 0;
     *head = *p;
@@ -739,11 +736,6 @@ LEX_PROCESSOR(Lex_Comments){
         }
     }
     
-    consume:
-    if(rLen > 0){
-        
-    }
-    
     end:
     *len = rLen;
     tokenizer->aggregate = aggregate;
@@ -778,7 +770,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     token->size = length;
     int tableIndex = -1;
     for(int k = 0; k < lookup->nSize; k++){
-        if(length == lookup->sizes[k].y){
+        if((int)length == lookup->sizes[k].y){
             tableIndex = k;
             break;
         }
@@ -847,7 +839,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     int lexrv = 0;
     char *h = *p;
     uint len = 1;
-    uint currSize = 0;
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
@@ -904,7 +895,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     int lexrv = 0;
     char *h = *p;
     uint len = 1;
-    uint currSize = 0;
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
@@ -978,7 +968,6 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     uint offset = 0;
     uint len = 0;
     int rv = 0;
-    char *h = *p;
     //printf("Starting at \'%c\'\n", **p);
     
     TokenizerContext *tCtx = nullptr;
@@ -1122,7 +1111,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
 //TODO: Translate the tokens into a more robust expression
 static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
     *found = 0;
-    while(i < buffer->tokenCount){
+    while(i < (int)buffer->tokenCount){
         Token *token = &buffer->tokens[i];
         if(token->identifier != TOKEN_ID_SPACE && 
            token->identifier != TOKEN_ID_ASTERISK)
@@ -1191,7 +1180,6 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     
     std::vector<GToken> tokens = cppTable->at(0);
     int elements = cppTable->size();
-    int offset = tokens.size();
     
     lookupTable->realSize = elements + DefaultAllocatorSize;
     lookupTable->table = (LookupToken **)AllocatorGet(sizeof(LookupToken *) * lookupTable->realSize);
@@ -1201,7 +1189,7 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
         LookupToken *tokenList = nullptr;
         tokens = cppTable->at(i);
         tokenList = (LookupToken *)AllocatorGet(sizeof(LookupToken) * (tokens.size() + DefaultAllocatorSize));
-        for(int k = 0; k < tokens.size(); k++){
+        for(uint k = 0; k < tokens.size(); k++){
             GToken gToken = tokens[k];
             uint len = Min(strlen(gToken.value), TOKEN_MAX_LENGTH);
             Memcpy((void *)tokenList[k].value, (void *)gToken.value, len);
@@ -1220,7 +1208,6 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
 void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable){
     TokenLookupTable *tables = nullptr;
     TokenizerWorkContext *workContext = nullptr;
-    TokenLookupTable *ax = nullptr;
     AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
     tokenizer->contexts = AllocatorGetN(TokenizerContext, 2);
     tokenizer->contextCount = 2;

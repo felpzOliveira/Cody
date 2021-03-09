@@ -101,7 +101,7 @@ void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer)
         uint lastP = buffer->tokens[buffer->tokenCount-1].position;
         uint lastX = lastP + buffer->tokens[buffer->tokenCount-1].size;
         
-        if(ss->cursor.textPosition.y < buffer->tokens[0].position){
+        if((int)ss->cursor.textPosition.y < buffer->tokens[0].position){
             ss->cursor.textPosition.y = buffer->tokens[0].position;
         }else if(ss->cursor.textPosition.y > lastX){
             ss->cursor.textPosition.y = lastX;
@@ -119,7 +119,7 @@ void VScroll_CursorToPosition(VScroll *ss, uint lineNo, uint col, LineBuffer *li
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, (uint)lineNo);
     if(buffer){
         if(buffer->count > 0)
-            col = Clamp(col, 0, buffer->count);
+            col = Clamp(col, (uint)0, buffer->count);
         else
             col = 0;
         
@@ -186,7 +186,7 @@ void VScroll_StartScrollViewTransition(VScroll *ss, int lineDiffs,
             expectedEnd = Min(lineBuffer->lineCount - 1, expectedEnd);
         }
         
-        int is_down = expectedEnd > ss->transitionAnim.endLine;
+        int is_down = expectedEnd > (int)ss->transitionAnim.endLine;
         ss->transitionAnim.endLine = expectedEnd;
         ss->transitionAnim.is_down = is_down;
     }
@@ -198,7 +198,6 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
 {
     AnimationProps *anim = &ss->transitionAnim;
     vec2ui oldP = ss->cursor.textPosition;
-    vec2ui vRect = ss->visibleRect;
     uint range = ss->currentMaxRange;
     
     AssertA(anim->transition == TransitionScroll, "Incorrect transition query");
@@ -266,7 +265,7 @@ void VScroll_StartCursorTransition(VScroll *ss, uint lineNo, uint col,
                                    Float duration, LineBuffer *lineBuffer)
 {
     AssertA(ss != nullptr, "Invalid scroll controller pointer");
-    lineNo = Clamp(lineNo, 0, lineBuffer->lineCount-1);
+    lineNo = Clamp(lineNo, (uint)0, lineBuffer->lineCount-1);
     if(IsZero(duration) || duration < 0){ // if no interval is given simply move
         VScroll_CursorToPosition(ss, lineNo, col, lineBuffer);
     }else if(ss->cursor.textPosition.x != lineNo){ // actual animation

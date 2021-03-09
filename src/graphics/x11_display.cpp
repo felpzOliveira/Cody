@@ -323,6 +323,13 @@ void _CreateWindowX11(int width, int height, const char *title,
     
     XMapWindow(x11->display, window->handle);
     waitForVisibilityNotify(window, x11);
+
+    XClassHint *xHint = XAllocClassHint();
+    if(xHint){
+        xHint->res_name = xHint->res_class = (char *)"Cody"; //TODO: app name
+        XSetClassHint(x11->display, window->handle, xHint);
+        XFree(xHint);
+    }
     
     window->shouldClose = 0;
     
@@ -884,8 +891,8 @@ void ProcessEventDestroyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11)
 void ProcessEventX11(XEvent *event){
     WindowX11 *window = NULL;
     int filtered = XFilterEvent(event, None);
-    int rv = XFindContext(x11Helper.display, event->xany.window,
-                          x11Helper.context, (XPointer *)&window);
+    XFindContext(x11Helper.display, event->xany.window,
+                 x11Helper.context, (XPointer *)&window);
     //if(rv != 0) return;
     
     switch(event->type){

@@ -197,7 +197,7 @@ void UndoRedoUndoPushInsertBlock(UndoRedo *redo, vec2ui start, char *text, uint 
     BufferChange bufferChange = {
         .bufferInfo = start,
         .buffer = nullptr,
-        .text = strdup(text),
+        .text = StringDup(text, size),
         .size = size,
         .change = CHANGE_BLOCK_INSERT,
     };

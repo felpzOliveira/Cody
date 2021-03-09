@@ -18,6 +18,8 @@ struct AutoCompleteBruteForce{
     SymbolTable symTable;
 };
 
+//TODO: Ternary Search!
+
 void AutoComplete_Initialize();
 
 void AutoComplete_PushString(char *value, uint valuelen);

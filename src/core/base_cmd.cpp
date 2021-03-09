@@ -64,7 +64,6 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
             if(opener->basePath[opener->pathLen-1] == '/'){ // change dir
                 char tmp = 0;
                 uint n = GetSimplifiedPathName(opener->basePath, opener->pathLen-1);
-                char *folder = opener->basePath;
                 
                 tmp = opener->basePath[n];
                 opener->basePath[n] = 0;
@@ -80,7 +79,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                 {
                     printf("Failed to list files from %s\n", opener->basePath);
                     opener->basePath[n] = tmp;
-                    CHDIR(opener->basePath);
+                    IGNORE(CHDIR(opener->basePath));
                     return 0;
                 }
                 
@@ -105,7 +104,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                                              &opener->entryCount, &opener->entrySize) < 0)
             {
                 printf("Failed to list files from %s\n", content);
-                CHDIR(opener->basePath);
+                IGNORE(CHDIR(opener->basePath));
                 return -1;
             }
             
@@ -144,7 +143,12 @@ int FileOpenCommandEntry(QueryBar *queryBar, View *view){
 }
 
 int FileOpenCommandCancel(QueryBar *queryBar, View *view){
+    FileOpener *opener = View_GetFileOpener(view);
     SelectableListFreeLineBuffer(view);
+    AllocatorFree(opener->entries);
+    opener->entries = nullptr;
+    opener->entryCount = 0;
+    opener->entrySize = 0;
     return 1;
 }
 
@@ -185,7 +189,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
                                          &opener->entryCount, &opener->entrySize) < 0)
         {
             printf("Failed to list files from %s\n", opener->basePath);
-            CHDIR(opener->basePath);
+            IGNORE(CHDIR(opener->basePath));
             return 1;
         }
         
@@ -201,6 +205,10 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
     queryBar->fileOpenCallback(view, entry);
     
     SelectableListFreeLineBuffer(view);
+    AllocatorFree(opener->entries);
+    opener->entries = nullptr;
+    opener->entryCount = 0;
+    opener->entrySize = 0;
     return 1;
 }
 
@@ -278,7 +286,6 @@ int SwitchBufferCommandCancel(QueryBar *queryBar, View *view){
 }
 
 int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
-    uint rindex = 0;
     LineBuffer *lineBuffer = nullptr;
     Buffer *buffer = nullptr;
     
@@ -316,7 +323,6 @@ int SwitchBufferCommandStart(View *view){
     const char *header = "Switch Buffer";
     uint hlen = strlen(header);
     FileBufferList *fBuffers = AppGetFileBufferList();
-    QueryBar *queryBar = View_GetQueryBar(view);
     
     lineBuffer = AllocatorGetN(LineBuffer, 1);
     LineBuffer_InitBlank(lineBuffer);
@@ -348,7 +354,7 @@ int SwitchBufferCommandStart(View *view){
 int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                           DoubleCursor *dcursor)
 {
-    AssertA(queryBar != nullptr && lineBuffer != nullptr && cursor != nullptr,
+    AssertA(queryBar != nullptr && lineBuffer != nullptr && dcursor != nullptr,
             "Invalid search input");
     AssertA(queryBar->cmd == QUERY_BAR_CMD_SEARCH ||
             queryBar->cmd == QUERY_BAR_CMD_REVERSE_SEARCH,

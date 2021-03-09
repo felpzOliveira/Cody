@@ -12,11 +12,6 @@
 #include <app.h>
 #include <autocomplete.h>
 
-#if defined(MEMORY_DEBUG)
-bool cmpr(void* a, void*b) { return (intptr_t)a < (intptr_t)b; }
-std::map<void*,long,bool(*)(void*, void*)> debug_memory_map(&cmpr);
-#endif
-
 Tokenizer tokenizer = TOKENIZER_INITIALIZER;
 SymbolTable symbolTable;
 
@@ -27,6 +22,40 @@ void test_autocomplete(){
     AutoComplete_PushString((char *)value, len);
     AutoComplete_PushString((char *)value, len);
 }
+
+void test_ternary_tree(){
+    TernaryTreeNode *root2 = nullptr;
+        
+    for(uint i = 0; i < 100; i++){
+        char d[256];
+        uint size = snprintf(d, sizeof(d), "STR-%d", i);
+        TernarySearchTree_Insert(&root2, (char *)d, size);
+    }
+    
+    auto print_words = [](const char *str) -> void{
+        printf("Found word: %s\n", str);
+    };
+    
+    TernarySearchTree_Transverse(root2, print_words);
+
+    const char *s = "STR-9";
+    uint sn = 5;
+    char *out[30];
+    int maxn = 30;
+    int n = 0;
+
+    void *p = TernarySearchTree_Guess(root2, (char *)s, sn, (char **)out, &n, maxn);
+    if(p){
+        printf("Got something\n");
+        for(int i = 0; i < n; i++){
+            printf(" > %s\n", out[i]);
+        }
+    }else{
+        printf("No result\n");
+    }
+}
+
+extern TernaryTreeNode *root;
 
 void test_tokenizer(const char *path=nullptr){
     AutoComplete_Initialize();
@@ -55,7 +84,13 @@ void test_tokenizer(const char *path=nullptr){
         LineBuffer_Init(lBuffer, bView->tokenizer, content, fileSize);
         LineBuffer_SetStoragePath(lBuffer, (char *)path, strlen(path));
         AllocatorFree(content);
-        
+
+        auto print_words = [](const char *str) -> void{
+            printf("Found word: %s\n", str);
+        };
+
+        //TernarySearchTree_Transverse(root, print_words);
+
         BufferView_SwapBuffer(bView, lBuffer);
         AppInsertLineBuffer(lBuffer);
     }
@@ -65,8 +100,11 @@ void test_tokenizer(const char *path=nullptr){
 
 int main(int argc, char **argv){
     DebuggerRoutines();
-    CHDIR("/home/felipe/Documents/Mayhem/src");
+    IGNORE(CHDIR("/home/felipe/Documents/Mayhem/src"));
     AppEarlyInitialize();
+
+    //test_ternary_tree();
+    //exit(0);
     
     //test_autocomplete();
     

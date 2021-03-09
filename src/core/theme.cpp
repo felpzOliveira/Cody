@@ -103,7 +103,9 @@ Theme themeRadical = {
     .lineNumberColor = ColorFromHex(0xFF767585),
     .lineNumberHighlitedColor = ColorFromHex(0xFF767585),
     .cursorLineHighlight = ColorFromHex(0xFF241630),
-    .operatorColor   = ColorFromHex(0xCCc7ff00),
+    //.operatorColor   = ColorFromHex(0xCCfc78ad),
+    //.operatorColor = ColorFromHex(0xCCfaaf05),
+    .operatorColor = ColorFromHex(0xCCc7ff00),
     
     .datatypeColor   = ColorFromHex(0xCCff427c),
     .commentColor    = ColorFromHex(0x48cff0e9),
@@ -197,8 +199,8 @@ Theme theme4Coder = {
     .alphaDimm = 1,
 };
 
-//Theme *defaultTheme = &themeRadical;
-Theme *defaultTheme = &theme4Coder;
+Theme *defaultTheme = &themeRadical;
+//Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 
 static int globalActive = 0;
