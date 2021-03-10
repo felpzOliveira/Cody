@@ -124,6 +124,17 @@ void Graphics_LineFlush(OpenGLState *state, int blend=1);
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize);
 
 /*
+* Computes the color a token should have according to the current given theme
+* and text format. This function returns -1 in case the given token does not
+* need to be rendered or 0 in case it needs, in which case the color is given
+* in 'color'. 'bView', 'lineNr' and 'tid' are only required if correct
+* braces color are expected for nesting points. Giving bView = nullptr
+* skips nest computation.
+*/
+int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
+                               Theme *theme, uint lineNr, uint tid,
+                               BufferView *bView, vec4i *color);
+/*
 * Renders a BufferView, returns != 0 in case the bufferview is animating and cannot
 * be put on hold.
 */

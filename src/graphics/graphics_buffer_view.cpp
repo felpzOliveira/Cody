@@ -478,11 +478,9 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
     Tokenizer *tokenizer = view->tokenizer;
     SymbolTable *symTable = tokenizer->symbolTable;
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
-    
-    NestPoint *start = view->startNest;
-    NestPoint *end   = view->endNest;
-    uint it = Max(view->startNestCount, view->endNestCount);
-    
+
+    vec4i col;
+
     //TODO: This is where we would wrap?
     if(buffer->taken > 0){
         uint pos = 0;
@@ -509,49 +507,15 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                 printf("Data : %s, taken: %u\n", buffer->data, buffer->taken);
                 AssertA(0, "Invalid character");
             }
-            
+
             if(token->identifier == TOKEN_ID_SPACE){
                 // NOTE: nothing to do
             }else if(token->position < (int)buffer->taken){
                 char *p = &buffer->data[token->position];
                 char *e = &buffer->data[token->position + token->size];
-                vec4i col = GetColor(defaultTheme, token->identifier);
-                
-                if(token->identifier == TOKEN_ID_NONE){
-                    SymbolNode *node = SymbolTable_Search(symTable, p, token->size);
-                    if(node){
-                        col = GetColor(defaultTheme, node->id);
-                    }
-                }else if(BufferView_CursorNestIsValid(view) &&
-                         Symbol_IsTokenNest(token->identifier))
-                {
-                    for(uint f = 0; f < it; f++){
-                        if((int)f < view->startNestCount){
-                            if(start[f].valid){ // is valid
-                                if((lineNr == start[f].position.x && 
-                                    i == start[f].position.y))
-                                {
-                                    col = GetNestColor(defaultTheme, start[f].id,
-                                                       start[f].depth);
-                                    break;
-                                }
-                            }
-                        }
-                        
-                        if((int)f < view->endNestCount){
-                            if(end[f].valid){ // is valid
-                                if((lineNr == end[f].position.x && 
-                                    i == end[f].position.y))
-                                {
-                                    col = GetNestColor(defaultTheme, end[f].id,
-                                                       start[f].depth);
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                }
-                
+                int r = Graphics_ComputeTokenColor(p, token, symTable, defaultTheme,
+                                                   lineNr, i, view, &col);
+                if(r < 0) continue;
                 pos += token->size;
                 x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
                                             p, e, &previousGlyph);

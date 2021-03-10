@@ -838,9 +838,9 @@ void AppCommandCopy(){
     NullRet(view->lineBuffer);
     
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
-        LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
-        ClipboardSetStringX11(ptr);
-        printf("Copied %s === \n", ptr);
+        uint size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
+        ClipboardSetStringX11(ptr, size);
+        printf("Copied %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
     }
 }
 
@@ -874,8 +874,8 @@ void AppCommandCut(){
     
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
-        ClipboardSetStringX11(ptr);
-        printf("Copied %s === \n", ptr);
+        ClipboardSetStringX11(ptr, size);
+        printf("Cut %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
         
         UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
         AppCommandRemoveTextBlock(view, start, end);

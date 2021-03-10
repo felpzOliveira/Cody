@@ -18,8 +18,8 @@ void __memory_freeze(){
 void __memory_compare_state(){
     DebugMap::iterator it;
     long unsigned int unused = 0;
-    long unsigned int freezedmem = 0;
-    long unsigned int currentmem = 0;
+    //long unsigned int freezedmem = 0;
+    //long unsigned int currentmem = 0;
     for(it = debug_memory_map.begin(); it != debug_memory_map.end(); it++){
         void *addr = it->first;
         MemoryEntry entry = it->second;

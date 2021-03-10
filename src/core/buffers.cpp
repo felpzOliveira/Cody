@@ -1085,6 +1085,7 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
     uint si = start.x;
     uint spi = 0;
     uint maxi = 0;
+	uint size = 0;
     Buffer *b = LineBuffer_GetBufferAt(lineBuffer, si);
     uint pi = Buffer_Utf8PositionToRawPosition(b, start.y);
     spi = pi;
@@ -1102,9 +1103,10 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
         }
     }while(si <= ei);
     
-    data = (char *)AllocatorGet(unprocessedSize);
+    data = AllocatorGetN(char, unprocessedSize);
     uint ic = 0;
     uint c = spi;
+	size = unprocessedSize;
     for(uint i = start.x; i <= ei; i++){
         b = LineBuffer_GetBufferAt(lineBuffer, i);
         char *p = &b->data[c];
@@ -1112,8 +1114,12 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
         
         // small hack for empty lines at the end of a copy
         //if(m == 0 && i == ei) data[ic++] = '\n';
-        
+
         while(m > c){
+            if(!(ic < size)){
+                data = AllocatorExpand(char, data, size+DefaultAllocatorSize, size);
+                size += DefaultAllocatorSize;
+            }
             data[ic++] = *p;
             if(*p == '\t'){
                 for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
@@ -1124,14 +1130,24 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
             AssertA(*p != '\n', "Invalid line configuration {break point}");
             p++; c++;
         }
-        
-        if(i < ei)
+
+        if(i < ei){
+            if(!(ic < size)){
+                data = AllocatorExpand(char, data, size+DefaultAllocatorSize, size);
+                size += DefaultAllocatorSize;
+            }
             data[ic++] = '\n';
+		}
         c = 0;
     }
     
+	if(!(ic < size)){
+		data = AllocatorExpand(char, data, size+DefaultAllocatorSize, size);
+		size += DefaultAllocatorSize;
+	}
+
+    AssertA(ic < size, "Invalid write size");
     data[ic++] = 0;
-    
     *ptr = data;
     return ic-1;
 }

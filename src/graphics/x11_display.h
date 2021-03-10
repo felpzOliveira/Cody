@@ -139,6 +139,8 @@ typedef struct{
     
     char *primarySelectionString;
     char *clipboardString;
+    unsigned int primarySelectionStringSize;
+    unsigned int clipboardStringSize;
     
     struct{
         int available;
@@ -168,7 +170,7 @@ void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y);
 double GetElapsedTime();
 
 const char *ClipboardGetStringX11(unsigned int *size);
-void ClipboardSetStringX11(char *str);
+void ClipboardSetStringX11(char *str, unsigned int len);
 
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
 void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);

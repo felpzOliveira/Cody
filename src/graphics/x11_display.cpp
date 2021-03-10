@@ -441,11 +441,15 @@ static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
     char* selectionString = NULL;
     const Atom formats[] = { x11Helper.UTF8_STRING, XA_STRING };
     const int formatCount = sizeof(formats) / sizeof(formats[0]);
+    unsigned int selectionSize = 0;
     
-    if(request->selection == x11Helper.PRIMARY)
+    if(request->selection == x11Helper.PRIMARY){
+        selectionSize   = x11Helper.primarySelectionStringSize;
         selectionString = x11Helper.primarySelectionString;
-    else
+    }else{
+        selectionSize   = x11Helper.clipboardStringSize;
         selectionString = x11Helper.clipboardString;
+	}
     
     if(request->property == None){
         // The requester is a legacy client (ICCCM section 2.2)
@@ -500,7 +504,7 @@ static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
                                 8,
                                 PropModeReplace,
                                 (unsigned char *) selectionString,
-                                strlen(selectionString));
+                                selectionSize);
             }
             else
                 targets[i + 1] = None;
@@ -549,7 +553,7 @@ static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
                             8,
                             PropModeReplace,
                             (unsigned char *) selectionString,
-                            strlen(selectionString));
+                            selectionSize);
             
             return request->property;
         }
@@ -560,15 +564,21 @@ static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
     return None;
 }
 
-const char* GetSelectionString(Atom selection){
+const char* GetSelectionString(Atom selection, unsigned int *outlen){
     char** selectionString = NULL;
     const Atom targets[] = { x11Helper.UTF8_STRING, XA_STRING };
     const size_t targetCount = sizeof(targets) / sizeof(targets[0]);
-    
-    if(selection == x11Helper.PRIMARY)
+    unsigned int *selectionSize = NULL;
+
+    if(selection == x11Helper.PRIMARY){
+        selectionSize   = &x11Helper.primarySelectionStringSize;
         selectionString = &x11Helper.primarySelectionString;
-    else
+    }else{
+        selectionSize   = &x11Helper.clipboardStringSize;
         selectionString = &x11Helper.clipboardString;
+    }
+
+    *outlen = *selectionSize;
     
     if(XGetSelectionOwner(x11Helper.display, selection) ==
        x11Helper.helperWindow)
@@ -676,19 +686,21 @@ const char* GetSelectionString(Atom selection){
         printf("Failed to copy content\n");
     }
     
+    *selectionSize = strlen(*selectionString);
+    *outlen = *selectionSize;
     return *selectionString;
     
 }
 
 const char *ClipboardGetStringX11(unsigned int *size){
-    const char *str = GetSelectionString(x11Helper.CLIPBOARD);
-    *size = strlen(str); // TODO: Make this thing go away
+    const char *str = GetSelectionString(x11Helper.CLIPBOARD, size);
     return str;
 }
 
-void ClipboardSetStringX11(char *str){
+void ClipboardSetStringX11(char *str, unsigned int len){
     free(x11Helper.clipboardString);
     x11Helper.clipboardString = str;
+    x11Helper.clipboardStringSize = len;
     XSetSelectionOwner(x11Helper.display, x11Helper.CLIPBOARD, 
                        x11Helper.helperWindow, CurrentTime);
     

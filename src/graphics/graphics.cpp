@@ -141,6 +141,54 @@ void Graphics_SetFontSize(OpenGLState *state, Float fontSize){
     state->scale = Scale(fMath->reduceScale, fMath->reduceScale, 1);
 }
 
+int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
+                               Theme *theme, uint lineNr, uint tid,
+                               BufferView *bView, vec4i *color)
+{
+    if(!str || !token || !symTable || !color) return -1;
+    if(token->identifier == TOKEN_ID_SPACE) return -1;
+    vec4i col = GetColor(theme, token->identifier);
+
+    if(token->identifier == TOKEN_ID_NONE){
+        SymbolNode *node = SymbolTable_Search(symTable, str, token->size);
+        if(node){
+            col = GetColor(theme, node->id);
+        }
+    }else if(bView){
+        if(BufferView_CursorNestIsValid(bView) && Symbol_IsTokenNest(token->identifier)){
+            NestPoint *start = bView->startNest;
+            NestPoint *end   = bView->endNest;
+            int it = (int)Max(bView->startNestCount, bView->endNestCount);
+            for(int f = 0; f < it; f++){
+                if(f < bView->startNestCount){
+                    if(start[f].valid){ // is valid
+                        if((lineNr == start[f].position.x &&
+                            tid == start[f].position.y))
+                        {
+                            col = GetNestColor(theme, start[f].id, start[f].depth);
+                            break;
+                        }
+                    }
+                }
+
+                if(f < bView->endNestCount){
+                    if(end[f].valid){
+                        if((lineNr == end[f].position.x &&
+                            tid == end[f].position.y))
+                        {
+                            col = GetNestColor(theme, end[f].id, end[f].depth);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    *color = col;
+    return 0;
+}
+
 void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
                                    Transform *model)
 {

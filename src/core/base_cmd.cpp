@@ -415,7 +415,7 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
         }while(done == 0);
     }
     
-    printf("Invalid\n");
-    searchResult->valid = 0;
+    //printf("Invalid\n");
+    //searchResult->valid = 0; // TODO: Why was this here?
     return 0;
 }
