@@ -91,6 +91,8 @@ void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer)
             lineNo = Min(lineBuffer->lineCount-1, X + gap);
         }else if(lineNo > Y - gap){
             lineNo = Max(Y - gap, 0);
+            int range = Y - X;
+            if(range < (int)ss->currentMaxRange) lineNo++;
         }
     }
     
@@ -135,6 +137,37 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
     int gap = 1;
     vec2ui visibleRect = ss->visibleRect;
     uint lineRangeSize = ss->currentMaxRange;
+
+    if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
+        if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
+            int iLine = (int)lineNo;
+            iLine = Max(0, iLine - gap);
+            visibleRect.x = (uint)iLine;
+            visibleRect.y = Min(visibleRect.x + lineRangeSize, lineBuffer->lineCount);
+        }else if(lineNo >= visibleRect.y - gap){ // going down
+            uint dif = visibleRect.x + lineRangeSize - visibleRect.y;
+            uint wished = Min(lineNo + gap + 1, lineBuffer->lineCount);
+            visibleRect.y = wished;
+            if(visibleRect.y + dif <= wished){
+                visibleRect.x = wished - lineRangeSize;
+            }
+        }
+    }
+
+    ss->visibleRect = visibleRect;
+    if(lineNo < lineBuffer->lineCount){
+        ss->cursor.textPosition.x = lineNo;
+        VScroll_UpdateRelativeDistance(ss, lineNo, lineBuffer->lineCount);
+    }
+
+    ss->cursor.is_dirty = 1;
+}
+
+void VScroll_CursorTo2(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
+    AssertA(ss != nullptr, "Invalid scroll controller pointer");
+    int gap = 1;
+    vec2ui visibleRect = ss->visibleRect;
+    uint lineRangeSize = ss->currentMaxRange;
     if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
         // Outside screen
         if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
@@ -143,8 +176,18 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
             visibleRect.x = (uint)iLine;
             visibleRect.y = Min(visibleRect.x + lineRangeSize, lineBuffer->lineCount);
         }else if(lineNo >= visibleRect.y - gap){ // going down
-            visibleRect.y = Min(lineNo + gap + 1, lineBuffer->lineCount);
-            visibleRect.x = visibleRect.y - lineRangeSize;
+#if 1
+            uint currRange = visibleRect.y - visibleRect.x;
+            if(lineNo == lineBuffer->lineCount - 1){
+                if(currRange > 1){
+                    visibleRect.y = lineBuffer->lineCount;
+                    visibleRect.x = visibleRect.y - currRange;
+                }
+            }else{
+                visibleRect.y = Min(lineNo + gap + 1, lineBuffer->lineCount);
+                visibleRect.x = visibleRect.y - lineRangeSize;
+            }
+#endif
         }
     }
     

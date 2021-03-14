@@ -1,77 +1,100 @@
 #include <autocomplete.h>
 #include <utilities.h>
+#include <app.h>
 
-static AutoCompleteBruteForce autoComplete_brute;
-TernaryTreeNode *root = nullptr;
+static AutoComplete autoComplete;
 
-void AutoComplete_Initialize(){
-    autoComplete_brute.alphabetList = List_Create<AutoCompleteEntry>();
-    SymbolTable_Initialize(&autoComplete_brute.symTable, true);
+void AutoComplete_Next(){
+    View *view = AppGetActiveView();
+    SelectableList *list = view->autoCompleteList;
+    SelectableList_NextItem(list);
 }
 
-void AutoComplete_Search(char *value, uint valuelen){
-    int size = 0;
-    List<AutoCompleteEntry> *searchList = autoComplete_brute.alphabetList;
-    AutoCompleteEntry *e = nullptr;
-    StringToCodepoint(value, valuelen, &size);
-    auto locate = [&](AutoCompleteEntry *entry) -> int{
-        if(StringEqual(value, entry->key.x, size)){
-            return 1;
-        }
-        return 0;
+void AutoComplete_Previous(){
+    View *view = AppGetActiveView();
+    SelectableList *list = view->autoCompleteList;
+    SelectableList_PreviousItem(list, 0);
+}
+
+void AutoComplete_Commit(){
+    View *view = AppGetActiveView();
+    SelectableList *list = view->autoCompleteList;
+    int id = SelectableList_GetActiveIndex(list);
+    if(id >= 0){
+        Buffer *buffer = nullptr;
+        SelectableList_GetItem(list, id, &buffer);
+        char *data = &buffer->data[autoComplete.lastSearchLen];
+        AppDefaultEntry(data, buffer->taken - autoComplete.lastSearchLen);
+        AppDefaultReturn();
+        if(autoComplete.lastSearchValue) AllocatorFree(autoComplete.lastSearchValue);
+        autoComplete.lastSearchLen = 0;
+    }
+}
+
+BindingMap *AutoComplete_Initialize(){
+    BindingMap *mapping = nullptr;
+    autoComplete.lastSearchLen = 0;
+    autoComplete.lastSearchValue = nullptr;
+
+    mapping = KeyboardCreateMapping();
+    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
+    RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
+    RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
+    RegisterRepeatableEvent(mapping, AutoComplete_Next, Key_Down);
+    RegisterRepeatableEvent(mapping, AutoComplete_Previous, Key_Up);
+    RegisterRepeatableEvent(mapping, AutoComplete_Commit, Key_Enter);
+    RegisterRepeatableEvent(mapping, AutoComplete_Commit, Key_Tab);
+
+    autoComplete.mapping = mapping;
+    autoComplete.root = TRIE_NODE_INITIALIZER;
+    return mapping;
+}
+
+int AutoComplete_Search(char *value, uint valuelen, SelectableList *list){
+    LineBuffer *lineBuffer = SelectableList_GetLineBuffer(list);
+    if(lineBuffer == nullptr){
+        lineBuffer = AllocatorGetN(LineBuffer, 1);
+    }else{
+        LineBuffer_Free(lineBuffer);
+    }
+
+    LineBuffer_InitBlank(lineBuffer);
+    auto push_wd = [&](char *buf, uint len, Trie *) -> void{
+        //printf(" > %s\n", buf);
+        if(len != valuelen)
+            LineBuffer_InsertLine(lineBuffer, buf, len, 0);
     };
 
-    e = List_Find<AutoCompleteEntry>(searchList, locate);
-    if(e){
-        ListNode<String> *ax = e->entries->head;
-        while(ax != nullptr){
-            String *e0 = ax->item;
-            if(e0->size >= valuelen && e0->data){
-                if(StringEqual(e0->data, value, valuelen)){
-                    printf("Found match %s\n", e0->data);
-                }
-            }
-            ax = ax->next;
-        }
-    }else{
-        printf("No match\n");
+    Trie_Search(&autoComplete.root, value, valuelen, push_wd);
+
+    if(autoComplete.lastSearchValue){
+        AllocatorFree(autoComplete.lastSearchValue);
     }
+
+    autoComplete.lastSearchValue = StringDup(value, valuelen);
+    autoComplete.lastSearchLen = valuelen;
+
+    SelectableList_SwapList(list, lineBuffer, 0);
+    return lineBuffer->lineCount;
 }
 
 void AutoComplete_PushString(char *value, uint valuelen){
-    return;
-    int size = 0;
-    List<AutoCompleteEntry> *searchList = autoComplete_brute.alphabetList;
-    SymbolTable *symTable = &autoComplete_brute.symTable;
-    AutoCompleteEntry *e = nullptr;
-    // 1- Grab the first codepoint to check the size of the element
-    if(valuelen < 2) return;
-    int r = SymbolTable_Insert(symTable, value, valuelen, TOKEN_ID_NONE);
-    
-    if(r == 0) return;
-    
-    StringToCodepoint(value, valuelen, &size);
-    auto locate = [&](AutoCompleteEntry *entry) -> int{
-        if(StringEqual(value, entry->key.x, size)){
-            return 1;
-        }
-        return 0;
-    };
-
-    TernarySearchTree_Insert(&root, value, valuelen);
-    
-    e = List_Find<AutoCompleteEntry>(searchList, locate);
-    if(e){
-        String *str = StringMake(value, valuelen);
-        List_Push<String>(e->entries, str);
-    }else{
-        String *str = StringMake(value, valuelen);
-        //printf("Inserting %s\n", str->data);
-        
-        e = AllocatorGetN(AutoCompleteEntry, 1);
-        e->entries = List_Create<String>();
-        Memcpy(e->key.x, value, size);
-        List_Push<String>(e->entries, str);
-        List_Push<AutoCompleteEntry>(searchList, e);
-    }
+#if 0
+    char s = value[valuelen];
+    value[valuelen] = 0;
+    printf(" Inserting > %s\n", value);
+    value[valuelen] = s;
+#endif
+    Trie_Insert(&autoComplete.root, value, valuelen);
 }
+
+void AutoComplete_Remove(char *value, uint valuelen){
+#if 0
+    char s = value[valuelen];
+    value[valuelen] = 0;
+    printf(" Removing > %s\n", value);
+    value[valuelen] = s;
+#endif
+    Trie_Remove(&autoComplete.root, value, valuelen);
+}
+

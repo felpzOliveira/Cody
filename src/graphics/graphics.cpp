@@ -220,6 +220,10 @@ void Graphics_FlushText(OpenGLState *state){
     glUseProgram(0);
 }
 
+vec2ui Graphics_GetMouse(OpenGLState *state){
+    return state->mouse;
+}
+
 static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
     buffer->vertex = AllocatorGetN(Float, 2 * n);
     buffer->colors = AllocatorGetN(Float, 4 * n);
@@ -283,6 +287,7 @@ void WindowOnSizeChange(int width, int height){
 
 void WinOnMouseMotion(int x, int y){
     //printf("Mouse to %d %d\n", x, y);
+    GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
 }
 
 void WindowOnScroll(int is_up){ 

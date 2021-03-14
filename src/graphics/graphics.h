@@ -67,6 +67,7 @@ struct OpenGLState{
     OpenGLBuffer glQuadBuffer;
     OpenGLBuffer glLineBuffer;
     OpenGLCursor glCursor, glGhostCursor;
+    vec2ui mouse;
     int running, width, height;
     Float renderLineWidth;
     Bounds2f windowBounds;
@@ -124,6 +125,11 @@ void Graphics_LineFlush(OpenGLState *state, int blend=1);
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize);
 
 /*
+* Queries the opengl state for the last known cursor position.
+*/
+vec2ui Graphics_GetMouse(OpenGLState *state);
+
+/*
 * Computes the color a token should have according to the current given theme
 * and text format. This function returns -1 in case the given token does not
 * need to be rendered or 0 in case it needs, in which case the color is given
@@ -168,6 +174,11 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state,
 */
 int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
                                  Geometry *geometry, LineBuffer *lineBuffer);
+
+/*
+* Renders the content of the autocomplete list in the current view.
+*/
+int Graphics_RenderAutoComplete(View *view, OpenGLState *state, Theme *theme, Float dt);
 
 /*
 * Given a view and a target viewport, prepares the viewport and scissor

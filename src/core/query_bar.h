@@ -13,7 +13,7 @@
 #define OnQueryBarCancel std::function<int(QueryBar *, View*)>
 #define OnQueryBarCommit std::function<int(QueryBar *, View*)>
 
-#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, }
+#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, .allowFreeType = 1, }
 
 /* Query bar is also the logical FileBar */
 
@@ -23,6 +23,7 @@ struct QueryBar;
 // This should probably be a regex, but I'm gonna avoid it for now
 struct QueryBarInputFilter{
     int digitOnly;
+    int allowFreeType;
 };
 
 struct QueryBar{

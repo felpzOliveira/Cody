@@ -50,6 +50,7 @@ void Buffer_CopyReferences(Buffer *dst, Buffer *src){
         dst->tokens = src->tokens;
         dst->stateContext = src->stateContext;
         dst->is_ours = src->is_ours;
+        dst->erased = src->erased;
     }
 }
 
@@ -98,7 +99,8 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
                 DuplicateToken(dstToken, srcToken);
             }
         }
-        
+
+        dst->erased = src->erased;
         dst->is_ours = src->is_ours;
         dst->count = src->count;
         dst->taken = src->taken;
@@ -176,6 +178,32 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     return r;
 }
 
+void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
+    if(buffer){
+        for(uint i = 0; i < buffer->tokenCount; i++){
+            Token *token = &buffer->tokens[i];
+            if(token->identifier != TOKEN_ID_SPACE &&
+               token->identifier != TOKEN_ID_COMMENT)
+            {
+                char *p = &buffer->data[token->position];
+                AutoComplete_Remove(p, token->size);
+
+                if(Lex_IsUserToken(token) && symTable){
+                    if(token->reserved != nullptr){
+                        char *label = (char *)token->reserved;
+                        SymbolTable_Remove(symTable, label, token->size,
+                                           token->identifier);                        
+                        AllocatorFree(token->reserved);
+                        token->reserved = nullptr;
+                    }
+                }
+            }
+        }
+
+        buffer->erased = true;
+    }
+}
+
 //TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
     if(!(u8p <= buffer->taken)){
@@ -235,22 +263,7 @@ void Buffer_Claim(Buffer *buffer){
 }
 
 uint Buffer_GetUtf8Count(Buffer *buffer){
-    uint r = 0;
-    if(buffer->taken > 0){
-        char *p = buffer->data;
-        uint c = 0;
-        int rv = -1;
-        do{
-            int of = 0;
-            rv = StringToCodepoint(&p[c], buffer->taken - c, &of);
-            if(rv != -1){
-                c += of;
-                r += 1;
-            }
-        }while(*p && c < buffer->taken && rv >= 0);
-    }
-    
-    return r;
+    return StringComputeU8Count(buffer->data, buffer->taken);
 }
 
 void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size){
@@ -419,7 +432,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
             buffer->taken = 0;
         }
         
-        if(buffer->size < buffer->taken + len){
+        if(buffer->size <= buffer->taken + len){
             uint newSize = buffer->size + len + DefaultAllocatorSize;
             buffer->data = AllocatorExpand(char, buffer->data, newSize, buffer->size);
             buffer->size = newSize;
@@ -454,7 +467,8 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
     }else if(buffer->size == 0 || buffer->data == nullptr){
         Buffer_Init(buffer, DefaultAllocatorSize);
     }
-    
+
+    AssertA(buffer->size >= buffer->taken, "Out of bounds write");
     return ic;
 }
 
@@ -683,7 +697,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
             
-            if(token.identifier != TOKEN_ID_SPACE){
+            if(token.identifier != TOKEN_ID_SPACE && token.identifier != TOKEN_ID_COMMENT){
                 AutoComplete_PushString(h, token.size);
             }
 #if DEBUG_TOKENS != 0
@@ -712,6 +726,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, lineNr-1);
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
+    buffer->erased = false;
     
 }
 
@@ -742,6 +757,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     workContext->workTokenListHead = 0;
     
     char *p = buffer->data;
+    char *h = p;
     int totalSize = buffer->taken;
     
     int size = buffer->taken;
@@ -771,6 +787,12 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             workContext->workTokenList[head].source = token.source;
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
+
+            if(token.identifier != TOKEN_ID_SPACE && 
+               token.identifier != TOKEN_ID_COMMENT)
+            {
+                AutoComplete_PushString(&h[token.position], token.size);
+            }
             
             size = totalSize - token.position - token.size;
         }
@@ -802,7 +824,7 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
     
     Lex_TokenizerRestoreFromContext(tokenizer, &buffer->stateContext);
     Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_BufferFetcher);
-    
+
     i = start;
     activeLineBuffer = lineBuffer;
     while((i < expectedEnd || Lex_TokenizerHasPendingWork(tokenizer))){
@@ -810,19 +832,30 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
         buffer = LineBuffer_GetBufferAt(lineBuffer, i);
         // Before re-tokenizing check for user tokens and allow symbol table
         // to remove them
-        for(uint s = 0; s < buffer->tokenCount; s++){
-            Token *token = &buffer->tokens[s];
-            if(token){
-                if(Lex_IsUserToken(token) && token->reserved != nullptr){
-                    SymbolTable_Remove(symTable, (char *)token->reserved,
-                                       token->size, token->identifier);
-                    AllocatorFree(token->reserved);
-                    token->reserved = nullptr;
+        if(!buffer->erased){
+            for(uint s = 0; s < buffer->tokenCount; s++){
+                Token *token = &buffer->tokens[s];
+                if(token){
+                    if(token->identifier != TOKEN_ID_SPACE &&
+                    token->identifier != TOKEN_ID_COMMENT)
+                    {
+                        char *p = &buffer->data[token->position];
+                        AutoComplete_Remove(p, token->size);
+                    }
+
+                    if(Lex_IsUserToken(token) && token->reserved != nullptr){
+                        SymbolTable_Remove(symTable, (char *)token->reserved,
+                        token->size, token->identifier);
+                        AllocatorFree(token->reserved);
+                        token->reserved = nullptr;
+                    }
                 }
             }
         }
+
         LineBuffer_RemountBuffer(lineBuffer, buffer, tokenizer, i);
-        
+        buffer->erased = false;
+
         i++;
         if(i >= lineBuffer->lineCount) break;
     }
@@ -873,14 +906,14 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
                                 uint *offset)
 {
     /*
-* Algorithm: We need to insert a possible multi-line text at a given position.
-* We need to get the content from the position forward in the buffer. Move all
-* the buffers bellow to the amount of lines inserted. Add the first line to the
-* of the original buffer, insert the rest of the lines and finally the original
-* text from the position. Because we will make multiple line movements
-* it is faster if we directly move the buffers than to perform line insertion
-* with 'LineBuffer_InsertLineAt'.
-*/
+    * Algorithm: We need to insert a possible multi-line text at a given position.
+    * We need to get the content from the position forward in the buffer. Move all
+    * the buffers bellow to the amount of lines inserted. Add the first line to the
+    * of the original buffer, insert the rest of the lines and finally the original
+    * text from the position. Because we will make multiple line movements
+    * it is faster if we directly move the buffers than to perform line insertion
+    * with 'LineBuffer_InsertLineAt'.
+    */
     
     // 1 - Count the amount of lines so we can shift the file in a single pass
     //     the amount of lines is given by the text and not the buffer so its ok

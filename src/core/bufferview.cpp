@@ -3,11 +3,6 @@
 #include <app.h>
 #include <symbol.h>
 
-int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
-    return ((p.x <= geometry->upper.x && p.x >= geometry->lower.x) &&
-            (p.y <= geometry->upper.y && p.y >= geometry->lower.y)) ? 1 : 0;
-}
-
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
                             Float *velocity)
@@ -67,6 +62,7 @@ void BufferView_CursorTo(BufferView *view, uint lineNo){
     }
 }
 
+//TODO: Figure this out!
 void BufferView_Synchronize(BufferView *view){
     if(view->lineBuffer){
         VScroll *ss = &view->sController;
@@ -80,17 +76,9 @@ void BufferView_Synchronize(BufferView *view){
             ss->cursor.textPosition = vec2ui(0);
             return;
         }
-        
-        vec2ui rDist(cursor.x, view->lineBuffer->lineCount - cursor.x);
-        if(rDist.y > ss->cursor.relativeDistance.y){ // insertion of line up
-            cursor.x += rDist.y - ss->cursor.relativeDistance.y;
-        }else if(rDist.y < ss->cursor.relativeDistance.y){ // removal of line up
-            cursor.x -= ss->cursor.relativeDistance.y - rDist.y;
-        }
-        
-        // we don't need to care about insertion bellow
-        
+
         cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
+
         // 2- Update the scroll controller so that viewing range also gets updated
         VScroll_CursorToPosition(ss, cursor.x, cursor.y, view->lineBuffer);
     }else{ // our buffer got killed

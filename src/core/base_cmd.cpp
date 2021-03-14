@@ -3,6 +3,35 @@
 #include <string.h>
 #include <app.h>
 
+/* Default helper functions */
+static void SelectableListFreeLineBuffer(View *view){
+    LineBuffer *lb = View_SelectableListGetLineBuffer(view);
+    LineBuffer_Free(lb);
+    AllocatorFree(lb);
+}
+
+static int SelectableListDynamicEntry(View *view, char *entry, uint len){
+    if(len > 0){
+        View_SelectableListFilterBy(view, entry, len);
+    }else{
+        View_SelectableListFilterBy(view, nullptr, 0);
+    }
+
+    return 1;
+}
+
+static int SelectableListDefaultEntry(QueryBar *queryBar, View *view){
+    char *content = nullptr;
+    uint contentLen = 0;
+    QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
+    return SelectableListDynamicEntry(view, content, contentLen);
+}
+
+static int SelectableListDefaultCancel(QueryBar *queryBar, View *view){
+    SelectableListFreeLineBuffer(view);
+    return 1;
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // File opening handling routines
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -26,16 +55,11 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
     return 0;
 }
 
-static void SelectableListFreeLineBuffer(View *view){
-    LineBuffer *lb = View_SelectableListGetLineBuffer(view);
-    LineBuffer_Free(lb);
-    AllocatorFree(lb);
-}
-
 static void FileOpenUpdateList(View *view){
     FileOpener *opener = View_GetFileOpener(view);
     LineBuffer *lb = View_SelectableListGetLineBuffer(view);
-    
+
+    // TODO: This is very ineficient, but it is working so...
     LineBuffer_Free(lb);
     LineBuffer_InitBlank(lb);
     
@@ -270,21 +294,6 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 //////////////////////////////////////////////////////////////////////////////////////////
 // Switch buffer routines.
 //////////////////////////////////////////////////////////////////////////////////////////
-static int SwitchBuffersUpdateEntry(View *view, char *entry, uint len){
-    if(len > 0){
-        View_SelectableListFilterBy(view, entry, len);
-    }else{
-        View_SelectableListFilterBy(view, nullptr, 0);
-    }
-    
-    return 1;
-}
-
-int SwitchBufferCommandCancel(QueryBar *queryBar, View *view){
-    SelectableListFreeLineBuffer(view);
-    return 1;
-}
-
 int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
     LineBuffer *lineBuffer = nullptr;
     Buffer *buffer = nullptr;
@@ -307,13 +316,6 @@ int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
     BufferView_SwapBuffer(bView, lineBuffer);
     SelectableListFreeLineBuffer(view);
     return 1;
-}
-
-int SwitchBufferCommandEntry(QueryBar *queryBar, View *view){
-    char *content = nullptr;
-    uint contentLen = 0;
-    QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
-    return SwitchBuffersUpdateEntry(view, content, contentLen);
 }
 
 int SwitchBufferCommandStart(View *view){
@@ -343,10 +345,55 @@ int SwitchBufferCommandStart(View *view){
     };
     
     List_Transverse<FileBuffer>(list, filler);
-    
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+    filter.allowFreeType = 0;
+
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
-                           SwitchBufferCommandEntry, SwitchBufferCommandCancel,
-                           SwitchBufferCommandCommit, nullptr);
+                           SelectableListDefaultEntry, SelectableListDefaultCancel,
+                           SwitchBufferCommandCommit, &filter);
+    return 0;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
+// Switch theme routines.
+//////////////////////////////////////////////////////////////////////////////////////////
+int SwitchThemeCommandCommit(QueryBar *queryBar, View *view){
+    Buffer *buffer = nullptr;
+    uint active = View_SelectableListGetActiveIndex(view);
+    View_SelectableListGetItem(view, active, &buffer);
+    if(!buffer){
+        return 0;
+    }
+
+    SwapDefaultTheme(buffer->data, buffer->taken);
+
+    SelectableListFreeLineBuffer(view);
+    return 1;    
+}
+
+int SwitchThemeCommandStart(View *view){
+    AssertA(view != nullptr, "Invalid view pointer");
+    std::vector<ThemeDescription> *themes = nullptr; 
+    LineBuffer *lineBuffer = nullptr;
+    const char *header = "Switch Theme";
+    uint hlen = strlen(header);
+    lineBuffer = AllocatorGetN(LineBuffer, 1);
+
+    GetThemeList(&themes);
+    AssertA(themes != nullptr, "Invalid theme list");
+
+    LineBuffer_InitBlank(lineBuffer);
+    for(uint i = 0; i < themes->size(); i++){
+        ThemeDescription dsc = themes->at(i);
+        uint slen = strlen(dsc.name);
+        LineBuffer_InsertLine(lineBuffer, (char *)dsc.name, slen, 0);
+    }
+
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+    filter.allowFreeType = 0;
+    View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
+                           SelectableListDefaultEntry, SelectableListDefaultCancel,
+                           SwitchThemeCommandCommit, &filter);
     return 0;
 }
 
@@ -368,9 +415,9 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
     QueryBar_GetWrittenContent(queryBar, &str, &slen);
     if(slen > 0){
         /*
-    * We cannot use token comparation because we would be unable to
-* capture compositions
-*/
+        * We cannot use token comparation because we would be unable to
+        * capture compositions
+        */
         
         int done = 0;
         vec2ui cursor = dcursor->textPosition;

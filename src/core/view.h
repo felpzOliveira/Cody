@@ -2,6 +2,7 @@
 
 #ifndef VIEW_H
 #define VIEW_H
+#include <selectable.h>
 #include <bufferview.h>
 #include <graphics.h>
 #include <utilities.h>
@@ -9,12 +10,11 @@
 
 #define View_IsQueryBarActive(view) ((view->state) == View_QueryBar || (view->state) == View_SelectableList)
 
-#define SELECTABLE_LIST_INITIALIZER { .listBuffer = nullptr, .selectable = nullptr, .selectableSize = 0, .used = 0, }
-
 typedef enum{
     View_FreeTyping = 0,
     View_QueryBar,
     View_SelectableList,
+    View_AutoComplete,
     View_StatesCount
 }ViewState;
 
@@ -26,21 +26,11 @@ struct FileOpener{
     ushort pathLen;
 };
 
-struct SelectableList{
-    LineBuffer *listBuffer;
-    vec2ui viewRange;
-    uint *selectable;
-    uint selectableSize;
-    uint used;
-    uint currentLineRange;
-    uint currentDisplayRange;
-    int active;
-};
-
 struct View{
     BufferView bufferView;
     FileOpener *fileOpener;
     SelectableList selectableList;
+    SelectableList *autoCompleteList;
     QueryBar queryBar;
     Geometry geometry;
     DescriptionLocation descLocation;

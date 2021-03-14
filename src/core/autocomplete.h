@@ -3,27 +3,30 @@
 
 #include <utilities.h>
 #include <symbol.h>
+#include <selectable.h>
+#include <view.h>
+#include <keyboard.h>
+#include <tries.h>
 
 /* Lets atttempt to implement auto-complete shall we? */
 
-//Brute force this thing
-
-struct AutoCompleteEntry{
-    CharU8 key;
-    List<String> *entries;
+struct AutoComplete{
+    uint lastSearchLen;
+    char *lastSearchValue;
+    BindingMap *mapping;
+    Trie root;
 };
 
-struct AutoCompleteBruteForce{
-    List<AutoCompleteEntry> *alphabetList;
-    SymbolTable symTable;
-};
-
-//TODO: Ternary Search!
-
-void AutoComplete_Initialize();
+BindingMap *AutoComplete_Initialize();
 
 void AutoComplete_PushString(char *value, uint valuelen);
 
-void AutoComplete_Search(char *value, uint valuelen);
+int AutoComplete_Search(char *value, uint valuelen, SelectableList *list);
 
+void AutoComplete_Remove(char *value, uint valuelen);
+
+int AutoComplete_Activate(View *view);
+
+
+void AutoComplete_Commit();
 #endif

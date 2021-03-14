@@ -1,12 +1,15 @@
-project(Mayhem)
+project(Cody)
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
-set(MAYHEM "mayhem")
+set(CODY "cody")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
 	message(STATUS "Debug build")
 	set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic")
+elseif(CMAKE_BUILD_TYPE MATCHES Valgrind)
+	message(STATUS "Valgrind build")
+	set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -rdynamic")
 else()
 	message(STATUS "Release build")
 	set(MH_FLAGS "-O2 -Wall -std=c++11")

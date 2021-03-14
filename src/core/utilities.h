@@ -10,11 +10,12 @@
 #include <limits.h>
 #include <unistd.h>
 #include <functional>
+#include <sys/stat.h>
 
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
 #define DebugBreak() raise(SIGTRAP)
-#define MAX_DECRIPTOR_LENGTH 256
+#define MAX_DESCRIPTOR_LENGTH 256
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
@@ -28,6 +29,8 @@ const int kMaximumIndentEmptySearch = 9;
 const Float kTransitionScrollInterval = 0.15;
 const Float kTransitionJumpInterval = 0.1;
 const Float kViewSelectableListScaling = 2.0;
+const Float kAutoCompleteListScaling = 1.2;
+const Float kAutoCompleteMaxHeightFraction = 0.3;
 const Float kViewSelectableListOffset = 0.05;
 const Float kOnes[] = {1,1,1,1};
 
@@ -43,7 +46,7 @@ struct String{
 
 /* Representation of a file, path holds the file name with regards to its base directory */
 struct FileEntry{
-    char path[MAX_DECRIPTOR_LENGTH];
+    char path[MAX_DESCRIPTOR_LENGTH];
     uint pLen;
     FileType type;
     int isLoaded;
@@ -106,6 +109,13 @@ uint StringToUnsigned(char *s0, uint len);
 int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size);
 
 /*
+* Attempt to guess what a path means, and fill a entry with the description.
+* Returns -1 in case it could not guess, 0 otherwise. It writes the full folder
+* path in 'folder' which should be of length PATH_MAX.
+*/
+int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder);
+
+/*
 * Gets the current working directory, 'dir' should be of size 'len' = PATH_MAX.
 */
 void GetCurrentWorkingDirectory(char *dir, uint len);
@@ -142,6 +152,11 @@ uint GetSimplifiedPathName(char *fullPath, uint len);
 * the size of the string 's0'.
 */
 uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len=-1);
+
+/*
+* Computes the amount of UTF-8 characters inside the string 's0'.
+*/
+uint StringComputeU8Count(char *s0, uint len);
 
 /*
 * Convert colors.
@@ -196,7 +211,8 @@ typedef struct TernaryTreeNode{
 * Inserts a new string inside the search tree and returns the address of the 
 * inserted element, returns nullptr in case of errors.
 */
-void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuelen);
+void *TernarySearchTree_InsertDelete(TernaryTreeNode **root, char *value,
+                                     uint valuelen, int del);
 
 /*
 * Transverses the ternary search tree and invoke fn on all words.

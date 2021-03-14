@@ -74,7 +74,7 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
     glCursor->pGlyph = -1;
     glCursor->valid = 0;
     glCursor->textPos = cursor;
-    
+
     if(cursor.x >= visibleLines.x && cursor.x <= visibleLines.y){
         glCursor->valid = 1;
         if(cursor.y > 0){
@@ -169,8 +169,19 @@ void OpenGLRenderAllLineNumbers(OpenGLState *state, BufferView *view, Theme *the
         glUseProgram(font->shader.id);
         Shader_UniformMatrix4(font->shader, "projection", &state->projection.m);
         Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
-        
-        for(uint i = lines.x; i < lines.y; i++){
+
+        uint st0 = lines.x;
+        uint ed0 = lines.y;
+        if(lines.x > 0){
+            st0 -= 1;
+            y -= font->fontMath.fontSizeAtRenderCall;
+        }
+
+        if(lines.y < view->lineBuffer->lineCount-1){
+            ed0 += 1;
+        }
+
+        for(uint i = st0; i < ed0; i++){
             OpenGLRenderLineNumber(view, font, x, y, i, linen, theme);
             x = x0;
             y += font->fontMath.fontSizeAtRenderCall;
@@ -189,11 +200,23 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     OpenGLFont *font = &state->font;
     
     Graphics_PrepareTextRendering(state, projection, &state->model);
-    
+
     x = x0;
     y = baseHeight;
     vec4i s(128);
-    for(uint i = lines.x; i < lines.y; i++){
+    uint st0 = lines.x;
+    uint ed0 = lines.y;
+
+    if(lines.x > 0){
+        st0 -= 1;
+        y -= font->fontMath.fontSizeAtRenderCall;
+    }
+
+    if(lines.y < view->lineBuffer->lineCount-1){
+        ed0 += 1;
+    }
+
+    for(uint i = st0; i < ed0; i++){
         if(OpenGLRenderLine(view, state, x, y, i)){
 #if 0
             int pGlyph  = -1;
@@ -301,8 +324,8 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
         if(BufferView_CursorNestIsValid(view)){
             NestPoint *start = view->startNest;
             NestPoint *end   = view->endNest;
-            Float minY = 0;
-            Float maxY = view->sController.currentMaxRange * 
+            Float minY = -font->fontMath.fontSizeAtRenderCall;;
+            Float maxY = (view->sController.currentMaxRange + 1)* 
                 font->fontMath.fontSizeAtRenderCall;
             struct _Quad{
                 vec2ui left, right;
@@ -480,6 +503,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
 
     vec4i col;
+    if(!buffer) return largeLine;
 
     //TODO: This is where we would wrap?
     if(buffer->taken > 0){
@@ -556,9 +580,8 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     
     //vec3f col = ColorRGB(theme->backgroundColor);
     //vec3f col(0.6);
-    Float a = 0.42;
-    Float g = 0.1705882; //TODO: add this to theme
-    vec3f col = vec3f(g, g, 2 * g);
+    vec4f col = GetUIColorf(theme, UIBackground);
+    //vec4f col = GetNestColorf(theme, TOKEN_ID_SCOPE, 0);
     
     if(vview->descLocation == DescriptionTop){
         a0 = vec2ui(l.x, l.y);
@@ -566,10 +589,10 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     }else if(vview->descLocation != DescriptionBottom){
         AssertA(0, "Invalid description position");
     }
+
+    col.w = 1; // make sure this thing does not suffer blending from behind text
+    Graphics_QuadPush(state, a0, a1, col);
     
-    Graphics_QuadPush(state, a0, a1, vec4f(col.x, col.y, col.z, a));
-    
-    a = 0.42;
     //col = vec3f(1.8 * g, 2 * g, g);
     vec4f cc = ColorFromHexf(0xff353f25);
     vec2f b0 = vec2f((Float)a0.x + (Float)(a1.x - a0.x) * pc, (Float)a0.y);
@@ -648,8 +671,6 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         return Graphics_RenderDefaultView(view, state, theme, dt);
     }
 }
-
-extern int testHover;
 
 int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Float dt){
     Float ones[] = {1,1,1,1};
@@ -770,29 +791,6 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     
     ActivateViewportAndProjection(state, vview, ViewportAllView);
     Graphics_RenderFrame(state, vview, &state->projection, originalScaleWidth, theme);
-
-    if(testHover && 0){
-        Geometry geometry2;
-        static LineBuffer lineBuffer = LINE_BUFFER_INITIALIZER;
-        static int xxx = 0;
-        if(xxx == 0){
-            xxx++;
-            LineBuffer_InitEmpty(&lineBuffer);
-            for(uint i = 0; i < 10; i++){
-                char d[256];
-                uint l = snprintf(d, sizeof(d), "STRING-%d", i);
-                LineBuffer_InsertLine(&lineBuffer, d, l, 0);
-            }
-        }
-
-        Float w = geometry.upper.x - geometry.lower.x;
-        Float h = geometry.upper.y - geometry.lower.y;
-        geometry2.upper.x = (geometry.upper.x + geometry.lower.x) * 0.5;
-        geometry2.upper.y = (geometry.upper.y + geometry.lower.y) * 0.5;
-        geometry2.lower.x = geometry2.upper.x - w * 0.25;
-        geometry2.lower.y = geometry2.upper.y - h * 0.25;
-        Graphics_RenderHoverableList(vview, state, theme, &geometry2, &lineBuffer);
-    }
 
     glDisable(GL_SCISSOR_TEST);
     return is_animating;

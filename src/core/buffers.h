@@ -5,6 +5,7 @@
 #include <types.h>
 #include <lex.h>
 #include <undo.h>
+#include <symbol.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -28,6 +29,7 @@ struct Buffer{
     Token *tokens;
     uint tokenCount;
     bool is_ours;
+    bool erased;
     TokenizerStateContext stateContext;
 };
 
@@ -91,7 +93,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint len, int decode_tab);
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
 * and must have length 'len'. If you are copying raw data to this buffer and needs 
 * the issue of tab x spacing handled use decode_tab = 1. The position 'at' is a UTF-8
- * encoded position. Returns the amount of bytes actually inserted after tab expansion.
+* encoded position. Returns the amount of bytes actually inserted after tab expansion.
 */
 uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int decode_tab=0);
 
@@ -127,6 +129,12 @@ void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end);
 * Checks whether a buffer is visually empty.
 */
 int Buffer_IsBlank(Buffer *buffer);
+
+/*
+* Perform cleanup of the entries of the symbol table **and** auto completes
+* ternary search tree relating to tokens inside this buffer.
+*/
+void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable);
 
 /*
 * Count the amount of UTF-8 characters.

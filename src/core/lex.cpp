@@ -1311,7 +1311,8 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
 }
 
 int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer){
-    return (tokenizer->unfinishedContext >= 0 ? 1 : 0 || !BoundedStack_IsEmpty(tokenizer->procStack));
+    return (tokenizer->unfinishedContext >= 0 ? 1 : 0 ||
+            !BoundedStack_IsEmpty(tokenizer->procStack));
 }
 
 void Lex_TokenizerSetFetchCallback(Tokenizer *tokenizer,

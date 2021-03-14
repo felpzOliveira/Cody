@@ -21,6 +21,38 @@ void GetCurrentWorkingDirectory(char *dir, uint len){
     }
 }
 
+//TODO: Windows
+int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder){
+    int r = -1;
+    if(path && size > 0 && entry && folder){
+        struct stat st;
+        if(stat(path, &st) == 0){
+            if(st.st_mode & S_IFDIR || st.st_mode & S_IFREG){
+                char *ptr = realpath(path, folder);
+                if(ptr){
+                    uint s = strlen(folder);
+                    uint n = GetSimplifiedPathName(folder, s);
+                    Memcpy(entry->path, &folder[n], s - n);
+                    entry->path[s-n] = 0;
+                    entry->pLen = s - n;
+                    entry->isLoaded = 0;
+                    if(st.st_mode & S_IFDIR){
+                        entry->type = DescriptorDirectory;
+                    }else{
+                        if(n > 0)
+                            folder[n-1] = 0;
+                        entry->type = DescriptorFile;
+                    }
+
+                    r = 0;
+                }
+            }
+        }
+    }
+
+    return r;
+}
+
 int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
     AssertA(n != nullptr && entries != nullptr && basePath != nullptr,
             "Invalid query pointers");
@@ -97,6 +129,25 @@ uint GetSimplifiedPathName(char *fullPath, uint len){
     }
     
     return 0;
+}
+
+uint StringComputeU8Count(char *s0, uint len){
+    uint r = 0;
+    if(len > 0){
+        char *p = s0;
+        uint c = 0;
+        int rv = -1;
+        do{
+            int of = 0;
+            rv = StringToCodepoint(&p[c], len - c, &of);
+            if(rv != -1){
+                c += of;
+                r += 1;
+            }
+        }while(*p && c < len && rv >= 0);
+    }
+
+    return r;
 }
 
 uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len){
@@ -463,12 +514,205 @@ char *GetFileContents(const char *path, uint *size){
     return ret;
 }
 
-void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuelen){
+/*
+* The following implementation of a ternary search tree is heavily based on:
+* https://codereview.stackexchange.com/questions/175797/deletion-of-word-from-ternary-search-tree-where-both-siblings-present
+* There was a different implementation originally but I find this one very nice.
+*/
+
+#define TSTStackMaxLen 256
+struct TSTStack{
+    TernaryTreeNode *data[TSTStackMaxLen];
+    uint idx;
+};
+
+static TernaryTreeNode *TSTStackPush(TSTStack *s, TernaryTreeNode *node){
+    if (s->idx >= TSTStackMaxLen)
+        return NULL;
+
+    return (s->data[(s->idx)++] = node);
+}
+
+static TernaryTreeNode *TSTStackPop(TSTStack *s){
+    if (!s->idx) return NULL;
+
+    TernaryTreeNode *node = s->data[--(s->idx)];
+    s->data[s->idx] = NULL;
+
+    return node;
+}
+
+
+static 
+void *TernarySearchTree_Remove(TernaryTreeNode **root, TernaryTreeNode *node, TSTStack *stk){
+    TernaryTreeNode *victim = node;            /* begin deletion w/victim */
+    TernaryTreeNode *parent = TSTStackPop(stk); /* parent to victim */
+
+    if(!victim->references){              /* if last occurrence */
+        if(victim->u8size == 0)               /* check key is nul   */
+            AllocatorFree(victim->mid);       /* free string (data) */
+
+        /* remove unique suffix chain - parent & victim nodes
+         * have no children. simple remove until the first parent
+         * found with children.
+         */
+        while(!parent->left && !parent->right &&
+              !victim->left && !victim->right)
+        {
+            parent->mid = NULL;
+            AllocatorFree(victim);
+            victim = parent;
+            parent = TSTStackPop(stk);
+            if(!parent){              /* last word & root node */
+                AllocatorFree(victim);
+                return (void*)(*root = NULL);
+            }
+        }
+
+        /* check if victim is prefix for others (victim has lo/hi node).
+         * if both lo & hi children, find highest node under low with
+         * children and make parent->eqkid equal highest, free victim.
+         */
+        if(victim->left && victim->right){   /* victim has both lokid/hikid */
+            if(!victim->left->right){        /* check for hikid in lo tree */
+                /* rotate victim->hikid to victim->lokid->hikid, and 
+                 * rotate victim->lokid to place of victim.
+                 */
+                victim->left->right = victim->right;
+                if(!parent)
+                    *root = victim->left;
+                else if(victim == parent->left)
+                    parent->left = victim->right;
+                else if(victim == parent->right)
+                    parent->right = victim->left;
+                else
+                    parent->mid = victim->left;
+                AllocatorFree(victim);
+                victim = NULL;
+            }
+            else if(!victim->right->left){   /* check for lokid in hi tree */
+                /* opposite rotation */
+                victim->right->left = victim->left;
+                if(!parent)
+                    *root = victim->right;
+                else if (victim == parent->left)
+                    parent->left = victim->right;
+                else if (victim == parent->right)
+                    parent->right = victim->right;
+                else
+                    parent->mid = victim->right;
+                AllocatorFree(victim);
+                victim = NULL;
+            }
+            else    /* can't rotate, return, leaving victim->eqkid NULL */
+                return NULL;
+        }
+        else if(victim->left){   /* only lokid, replace victim with lokid */
+            parent->mid = victim->left;
+            AllocatorFree(victim);
+            victim = NULL;
+        }
+        else if(victim->right){   /* only hikid, replace victim with hikid */
+            parent->mid = victim->right;
+            AllocatorFree(victim);
+            victim = NULL;
+        }
+        else {  /* victim - no children, but parent has other children */
+            if(victim == parent->left){      /* if parent->lokid - trim */
+                parent->left = NULL;
+                AllocatorFree(victim);
+                victim = NULL;
+            }
+            else if(victim == parent->right){ /* if parent->hikid - trim */
+                parent->right = NULL;
+                AllocatorFree(victim);
+                victim = NULL;
+            }
+            else{  /* victim was parent->eqkid, but parent->lo/hikid exists */
+                parent->mid = NULL;               /* set eqkid NULL */
+                AllocatorFree(victim);                      /* free current victim */
+                victim = parent;                    /* set parent = victim */
+                parent = TSTStackPop(stk);       /* get new parent */
+                /* if both victim hi/lokid are present */
+                if(victim->left && victim->right){
+                    /* same checks and rotations as above */
+                    if(!victim->left->right) {
+                        victim->left->right = victim->right;
+                        if(!parent)
+                            *root = victim->left;
+                        else if (victim == parent->left)
+                            parent->left = victim->left;
+                        else if (victim == parent->right)
+                            parent->right = victim->right;
+                        else
+                            parent->mid = victim->left;
+                        AllocatorFree(victim);
+                        victim = NULL;
+                    }
+                    else if(!victim->right->left){
+                        victim->right->left = victim->left;
+                        if(!parent)
+                            *root = victim->right;
+                        else if(victim == parent->left)
+                            parent->left = victim->right;
+                        else if (victim == parent->right)
+                            parent->right = victim->right;
+                        else
+                            parent->mid = victim->right;
+                        AllocatorFree(victim);
+                        victim = NULL;
+                    }
+                    else
+                        return NULL;
+                }
+                /* if only lokid, rewire to parent */
+                else if(victim->left){
+                    if(parent){   /* if parent exists, rewire */
+                        if(victim == parent->left)
+                            parent->left = victim->left;
+                        else if(victim == parent->right)
+                            parent->right = victim->left;
+                        else
+                            parent->mid = victim->left;
+                    }
+                    else            /* we are new root node, update root */
+                        *root = victim->left;  /* make last node root */
+                    AllocatorFree(victim);
+                    victim = NULL;
+                }
+                /* if only hikid, rewire to parent */
+                else if(victim->right){
+                    if(parent){   /* if parent exists, rewire */
+                        if(victim == parent->left)
+                            parent->left = victim->right;
+                        else if(victim == parent->right)
+                            parent->right = victim->right;
+                        else
+                            parent->mid = victim->right;
+                    }
+                    else            /* we are new root node, update root */
+                        *root = victim->right;  /* make last node root */
+                    AllocatorFree(victim);
+                    victim = NULL;
+                }
+            }
+        }
+    }
+    else{}    /* node->refcnt non-zero */
+
+    return victim;  /* return NULL on successful free, *node otherwise */
+}
+
+
+void *TernarySearchTree_InsertDelete(TernaryTreeNode **root, char *value,
+                                      uint valuelen, int del)
+{
     int diff = 0; // keep evaluator as we go down the tree
     char *p = value;
     uint pLen = valuelen;
     TernaryTreeNode *current = nullptr;
     TernaryTreeNode **pcurrent = nullptr;
+    TSTStack stk = { .data = {NULL}, .idx = 0 };
 
     if(root == nullptr || value == nullptr) return nullptr;
 
@@ -484,8 +728,13 @@ void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuele
             cpp = StringToCodepoint(&p[off], pLen, &pplen);
 
             if(pLen == 0){
-                current->references++;
-                return (void *)current->mid;
+                if(del){
+                    current->references--;
+                    return TernarySearchTree_Remove(root, current, &stk);
+                }else{
+                    current->references++;
+                    return (void *)current->mid;
+                }
             }
             pcurrent = &(current->mid);
         }else if(diff < 0){
@@ -493,6 +742,15 @@ void *TernarySearchTree_Insert(TernaryTreeNode **root, char *value, uint valuele
         }else{
             pcurrent = &(current->right);
         }
+
+        if(del){
+            TSTStackPush(&stk, current);
+        }
+    }
+
+    if(del){
+        /* In case of invalid search this needs to return to avoid inserting */
+        return NULL;
     }
 
     while(1){

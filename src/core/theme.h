@@ -4,6 +4,7 @@
 #define THEME_H
 #include <geometry.h>
 #include <lex.h>
+#include <vector>
 
 typedef enum{
     UIBackground,
@@ -60,6 +61,11 @@ typedef struct{
     short alphaDimm;
 }Theme;
 
+typedef struct{
+    const char *name;
+    Theme *theme;
+}ThemeDescription;
+
 extern Theme *defaultTheme;
 
 void SetAlpha(int acitve);
@@ -71,4 +77,6 @@ vec4i GetUIColor(Theme *theme, UIElement id);
 vec4f GetUIColorf(Theme *theme, UIElement id);
 Float GetLineBorderWidth(Theme *theme);
 short GetBackTextCount(Theme *theme);
+void GetThemeList(std::vector<ThemeDescription> **themes);
+void SwapDefaultTheme(char *name, uint len);
 #endif //THEME_H

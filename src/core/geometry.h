@@ -966,6 +966,14 @@ class Geometry{
     }
 };
 
+/*
+* Checks if a point 'p' is inside 'geometry'.
+*/
+inline int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
+    return ((p.x <= geometry->upper.x && p.x >= geometry->lower.x) &&
+            (p.y <= geometry->upper.y && p.y >= geometry->lower.y)) ? 1 : 0;
+}
+
 typedef struct{
     vec2ui textPosition;
     vec2ui ghostPosition;

@@ -46,4 +46,6 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 
 int SwitchBufferCommandStart(View *view);
 
+int SwitchThemeCommandStart(View *view);
+
 #endif //BASE_CMD_H

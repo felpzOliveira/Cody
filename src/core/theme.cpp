@@ -203,6 +203,21 @@ Theme *defaultTheme = &themeRadical;
 //Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 
+std::vector<ThemeDescription> themesDesc = {
+    {
+        .name = "Radical",
+        .theme = &themeRadical,
+    },
+    {
+        .name = "4coder",
+        .theme = &theme4Coder,
+    },
+    {
+        .name = "Dracula",
+        .theme = &themeDracula,
+    }
+};
+
 static int globalActive = 0;
 void SetAlpha(int active){
     globalActive = active;
@@ -218,6 +233,25 @@ inline static T ApplyAlpha(T color, Theme *theme){
     }
     
     return color;
+}
+
+void GetThemeList(std::vector<ThemeDescription> **themes){
+    if(themes){
+        *themes = &themesDesc;
+    }
+}
+
+void SwapDefaultTheme(char *name, uint len){
+    for(uint i = 0; i < themesDesc.size(); i++){
+        ThemeDescription *desc = &themesDesc[i];
+        uint slen = strlen(desc->name);
+        if(slen == len){
+            if(StringEqual(name, (char *)desc->name, len)){
+                defaultTheme = desc->theme;
+                break;
+            }
+        }
+    }
 }
 
 vec4i GetNestColor(Theme *theme, TokenId id, int level){

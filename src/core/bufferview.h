@@ -33,8 +33,8 @@ struct BufferView{
     Geometry geometry;
     
     /*
-* Rendering properties of the BufferView, defined by the renderer
-*/
+    * Rendering properties of the BufferView, defined by the renderer
+    */
     Scroll scroll;
     Float lineOffset;
     int isActive;
@@ -54,10 +54,6 @@ Float InterpolateValueCubic(Float dt, Float remaining,
 Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
                              Float initialValue, Float finalValue);
 
-/*
-* Checks if a point 'p' is inside 'geometry'.
-*/
-int Geometry_IsPointInside(Geometry *geometry, vec2ui p);
 
 /*
 * Initializes a bufferview to represent the contents of the given linebuffer. It also
