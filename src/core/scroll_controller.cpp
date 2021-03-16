@@ -137,6 +137,7 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
     int gap = 1;
     vec2ui visibleRect = ss->visibleRect;
     uint lineRangeSize = ss->currentMaxRange;
+    uint currentRange = visibleRect.y - visibleRect.x;
 
     if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
         if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
@@ -152,6 +153,12 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
                 visibleRect.x = wished - lineRangeSize;
             }
         }
+    }
+
+    if(currentRange < lineRangeSize){
+        uint diff = lineRangeSize - currentRange;
+        uint off = Min(diff, lineBuffer->lineCount - visibleRect.y);
+        visibleRect.y += off;
     }
 
     ss->visibleRect = visibleRect;
