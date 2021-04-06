@@ -398,27 +398,38 @@ int SwitchThemeCommandStart(View *view){
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// Seach text command routines.
+//////////////////////////////////////////////////////////////////////////////////////////
 int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
-                          DoubleCursor *dcursor)
+                          DoubleCursor *dcursor, char *toSearch,
+                          uint toSearchLen)
 {
     AssertA(queryBar != nullptr && lineBuffer != nullptr && dcursor != nullptr,
             "Invalid search input");
     AssertA(queryBar->cmd == QUERY_BAR_CMD_SEARCH ||
-            queryBar->cmd == QUERY_BAR_CMD_REVERSE_SEARCH,
+            queryBar->cmd == QUERY_BAR_CMD_REVERSE_SEARCH ||
+            queryBar->cmd == QUERY_BAR_CMD_SEARCH_AND_REPLACE,
             "QueryBar is in incorrect state");
     
-    char *str = nullptr;
-    uint slen = 0;
+    char *str = toSearch;
+    uint slen = toSearchLen;
     QueryBarCmdSearch *searchResult = &queryBar->searchCmd;
     QueryBarCommand id = queryBar->cmd;
-    
-    QueryBar_GetWrittenContent(queryBar, &str, &slen);
+
+    // Lookup for replace is always forward
+    if(id == QUERY_BAR_CMD_SEARCH_AND_REPLACE){
+        id = QUERY_BAR_CMD_SEARCH;
+    }
+
+    if(str == nullptr){
+        QueryBar_GetWrittenContent(queryBar, &str, &slen);
+    }
+
     if(slen > 0){
         /*
         * We cannot use token comparation because we would be unable to
         * capture compositions
         */
-        
         int done = 0;
         vec2ui cursor = dcursor->textPosition;
         uint line = cursor.x;

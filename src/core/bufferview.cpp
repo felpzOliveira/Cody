@@ -496,6 +496,14 @@ void BufferView_UpdateCursorNesting(BufferView *view){
     }
 }
 
+void BufferView_Dirty(BufferView *view){
+    if(view){
+        if(view->lineBuffer){
+            view->lineBuffer->is_dirty = 1;
+        }
+    }
+}
+
 uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){
     return VScroll_GetCursorSelection(&view->sController, start, end);
 }

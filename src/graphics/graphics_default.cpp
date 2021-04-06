@@ -13,7 +13,7 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
     
     Geometry *geometry = &view->geometry;
     vec4f backgroundColor = GetUIColorf(theme, UISelectorBackground);
-    vec4i color = GetUIColor(theme, UIScopeLine);
+    vec4i color = GetUIColor(theme, UIScopeLine) * 1.3;
     Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z,
         backgroundColor.w };
     

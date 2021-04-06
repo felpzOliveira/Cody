@@ -65,7 +65,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                     const char *ld = " LOADED";
                     uint llen = strlen(ld);
                     Graphics_PushText(state, x, ym, (char *)ld, llen,
-                    style->item_load_color, &pGlyph);
+                                      style->item_load_color, &pGlyph);
                 }
             }
         }
@@ -206,7 +206,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     
     vec4f col = GetUIColorf(theme, UISelectableListBackground);
     vec4i tcol = GetColor(theme, TOKEN_ID_NONE);
-    vec4i tcolSel = ColorFromHex(0xFFCB9401);
+    vec4i tcolSel = GetUIColor(theme, UISelectorLoadedColor);
     vec4f scol = GetUIColorf(theme, UIQueryBarCursor);
 
     FrameStyle style = {

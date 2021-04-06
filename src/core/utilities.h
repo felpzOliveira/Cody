@@ -197,41 +197,6 @@ void Memset(void *dst, unsigned char v, uint size);
 /* Data structures - Structures create their own copy of the item so you can free yours*/
 
 /*
-* Ternary Search Tree.
-*/
-typedef struct TernaryTreeNode{
-    CharU8 key;
-    uint u8size;
-    int codepoint;
-    uint references;
-    struct TernaryTreeNode *left, *right, *mid;
-}TernaryTreeNode;
-
-/*
-* Inserts a new string inside the search tree and returns the address of the 
-* inserted element, returns nullptr in case of errors.
-*/
-void *TernarySearchTree_InsertDelete(TernaryTreeNode **root, char *value,
-                                     uint valuelen, int del);
-
-/*
-* Transverses the ternary search tree and invoke fn on all words.
-*/
-void TernarySearchTree_Transverse(TernaryTreeNode *root, std::function<void(const char *str)> fn);
-
-/*
-* Searches for a string inside the ternary search tree. Returns the string as void pointer
-* in case of success or nullptr in case it could not find.
-*/
-void *TernarySearchTree_SearchString(TernaryTreeNode *root, char *value, uint len);
-
-/*
-* Searches for a prefix inside a ternary search tree.
-*/
-void *TernarySearchTree_Guess(TernaryTreeNode *root, char *s, uint plen,
-                              char **out, int *n, int maxn);
-
-/*
 * Doubly linked list.
 */
 template<typename T>

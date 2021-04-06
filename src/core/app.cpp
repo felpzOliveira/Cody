@@ -367,7 +367,7 @@ void AppDefaultRemoveOne(){
         
         BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         BufferView_AdjustGhostCursorIfOut(bufferView);
-        bufferView->lineBuffer->is_dirty = 1;
+        BufferView_Dirty(bufferView);
         if(state == View_AutoComplete){
             AppCommandAutoComplete();
         }
@@ -421,7 +421,7 @@ void AppCommandRemovePreviousToken(){
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
     
     BufferView_AdjustGhostCursorIfOut(bufferView);
-    bufferView->lineBuffer->is_dirty = 1;
+    BufferView_Dirty(bufferView);
 }
 
 void AppCommandInsertTab(){
@@ -453,7 +453,7 @@ void AppCommandInsertTab(){
     
     cursor.y += offset;
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
-    bufferView->lineBuffer->is_dirty = 1;
+    BufferView_Dirty(bufferView);
 }
 
 void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end){
@@ -481,7 +481,7 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
         
         // merge start and end
         LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, start.x);
-        bufferView->lineBuffer->is_dirty = 1;
+        BufferView_Dirty(bufferView);
     }
 }
 
@@ -562,7 +562,7 @@ void AppCommandNewLine(){
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
     BufferView_AdjustGhostCursorIfOut(bufferView);
     LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(cursor.x-1, OPERATION_INSERT_LINE));
-    bufferView->lineBuffer->is_dirty = 1;
+    BufferView_Dirty(bufferView);
 }
 
 //TODO
@@ -732,6 +732,50 @@ void AppCommandHomeLine(){
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     cursor.y = 0;
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+}
+
+void AppCommandQueryBarSearchAndReplace(){
+    View *view = AppGetActiveView();
+    ViewState state = View_GetState(view);
+    NullRet(view->bufferView.lineBuffer);
+    if(state != View_QueryBar){
+        QueryBar *bar = View_GetQueryBar(view);
+        QueryBarCmdSearchAndReplace *replace = &bar->replaceCmd;
+        replace->state = QUERY_BAR_SEARCH_AND_REPLACE_SEARCH;
+
+        auto onConfirm = [&](QueryBar *qbar, View *vview, int accepted) -> int{
+            // The search and replace command uses the search command under the hood
+            // so you need to get that result too.
+            QueryBarCmdSearch *searchResult = &qbar->searchCmd;
+            QueryBarCmdSearchAndReplace *searchReplace = &qbar->replaceCmd;
+            if(accepted){
+                BufferView *bView = View_GetBufferView(vview);
+                Buffer *buf = BufferView_GetBufferAt(bView, searchResult->lineNo);
+                if(buf){
+                    Tokenizer *tokenizer = bView->tokenizer;
+                    SymbolTable *symTable = tokenizer->symbolTable;
+                    vec2ui cursor = BufferView_GetCursorPosition(bView);
+
+                    UndoRedoUndoPushInsert(&bView->lineBuffer->undoRedo, buf, cursor);
+
+                    Buffer_EraseSymbols(buf, symTable);
+
+                    Buffer_RemoveRangeRaw(buf, searchResult->position,
+                                          searchResult->position + searchReplace->toLocateLen);
+                    Buffer_InsertRawStringAt(buf, searchResult->position,
+                                             searchReplace->toReplace, searchReplace->toReplaceLen, 0);
+                    RemountTokensBasedOn(bView, cursor.x);
+                    BufferView_Dirty(bView);
+                }
+            }
+            return 0;
+        };
+
+        QueryBar_SetInteractiveSearchCallback(bar, onConfirm);
+        QueryBar_Activate(bar, QUERY_BAR_CMD_SEARCH_AND_REPLACE, view);
+        View_ReturnToState(view, View_QueryBar);
+        KeyboardSetActiveMapping(appContext.queryBarMapping);
+    }
 }
 
 void AppCommandQueryBarSearch(){
@@ -1093,6 +1137,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
             ViewState state = View_GetState(view);
             if(state == View_FreeTyping || state == View_AutoComplete){
                 BufferView *bufferView = AppGetActiveBufferView();
+		        SymbolTable *symTable = bufferView->tokenizer->symbolTable;
                 NullRet(bufferView->lineBuffer);
 
                 vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -1115,7 +1160,10 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 
                 uint startX = cursor.x;
                 uint offset = 0;
+                
+                Buffer_EraseSymbols(buffer, symTable);
                 Buffer_InsertStringAt(buffer, cursor.y, utf8Data, utf8Size);
+
                 if(utf8Size == 1){ // TODO: make this better
                     if(*utf8Data == '}' || *utf8Data == '{'){
                         if(BufferView_CursorNestIsValid(bufferView)){
@@ -1142,8 +1190,11 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 
             }else if(View_IsQueryBarActive(view)){
                 QueryBar *bar = View_GetQueryBar(view);
-                if(QueryBar_AddEntry(bar, view, utf8Data, utf8Size) != 0){
-                    AppQueryBarSearchJumpToResult(bar, view); // TODO: other choises
+                int r = QueryBar_AddEntry(bar, view, utf8Data, utf8Size);
+                if(r == 1){
+                    AppQueryBarSearchJumpToResult(bar, view);
+                }else if(r == -2){
+                    AppDefaultReturn();
                 }
             }
         }
@@ -1408,6 +1459,7 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearch, Key_LeftControl, Key_S);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarSearchAndReplace, Key_LeftControl, Key_O);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftControl, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftAlt, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarRevSearch, Key_LeftControl, Key_R);

@@ -1,6 +1,63 @@
 #include <theme.h>
 #include <utilities.h>
 
+//0xFFf9f5d7
+Theme themeGruvboxLight = {
+    .backgroundColor = ColorFromHex(0xFFfbf1c7),
+    .selectorBackground = ColorFromHex(0xFFfbf1c7),
+
+    .searchBackgroundColor = ColorFromHex(0xFFfbf1c7),
+    .selectableListBackground = ColorFromHex(0xFFfbf1c7),
+    .searchWordColor = ColorFromHex(0xCCd5c4a1),
+    .backgroundLineNumbers = ColorFromHex(0xFFfbf1c7),
+    .lineNumberColor = ColorFromHex(0xFF928374),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF180f58),
+    .cursorLineHighlight = ColorFromHex(0xFFebdbb2),
+
+    .operatorColor   = ColorFromHex(0xCC960d01),
+    .datatypeColor   = ColorFromHex(0xFF9b0511),
+    .commentColor    = ColorFromHex(0xFF928375),
+    .stringColor     = ColorFromHex(0xff124b28),
+    .numberColor     = ColorFromHex(0xFF116677),
+    .reservedColor   = ColorFromHex(0xFF116677),
+    .functionColor   = ColorFromHex(0xFF00557f),
+    .includeColor    = ColorFromHex(0xFF022b08),
+
+    .mathColor       = ColorFromHex(0xFF9d0006),
+
+    .tokensColor     = ColorFromHex(0xFF3c3836),
+    .tokensOverCursorColor = ColorFromHex(0xFFebdab4),
+
+    .preprocessorColor = ColorFromHex(0xFF076678),
+    .preprocessorDefineColor = ColorFromHex(0xFF076678),
+
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    .braces = ColorFromHex(0xCC960d01),
+    .cursorColor = ColorFromHex(0xFF928375),
+    .querybarCursorColor = ColorFromHex(0xFFFF4040),
+    .ghostCursorColor = ColorFromHex(0xFF5B4D3C),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFFfbf1c7),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xFF3e1856),
+    .userDatatypeEnum = ColorFromHex(0xFF8f3f71),
+    .scopeLineColor = ColorFromHex(0x66666666),
+    .scrollbarColor = ColorFromHex(0xffebdab4),
+    .querybarTypeLineColor = ColorFromHex(0xFFd5c4a3),
+    .selectorLoadedColor = ColorFromHex(0xFF458588),
+    .testColor = ColorFromHex(0xFF8f3f71),
+    .backTextCount = 1,
+    .lineBorderWidth = 0,
+    .alphaDimm = 1,
+};
+
 Theme themeDracula = {
     .backgroundColor = ColorFromHex(0xFF282a36),
     .selectorBackground = ColorFromHex(0xFF363a47),
@@ -21,6 +78,7 @@ Theme themeDracula = {
     .includeColor    = ColorFromHex(0xFFf1fa8c),
     .mathColor       = ColorFromHex(0xFFD2D2D3),
     .tokensColor     = ColorFromHex(0xFFf8f8f2),
+    .tokensOverCursorColor = ColorFromHex(0xFF000000),
     .preprocessorColor = ColorFromHex(0xFFDAB98F),
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     .borderColor = ColorFromHex(0xFFFF7F50),
@@ -40,6 +98,9 @@ Theme themeDracula = {
     .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff353f25),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .testColor = ColorFromHex(0xCCff5555),
     .backTextCount = 1,
     .lineBorderWidth = 0,
@@ -66,6 +127,7 @@ Theme themeYavid = {
     .includeColor    = ColorFromHex(0xFF6B8E23),
     .mathColor       = ColorFromHex(0xFFD2D2D3),
     .tokensColor     = ColorFromHex(0xFFD2D2D3),
+    .tokensOverCursorColor = ColorFromHex(0xFF000000),
     .preprocessorColor = ColorFromHex(0xFFDAB98F),
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     .borderColor = ColorFromHex(0xFFFF7F50),
@@ -85,6 +147,9 @@ Theme themeYavid = {
     .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff353f25),
+    .querybarTypeLineColor = ColorFromHex(0xFFFF4040),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .testColor = ColorFromHex(0xCCCD950C),
     .backTextCount = 1,
     .lineBorderWidth = 0,
@@ -116,6 +181,7 @@ Theme themeRadical = {
     .includeColor    = ColorFromHex(0xCCbaf7fc),
     .mathColor       = ColorFromHex(0xCCff5395),
     .tokensColor     = ColorFromHex(0xCCcbfff2),
+    .tokensOverCursorColor = ColorFromHex(0xFF000000),
     .preprocessorColor = ColorFromHex(0xCCff4271),
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     //.preprocessorDefineColor = ColorFromHex(0xFFDD1A01),
@@ -137,6 +203,9 @@ Theme themeRadical = {
     .userDatatypeColor = ColorFromHex(0xCCff427c),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAd5348f),
+    .scrollbarColor = ColorFromHex(0xff353f25),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .testColor = ColorFromHex(0xCCfa62b9),
     .backTextCount = 1,
     .lineBorderWidth = 0,
@@ -165,6 +234,7 @@ Theme theme4Coder = {
     .includeColor    = ColorFromHex(0xCC6B8E23),
     .mathColor       = ColorFromHex(0xCCAB8E23),
     .tokensColor     = ColorFromHex(0xDDA08563),
+    .tokensOverCursorColor = ColorFromHex(0xFF000000),
     .preprocessorColor = ColorFromHex(0xCCDAB98F),
     .preprocessorDefineColor = ColorFromHex(0xAADAB98F),
     //.preprocessorDefineColor = ColorFromHex(0xFFDD1A01),
@@ -193,15 +263,20 @@ Theme theme4Coder = {
     //.userDatatypeColor = ColorFromHex(0xCC00CCCC),
     //.testColor = ColorFromHex(0xCCE91E63),
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff353f25),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .testColor = ColorFromHex(0xCCd04c6a),
     .backTextCount = 4,
     .lineBorderWidth = 0,
     .alphaDimm = 1,
 };
 
-Theme *defaultTheme = &themeRadical;
+//Theme *defaultTheme = &themeRadical;
 //Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
+//Theme *defaultTheme = &themeYavid;
+Theme *defaultTheme = &themeGruvboxLight;
 
 std::vector<ThemeDescription> themesDesc = {
     {
@@ -215,6 +290,14 @@ std::vector<ThemeDescription> themesDesc = {
     {
         .name = "Dracula",
         .theme = &themeDracula,
+    },
+    {
+        .name = "Gruvbox Light",
+        .theme = &themeGruvboxLight,
+    },
+    {
+        .name = "Yavid",
+        .theme = &themeYavid,
     }
 };
 
@@ -346,6 +429,10 @@ vec4i GetUIColor(Theme *theme, UIElement id){
         COLOR_RET(UIGhostCursor, ghostCursorColor);
         COLOR_RET(UISelectableListBackground, selectableListBackground);
         COLOR_RET(UIScopeLine, scopeLineColor);
+        COLOR_RET(UICharOverCursor, tokensOverCursorColor);
+        COLOR_RET(UIScrollBarColor, scrollbarColor);
+        COLOR_RET(UIQueryBarTypeColor, querybarTypeLineColor);
+        COLOR_RET(UISelectorLoadedColor, selectorLoadedColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);
@@ -378,4 +465,12 @@ short GetBackTextCount(Theme *theme){
 
 Float GetLineBorderWidth(Theme *theme){
     return theme->lineBorderWidth;
+}
+
+int ThemeNeedsEffect(Theme *theme){
+    if(theme == &theme4Coder){
+        return 1;
+    }
+
+    return 0;
 }

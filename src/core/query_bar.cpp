@@ -2,6 +2,100 @@
 #include <view.h>
 #include <bufferview.h>
 
+static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
+                                  char *name=nullptr, uint titleLen=0);
+
+static int QueryBar_EmptySearchReplaceCallback(QueryBar *bar, View *view, int accepted){
+    (void)bar; (void)view; (void)accepted;
+    printf("Warning unconfigured search callback\n");
+    //printf("Accepted: %d\n", accepted);
+    return 0;
+}
+
+void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view);
+// called when user pressed enter and the query bar is in SearchAndReplace mode
+static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int fromEnter=0){
+    int r = 0;
+    char *search = nullptr;
+    uint searchLen = 0;
+    int increment = 1;
+    QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
+
+    QueryBar_GetWrittenContent(queryBar, &search, &searchLen);
+    if(searchLen > 0 || fromEnter){
+        if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_SEARCH && searchLen > 0){
+            AssertA(searchLen < sizeof(replace->toLocate), "Query is too big");
+
+            Memcpy(replace->toLocate, search, searchLen);
+            replace->toLocateLen = searchLen;
+            replace->toLocate[searchLen] = 0;
+
+            replace->state = QUERY_BAR_SEARCH_AND_REPLACE_REPLACE;
+            QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_SEARCH_AND_REPLACE);
+
+        }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_REPLACE && searchLen > 0){
+            AssertA(searchLen < sizeof(replace->toReplace), "Query is too big");
+
+            Memcpy(replace->toReplace, search, searchLen);
+            replace->toReplaceLen = searchLen;
+            replace->toReplace[searchLen] = 0;
+
+            replace->state = QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE;
+            increment = 0;
+        }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_ASK){
+            // TODO: This is a OK on the execute question we need to replace the content
+            int toNext = 1;
+            if(fromEnter){
+                replace->searchCallback(queryBar, view, 1);
+            }else{
+                if(search[0] == 'y' || search[0] == 'Y'){
+                    replace->searchCallback(queryBar, view, 1);
+                }else if(search[0] == 'n' || search[0] == 'N'){
+                    replace->searchCallback(queryBar, view, 0);
+                }else{
+                    toNext = 0;
+                    r = 0;
+                    QueryBar_SetEntry(queryBar, view, nullptr, 0);
+                }
+            }
+            if(toNext)
+                replace->state = QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE;
+        }
+
+        if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE){
+            DoubleCursor cursor;
+            QueryBarCmdSearch searchResult;
+            BufferView *bView = View_GetBufferView(view);
+            if(queryBar->searchCmd.valid){
+                cursor.textPosition = vec2ui(queryBar->searchCmd.lineNo,
+                                             queryBar->searchCmd.position+increment);
+            }else{
+                cursor = bView->sController.cursor;
+            }
+            int s = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor,
+                                          replace->toLocate, replace->toLocateLen);
+
+            searchResult = queryBar->searchCmd;
+            if(s > 0){
+                AppQueryBarSearchJumpToResult(queryBar, view);
+                replace->state = QUERY_BAR_SEARCH_AND_REPLACE_ASK;
+                QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_SEARCH_AND_REPLACE);
+            }
+
+            queryBar->searchCmd = searchResult;
+            r = s > 0 ? 0 : 1;
+        }
+    }else{
+        r = 1;
+    }
+    return r;
+}
+
+void QueryBar_SetInteractiveSearchCallback(QueryBar *queryBar, OnInteractiveSearch onConfirm){
+    QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
+    replace->searchCallback = onConfirm;
+}
+
 static int QueryBar_AcceptInput(QueryBar *queryBar, char *input, uint len){
     QueryBarInputFilter *filter = &queryBar->filter;
     if(filter->digitOnly){
@@ -13,9 +107,9 @@ static int QueryBar_AcceptInput(QueryBar *queryBar, char *input, uint len){
 
 static int QueryBar_AreCommandsContinuous(QueryBar *queryBar, QueryBarCommand cmd){
     /*
-* TODO: Check if the new command can borrow the already presented content of
-* the query bar, i.e.: search - rever-search.
-*/
+    * TODO: Check if the new command can borrow the already presented content of
+    * the query bar, i.e.: search - rever-search.
+    */
     QueryBarCommand id = queryBar->cmd;
     return ((id == QUERY_BAR_CMD_REVERSE_SEARCH && cmd == QUERY_BAR_CMD_SEARCH) ||
             (id == QUERY_BAR_CMD_SEARCH && cmd == QUERY_BAR_CMD_REVERSE_SEARCH));
@@ -23,7 +117,7 @@ static int QueryBar_AreCommandsContinuous(QueryBar *queryBar, QueryBarCommand cm
 
 /* Sets tittle and ids */
 static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
-                                  char *name=nullptr, uint titleLen=0)
+                                  char *name, uint titleLen)
 {
     char title[32];
     uint len = 0;
@@ -47,6 +141,18 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
         case QUERY_BAR_CMD_CUSTOM:{
             if(title && titleLen > 0){
                 len = snprintf(title, sizeof(title), "%s: ", name);
+            }
+        } break;
+        case QUERY_BAR_CMD_SEARCH_AND_REPLACE:{
+            QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
+            if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_SEARCH){
+                len = snprintf(title, sizeof(title), "Search and Replace (Search): ");
+            }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_REPLACE){
+                len = snprintf(title, sizeof(title), "Search and Replace (Replace): ");
+            }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_ASK){
+                len = snprintf(title, sizeof(title), "Replace (y/n) ? ");
+            }else{
+                AssertA(0, "Invalid state");
             }
         } break;
         default:{
@@ -79,6 +185,15 @@ static int  QueryBar_DynamicUpdate(QueryBar *queryBar, View *view){
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer,
                                       &bView->sController.cursor);
         } break;
+        case QUERY_BAR_CMD_SEARCH_AND_REPLACE:{
+            QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
+            if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_ASK){
+                r = QueryBar_SearchAndReplaceProcess(queryBar, view);
+                if(r != 0){
+                    r = -2;
+                }
+            }
+        } break;
         case QUERY_BAR_CMD_CUSTOM:{
             if(queryBar->entryCallback){
                 r = queryBar->entryCallback(queryBar, view);
@@ -92,6 +207,7 @@ static int  QueryBar_DynamicUpdate(QueryBar *queryBar, View *view){
 
 void QueryBar_Free(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
     Buffer_Free(&queryBar->buffer);
     queryBar->isActive = 0;
     queryBar->writePos = 0;
@@ -100,6 +216,9 @@ void QueryBar_Free(QueryBar *queryBar){
     queryBar->cancelCallback = nullptr;
     queryBar->commitCallback = nullptr;
     queryBar->cmd = QUERY_BAR_CMD_NONE;
+    replace->toLocateLen = 0;
+    replace->toReplaceLen = 0;
+    replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
 }
 
 /*
@@ -107,6 +226,7 @@ void QueryBar_Free(QueryBar *queryBar){
 */
 void QueryBar_Initialize(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
     queryBar->buffer = BUFFER_INITIALIZER;
     queryBar->isActive = 0;
     queryBar->writePos = 0;
@@ -115,6 +235,9 @@ void QueryBar_Initialize(QueryBar *queryBar){
     queryBar->cancelCallback = nullptr;
     queryBar->commitCallback = nullptr;
     queryBar->cmd = QUERY_BAR_CMD_NONE;
+    replace->toLocateLen = 0;
+    replace->toReplaceLen = 0;
+    replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
     Buffer_Init(&queryBar->buffer, DefaultAllocatorSize);
 }
 
@@ -185,9 +308,12 @@ void QueryBar_SetEntry(QueryBar *queryBar, View *view, char *str, uint len){
         uint p = queryBar->writePosU8;
         uint rawP = queryBar->writePos;
         Buffer_RemoveRangeRaw(&queryBar->buffer, rawP, queryBar->buffer.taken);
-        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, 0);
+        if(len > 0){
+            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, 0);
+        }
+
         queryBar->cursor.textPosition.y =
-            Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);
+                        Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);
     }
 }
 
@@ -332,6 +458,9 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                     BufferView_CursorToPosition(bView, target, p);
                 }
             } break;
+            case QUERY_BAR_CMD_SEARCH_AND_REPLACE:{
+                r = QueryBar_SearchAndReplaceProcess(queryBar, view, 1);
+            } break;
             case QUERY_BAR_CMD_SEARCH:
             case QUERY_BAR_CMD_REVERSE_SEARCH:{
                 if(queryBar->searchCmd.valid){
@@ -351,6 +480,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
     }
     
     if(r != 0){
+        QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
         queryBar->cmd = QUERY_BAR_CMD_NONE;
         Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count);
         queryBar->writePosU8 = 0;
@@ -361,6 +491,9 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
         queryBar->cancelCallback = nullptr;
         queryBar->commitCallback = nullptr;
         queryBar->filter = INPUT_FILTER_INITIALIZER;
+        replace->toLocateLen = 0;
+        replace->toReplaceLen = 0;
+        replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
     }
     
     return r;

@@ -17,10 +17,14 @@ typedef enum{
     UICursorLineHighlight,
     UIBorder,
     UICursor,
+    UICharOverCursor,
     UIQueryBarCursor,
+    UIQueryBarTypeColor,
     UISelectableListBackground,
     UIGhostCursor,
     UIScopeLine,
+    UIScrollBarColor,
+    UISelectorLoadedColor,
 }UIElement;
 
 typedef struct{
@@ -43,6 +47,7 @@ typedef struct{
     vec4i includeColor;
     vec4i mathColor;
     vec4i tokensColor;
+    vec4i tokensOverCursorColor;
     vec4i preprocessorColor;
     vec4i preprocessorDefineColor;
     vec4i borderColor;
@@ -55,6 +60,9 @@ typedef struct{
     vec4i userDatatypeColor;
     vec4i userDatatypeEnum;
     vec4i scopeLineColor;
+    vec4i scrollbarColor;
+    vec4i querybarTypeLineColor;
+    vec4i selectorLoadedColor;
     vec4i testColor;
     short backTextCount;
     Float lineBorderWidth;
@@ -79,4 +87,5 @@ Float GetLineBorderWidth(Theme *theme);
 short GetBackTextCount(Theme *theme);
 void GetThemeList(std::vector<ThemeDescription> **themes);
 void SwapDefaultTheme(char *name, uint len);
+int ThemeNeedsEffect(Theme *theme);
 #endif //THEME_H

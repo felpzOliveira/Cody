@@ -102,7 +102,8 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, 
         { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, 
+        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__host__", .identifier = TOKEN_ID_RESERVED },
         { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
         { .value = "register", .identifier = TOKEN_ID_OPERATOR },
         { .value = "requires", .identifier = TOKEN_ID_OPERATOR },
@@ -116,7 +117,10 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "protected", .identifier = TOKEN_ID_OPERATOR },
         { .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
     {
-        { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR }, },
+        { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "__device__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__global__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
@@ -243,7 +247,8 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, 
         { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED }, 
+        { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__host__", .identifier = TOKEN_ID_RESERVED },
         { .value = "explicit", .identifier = TOKEN_ID_OPERATOR },
         { .value = "register", .identifier = TOKEN_ID_OPERATOR },
         { .value = "requires", .identifier = TOKEN_ID_OPERATOR },
@@ -257,7 +262,10 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "protected", .identifier = TOKEN_ID_OPERATOR },
         { .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
     {
-        { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR }, },
+        { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "__device__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__global__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {

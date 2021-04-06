@@ -277,16 +277,11 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view,
             uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len);
             char *chr = &buffer->data[rawp];
             if(*chr != '\t'){
-                glEnable(GL_BLEND);
-                glBlendFunc(GL_ZERO, GL_ONE_MINUS_SRC_ALPHA);
-                
-                glUseProgram(font->shader.id);
-                Shader_UniformMatrix4(font->shader, "projection", &projection->m);
-                Shader_UniformMatrix4(font->shader, "modelView", &model->m);
-                
-                fonsStashMultiTextColor(font->fsContext, p.x, p.y, glfonsRGBA(0, 0, 0, 255),
+                Graphics_PrepareTextRendering(state, projection, &state->model);
+                vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
+                fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
                                         chr, chr+len, &pGlyph);
-                fonsStashFlush(font->fsContext);
+                Graphics_FlushText(state);
             }
         }
     }else{
@@ -594,7 +589,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     Graphics_QuadPush(state, a0, a1, col);
     
     //col = vec3f(1.8 * g, 2 * g, g);
-    vec4f cc = ColorFromHexf(0xff353f25);
+    vec4f cc = GetUIColorf(theme, UIScrollBarColor);
     vec2f b0 = vec2f((Float)a0.x + (Float)(a1.x - a0.x) * pc, (Float)a0.y);
     Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y),
                       a1, cc);
@@ -621,46 +616,6 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     
     fonsStashFlush(font->fsContext);
     glDisable(GL_BLEND);
-    
-    if(view->isActive){
-        //vec4f color(0.78, 0.123, 0.1, 0.6); // TODO: state
-        //vec4f c = GetUIColorf(theme, UIBorder);
-        //vec4f color = vec4f(c.x, c.y, c.z, 0.7);
-        
-        //glUseProgram(font->cursorShader.id);
-        //Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-        //Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
-        
-#if 0
-        Float w = 1;
-        vec2ui p = vec2ui(0, 0);
-        vec2ui s = geometry->upper - geometry->lower;
-        vec2ui k0, k1;
-        k0 = ScreenToGL(vec2ui(p.x + w, s.y), state);
-        Graphics_QuadPush(state, p, k0, color);
-        
-        k0 = ScreenToGL(vec2ui(s.x, p.y + w), state);
-        Graphics_QuadPush(state, l, k0, color);
-        
-        
-        k0 = ScreenToGL(vec2ui(s.x-w, l.y), state);
-        k1 = ScreenToGL(vec2ui(s.x, s.y-w), state);
-        Graphics_QuadPush(state, k0, k1, color);
-        
-        k0 = ScreenToGL(vec2ui(l.x, s.y-w), state);
-        k1 = ScreenToGL(vec2ui(u.x, s.y), state);
-        Graphics_QuadPush(state, k0, k1, color);
-        
-        Graphics_QuadFlush(state);
-#endif
-#if 0
-        Graphics_LinePush(state, l, vec2ui(l.x, u.y), color); // left line
-        Graphics_LinePush(state, vec2ui(l.x, u.y), u, color); // top line
-        Graphics_LinePush(state, u, vec2ui(u.x, l.y), color);
-        Graphics_LinePush(state, vec2ui(u.x, l.y), l, color);
-        Graphics_LineFlush(state);
-#endif
-    }
 }
 
 int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){

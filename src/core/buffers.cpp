@@ -460,8 +460,9 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         
         buffer->taken += len;
         buffer->count = Buffer_GetUtf8Count(buffer);
+        buffer->data[buffer->taken] = 0;
         if(buffer->size > buffer->taken){
-            buffer->data[buffer->taken] = 0;
+            // ??? buffer->data[buffer->taken] = 0;
         }
         
     }else if(buffer->size == 0 || buffer->data == nullptr){

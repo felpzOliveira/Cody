@@ -29,7 +29,7 @@ extern AppConfig appGlobalConfig;
 void AppEarlyInitialize();
 
 /*
-* Performs initialization when there graphics interface is already loaded.
+* Performs initialization when the graphics interface is already loaded.
 */
 void AppInitialize();
 
@@ -160,6 +160,7 @@ void AppCommandQueryBarRevSearch();
 void AppCommandQueryBarGotoLine();
 void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end);
 void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end);
+void AppCommandQueryBarSearchAndReplace();
 
 /* Base commands for the query bar */
 void AppCommandQueryBarNext();

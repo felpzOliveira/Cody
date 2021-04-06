@@ -246,5 +246,10 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size);
 */
 void BufferView_Synchronize(BufferView *view);
 
+/*
+* Marks the linebuffer present in the bufferview 'view' as dirty, i.e.: needing save.
+*/
+void BufferView_Dirty(BufferView *view);
+
 void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

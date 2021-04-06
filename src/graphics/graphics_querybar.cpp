@@ -116,15 +116,23 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
     OpenGLFont *font = &state->font;
     ActivateViewportAndProjection(state, view, ViewportText);
     QueryBarCommand cmd = QueryBar_GetActiveCommand(bar);
-    if(cmd == QUERY_BAR_CMD_SEARCH || cmd == QUERY_BAR_CMD_REVERSE_SEARCH){
+    if(cmd == QUERY_BAR_CMD_SEARCH || cmd == QUERY_BAR_CMD_REVERSE_SEARCH
+       || cmd == QUERY_BAR_CMD_SEARCH_AND_REPLACE)
+    {
         QueryBarCmdSearch *result = nullptr;
+        QueryBarCmdSearchAndReplace *replace = &bar->replaceCmd;
         QueryBar_GetSearchResult(bar, &result);
         
         if(result->valid == 0) return;
         
         char *searched = nullptr;
         uint slen = 0;
-        QueryBar_GetWrittenContent(bar, &searched, &slen);
+        if(cmd == QUERY_BAR_CMD_SEARCH_AND_REPLACE){
+            searched = replace->toLocate;
+            slen = replace->toLocateLen;
+        }else{
+            QueryBar_GetWrittenContent(bar, &searched, &slen);
+        }
         
         if(slen == 0) return;
         
@@ -210,8 +218,8 @@ int Graphics_RenderQueryBar(View *view, OpenGLState *state,
     // Check if we need to render something for the list
     if(View_GetState(view) == View_SelectableList){
         int active = View_SelectableListGetActiveIndex(view);
-        if(active < 0){
-            vec4f cc = cursorColor * 0.2;
+        if(active < 0){ // 51, 13, 13, 51
+            vec4f cc = GetUIColorf(theme, UIQueryBarTypeColor);
             fcol[0] = cc[0];
             fcol[1] = cc[1];
             fcol[2] = cc[2];

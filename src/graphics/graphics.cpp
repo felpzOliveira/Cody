@@ -498,40 +498,6 @@ void Graphics_LineFlush(OpenGLState *state, int blend){
     lines->length = 0;
 }
 
-#if 0
-void test_gl_selector(OpenGLState *state){
-    OpenGLSelector selector;
-    Float w = state->width;
-    Float h = state->height;
-    selector.geometry.extensionX = vec2f(0.1, 0.2);
-    selector.geometry.extensionY = vec2f(0.5, 1.0);
-    
-    uint x0 = (uint)(w * selector.geometry.extensionX.x);
-    uint x1 = (uint)(w * selector.geometry.extensionX.y);
-    uint y0 = (uint)(h * selector.geometry.extensionY.x);
-    uint y1 = (uint)(h * selector.geometry.extensionY.y);
-    
-    selector.lineBuffer = LINE_BUFFER_INITIALIZER;
-    selector.geometry.lower = vec2ui(x0, y0);
-    selector.geometry.upper = vec2ui(x1, y1);
-    
-    const char *str = "Example Selector";
-    uint len = strlen(str);
-    
-    LineBuffer_InitEmpty(&selector.lineBuffer);
-    LineBuffer_InsertLineAt(&selector.lineBuffer, 0, (char *)str, len, 0);
-    char linedata[128];
-    for(uint i = 0; i < 30; i++){
-        uint k = snprintf(linedata, sizeof(linedata), "Line - %u", i);
-        LineBuffer_InsertLine(&selector.lineBuffer, linedata, k, 0);
-    }
-    
-    Graphics_RenderSelector(state, &selector, defaultTheme, 0);
-    
-    LineBuffer_Free(&selector.lineBuffer);
-}
-#endif
-
 /*
 * TODO: It is interesting to attempt to render 1 +2pages and allow
 *       for a translation matrix. It might allow us to better represent
@@ -541,6 +507,7 @@ void test_gl_selector(OpenGLState *state){
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
+    OpenGLFont *font = &state->font;
     
     _OpenGLStateInitialize(state);
     OpenGLInitialize(state);
@@ -557,7 +524,12 @@ void OpenGLEntry(){
         
         lastTime = currTime;
         AppUpdateViews();
-        
+
+        //TODO: Move this
+        glUseProgram(font->shader.id);
+        Shader_UniformInteger(font->shader, "enable_contrast",
+                              ThemeNeedsEffect(defaultTheme));
+
         int c = AppGetViewCount();
         for(int i = 0; i < c; i++){
             View *view = AppGetView(i);
@@ -572,18 +544,13 @@ void OpenGLEntry(){
                 animating |= pipeline->stages[s].renderer(view, state, defaultTheme, dt);
             }
         }
-        
-        //state->model = state->scale;
-        //test_gl_selector(state);
-        
+
         SwapBuffersX11(state->window);
         if(animating){
             PoolEventsX11();
         }else{
             WaitForEventsX11();
         }
-        
-        //usleep(10000);
     }
     
     DEBUG_MSG("Finalizing OpenGL graphics\n");
@@ -606,5 +573,5 @@ void Graphics_Initialize(){
         GlobalGLState.running = 1;
         std::thread(OpenGLEntry).detach();
     }
-#endif
+#endif    
 }

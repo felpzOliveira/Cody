@@ -36,10 +36,11 @@ struct QueryBar{
     uint writePosU8;
     QueryBarCommand cmd;
     QueryBarInputFilter filter;
-    
+
     /* Command related data */
     QueryBarCmdSearch searchCmd;
-    
+    QueryBarCmdSearchAndReplace replaceCmd;
+
     /* For custom usage */
     OnQueryBarEntry  entryCallback; // happens when the query bar buffer changes
     OnQueryBarCancel cancelCallback; // when user presses Esc on a query bar
@@ -136,6 +137,12 @@ int QueryBar_PreviousItem(QueryBar *queryBar, View *view);
 * Gets a reference to the results of the previously executed search command.
 */
 void QueryBar_GetSearchResult(QueryBar *queryBar, QueryBarCmdSearch **result);
+
+/*
+* Sets the default callback for the interactive search to be called when user
+* confirms/denies a search value.
+*/
+void QueryBar_SetInteractiveSearchCallback(QueryBar *queryBar, OnInteractiveSearch onConfirm);
 
 /*
 * Gets the active command in a QueryBar, if any.

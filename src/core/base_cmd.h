@@ -13,6 +13,7 @@ struct View;
 struct FileEntry;
 
 #define OnFileOpenCallback std::function<void(View *view, FileEntry *entry)>
+#define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
 
 /* Commands are pre-defined by their enum id */
 typedef enum{
@@ -20,16 +21,36 @@ typedef enum{
     QUERY_BAR_CMD_SEARCH,
     QUERY_BAR_CMD_REVERSE_SEARCH,
     QUERY_BAR_CMD_JUMP_TO_LINE,
-    
+    QUERY_BAR_CMD_SEARCH_AND_REPLACE,
+
     QUERY_BAR_CMD_CUSTOM,
 }QueryBarCommand;
 
-struct QueryBarCmdSearch{
+typedef enum{
+    QUERY_BAR_SEARCH_AND_REPLACE_SEARCH = 0,
+    QUERY_BAR_SEARCH_AND_REPLACE_REPLACE,
+    QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE,
+    QUERY_BAR_SEARCH_AND_REPLACE_ASK,
+}QueryBarSearchAndReplaceState;
+
+typedef struct QueryBarCmdSearch{
     uint lineNo;
     uint position;
     uint length;
     short valid;
-};
+}QueryBarCmdSearch;
+
+typedef struct QueryBarCmdSearchAndReplace{
+    QueryBarSearchAndReplaceState state;
+    char toLocate[128];
+    uint toLocateLen;
+
+    char toReplace[128];
+    uint toReplaceLen;
+
+    /* Callback when user confirms/denies a search value */
+    OnInteractiveSearch searchCallback;
+}QueryBarCmdSearchAndReplace;
 
 /*
 * Performs one computation of the search operation based on the contents
@@ -37,15 +58,21 @@ struct QueryBarCmdSearch{
 * as a starting point. Returns 1 in case a new match was found, 0 otherwise.
 */
 int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
-                          DoubleCursor *cursor);
+                          DoubleCursor *dcursor, char *toSearch = nullptr,
+                          uint toSearchLen = 0);
 /*
 * Perform setup to start a command of file opening.
 */
 int FileOpenerCommandStart(View *view, char *basePath, ushort len,
                            OnFileOpenCallback onOpenFile);
-
+/*
+* Performs setup to start a command of buffer switch.
+*/
 int SwitchBufferCommandStart(View *view);
 
+/*
+* Performs setup to start a command theme.
+*/
 int SwitchThemeCommandStart(View *view);
 
 #endif //BASE_CMD_H
