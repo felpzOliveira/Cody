@@ -164,6 +164,7 @@ uint StringComputeU8Count(char *s0, uint len);
 vec4i ColorFromHex(uint hex);
 vec4f ColorFromHexf(uint hex);
 vec4i ColorFromRGBA(vec4f color);
+vec4f ColorFromInt(vec4i col);
 
 /*
 * Count the amount of digits in a int.

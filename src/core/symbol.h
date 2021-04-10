@@ -10,7 +10,7 @@
 
 /*
 * We have a few tokens that usually you wouldn't need but these help our
-* lexer to its thing and to better work with the symbol table.
+* lexer do its thing and to better work with the symbol table.
 */
 typedef enum{
     TOKEN_ID_IGNORE = 0,
@@ -56,6 +56,14 @@ typedef enum{
     TOKEN_ID_DATATYPE_USER_CLASS,
     TOKEN_ID_FUNCTION_DECLARATION,
 }TokenId;
+
+inline int Symbol_IsTokenQueriable(TokenId id){
+    if(!((int)id > TOKEN_ID_IGNORE && (int)id < TOKEN_ID_FUNCTION_DECLARATION)){
+        return 0;
+    }
+
+    return (id != TOKEN_ID_SCOPE && id != TOKEN_ID_SPACE) ? 1 : 0;
+}
 
 inline int Symbol_IsTokenNest(TokenId id){
     return (id == TOKEN_ID_PARENTHESE_OPEN || id == TOKEN_ID_PARENTHESE_CLOSE ||

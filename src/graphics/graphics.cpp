@@ -189,6 +189,45 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
     return 0;
 }
 
+vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
+    if(!theme->dynamicCursor){
+        return GetUIColorf(theme, UICursor);
+    }else{
+        vec4i color;
+        vec2ui cursor;
+        int r = -1;
+        Tokenizer *tokenizer = view->tokenizer;
+        SymbolTable *symTable = tokenizer->symbolTable;
+
+        if(ghost){
+            cursor = BufferView_GetGhostCursorPosition(view);
+        }else{
+            cursor = BufferView_GetCursorPosition(view);
+        }
+
+        Buffer *buffer = BufferView_GetBufferAt(view, cursor.x);
+        uint tid = Buffer_GetTokenAt(buffer, cursor.y);
+        Token *token = &buffer->tokens[tid];
+        if(token == nullptr){
+            return GetUIColorf(theme, UICursor);
+        }
+
+        if(!Symbol_IsTokenQueriable(token->identifier)){
+            return GetUIColorf(theme, UICursor);
+        }
+
+        char *str = &buffer->data[token->position];
+
+        r = Graphics_ComputeTokenColor(str, token, symTable, theme, cursor.x,
+                                       token->identifier, nullptr, &color);
+        if(r == -1){
+            return GetUIColorf(theme, UICursor);
+        }
+
+        return ColorFromInt(color);
+    }
+}
+
 void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
                                    Transform *model)
 {
@@ -383,7 +422,7 @@ void OpenGLFontSetup(OpenGLState *state){
                                      (uint8 *)fontfileContents, filesize, 0,
                                      font->sdfSettings);
     AssertA(font->fontId != FONS_INVALID, "Failed to create font");
-    Graphics_SetFontSize(state, 18); // TODO: User
+    Graphics_SetFontSize(state, 19); // TODO: User
 }
 
 void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,

@@ -17,6 +17,7 @@ endif()
 
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/core"
+					"${CMAKE_CURRENT_SOURCE_DIR}/src/files"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/languages"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
 					"${CMAKE_CURRENT_SOURCE_DIR}/src/external"

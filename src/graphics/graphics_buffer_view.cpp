@@ -248,20 +248,18 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view,
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor->textPos.x);
     
     if(vstate == View_FreeTyping){
+        vec4f col = Graphics_GetCursorColor(bufferView, defaultTheme);
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
         Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
         
         glDisable(GL_BLEND);
-        OpenGLRenderCursor(state, &state->glCursor, GetUIColorf(defaultTheme, UICursor),
+        OpenGLRenderCursor(state, &state->glCursor, col,
                            4, bufferView->isActive && vstate == View_FreeTyping);
         
         if(state->glGhostCursor.valid){
-            //Float g = 0.5;
-            //Float a = 0.6;
-            OpenGLRenderCursor(state, &state->glGhostCursor,
-                               GetUIColorf(defaultTheme, UIGhostCursor), 2, 0);
-            //vec4f(g, g, g, a), 2, 0);
+            col = Graphics_GetCursorColor(bufferView, defaultTheme, 1);
+            OpenGLRenderCursor(state, &state->glGhostCursor, col, 2, 0);
         }
     }
     

@@ -1,4 +1,5 @@
 file(GLOB MH_CORE core/*.cpp
+				  files/*.cpp
 				  resources/*.cpp
 				  languages/*.cpp
 				  graphics/*.cpp

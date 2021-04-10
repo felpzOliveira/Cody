@@ -309,6 +309,11 @@ vec4f ColorFromHexf(uint hex){
                  c.z * kInv255, c.w * kInv255);
 }
 
+vec4f ColorFromInt(vec4i col){
+    return vec4f(col.x * kInv255, col.y * kInv255,
+                 col.z * kInv255, col.w * kInv255);
+}
+
 vec4i ColorFromRGBA(vec4f color){
     return vec4i((uint)(ColorClamp(color.x) * 256.0f),
                  (uint)(ColorClamp(color.y) * 256.0f),

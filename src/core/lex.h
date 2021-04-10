@@ -19,7 +19,7 @@
 * is broken by Lex_TokenizeNext into 8 tokens, i.e.:
 * <TOKEN_ID_DATATYPE_TYPEDEF_DEF>, <TOKEN_ID_SPACE>, <TOKEN_ID_DATATYPE_STRUCT_DEF>,
 * <TOKEN_ID_SPACE>, <TOKEN_ID_NONE>, <TOKEN_ID_SPACE>, <TOKEN_ID_NONE> and
- * <TOKEN_ID_SEMICOLON>.
+* <TOKEN_ID_SEMICOLON>.
 *
 * Because typedef wishes to be a logical processor, it implements LEX_LOGICAL_PROCESSOR
 * where it wants to classify the last 'lex' as a <TOKEN_ID_DATATYPE_USER_TYPEDEF>.
@@ -39,7 +39,7 @@
 * called but now because it already got its key it pops itself and allows the next
 * unit to process, i.e.: typedef's. Now typedef's is assure that the <SOMETHING> in its
 * rule was consumed and because it is in a unested state it gets the token and marks it
-* as <TOKEN_ID_DATATYPE_USER_TYPEDEF>, when the ';' appears, because typede's unit is 
+* as <TOKEN_ID_DATATYPE_USER_TYPEDEF>, when the ';' appears, because typedef's unit is 
 * in unested state it means the declaration is done. So it pops itself from the stack
 * and returns.
 * Now we have both 'lex' tokens marked accordingly. I guess in the end this is the
@@ -197,7 +197,7 @@ typedef struct{
 
 /*
 * The actual Tokenizer structure. Contains a list of contexts that need to run,
- * a work context for faster token insertion, and a few utilities for querying
+* a work context for faster token insertion, and a few utilities for querying
 * its state and pending works.
 */
 struct Tokenizer{

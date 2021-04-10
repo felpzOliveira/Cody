@@ -140,6 +140,12 @@ vec2ui Graphics_GetMouse(OpenGLState *state);
 int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
                                Theme *theme, uint lineNr, uint tid,
                                BufferView *bView, vec4i *color);
+
+/*
+* Computes the color of the editing cursor.
+*/
+vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost=0);
+
 /*
 * Renders a BufferView, returns != 0 in case the bufferview is animating and cannot
 * be put on hold.

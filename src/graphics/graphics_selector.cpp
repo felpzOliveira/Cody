@@ -8,11 +8,13 @@ typedef struct FrameStyle{
     int with_border;
     int with_line_border;
     int with_load;
+    int with_line_highlight;
     vec4f item_background_color;
     vec4i item_foreground_color;
     vec4i item_load_color;
     vec4f item_active_border_color;
     vec4i item_active_foreground_color;
+    vec4f item_active_background_color;
     Float yScaling;
 }FrameStyle;
 
@@ -31,8 +33,6 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         AssertA(buffer != nullptr, "Failed to get buffer from selectable list");
         maxn = Max(buffer->taken, maxn);
     }
-
-    //printf("Rendering range %u %u, %u\n", range.x, range.y, list->active);
 
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
@@ -57,7 +57,6 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                               style->item_foreground_color, &pGlyph);
         }
 
-        //TODO: This needs state and not do for any available list pointer
         if(opener && style->with_load){
             if(opener->entries){
                 FileEntry *e = &opener->entries[rindex];
@@ -73,6 +72,12 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         if((int)i == list->active && style->with_line_border){
             Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, 2,
                                     style->item_active_border_color);
+        }
+
+        if((int)i == list->active && style->with_line_highlight){
+            int w = 2;
+            Graphics_QuadPush(state, vec2ui(w, y0+w), vec2ui(lWidth-w, y1-w),
+                              style->item_active_background_color);
         }
 
         y0 += (1.0 + kViewSelectableListOffset) * style->yScaling *
@@ -92,19 +97,22 @@ int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
 
     Float fcol[] = {backColor.x, backColor.y, backColor.z, backColor.w};
     glClearBufferfv(GL_COLOR, 0, fcol);
-    glClearBufferfv(GL_DEPTH, 0, kOnes); //???
+    glClearBufferfv(GL_DEPTH, 0, kOnes);
 
     vec4i tcol = GetColor(theme, TOKEN_ID_NONE);
-    vec4i scol = ColorFromHex(0xCCfffc7f); // theme?
+    vec4i scol = GetUIColor(theme, UIHoverableListItem);
+    vec4f sscol = GetUIColorf(theme, UIHoverableListItemBackground);
 
     FrameStyle style = {
         .with_line_border = 0,
         .with_load = 0,
+        .with_line_highlight = 1,
         .item_background_color = backColor,
         .item_foreground_color = tcol,
         .item_load_color = vec4i(0),
         .item_active_border_color = vec4f(0),
         .item_active_foreground_color = scol,
+        .item_active_background_color = sscol,
         .yScaling = kAutoCompleteListScaling,
     };
 
@@ -212,6 +220,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     FrameStyle style = {
         .with_line_border = 1,
         .with_load = 1,
+        .with_line_highlight = 0,
         .item_background_color = col,
         .item_foreground_color = tcol,
         .item_load_color = tcolSel,
