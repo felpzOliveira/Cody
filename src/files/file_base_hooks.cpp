@@ -15,7 +15,7 @@ static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     std::time_t curr = time(0);
     std::tm *now = std::localtime(&curr);
     std::string ext = "th ";
-    uint digit = GetDigitOf(now->tm_mday, 0); // equivalently to tm_mday % 10
+    uint digit = GetDigitOf(now->tm_mday, 0); // equivalent to tm_mday % 10
 
     if(digit == 1 && now->tm_mday != 11){
         ext = "st ";

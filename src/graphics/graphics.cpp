@@ -206,7 +206,12 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
         }
 
         Buffer *buffer = BufferView_GetBufferAt(view, cursor.x);
+
         uint tid = Buffer_GetTokenAt(buffer, cursor.y);
+        if(tid >= buffer->tokenCount){
+            return GetUIColorf(theme, UICursor);
+        }
+
         Token *token = &buffer->tokens[tid];
         if(token == nullptr){
             return GetUIColorf(theme, UICursor);
