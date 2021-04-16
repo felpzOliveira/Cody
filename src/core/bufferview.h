@@ -65,7 +65,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *
 /*
 * Makes a bufferview uses a linebuffer for file reference.
 */
-void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer);
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer=nullptr);
 
 /*
 * Sets the geometry of a bufferview.

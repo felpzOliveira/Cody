@@ -8,9 +8,11 @@
 #include <undo.h>
 #include <view.h>
 #include <string.h>
-#include <file_buffer.h>
+#include <file_provider.h>
 #include <autocomplete.h>
 #include <types.h>
+#include <view_tree.h>
+#include <control_cmds.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -24,19 +26,16 @@ typedef struct{
     BindingMap *queryBarMapping;
     BindingMap *autoCompleteMapping;
     View *activeView;
-    uint viewsCount;
     int activeId;
     
     char cwd[PATH_MAX];
-    View views[MAX_VIEWS];
-    FileBufferList fileBuffer;
+    Geometry currentGeometry;
+    Float currentLineHeight;
 }App;
 
 static App appContext = { 
     .freeTypeMapping = nullptr, 
     .activeView = nullptr,
-    .viewsCount = 0,
-    .activeId = -1,
 };
 
 AppConfig appGlobalConfig;
@@ -50,101 +49,67 @@ void AppCommandAutoComplete();
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     Float w = (Float)(geometry.upper.x - geometry.lower.x);
     Float h = (Float)(geometry.upper.y - geometry.lower.y);
-    for(uint i = 0; i < appContext.viewsCount; i++){
-        View *view = &appContext.views[i];
-        uint x0 = (uint)(w * view->geometry.extensionX.x);
-        uint x1 = (uint)(w * view->geometry.extensionX.y);
-        uint y0 = (uint)(h * view->geometry.extensionY.x);
-        uint y1 = (uint)(h * view->geometry.extensionY.y);
-        
-        Geometry targetGeo;
-        targetGeo.lower = vec2ui(x0, y0);
-        targetGeo.upper = vec2ui(x1, y1);
-        targetGeo.extensionX = view->geometry.extensionX;
-        targetGeo.extensionY = view->geometry.extensionY;
-        View_SetGeometry(view, targetGeo, lineHeight);
-    }
+    auto fn = [&](ViewNode *node) -> int{
+        View *view = node->view;
+        if(view){
+            uint x0 = (uint)(w * view->geometry.extensionX.x);
+            uint x1 = (uint)(w * view->geometry.extensionX.y);
+            uint y0 = (uint)(h * view->geometry.extensionY.x);
+            uint y1 = (uint)(h * view->geometry.extensionY.y);
+
+            Geometry targetGeo;
+            targetGeo.lower = vec2ui(x0, y0);
+            targetGeo.upper = vec2ui(x1, y1);
+            targetGeo.extensionX = view->geometry.extensionX;
+            targetGeo.extensionY = view->geometry.extensionY;
+            View_SetGeometry(view, targetGeo, lineHeight);
+        }
+
+        return 0;
+    };
+
+    ViewTree_ForAllViews(fn);
+    appContext.currentGeometry = geometry;
+    appContext.currentLineHeight = lineHeight;
 }
 
 void AppEarlyInitialize(){
     View *view = nullptr;
-#if 1
-    view = &appContext.views[0];
-    appContext.activeView = view;
-    view->geometry.extensionX = vec2f(0.f, 0.5f);
-    view->geometry.extensionY = vec2f(0.f, 1.0f);
-    view->geometry.lower = vec2ui();
-    View_EarlyInitialize(view);
-    View_SetActive(view, 0);
-    
-    view = &appContext.views[1];
-    view->geometry.extensionX = vec2f(0.5f, 1.0f);
-    view->geometry.extensionY = vec2f(0.f, 1.0f);
-    view->geometry.lower = vec2ui();
-    View_EarlyInitialize(view);
-    View_SetActive(view, 0);
-    appContext.viewsCount = 2;
-#else
-    view = &appContext.views[0];
-    appContext.activeView = view;
-    view->geometry.extensionX = vec2f(0.f, 0.5f);
-    view->geometry.extensionY = vec2f(0.f, 1.0f);
-    view->geometry.lower = vec2ui();
-    View_EarlyInitialize(view, bView);
-    View_SetActive(view, 0);
-    appContext.viewsCount = 1;
-#endif
-    
-    appContext.activeId = 0;
-    view = &appContext.views[appContext.activeId];
-    appContext.activeView = view;
-    View_SetActive(appContext.activeView, 1);
-    
-    FileBufferList_Init(&appContext.fileBuffer);
-    GetCurrentWorkingDirectory(appContext.cwd, PATH_MAX);
 
-    appContext.autoCompleteMapping = AutoComplete_Initialize();
-
-    //TODO: Configuration file
+    // TODO: Configuration file
+    // NOTE: Configuration must be done first as tab spacing
+    //       needs to be defined before the lexer can correctly mount buffers
     appGlobalConfig.tabSpacing = 4;
     appGlobalConfig.useTabs = 0;
     appGlobalConfig.cStyle = CURSOR_RECT;
+
+    ViewTree_Initialize();
+    FileProvider_Initialize();
+    AutoComplete_Initialize();
+
+    ViewNode *node = ViewTree_GetCurrent();
+    view = node->view;
+
+    view->geometry.lower = vec2ui();
+    appContext.activeView = view;
+
+    View_SetActive(appContext.activeView, 1);
+
+    GetCurrentWorkingDirectory(appContext.cwd, PATH_MAX);
+
+    appContext.autoCompleteMapping = AutoComplete_Initialize();
 }
 
 char *AppGetContextDirectory(){
     return &appContext.cwd[0];
 }
 
-int AppGetViewCount(){
-    return appContext.viewsCount;
-}
-
 View *AppGetActiveView(){
     return appContext.activeView;
 }
 
-View *AppGetView(int i){
-    return &appContext.views[i];
-}
-
-BufferView *AppGetBufferView(int i){
-    return &appContext.views[i].bufferView;
-}
-
 BufferView *AppGetActiveBufferView(){
     return &appContext.activeView->bufferView;
-}
-
-void AppInsertLineBuffer(LineBuffer *lineBuffer){
-    FileBufferList_Insert(&appContext.fileBuffer, lineBuffer);
-}
-
-FileBufferList *AppGetFileBufferList(){
-    return &appContext.fileBuffer;
-}
-
-int AppIsFileLoaded(char *path, uint len){
-    return FileBufferList_FindByPath(&appContext.fileBuffer, nullptr, path, len);
 }
 
 void AppSetBindingsForState(ViewState state){
@@ -159,23 +124,28 @@ void AppSetBindingsForState(ViewState state){
     }
 }
 
-void AppSetActiveView(int i){
-    AssertA(i >= 0 && (uint)i < appContext.viewsCount, "Invalid view id");
+void AppSetActiveView(View *view){
+    AssertA(view != nullptr, "Invalid view");
     if(appContext.activeView){
         View_SetActive(appContext.activeView, 0);
     }
-    appContext.activeView = &appContext.views[i];
+    appContext.activeView = view;
     View_SetActive(appContext.activeView, 1);
     ViewState state = View_GetState(appContext.activeView);
     
     AppSetBindingsForState(state);
-    appContext.activeId = i;
 }
 
 void AppUpdateViews(){
-    for(uint i = 0; i < appContext.viewsCount; i++){
-        BufferView *view = AppGetBufferView(i);
-        BufferView_Synchronize(view);
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        View *view = iterator.value->view;
+
+        BufferView *bView = &view->bufferView;
+        BufferView_Synchronize(bView);
+
+        ViewTree_Next(&iterator);
     }
 }
 
@@ -326,9 +296,9 @@ void AppDefaultRemoveOne(){
     ViewState state = View_GetState(view);
     BufferView *bufferView = View_GetBufferView(view);
 
-    Tokenizer *tokenizer = bufferView->tokenizer;
-    SymbolTable *symTable = tokenizer->symbolTable;
     if(state == View_FreeTyping || state == View_AutoComplete){
+        Tokenizer *tokenizer = bufferView->tokenizer;
+        SymbolTable *symTable = tokenizer->symbolTable;
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
         Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
         
@@ -605,26 +575,40 @@ void AppCommandKillBuffer(){
 
     LineBuffer *lineBuffer = bufferView->lineBuffer;
     if(lineBuffer){
+        ViewTreeIterator iterator;
+        ViewTree_Begin(&iterator);
+
         Tokenizer *tokenizer = bufferView->tokenizer;
         SymbolTable *symTable = tokenizer->symbolTable;
         for(uint i = 0; i < lineBuffer->lineCount; i++){
             Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
             Buffer_EraseSymbols(buffer, symTable);
         }
-        
-        for(uint i = 0; i < appContext.viewsCount; i++){
-            BufferView *bView = AppGetBufferView(i);
+
+        while(iterator.value){
+            View *view = iterator.value->view;
+            BufferView *bView = &view->bufferView;
             if(bView->lineBuffer == lineBuffer){
                 BufferView_SwapBuffer(bView, nullptr);
             }
+            ViewTree_Next(&iterator);
         }
         
         char *ptr = lineBuffer->filePath;
         uint pSize = lineBuffer->filePathSize;
-        FileBufferList_Remove(&appContext.fileBuffer, ptr, pSize);
+        FileProvider_Remove(ptr, pSize);
         LineBuffer_Free(lineBuffer);
         AllocatorFree(lineBuffer);
     }
+}
+
+void AppCommandKillView(){
+    AppCommandKillBuffer();
+     // TODO: Check if it is safe to erase the view in the vnode here
+    ViewNode *vnode = ViewTree_DestroyCurrent(1);
+    AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);
+    appContext.activeView = vnode->view;
+    AppSetActiveView(appContext.activeView);
 }
 
 void AppCommandUndo(){
@@ -730,7 +714,22 @@ void AppCommandHomeLine(){
     if(!bufferView->lineBuffer) return;
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
-    cursor.y = 0;
+    Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
+
+    if(buffer == nullptr){
+        cursor.y = 0;
+    }else if(Buffer_IsBlank(buffer)){
+        cursor.y = 0;
+    }else{
+        uint tid = Buffer_FindFirstNonEmptyToken(buffer);
+        Token *token = &buffer->tokens[tid];
+        uint p8 = Buffer_Utf8RawPositionToPosition(buffer, token->position);
+        if(cursor.y <= p8) cursor.y = 0;
+        else{
+            cursor.y = p8;
+        }
+    }
+
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
@@ -828,10 +827,28 @@ void AppCommandEndLine(){
 }
 
 void AppCommandSwapView(){
-    if((uint)appContext.activeId + 1 < appContext.viewsCount){
-        AppSetActiveView(appContext.activeId+1);
-    }else{
-        AppSetActiveView(0);
+    int n = 0;
+    View *view = appContext.activeView;
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+
+    ViewNode *vnode = iterator.value;
+    while(iterator.value){
+        if(n == 1){
+            vnode = iterator.value;
+            break;
+        }
+
+        if(view == iterator.value->view){
+            n = 1;
+        }
+
+        ViewTree_Next(&iterator);
+    }
+
+    if(vnode){
+        ViewTree_SetActive(vnode);
+        AppSetActiveView(vnode->view);
     }
 }
 
@@ -1128,6 +1145,18 @@ void AppCommandIndent(){
     }
 }
 
+void AppCommandSplitHorizontal(){
+    ViewTree_SplitHorizontal();
+    AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);
+    View_SetActive(appContext.activeView, 1);
+}
+
+void AppCommandSplitVertical(){
+    ViewTree_SplitVertical();
+    AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);
+    View_SetActive(appContext.activeView, 1);
+}
+
 void AppDefaultEntry(char *utf8Data, int utf8Size){
     if(utf8Size > 0){
         int off = 0;
@@ -1137,8 +1166,10 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
             ViewState state = View_GetState(view);
             if(state == View_FreeTyping || state == View_AutoComplete){
                 BufferView *bufferView = AppGetActiveBufferView();
-		        SymbolTable *symTable = bufferView->tokenizer->symbolTable;
+                NullRet(bufferView);
                 NullRet(bufferView->lineBuffer);
+
+		        SymbolTable *symTable = bufferView->tokenizer->symbolTable;
 
                 vec2ui cursor = BufferView_GetCursorPosition(bufferView);
                 Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -1202,15 +1233,18 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 }
 
 View *AppGetViewAt(int x, int y){
-    View *rView = nullptr;
-    int vCount = AppGetViewCount();
+    ViewTreeIterator iterator;
+    View *rView = nullptr, *view = nullptr;
     vec2ui r(x, y);
-    for(int i = 0; i < vCount; i++){
-        View *view = AppGetView(i);
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        view = iterator.value->view;
         if(Geometry_IsPointInside(&view->geometry, r)){
             rView = view;
             break;
         }
+
+        ViewTree_Next(&iterator);
     }
     
     return rView;
@@ -1218,16 +1252,22 @@ View *AppGetViewAt(int x, int y){
 
 vec2ui AppActivateViewAt(int x, int y){
     // Check which view is the mouse on and activate it
-    int vCount = AppGetViewCount();
     vec2ui r(x, y);
-    for(int i = 0; i < vCount; i++){
-        View *view = AppGetView(i);
+    View *view = nullptr;
+    ViewTreeIterator iterator;
+
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        view = iterator.value->view;
         if(Geometry_IsPointInside(&view->geometry, r)){
             // Activate the view and re-map position
-            AppSetActiveView(i);
+            ViewTree_SetActive(iterator.value);
+            AppSetActiveView(view);
             r = r - view->geometry.lower;
             break;
         }
+
+        ViewTree_Next(&iterator);
     }
     
     return r;
@@ -1298,42 +1338,23 @@ void AppCommandOpenFile(){
     View *view = AppGetActiveView();
     auto fileOpen = [](View *view, FileEntry *entry) -> void{
         char targetPath[PATH_MAX];
+        Tokenizer *tokenizer = nullptr;
         LineBuffer *lBuffer = nullptr;
         BufferView *bView = View_GetBufferView(view);
         if(entry){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
-                uint fileSize = 0;
-                char *content = GetFileContents(targetPath, &fileSize);
-                
-                lBuffer = AllocatorGetN(LineBuffer, 1);
-                *lBuffer = LINE_BUFFER_INITIALIZER;
-                
-                //TODO: Can we center this call somewhere instead of manually
-                //      needing to invoke a tokenizer state cleanup?
-                Lex_TokenizerContextReset(bView->tokenizer);
-                
-                if(fileSize == 0){
-                    AllocatorFree(content);
-                    LineBuffer_InitEmpty(lBuffer);
-                }else{
-                    LineBuffer_Init(lBuffer, bView->tokenizer, content, fileSize);
-                }
-                
-                LineBuffer_SetStoragePath(lBuffer, targetPath, l);
-                AllocatorFree(content);
-                
-                BufferView_SwapBuffer(bView, lBuffer);
-                AppInsertLineBuffer(lBuffer);
+                FileProvider_Load(targetPath, l, &lBuffer, &tokenizer);
+                BufferView_SwapBuffer(bView, lBuffer, tokenizer);
+
             }else{
-                int f = FileBufferList_FindByPath(&appContext.fileBuffer, &lBuffer,
-                                                  targetPath, l);
+                int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
                 if(f == 0 || lBuffer == nullptr){
                     printf("Did not find buffer %s\n", entry->path);
                 }else{
                     printf("Swapped to %s\n", entry->path);
-                    BufferView_SwapBuffer(bView, lBuffer);
+                    BufferView_SwapBuffer(bView, lBuffer, tokenizer);
                 }
             }
         }else{ // is file creation (or dir?)
@@ -1344,14 +1365,8 @@ void AppCommandOpenFile(){
             QueryBar_GetWrittenContent(querybar, &content, &len);
             if(len > 0){
                 printf("Creating file %s\n", content);
-                lBuffer = AllocatorGetN(LineBuffer, 1);
-                *lBuffer = LINE_BUFFER_INITIALIZER;
-                LineBuffer_InitEmpty(lBuffer);
-                
-                LineBuffer_SetStoragePath(lBuffer, content, len);
-                
-                BufferView_SwapBuffer(bView, lBuffer);
-                AppInsertLineBuffer(lBuffer);
+                FileProvider_CreateFile(content, len, &lBuffer, &tokenizer);
+                BufferView_SwapBuffer(bView, lBuffer, tokenizer);
             }
         }
     };
@@ -1456,6 +1471,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftAlt, Key_N);
     RegisterRepeatableEvent(mapping, AppCommandKillBuffer, Key_LeftControl, Key_K);
     RegisterRepeatableEvent(mapping, AppCommandKillEndOfLine, Key_LeftAlt, Key_K);
+    RegisterRepeatableEvent(mapping, AppCommandKillView, Key_LeftControl, Key_LeftAlt, Key_K);
 
     RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearch, Key_LeftControl, Key_S);
@@ -1466,7 +1482,9 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandSwitchBuffer, Key_LeftAlt, Key_B);
     RegisterRepeatableEvent(mapping, AppCommandInsertTab, Key_Tab);
-    
+
+    RegisterRepeatableEvent(mapping, AppCommandSplitHorizontal, Key_LeftAlt, Key_LeftControl, Key_H);
+    RegisterRepeatableEvent(mapping, AppCommandSplitVertical, Key_LeftAlt, Key_LeftControl, Key_V);
     RegisterRepeatableEvent(mapping, AppCommandPaste, Key_LeftControl, Key_V);
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_C);
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_Q);
@@ -1474,10 +1492,15 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
     //RegisterRepeatableEvent(mapping, AppCommandRedo, Key_LeftControl, Key_R);
     
-    RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_B);
+    RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
+
+
+    // Let the control commands bind its things
+    ControlCommands_Initialize();
+    ControlCommands_BindTrigger(mapping);
     
     appContext.freeTypeMapping = mapping;
 }

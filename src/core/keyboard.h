@@ -94,7 +94,7 @@ typedef struct{
     KeySetEventCallback *callback;
     int keySetSize;
     int supportsRepeat;
-	char bindingname[128];
+    char bindingname[128];
 }Binding;
 
 typedef struct{
@@ -109,6 +109,7 @@ const char *KeyboardGetStateName(int state);
 
 BindingMap *KeyboardCreateMapping();
 void KeyboardSetActiveMapping(BindingMap *mapping);
+BindingMap *KeyboardGetActiveMapping();
 
 void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback);
 void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,

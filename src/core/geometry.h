@@ -2,7 +2,7 @@
 #ifndef GEOMETRY_H
 #define GEOMETRY_H
 
-#include <math.h>
+#include <cmath>
 #include <cfloat>
 #include <stdio.h>
 #include <stdint.h>

@@ -36,6 +36,16 @@ BufferView *View_GetBufferView(View *view){
     return &view->bufferView;
 }
 
+void View_GetControlRenderOpts(View *view, ControlProps **props){
+    *props = &view->controlProps;
+}
+
+void View_SetControlOpts(View *view, ControlRenderOpts opts, Float inter){
+    view->controlProps.opts = opts;
+    view->controlProps.executedInterval = inter;
+    view->controlProps.executedPassed = 0;
+}
+
 QueryBar *View_GetQueryBar(View *view){
     return &view->queryBar;
 }
@@ -94,38 +104,43 @@ void View_EarlyInitialize(View *view){
     SelectableList_Init(&view->selectableList);
     SelectableList_Init(view->autoCompleteList);
     QueryBar_Initialize(&view->queryBar);
+
+    View_SetControlOpts(view, Control_Opts_None);
     
     view->renderList[View_FreeTyping] = {
         .stages = {
             Graphics_RenderView,
+            Graphics_RenderControlCommands,
         },
-        .stageCount = 1,
+        .stageCount = 2,
     };
     
     view->renderList[View_QueryBar] = {
         .stages = {
             Graphics_RenderView,
             Graphics_RenderQueryBar,
+            Graphics_RenderControlCommands,
         },
-        .stageCount = 2,
+        .stageCount = 3,
     };
     
-    //TODO: Add render function
     view->renderList[View_SelectableList] = {
         .stages = {
             Graphics_RenderListSelector,
             Graphics_RenderQueryBar,
+            Graphics_RenderControlCommands,
         },
-        .stageCount = 2,
+        .stageCount = 3,
     };
 
     view->renderList[View_AutoComplete] = {
         .stages = {
             Graphics_RenderView,
             Graphics_RenderAutoComplete,
+            Graphics_RenderControlCommands,
         },
 
-        .stageCount = 2,
+        .stageCount = 3,
     };
 }
 

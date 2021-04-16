@@ -94,6 +94,9 @@ class Transform{
         if (wp == 1)
             return vec3<T>(xp, yp, zp);
         else{
+            if(IsZero(wp)){
+                printf("Zero wp\n");
+            }
             AssertA(!IsZero(wp), "Zero transform wp [Point3f]");
             return vec3<T>(xp, yp, zp) / wp;
         }

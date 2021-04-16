@@ -18,6 +18,17 @@ typedef enum{
     View_StatesCount
 }ViewState;
 
+typedef enum{
+    Control_Opts_None = 0,
+    Control_Opts_Indices,
+}ControlRenderOpts;
+
+struct ControlProps{
+    ControlRenderOpts opts;
+    Float executedPassed;
+    Float executedInterval;
+};
+
 struct FileOpener{
     FileEntry *entries;
     char basePath[PATH_MAX];
@@ -37,6 +48,7 @@ struct View{
     int isActive;
     ViewState state;
     RenderList renderList[View_StatesCount];
+    ControlProps controlProps;
 };
 
 /*
@@ -63,9 +75,9 @@ void View_SetActive(View *view, int isActive);
 * Triggers a view to be in a selectable list mode.
 */
 void View_SelectableListSet(View *view, LineBuffer *sourceBuffer,
-                            char *title, uint titlelen, OnQueryBarEntry entry,
-                            OnQueryBarCancel cancel, OnQueryBarCommit commit,
-                            QueryBarInputFilter *filter);
+char *title, uint titlelen, OnQueryBarEntry entry,
+OnQueryBarCancel cancel, OnQueryBarCommit commit,
+QueryBarInputFilter *filter);
 
 /*
 * Gets the view range of a views selectable list.
@@ -143,6 +155,16 @@ void View_ReturnToState(View *view, ViewState state);
 * Forces a view to return to a state applying any pending changes.
 */
 int View_CommitToState(View *view, ViewState state);
+
+/*
+* Sets the rendering properties of the control cmds.
+*/
+void View_SetControlOpts(View *view, ControlRenderOpts opts, Float inter=0);
+
+/*
+* Gets the current configuration of the control cmds rendering options.
+*/
+void View_GetControlRenderOpts(View *view, ControlProps **props);
 
 /*
 * Gets the bufferview from a view.

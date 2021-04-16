@@ -34,7 +34,7 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme){
     
     QueryBar_GetTitle(bar, &header, &headerLen);
     if(header){
-        vec4i col = GetColor(theme, TOKEN_ID_FUNCTION);
+        vec4i col = GetColor(theme, TOKEN_ID_NONE);
         _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph);
     }
     

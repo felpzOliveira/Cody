@@ -34,21 +34,6 @@ void AppEarlyInitialize();
 void AppInitialize();
 
 /*
-* Inserts a new linebuffer into the apps buffer list.
-*/
-void AppInsertLineBuffer(LineBuffer *lineBuffer);
-
-/*
-* Checks if the app already loaded the file given in path.
-*/
-int AppIsFileLoaded(char *path, uint len);
-
-/*
-* Gets apps file buffer list.
-*/
-FileBufferList *AppGetFileBufferList();
-
-/*
 * Gets the bufferview from the active View.
 */
 BufferView *AppGetActiveBufferView();
@@ -76,22 +61,7 @@ View *AppGetActiveView();
 /*
 * Sets a specific view to be active.
 */
-void AppSetActiveView(int i);
-
-/*
-* Get the bufferview from the view index i.
-*/
-BufferView *AppGetBufferView(int i);
-
-/*
-* Get the view with index i.
-*/
-View *AppGetView(int i);
-
-/*
-* Get the amount of views that exist.
-*/
-int AppGetViewCount();
+void AppSetActiveView(View *view);
 
 /*
 * Gets cwd from app context.

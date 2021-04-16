@@ -2,6 +2,7 @@
 #include <utilities.h>
 #include <string.h>
 #include <app.h>
+#include <file_provider.h>
 
 /* Default helper functions */
 static void SelectableListFreeLineBuffer(View *view){
@@ -47,7 +48,7 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
     for(uint i = 0; i < *n; i++){
         FileEntry *e = &arr[i];
         uint s = snprintf(path, PATH_MAX, "%s%s", basePath, e->path);
-        if(AppIsFileLoaded(path, s)){
+        if(FileProvider_IsFileOpened(path, s)){
             e->isLoaded = 1;
         }
     }
@@ -298,7 +299,7 @@ int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
     LineBuffer *lineBuffer = nullptr;
     Buffer *buffer = nullptr;
     
-    FileBufferList *fList = AppGetFileBufferList();
+    FileBufferList *fList = FileProvider_GetBufferList();
     BufferView *bView = View_GetBufferView(view);
     
     uint active = View_SelectableListGetActiveIndex(view);
@@ -324,7 +325,7 @@ int SwitchBufferCommandStart(View *view){
     List<FileBuffer> *list = nullptr;
     const char *header = "Switch Buffer";
     uint hlen = strlen(header);
-    FileBufferList *fBuffers = AppGetFileBufferList();
+    FileBufferList *fBuffers = FileProvider_GetBufferList();
     
     lineBuffer = AllocatorGetN(LineBuffer, 1);
     LineBuffer_InitBlank(lineBuffer);

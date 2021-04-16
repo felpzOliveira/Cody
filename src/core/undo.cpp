@@ -139,6 +139,7 @@ void _UndoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor, int is_un
 void _UndoRedoUndoPushNewLine(UndoRedo *redo, vec2ui baseU8, int is_undo){
     BufferChange bufferChange = {
         .bufferInfo = baseU8,
+        .bufferInfoEnd = vec2ui(),
         .buffer = nullptr,
         .text = nullptr,
         .size = 0,
@@ -153,6 +154,7 @@ void _UndoRedoUndoPushNewLine(UndoRedo *redo, vec2ui baseU8, int is_undo){
 void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
+        .bufferInfoEnd = vec2ui(),
         .buffer = nullptr,
         .text = nullptr,
         .size = 0,
@@ -168,6 +170,7 @@ void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
 void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
+        .bufferInfoEnd = vec2ui(),
         .buffer = buffer,
         .text = nullptr,
         .size = 0,
@@ -196,6 +199,7 @@ void UndoRedoUndoPushRemoveBlock(UndoRedo *redo, vec2ui start, vec2ui end){
 void UndoRedoUndoPushInsertBlock(UndoRedo *redo, vec2ui start, char *text, uint size){
     BufferChange bufferChange = {
         .bufferInfo = start,
+        .bufferInfoEnd = vec2ui(),
         .buffer = nullptr,
         .text = StringDup(text, size),
         .size = size,

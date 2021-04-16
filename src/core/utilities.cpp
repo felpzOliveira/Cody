@@ -413,6 +413,15 @@ uint StringToUnsigned(char *s0, uint len){
     return n;
 }
 
+int GetFilePathExtension(const char *path, uint size){
+    if(size < 2) return -1;
+    for(uint i = size-1; i >= 0; i--){
+        if(path[i] == '.') return i;
+    }
+
+    return -1;
+}
+
 int StringEqual(char *s0, char *s1, uint maxn){
     for(uint i = 0; i < maxn; i++){
         if(s0[i] != s1[i]){

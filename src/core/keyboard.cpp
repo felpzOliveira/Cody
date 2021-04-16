@@ -18,6 +18,10 @@ void KeyboardSetActiveMapping(BindingMap *mapping){
     activeMapping = mapping;
 }
 
+BindingMap *KeyboardGetActiveMapping(){
+    return activeMapping;
+}
+
 inline int KeyboardGetKeyState(Key key){
     return keyStates[GetKeyID(key)];
 }
@@ -116,17 +120,17 @@ void RegisterKeyboardEventv(BindingMap *mapping, int repeat, const char *name,
         AssertA(iKey >= (int)Key_A && iKey < (int)Key_Unmapped, "Invalid key");
         keySet[size++] = (Key)iKey;
     }while(size < KEYSET_MAX_SIZE);
-    
+
     AssertA(size > 0, "Invalid mapping");
-    
+
     for(int i = 0; i < size; i++){
         int id = GetKeyID(keySet[i]);
         int count = counts[id];
         if(count < MAX_BINDINGS_PER_ENTRY){
             Binding *binding = &binds[GetBindingID(id, count)];
-			if(name){
-				memcpy(binding->bindingname, name, strlen(name));
-			}
+            if(name){
+                memcpy(binding->bindingname, name, strlen(name));
+            }
             Memcpy(binding->keySet, keySet, sizeof(keySet));
             binding->keySetSize = size;
             binding->callback = callback;

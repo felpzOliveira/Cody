@@ -11,7 +11,7 @@
 #include <sstream>
 #include <keyboard.h>
 #include <resources.h>
-
+#include <view_tree.h>
 #include <iostream>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
@@ -30,7 +30,7 @@ static OpenGLState GlobalGLState;
 
 /*
 * NOTE: IMPORTANT!
-* Remenber that we render things in higher scale and than
+* Remember that we render things in higher scale and than
 * downscale with a projection, so if you want to specify 
 * a rectangle or whatever in screen space [0, 0] x [width, height]
 * you need to multiply the coordinates by the inverse scale:
@@ -320,6 +320,10 @@ static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
 
 //TODO: Timing system.
 double lastTime;
+void Timing_Update(){
+    lastTime = GetElapsedTime();
+}
+
 void WindowOnSizeChange(int width, int height){
     _OpenGLUpdateProjections(&GlobalGLState, width, height);
 }
@@ -336,27 +340,30 @@ void WindowOnScroll(int is_up){
     //      when going up, debug it!
     GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
     
-    View *view = AppGetViewAt(x, y);
+    View *view = AppGetViewAt(x, GlobalGLState.height - y);
     if(view){
         ViewState state = View_GetState(view);
         if(state == View_FreeTyping){
             BufferView *bView = View_GetBufferView(view);
+            NullRet(bView);
+            NullRet(bView->lineBuffer);
             BufferView_StartScrollViewTransition(bView, is_up ? -scrollRange : scrollRange,
                                                  kTransitionScrollInterval);
-            lastTime = GetElapsedTime();
+            Timing_Update();
         }
     }
 }
 
 void WindowOnClick(int x, int y){
-    vec2ui mouse = AppActivateViewAt(x, y);
+    vec2ui mouse = AppActivateViewAt(x, GlobalGLState.height - y);
     
     //TODO: States
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
     if(state == View_FreeTyping){
         BufferView *bufferView = View_GetBufferView(view);
-        int lineNo = BufferView_ComputeTextLine(bufferView, mouse.y, view->descLocation);
+        uint dy = view->geometry.upper.y - view->geometry.lower.y;
+        int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y, view->descLocation);
         if(lineNo < 0) return;
         
         lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
@@ -555,7 +562,8 @@ void OpenGLEntry(){
     _OpenGLUpdateProjections(state, state->width, state->height);
     
     BufferView_CursorTo(bufferView, 0);
-    lastTime = GetElapsedTime();
+    Timing_Update();
+
     while(!WindowShouldCloseX11(state->window)){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
@@ -569,19 +577,22 @@ void OpenGLEntry(){
         Shader_UniformInteger(font->shader, "enable_contrast",
                               ThemeNeedsEffect(defaultTheme));
 
-        int c = AppGetViewCount();
-        for(int i = 0; i < c; i++){
-            View *view = AppGetView(i);
+        ViewTreeIterator iterator;
+        ViewTree_Begin(&iterator);
+        while(iterator.value){
+            View *view = iterator.value->view;
             RenderList *pipeline = View_GetRenderPipeline(view);
             BufferView_UpdateCursorNesting(View_GetBufferView(view));
-            
+
             // Sets the alpha for the current view rendering stages, makes the dimm effect
             SetAlpha(view->isActive ? 0 : 1);
-            
+
             for(uint s = 0; s < pipeline->stageCount; s++){
                 state->model = state->scale; // reset model
                 animating |= pipeline->stages[s].renderer(view, state, defaultTheme, dt);
             }
+
+            ViewTree_Next(&iterator);
         }
 
         SwapBuffersX11(state->window);

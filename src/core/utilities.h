@@ -19,7 +19,7 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
-#define BUG() printf("=========== BUG ===========\nLine:%d\n", __LINE__);
+#define BUG() printf("=========== BUG ===========\nLine:%d\n", __LINE__)
 #define NullRet(x) if(!(x)) return
 
 const Float kInv255 = 0.003921569;
@@ -32,6 +32,7 @@ const Float kViewSelectableListScaling = 2.0;
 const Float kAutoCompleteListScaling = 1.2;
 const Float kAutoCompleteMaxHeightFraction = 0.3;
 const Float kViewSelectableListOffset = 0.05;
+const Float kTransitionControlIndices = 1.5;
 const Float kOnes[] = {1,1,1,1};
 
 typedef enum{
@@ -60,6 +61,11 @@ char *GetFileContents(const char *path, uint *size);
 * In case no one is found it returns -1 otherwise the right-most position located.
 */
 int GetRightmostSplitter(const char *path, uint size);
+
+/*
+* Gets the position of the character where the extension of the file is defined
+*/
+int GetFilePathExtension(const char *path, uint size);
 
 /*
 * Utility for getting a line from a opened std::istream.
@@ -223,7 +229,7 @@ template<typename T> inline List<T> *List_Create(){
     return list;
 }
 
-template<typename T> inline 
+template<typename T> inline
 T *List_Find(List<T> *list, std::function<int(T *)> call){
     if(!list) return nullptr;
     

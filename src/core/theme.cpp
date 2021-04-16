@@ -1,36 +1,36 @@
 #include <theme.h>
 #include <utilities.h>
 
-Theme terminalTheme = {
-    .backgroundColor = ColorFromHex(0xff380c2a),
+Theme themeTerminal = {
+    .backgroundColor = ColorFromHex(0xff2C001e),
     .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3),
     .hoverableItemBackgroundColor = ColorFromHex(0xff611449),
-    .selectorBackground = ColorFromHex(0xff380c2a), //???
+    .selectorBackground = ColorFromHex(0xff2C001e),
 
-    .searchBackgroundColor = ColorFromHex(0xff87ffaf), // ???
+    .searchBackgroundColor = ColorFromHex(0xff87ffaf),
     .selectableListBackground = ColorFromHex(0xff340b27),
     .searchWordColor = ColorFromHex(0xff380c2a),
-    .backgroundLineNumbers = ColorFromHex(0xff380c2a),
+    .backgroundLineNumbers = ColorFromHex(0xff2C001e),
     .lineNumberColor = ColorFromHex(0xfffce94f),
     .lineNumberHighlitedColor = ColorFromHex(0xfffce94f),
-    .cursorLineHighlight = ColorFromHex(0xff380c2a),
+    .cursorLineHighlight = ColorFromHex(0xff2C001e),
 
     .operatorColor   = ColorFromHex(0xfffce94f),
     .datatypeColor   = ColorFromHex(0xff87ffaf),
     .commentColor    = ColorFromHex(0xff34e2e2),
     .stringColor     = ColorFromHex(0xffad7fa6),
     .numberColor     = ColorFromHex(0xffad7fa8),
-    .reservedColor   = ColorFromHex(0xffad7fa8), //???
-    .functionColor   = ColorFromHex(0xffd7d7d7),
+    .reservedColor   = ColorFromHex(0xffad7fa8),
+    .functionColor   = ColorFromHex(0xffCFB4C2),
     .includeColor    = ColorFromHex(0xffad7fa8),
 
     .mathColor       = ColorFromHex(0xffffd7d7),
 
     .tokensColor     = ColorFromHex(0xffd7d7d7),
-    .tokensOverCursorColor = ColorFromHex(0xff380c2a),
+    .tokensOverCursorColor = ColorFromHex(0xff2C001e),
 
-    .preprocessorColor = ColorFromHex(0xff5fd7ff),
-    .preprocessorDefineColor = ColorFromHex(0xff5fd7ff),
+    .preprocessorColor = ColorFromHex(0xff5fd7fc),
+    .preprocessorDefineColor = ColorFromHex(0xff5fd7fc),
 
     .borderColor = ColorFromHex(0xFFFF7F50),
     .braces = ColorFromHex(0xCC960d01),
@@ -44,16 +44,16 @@ Theme terminalTheme = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0xff340b27),
+        ColorFromHex(0xff2C001e),
     },
 
     .userDatatypeColor = ColorFromHex(0xff7ceba1),
     .userDatatypeEnum = ColorFromHex(0xffffd7d7),
     .scopeLineColor = ColorFromHex(0x66666666),
-    .scrollbarColor = ColorFromHex(0xff380c2a),
+    .scrollbarColor = ColorFromHex(0xff2C001e),
     .querybarTypeLineColor = ColorFromHex(0xff340b27),
     .selectorLoadedColor = ColorFromHex(0xFF458588),
-    .userDefineColor = ColorFromHex(0xff5fd7ff),
+    .userDefineColor = ColorFromHex(0xff5fd7fc),
     .backTextCount = 1,
     .lineBorderWidth = 0,
     .alphaDimm = 1,
@@ -348,7 +348,7 @@ Theme theme4Coder = {
 //Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
-Theme *defaultTheme = &terminalTheme;
+Theme *defaultTheme = &themeTerminal;
 //Theme *defaultTheme = &themeGruvboxLight;
 
 std::vector<ThemeDescription> themesDesc = {
@@ -357,7 +357,7 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "Dracula", .theme = &themeDracula, },
     { .name = "Gruvbox Light", .theme = &themeGruvboxLight, },
     { .name = "Yavid", .theme = &themeYavid, },
-    { .name = "Terminal", .theme = &terminalTheme, },
+    { .name = "Terminal", .theme = &themeTerminal, },
 };
 
 static int globalActive = 0;
