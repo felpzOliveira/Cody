@@ -3,6 +3,7 @@
 #include <string.h>
 #include <view.h>
 #include <autocomplete.h>
+#include <file_provider.h>
 
 typedef struct FrameStyle{
     int with_border;
@@ -61,8 +62,12 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
             if(opener->entries){
                 FileEntry *e = &opener->entries[rindex];
                 if(e->isLoaded){
-                    const char *ld = " LOADED";
-                    uint llen = strlen(ld);
+                    const char *ld = " LOADED *";
+                    uint llen = 9;
+                    if(!FileProvider_IsLineBufferDirty(buffer->data, buffer->taken)){
+                        llen = 7;
+                    }
+
                     Graphics_PushText(state, x, ym, (char *)ld, llen,
                                       style->item_load_color, &pGlyph);
                 }

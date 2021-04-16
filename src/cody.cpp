@@ -24,7 +24,6 @@ void StartWithFile(const char *path=nullptr){
 
 int main(int argc, char **argv){
     DebuggerRoutines();
-    
     if(argc > 1){
         char folder[PATH_MAX];
         char *p = argv[1];

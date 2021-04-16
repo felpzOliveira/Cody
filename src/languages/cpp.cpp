@@ -247,7 +247,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "operator", .identifier = TOKEN_ID_OPERATOR },
         { .value = "template", .identifier = TOKEN_ID_OPERATOR }, 
         { .value = "__FILE__", .identifier = TOKEN_ID_RESERVED },
-        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED}, 
+        { .value = "__LINE__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__DATE__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__TIME__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__host__", .identifier = TOKEN_ID_RESERVED },

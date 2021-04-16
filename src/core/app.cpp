@@ -39,7 +39,6 @@ static App appContext = {
 };
 
 AppConfig appGlobalConfig;
-int testHover = 1;
 
 void AppInitializeFreeTypingBindings();
 void AppInitializeQueryBarBindings();
@@ -85,7 +84,6 @@ void AppEarlyInitialize(){
 
     ViewTree_Initialize();
     FileProvider_Initialize();
-    AutoComplete_Initialize();
 
     ViewNode *node = ViewTree_GetCurrent();
     view = node->view;
@@ -1101,7 +1099,9 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         
         // don't attempt to configure user comment format
         if(indentStyle == 2){
-            continue;
+            // however if we don't allow indentation until first
+            // token we would keep the tab/space as was defined
+            len = targetP;
         }
         
         if(len+llen > maxSize){

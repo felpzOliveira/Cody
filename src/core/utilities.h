@@ -105,6 +105,13 @@ int StringIsDigits(char *s0, uint len);
 uint StringToUnsigned(char *s0, uint len);
 
 /*
+* Get the n-th digit of value. Digits are count backwards, i.e.:
+* the number '1234567' will give '7' for GetDigitOf(1234567, 0) in
+* order to avoid stacking numbers and perform multiple loops.
+*/
+uint GetDigitOf(uint value, uint n);
+
+/*
 * Generates a list of the files and directories present in 'basePath',
 * return >= 0 in case of success, -1 in case it could not read 'basePath'.
 * Warning: In case *entries != nullptr this function might realloc its pointer

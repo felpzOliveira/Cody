@@ -4,26 +4,38 @@
 #include <utilities.h>
 #include <app.h>
 #include <file_base_hooks.h>
+#include <languages.h>
 
 typedef struct FileProvider{
     FileBufferList fileBuffer;
-    Tokenizer cppTokenizer;
     SymbolTable symbolTable;
     file_hook openHooks[MAX_HOOKS];
     file_hook creationHooks[MAX_HOOKS];
     uint openHooksCount, createHooksCount;
+    Tokenizer cppTokenizer;
+    Tokenizer glslTokenizer;
 }FileProvider;
 
+// Static allocation of the file provider
 static FileProvider fProvider;
 
 void FileProvider_Initialize(){
     FileBufferList_Init(&fProvider.fileBuffer);
     SymbolTable_Initialize(&fProvider.symbolTable);
 
-    //TODO: Initialize all tokenizers
-    fProvider.cppTokenizer = TOKENIZER_INITIALIZER;
+    //TODO: Initialize all tokenizers, add as support for new languages are added
+    //      maybe we can see if we can initialize these as a file for them is requested?
+
+    // Tokenizers all share the same Symbol Table as it is very expensive to have multiple
+    fProvider.cppTokenizer  = TOKENIZER_INITIALIZER;
+    fProvider.glslTokenizer = TOKENIZER_INITIALIZER;
+
+    // C/C++
     Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable);
+                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable});
+    // GLSL
+    Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable});
 
     fProvider.openHooksCount = 0;
     fProvider.createHooksCount = 0;
@@ -48,12 +60,26 @@ int FileProvider_FindByPath(LineBuffer **lBuffer, char *path, uint len, Tokenize
     return FileBufferList_FindByPath(&fProvider.fileBuffer, lBuffer, path, len);
 }
 
-Tokenizer *FileProvider_GetCppTokenizer(){
-    return &fProvider.cppTokenizer;
-}
-
 // TODO: Implement when other languages are supported
 Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len){
+    int p = GetFilePathExtension(filename, len);
+    if(p > 0){
+        char *ext = &filename[p];
+        std::string strExt(ext);
+        //TODO: Add as needed
+        if(strExt == ".h" || strExt == ".hpp" || strExt == ".cpp"
+           || strExt == ".c" || strExt == ".cc")
+        {
+            return FileProvider_GetCppTokenizer();
+        }
+
+        if(strExt == ".glsl" || strExt == ".gl" || strExt == ".vs" || strExt == ".fs"){
+            return FileProvider_GetGlslTokenizer();
+        }
+    }
+
+    // TODO: Create an empty tokenizer that simply emits TOKEN_ID_NONE for all tokens
+    // so we can edit raw files without colors being all over the place
     return FileProvider_GetCppTokenizer();
 }
 
@@ -129,14 +155,33 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     *lTokenizer = tokenizer;
 }
 
-void FileProvider_RegisterFileOpenHook(file_hook hook){
+int FileProvider_IsLineBufferDirty(char *hint_name, uint len){
+    LineBuffer *lineBuffer = nullptr;
+    int r = FileBufferList_FindByName(&fProvider.fileBuffer, &lineBuffer,
+                                      hint_name, len);
+    if(r && lineBuffer != nullptr){
+        return lineBuffer->is_dirty;
+    }
+
+    return 0;
+}
+
+void RegisterFileOpenHook(file_hook hook){
     if(fProvider.openHooksCount < MAX_HOOKS){
         fProvider.openHooks[fProvider.openHooksCount++] = hook;
     }
 }
 
-void FileProvider_RegisterFileCreateHook(file_hook hook){
+void RegisterFileCreateHook(file_hook hook){
     if(fProvider.createHooksCount < MAX_HOOKS){
         fProvider.creationHooks[fProvider.createHooksCount++] = hook;
     }
+}
+
+Tokenizer *FileProvider_GetCppTokenizer(){
+    return &fProvider.cppTokenizer;
+}
+
+Tokenizer *FileProvider_GetGlslTokenizer(){
+    return &fProvider.glslTokenizer;
 }

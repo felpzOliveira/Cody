@@ -5,7 +5,6 @@
 #include <utilities.h>
 #include <vector>
 #include <buffers.h>
-#include <languages.h>
 
 #define MODULE_NAME "Lex"
 
@@ -1205,12 +1204,13 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     lookupTable->nSize = elements;
 }
 
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable){
+void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable,
+                        std::vector<std::vector<std::vector<GToken>> *> refTables){
     TokenLookupTable *tables = nullptr;
     TokenizerWorkContext *workContext = nullptr;
     AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
-    tokenizer->contexts = AllocatorGetN(TokenizerContext, 2);
-    tokenizer->contextCount = 2;
+    tokenizer->contexts = AllocatorGetN(TokenizerContext, refTables.size());
+    tokenizer->contextCount = refTables.size();
     tokenizer->unfinishedContext = 0;
     tokenizer->linesAggregated = 0;
     tokenizer->linePosition = 0;
@@ -1230,21 +1230,27 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTa
     workContext->workTokenListSize = 32;
     workContext->workTokenListHead = 0;
     workContext->lastToken = nullptr;
-    
+
     tokenizer->workContext = workContext;
     for(int i = 0; i < tokenizer->contextCount; i++){
         tokenizer->contexts[i].lookup = &tables[i];
         tokenizer->contexts[i].is_execing = 0;
         tokenizer->contexts[i].has_pending_work = 0;
+        Lex_BuildTokenLookupTable(tokenizer->contexts[i].lookup, refTables[i]);
     }
-    
-    Lex_BuildTokenLookupTable(tokenizer->contexts[0].lookup, &cppReservedPreprocessor);
-    Lex_BuildTokenLookupTable(tokenizer->contexts[1].lookup, &cppReservedTable);
-    
-    tokenizer->contexts[0].entry = Lex_PreprocessorEntry;
-    tokenizer->contexts[0].exec = Lex_TokenizeExecCodePreprocessor;
-    tokenizer->contexts[1].entry = nullptr;
-    tokenizer->contexts[1].exec = Lex_TokenizeExecCode;
+
+    if(refTables.size() > 1){
+        tokenizer->contexts[0].entry = Lex_PreprocessorEntry;
+        tokenizer->contexts[0].exec = Lex_TokenizeExecCodePreprocessor;
+        tokenizer->contexts[1].entry = nullptr;
+        tokenizer->contexts[1].exec = Lex_TokenizeExecCode;
+    }else{
+        tokenizer->contexts[0].entry = nullptr;
+        tokenizer->contexts[0].exec = Lex_TokenizeExecCode;
+    }
+
+    //TODO: How do we configure other functions (if any) ?
+
     tokenizer->unfinishedContext = -1;
     tokenizer->runningLine = 0;
     tokenizer->symbolTable = symTable;

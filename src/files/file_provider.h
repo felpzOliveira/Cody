@@ -38,9 +38,15 @@ int FileProvider_FindByPath(LineBuffer **lBuffer, char *path, uint len,
                             Tokenizer **tokenizer);
 
 /*
-* Asks the file provider for the C/C++ tokenizer
+* Checks if the linebuffer holding the file given by its hint name is currently dirty.
+*/
+int FileProvider_IsLineBufferDirty(char *hint_name, uint len);
+
+/*
+* Asks the file provider for a specific tokenizer
 */
 Tokenizer *FileProvider_GetCppTokenizer();
+Tokenizer *FileProvider_GetGlslTokenizer();
 
 /*
 * Asks the file provider to guess what is the tokenizer to use for a given file
@@ -69,9 +75,9 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
 /*
 * Register a file open hook.
 */
-void FileProvider_RegisterFileOpenHook(file_hook hook);
+void RegisterFileOpenHook(file_hook hook);
 
 /*
 * Register a file creation hook.
 */
-void FileProvider_RegisterFileCreateHook(file_hook hook);
+void RegisterFileCreateHook(file_hook hook);

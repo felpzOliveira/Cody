@@ -372,6 +372,8 @@ void WindowOnClick(int x, int y){
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
         x = ScreenToGL(mouse.x, &GlobalGLState) - bufferView->lineOffset;
         if(x > 0){
+            // TODO: It seems when we have a tab on a line and we click to select
+            // a character it seems we are jumping exactly tabSpacing - 1 ahead
             colNo = fonsComputeStringOffsetCount(GlobalGLState.font.fsContext,
                                                  buffer->data, x);
             BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);

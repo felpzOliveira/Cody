@@ -14,8 +14,18 @@ static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     std::stringstream ss;
     std::time_t curr = time(0);
     std::tm *now = std::localtime(&curr);
+    std::string ext = "th ";
+    uint digit = GetDigitOf(now->tm_mday, 0); // equivalently to tm_mday % 10
 
-    ss << "/* date = " << months[now->tm_mon] << " " << now->tm_mday << "th " <<
+    if(digit == 1 && now->tm_mday != 11){
+        ext = "st ";
+    }else if(digit == 2){
+        ext = "nd ";
+    }else if(digit == 3){
+        ext = "rd ";
+    }
+
+    ss << "/* date = " << months[now->tm_mon] << " " << now->tm_mday << ext <<
           (now->tm_year + 1900) << " " << now->tm_hour << ":" << now->tm_min << " */";
 
     std::string str = ss.str();
@@ -40,6 +50,6 @@ static void Hook_OnOpen(char *path, uint len, LineBuffer *lineBuffer, Tokenizer 
 }
 
 void FileHooks_RegisterDefault(){
-    FileProvider_RegisterFileOpenHook(Hook_OnOpen);
-    FileProvider_RegisterFileCreateHook(Hook_OnCreate);
+    RegisterFileOpenHook(Hook_OnOpen);
+    RegisterFileCreateHook(Hook_OnCreate);
 }

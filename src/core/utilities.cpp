@@ -286,6 +286,17 @@ int CodepointToString(int cp, char *c){
     return n;
 }
 
+uint GetDigitOf(uint value, uint n){
+    uint v = 0;
+    n += 1;
+    while(n-- > 0 && value != 0){
+        v = value % 10;
+        value /= 10;
+    }
+
+    return v;
+}
+
 uint DigitCount(uint value){
     uint v = 0;
     do{
