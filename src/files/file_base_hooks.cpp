@@ -10,7 +10,7 @@ std::string months[] = {
     "July", "August", "September", "October", "November", "December"
 };
 
-void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
+static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     std::stringstream ss;
     std::time_t curr = time(0);
     std::tm *now = std::localtime(&curr);
@@ -23,7 +23,7 @@ void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, 0, 0);
 }
 
-void Hook_OnCreate(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer){
+static void Hook_OnCreate(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer){
     int p = GetFilePathExtension(path, len);
     if(p > 0){
         char *ext = &path[p];
@@ -35,7 +35,7 @@ void Hook_OnCreate(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *toke
     }
 }
 
-void Hook_OnOpen(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer){
+static void Hook_OnOpen(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer){
     printf("[HOOK] Default file open hook: %s\n", path);
 }
 
