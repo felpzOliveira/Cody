@@ -426,7 +426,7 @@ uint StringToUnsigned(char *s0, uint len){
 
 int GetFilePathExtension(const char *path, uint size){
     if(size < 2) return -1;
-    for(uint i = size-1; i >= 0; i--){
+    for(int i = (int)size-1; i >= 0; i--){
         if(path[i] == '.') return i;
     }
 

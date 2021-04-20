@@ -15,6 +15,10 @@
 //	misrepresented as being the original software.
 // 3. This notice may not be removed or altered from any source distribution.
 //
+
+// Modified 16/04/2021 by Felipe: The code was ok, but it was leaking a lot of resources
+//                                added fixed gpu buffer manipulation for better performance
+//                                and memory management in order to make it stable.
 #ifndef GL3COREFONTSTASH_H
 #define GL3COREFONTSTASH_H
 #include <string.h>

@@ -60,7 +60,26 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
 
         if(opener && style->with_load){
             if(opener->entries){
+                uint mid = 0;
+                uint size = 80;
+                vec2ui p = vec2ui(50, (uint)ym-20);
                 FileEntry *e = &opener->entries[rindex];
+                mid = Graphics_FetchTextureFor(state, e);
+
+                int needs_render = Graphics_ImagePush(state, p, p+size, mid);
+                if(needs_render){
+                    // before flushing the images we need to flush the quad
+                    // otherwise later flushes will not display images
+                    glUseProgram(state->font.cursorShader.id);
+                    Graphics_QuadFlush(state);
+
+                    // now can flush the image
+                    Graphics_ImageFlush(state);
+
+                    // push the new image
+                    Graphics_ImagePush(state, p, p+size, mid);
+                }
+
                 if(e->isLoaded){
                     const char *ld = " LOADED *";
                     uint llen = 9;
@@ -241,18 +260,24 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     
     //Graphics_SetFontSize(state, currFontSize + 2);
 
+    glUseProgram(font->cursorShader.id);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &state->projection.m);
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+
+    glUseProgram(state->imageShader.id);
+    Shader_UniformMatrix4(state->imageShader, "projection", &state->projection.m);
+    Shader_UniformMatrix4(state->imageShader, "modelView", &state->scale.m);
+
     RenderSelectableListItens(state, list, theme, lWidth, &style, opener);
 
     glUseProgram(font->cursorShader.id);
-    
-    Shader_UniformMatrix4(font->cursorShader, "projection", &state->projection.m);
-    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
-    
     Graphics_QuadFlush(state);
     
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);
-    
+
+    Graphics_ImageFlush(state);
+
     Graphics_SetFontSize(state, currFontSize);
     glDisable(GL_SCISSOR_TEST);
     return 0;

@@ -10,12 +10,29 @@
 #include <theme.h>
 #include <fontstash.h>
 #include <x11_display.h>
+#include <map>
+
+//TODO: Fix this, this might be too few texture units
+#define MAX_TEXTURES_COUNT 256
+#define MAX_TEXTURES_PER_BATCH 16
+
+#if defined(DEBUG_BUILD)
+#define OpenGLCHK(fn) do{\
+    OpenGLClearErrors();\
+    (fn);\
+    OpenGLValidateErrors(#fn, __LINE__, __FILE__);\
+}while(0)
+#else
+#define OpenGLCHK(fn) fn
+#endif
 
 struct View;
 
 /*
 * OpenGL rendering system for the editor.
 */
+
+typedef uint GlTextureId;
 
 typedef enum{
     ViewportLineNumbers,
@@ -61,12 +78,35 @@ struct OpenGLBuffer{
     uint colorBuffer;
 };
 
+struct OpenGLImageQuadBuffer{
+    // Data
+    Float *vertex;
+    Float *tex;
+    uint size;
+    uint length;
+    //OpenGL
+    uint vertexArray;
+    uint vertexBuffer;
+    uint texBuffer;
+    uint textureIds[MAX_TEXTURES_PER_BATCH];
+    uint units;
+};
+
+struct OpenGLTexture{
+    uint textureId;
+    int format;
+};
+
 struct OpenGLState{
     WindowX11 *window;
     OpenGLFont font;
     OpenGLBuffer glQuadBuffer;
+    OpenGLImageQuadBuffer glQuadImageBuffer;
     OpenGLBuffer glLineBuffer;
     OpenGLCursor glCursor, glGhostCursor;
+    OpenGLTexture textures[MAX_TEXTURES_COUNT];
+    uint texBinds;
+    Shader imageShader;
     vec2ui mouse;
     int running, width, height;
     Float renderLineWidth;
@@ -74,6 +114,7 @@ struct OpenGLState{
     Transform projection;
     Transform scale;
     Transform model;
+    std::map<std::string, uint> textureMap;
 };
 
 #define RENDER_STAGE_CALL(name) int name(View *view, OpenGLState *state, Theme *theme, Float dt)
@@ -93,9 +134,27 @@ void Graphics_Initialize();
 int  Graphics_IsRunning();
 
 /*
+* Initializes a texture.
+*/
+void Graphics_TextureInit(OpenGLState *state, const char *path, const char *key);
+void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len, const char *key);
+
+/*
+* Get the id of a texture for the given file entry.
+*/
+uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e);
+
+/*
 * Pushes a new quad into the current OpenGLState quad batch to render.
 */
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color);
+
+/*
+* Pushes a new quad into the current OpenGLState image batch to render a image.
+* Returns whether or not it was possible to render, i.e.: maximum amount of
+* textures was reached and should be flushed.
+*/
+int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid);
 
 /*
 * Pushes a quad border into the quad batch buffer.
@@ -117,6 +176,11 @@ void Graphics_QuadFlush(OpenGLState *state, int blend=1);
 * Triggers the OpenGLState line accumulated batch to render all lines pushed.
 */
 void Graphics_LineFlush(OpenGLState *state, int blend=1);
+
+/*
+* Triggers the OpenGLState image buffer accumulated batch to render all images.
+*/
+void Graphics_ImageFlush(OpenGLState *state, int reset=1);
 
 /*
 * Sets the font size being used.
@@ -223,10 +287,21 @@ void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
 void Graphics_FlushText(OpenGLState *state);
 
 /*
+* Bind all image units.
+*/
+void Graphics_BindImages(OpenGLState *state);
+
+/*
 * Converts a screen coordinates to a rendering coordinate.
 */
 Float ScreenToGL(Float x, OpenGLState *state);
 vec2ui ScreenToGL(vec2ui u, OpenGLState * state);
 Float GLToScreen(Float x, OpenGLState *state);
+
+/*
+* Debug utilities.
+*/
+void OpenGLClearErrors();
+void OpenGLValidateErrors(const char *fn, int line, const char *file);
 
 #endif //GRAPHICS_H

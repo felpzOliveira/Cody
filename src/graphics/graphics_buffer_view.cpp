@@ -589,8 +589,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     //col = vec3f(1.8 * g, 2 * g, g);
     vec4f cc = GetUIColorf(theme, UIScrollBarColor);
     vec2f b0 = vec2f((Float)a0.x + (Float)(a1.x - a0.x) * pc, (Float)a0.y);
-    Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y),
-                      a1, cc);
+    Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y), a1, cc);
     
     Graphics_QuadFlush(state);
     

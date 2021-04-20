@@ -13,6 +13,7 @@
 #include <resources.h>
 #include <view_tree.h>
 #include <iostream>
+#include <image_util.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -37,6 +38,32 @@ static OpenGLState GlobalGLState;
 *               font->fontMath.invReduceScale
 */
 
+
+void OpenGLClearErrors(){
+    while(glGetError()) ;
+}
+
+void OpenGLValidateErrors(const char *fn, int line, const char *file){
+    int val = glGetError();
+    if(val != GL_NO_ERROR){
+        std::string error;
+        switch(val){
+            case GL_INVALID_ENUM:                  error = "INVALID_ENUM"; break;
+            case GL_INVALID_VALUE:                 error = "INVALID_VALUE"; break;
+            case GL_INVALID_OPERATION:             error = "INVALID_OPERATION"; break;
+            case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
+            case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
+            case GL_OUT_OF_MEMORY:                 error = "OUT_OF_MEMORY"; break;
+            case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
+            default: error = "Unknown Error";
+        }
+
+        printf("OpenGL Error: %s (%d) -- %s (%s:%d)\n", error.c_str(),
+                val, fn, file, line);
+    }
+
+    AssertA(val == GL_NO_ERROR, "Invalid OpenGL call");
+}
 
 void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float width = (Float)(upper.x - lower.x);
@@ -268,6 +295,24 @@ vec2ui Graphics_GetMouse(OpenGLState *state){
     return state->mouse;
 }
 
+static void _OpenGLTextureInitialize(OpenGLState *state){
+    state->texBinds = 0;
+    state->glQuadImageBuffer.units = 0;
+}
+
+static void _OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
+    buffer->vertex = AllocatorGetN(Float, 3 * n);
+    buffer->tex = AllocatorGetN(Float, 2 * n);
+    buffer->size = n;
+    buffer->length = 0;
+
+    glGenVertexArrays(1, &buffer->vertexArray);
+    glBindVertexArray(buffer->vertexArray);
+
+    glGenBuffers(1, &buffer->vertexBuffer);
+    glGenBuffers(1, &buffer->texBuffer);
+}
+
 static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
     buffer->vertex = AllocatorGetN(Float, 2 * n);
     buffer->colors = AllocatorGetN(Float, 4 * n);
@@ -279,6 +324,35 @@ static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
     
     glGenBuffers(1, &buffer->vertexBuffer);
     glGenBuffers(1, &buffer->colorBuffer);
+}
+
+static void _OpenGLBufferPushVertex(OpenGLImageQuadBuffer *buffer, Float x, Float y,
+                                    vec2f tex, uint mid)
+{
+    int addedUnit = 1;
+    int texId = -1;
+    for(uint i = 0; i < buffer->units; i++){
+        if(buffer->textureIds[i] == mid){
+            addedUnit = 0;
+            texId = i;
+            break;
+        }
+    }
+
+    if(addedUnit){
+        buffer->textureIds[buffer->units] = mid;
+        texId = buffer->units;
+        buffer->units++;
+    }
+
+    buffer->vertex[3 * buffer->length + 0] = x;
+    buffer->vertex[3 * buffer->length + 1] = y;
+    buffer->vertex[3 * buffer->length + 2] = (Float)texId;
+
+    buffer->tex[2 * buffer->length + 0] = tex.x;
+    buffer->tex[2 * buffer->length + 1] = tex.y;
+
+    buffer->length ++;
 }
 
 static void _OpenGLBufferPushVertex(OpenGLBuffer *buffer, Float x, Float y, vec4f color){
@@ -414,17 +488,21 @@ void OpenGLFontSetup(OpenGLState *state){
     const char *f0 = "/home/felipe/Documents/Mayhem/shaders/text.f.glsl";
     const char *v1 = "/home/felipe/Documents/Mayhem/shaders/cursor.v.glsl";
     const char *f1 = "/home/felipe/Documents/Mayhem/shaders/cursor.f.glsl";
+
+    const char *v2 = "/home/felipe/Documents/Mayhem/shaders/icon.v.glsl";
+    const char *f2 = "/home/felipe/Documents/Mayhem/shaders/icon.f.glsl";
     
-    //const char *ttf = "/home/felipe/Documents/Mayhem/fonts/liberation-mono.ttf";
-    //const char *ttf = "/usr/share/fonts/truetype/liberation2/LiberationMono-Regular.ttf";
     uint vertex    = Shader_CompileFile(v0, SHADER_TYPE_VERTEX);
     uint fragment  = Shader_CompileFile(f0, SHADER_TYPE_FRAGMENT);
     uint cvertex   = Shader_CompileFile(v1, SHADER_TYPE_VERTEX);
     uint cfragment = Shader_CompileFile(f1, SHADER_TYPE_FRAGMENT);
+    uint ivertex   = Shader_CompileFile(v2, SHADER_TYPE_VERTEX);
+    uint ifragment = Shader_CompileFile(f2, SHADER_TYPE_FRAGMENT);
     
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
-    
+    Shader_Create(state->imageShader, ivertex, ifragment);
+
     font->sdfSettings.sdfEnabled = 0;
     font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
     
@@ -448,10 +526,19 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
     Graphics_QuadPush(state, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
 }
 
+static void OpenGLLoadIcons(OpenGLState *state){
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/folder.png", ".folder");
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cmake.png", ".cmake");
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cpp.png", ".cpp");
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/glsl.png", ".glsl");
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cuda.png", ".cuda");
+}
+
 void OpenGLInitialize(OpenGLState *state){
     DEBUG_MSG("Initializing OpenGL graphics\n");
-    OpenGLBuffer *quad  = &state->glQuadBuffer;
-    OpenGLBuffer *lines = &state->glLineBuffer;
+    OpenGLBuffer *quad      = &state->glQuadBuffer;
+    OpenGLBuffer *lines     = &state->glLineBuffer;
+    OpenGLImageQuadBuffer *imageQuad = &state->glQuadImageBuffer;
     int width = state->width;
     int height = state->height;
     
@@ -465,13 +552,31 @@ void OpenGLInitialize(OpenGLState *state){
     AssertErr(error == GL_NO_ERROR, "Failed to setup opengl context");
     
     _OpenGLBufferInitialize(quad, 1024);
+    _OpenGLBufferInitialize(imageQuad, 1024);
     _OpenGLBufferInitialize(lines, 1024);
-    
+    _OpenGLTextureInitialize(state);
     AppInitialize();
     
     SwapIntervalX11(state->window, 0);
     RegisterInputs(state->window);
-    
+    OpenGLLoadIcons(state);
+}
+
+int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid){
+    Float x0 = left.x, y0 = left.y, x1 = right.x, y1 = right.y;
+    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+    if(!(quad->units+1 < MAX_TEXTURES_PER_BATCH)){
+        return 1;
+    }
+
+    _OpenGLBufferPushVertex(quad, x0, y0, vec2f(0, 0), mid);
+    _OpenGLBufferPushVertex(quad, x1, y1, vec2f(1, 1), mid);
+    _OpenGLBufferPushVertex(quad, x1, y0, vec2f(1, 0), mid);
+
+    _OpenGLBufferPushVertex(quad, x0, y0, vec2f(0, 0), mid);
+    _OpenGLBufferPushVertex(quad, x0, y1, vec2f(0, 1), mid);
+    _OpenGLBufferPushVertex(quad, x1, y1, vec2f(1, 1), mid);
+    return 0;
 }
 
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color){
@@ -490,6 +595,41 @@ void Graphics_LinePush(OpenGLState *state, vec2ui p0, vec2ui p1, vec4f color){
     OpenGLBuffer *lines = &state->glLineBuffer;
     _OpenGLBufferPushVertex(lines, p0.x, p0.y, color);
     _OpenGLBufferPushVertex(lines, p1.x, p1.y, color);
+}
+
+void Graphics_ImageFlush(OpenGLState *state, int reset){
+    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+    if(quad->length > 0){
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glUseProgram(state->imageShader.id);
+        glBindVertexArray(quad->vertexArray);
+        glEnableVertexAttribArray(0);
+        glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer);
+        glBufferData(GL_ARRAY_BUFFER, quad->length * 3 * sizeof(Float),
+                     quad->vertex, GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+        glEnableVertexAttribArray(1);
+        glBindBuffer(GL_ARRAY_BUFFER, quad->texBuffer);
+        glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float),
+                     quad->tex, GL_DYNAMIC_DRAW);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+
+
+        Graphics_BindImages(state);
+        glDrawArrays(GL_TRIANGLES, 0, quad->length);
+
+        glDisableVertexAttribArray(1);
+        glDisableVertexAttribArray(0);
+        glBindVertexArray(0);
+    }
+
+    quad->length = 0;
+    quad->units = 0;
+    if(reset){
+        // ??
+    }
 }
 
 void Graphics_QuadFlush(OpenGLState *state, int blend){
@@ -549,6 +689,128 @@ void Graphics_LineFlush(OpenGLState *state, int blend){
         glDisable(GL_BLEND);
     }
     lines->length = 0;
+}
+
+static void _Graphics_InitTexture(OpenGLState *state, uint8 *data,
+                                  int width, int height, int channels,
+                                  std::string key)
+{
+    AssertA(state->texBinds < MAX_TEXTURES_COUNT, "Too many texture builds");
+    uint tid = 0;
+    int format = GL_RGB;
+    glGenTextures(1, &tid);
+
+    AssertA(tid > 0, "Unitialized texture id");
+
+    glBindTexture(GL_TEXTURE_2D, tid);
+
+    switch(channels){
+        case 1:{
+            format = GL_RED; 
+        } break;
+        case 2:{
+            format = GL_RG; 
+        } break;
+        case 3:{
+            format = GL_RGB; 
+        } break;
+        case 4:{
+            format = GL_RGBA; 
+        } break;
+
+        default:{
+            printf("Unknown texture format {%d}\n", channels);
+            return;
+        };
+    }
+
+    OpenGLCHK(glTexImage2D(GL_TEXTURE_2D, 0, format, width, height,
+                           0, format, GL_UNSIGNED_BYTE, data));
+    OpenGLCHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT));
+    OpenGLCHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT));
+    OpenGLCHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
+    OpenGLCHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR));
+
+    OpenGLCHK(glGenerateMipmap(GL_TEXTURE_2D));
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    GlTextureId id = state->texBinds;
+    state->textures[id].textureId = tid;
+    state->textures[id].format = format;
+    state->textureMap[key] = id;
+    state->texBinds++;
+
+}
+
+static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
+    OpenGLTexture *tex = &state->textures[tid];
+
+    //TODO: glBindTextureUnit is generating SIGSEGV, cannot figure out why
+    //glBindTextureUnit((int)id, tex->textureId);
+
+    //TODO: This however works
+    char bindingname[32];
+    snprintf(bindingname, sizeof(bindingname), "image%d", (int)id);
+    glActiveTexture(GL_TEXTURE0 + (int)id);
+    OpenGLCHK(glBindTexture(GL_TEXTURE_2D, tex->textureId));
+    Shader_UniformInteger(state->imageShader, bindingname, (int)id);
+
+    //printf("Binding %d = %s (%d)\n", id, tex->bindingname, tex->textureId);
+}
+
+uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e){
+    uint id = 0;
+    if(e->type == DescriptorFile){
+        int p = GetFilePathExtension(e->path, e->pLen);
+        if(p > 0){
+            char *ext = &e->path[p];
+            std::string str(e->path);
+            std::string strExt(ext);
+            // TODO: Maybe create an array so we can easily loop this thing
+            if(strExt == ".h" || strExt == ".hpp" ||
+               strExt == ".cpp" || strExt == ".cc" || strExt == ".c")
+            {
+                id = state->textureMap[".cpp"];
+            }else if(strExt == ".cmake" || str == "CMakeLists.txt"){
+                id = state->textureMap[".cmake"];
+            }else if(strExt == ".glsl" || strExt == ".fs" || strExt == ".vs"
+                     || strExt == ".gl")
+            {
+                id = state->textureMap[".glsl"];
+            }else{
+                // TODO: some unknown extension
+            }
+        }else{
+            // TODO: no extension, default to something
+        }
+    }
+
+    return id;
+}
+
+void Graphics_BindImages(OpenGLState *state){
+    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+    for(uint i = 0; i < quad->units; i++){
+        _Graphics_BindTexture(state, (GlTextureId)i, quad->textureIds[i]);
+    }
+}
+
+void Graphics_TextureInit(OpenGLState *state, const char *path, const char *key){
+    int x = 0, y = 0, n = 0;
+    uint8 *data = ImageUtils_LoadPixels(path, &x, &y, &n);
+    if(data){
+        _Graphics_InitTexture(state, data, x, y, n, key);
+        ImageUtils_FreePixels(data);
+    }
+}
+
+void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len, const char *key){
+    int x = 0, y = 0, n = 0;
+    uint8 *data = ImageUtils_LoadPixels(image, len, &x, &y, &n);
+    if(data){
+        _Graphics_InitTexture(state, data, x, y, n, key);
+        ImageUtils_FreePixels(data);
+    }
 }
 
 /*
