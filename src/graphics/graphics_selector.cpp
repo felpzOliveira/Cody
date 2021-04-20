@@ -19,6 +19,12 @@ typedef struct FrameStyle{
     Float yScaling;
 }FrameStyle;
 
+///////////////////////////////////////////////////////////////
+//TODO > Tokenizer issue when working with glsl (close/open mixup ?)
+//TODO > missing line during buffer selection on vertical split
+//TODO > pratical way to handle many icons (load all of them or go caching?)
+///////////////////////////////////////////////////////////////
+
 void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                                Theme *theme, Float lWidth, FrameStyle *style,
                                FileOpener *opener = nullptr)
@@ -37,6 +43,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
 
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
+        uint size = 80;
         int pGlyph = -1;
         Float x = lWidth * 0.03;
         Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
@@ -50,6 +57,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lWidth, y1),
                           style->item_background_color);
 
+        x = Max(x, 2 * size);
         if((int)i == list->active){
             Graphics_PushText(state, x, ym, buffer->data, buffer->taken,
                               style->item_active_foreground_color, &pGlyph);
@@ -61,7 +69,6 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         if(opener && style->with_load){
             if(opener->entries){
                 uint mid = 0;
-                uint size = 80;
                 vec2ui p = vec2ui(50, (uint)ym-20);
                 FileEntry *e = &opener->entries[rindex];
                 mid = Graphics_FetchTextureFor(state, e);
