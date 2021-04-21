@@ -7,7 +7,7 @@ static ViewTree viewTree = {
     .activeNode = nullptr,
 };
 
-ViewNode *ViewTree_CreateNode(Tokenizer *tokenizer=nullptr, int is_leaf=1){
+ViewNode *ViewTree_CreateNode(int is_leaf=1){
     ViewNode *node = AllocatorGetN(ViewNode, 1);
     node->view = nullptr;
     node->is_leaf = is_leaf;
@@ -18,9 +18,9 @@ ViewNode *ViewTree_CreateNode(Tokenizer *tokenizer=nullptr, int is_leaf=1){
         node->view = AllocatorGetN(View, 1);
         View_EarlyInitialize(node->view);
         View_SetActive(node->view, 0);
-        if(viewTree.root && tokenizer){
+        if(viewTree.root){
             BufferView *bView = &node->view->bufferView;
-            BufferView_Initialize(bView, nullptr, tokenizer);
+            BufferView_Initialize(bView, nullptr);
         }
     }
 
@@ -159,9 +159,8 @@ void ViewTree_SplitVertical(){
     if(viewTree.activeNode){
         Geometry smallGeometry, olderGeometry;
         ViewNode *active = viewTree.activeNode;
-        Tokenizer *tokenizer = active->view->bufferView.tokenizer;
-        ViewNode *smallChild = ViewTree_CreateNode(tokenizer, 0);
-        ViewNode *olderChild = ViewTree_CreateNode(tokenizer);
+        ViewNode *smallChild = ViewTree_CreateNode(0);
+        ViewNode *olderChild = ViewTree_CreateNode();
         Float dy = active->geometry.extensionY.y - active->geometry.extensionY.x;
 
         // For vertical split we put the left child at the top
@@ -200,9 +199,8 @@ void ViewTree_SplitHorizontal(){
     if(viewTree.activeNode){
         Geometry smallGeometry, olderGeometry;
         ViewNode *active = viewTree.activeNode;
-        Tokenizer *tokenizer = active->view->bufferView.tokenizer;
-        ViewNode *smallChild = ViewTree_CreateNode(tokenizer, 0);
-        ViewNode *olderChild = ViewTree_CreateNode(tokenizer);
+        ViewNode *smallChild = ViewTree_CreateNode(0);
+        ViewNode *olderChild = ViewTree_CreateNode();
         Float dx = active->geometry.extensionX.y - active->geometry.extensionX.x;
 
         smallGeometry.extensionX = vec2f(active->geometry.extensionX.x,

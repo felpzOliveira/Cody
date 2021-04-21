@@ -26,9 +26,11 @@ typedef struct{
     Transform horizontal;
 }Scroll;
 
+// TODO: The tokenizer should really be inside the LineBuffer as it
+// is umatable there. Being in a bufferview only introduces difficulties
+// synchornizing access to both and making sure they are correct.
 struct BufferView{
     LineBuffer *lineBuffer;
-    Tokenizer *tokenizer;
     VScroll sController;
     Geometry geometry;
     
@@ -60,12 +62,12 @@ Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
 * receives the tokenizer responsible for tokenization of the linebuffer to be used
 * for updates.
 */
-void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer);
+void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer);
 
 /*
 * Makes a bufferview uses a linebuffer for file reference.
 */
-void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer=nullptr);
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer);
 
 /*
 * Sets the geometry of a bufferview.

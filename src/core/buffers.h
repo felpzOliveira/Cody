@@ -33,6 +33,20 @@ struct Buffer{
     TokenizerStateContext stateContext;
 };
 
+
+typedef enum{
+    FILE_EXTENSION_NONE = 0,
+    FILE_EXTENSION_CPP,
+    FILE_EXTENSION_GLSL,
+    FILE_EXTENSION_CUDA,
+    FILE_EXTENSION_CMAKE,
+}FileExtension;
+
+struct LineBufferProps{
+    uint type;
+    FileExtension ext;
+};
+
 /*
 * Basic description of a structured file. A list of lines with the available size and
 * current line count.
@@ -46,6 +60,7 @@ struct LineBuffer{
     uint is_dirty;
     UndoRedo undoRedo;
     vec2i activeBuffer;
+    LineBufferProps props;
 };
 
 /* For static initialization */
@@ -142,7 +157,7 @@ void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable);
 uint Buffer_GetUtf8Count(Buffer *buffer);
 
 /*
-* Get the id of the token that contains at position 'u8'.
+* Get the id of the token that contains position 'u8'.
 */
 uint Buffer_GetTokenAt(Buffer *buffer, uint u8);
 
@@ -196,7 +211,7 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
 
 /*
 * Inserts a new line at a position 'at' of the LineBuffer. The line is 
- * specified by its contents in 'line' with size 'size'.
+* specified by its contents in 'line' with size 'size'.
 */
 void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
                              uint size, int decode_tab);
@@ -272,6 +287,18 @@ vec2i LineBuffer_GetActiveBuffer(LineBuffer *lineBuffer);
 * Replaces the buffer located at 'at' and returns the existing buffer.
 */
 Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint at);
+
+/*
+* Generic setter for the linebuffer properties.
+*/
+void LineBuffer_SetType(LineBuffer *lineBuffer, uint type);
+void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext);
+
+/*
+* Generic getter for the linebuffer properties.
+*/
+uint LineBuffer_GetType(LineBuffer *lineBuffer);
+FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer);
 
 /*
 * Releases memory taken by a LineBuffer.

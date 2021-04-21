@@ -101,6 +101,11 @@ void View_SelectableListSwapList(View *view, LineBuffer *sourceBuffer, int relea
 LineBuffer *View_SelectableListGetLineBuffer(View *view);
 
 /*
+* Returns the LineBuffer in use by the underlying bufferview
+*/
+LineBuffer *View_GetBufferViewLineBuffer(View *view);
+
+/*
 * Pushes a new item into a view configured as a SelectableList, this function
 * does not trigger any callback set with 'View_SelectableListSet'.
 */

@@ -1261,6 +1261,34 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     lineBuffer->is_dirty = 0;
 }
 
+void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext){
+    if(lineBuffer){
+        lineBuffer->props.ext = ext;
+    }
+}
+
+void LineBuffer_SetType(LineBuffer *lineBuffer, uint type){
+    if(lineBuffer){
+        lineBuffer->props.type = type;
+    }
+}
+
+FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer){
+    if(lineBuffer){
+        return lineBuffer->props.ext;
+    }
+
+    return FILE_EXTENSION_NONE;
+}
+
+uint LineBuffer_GetType(LineBuffer *lineBuffer){
+    if(lineBuffer){
+        return lineBuffer->props.type;
+    }
+
+    return 0;
+}
+
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer){
     printf("Current UTF-8 size: %u\n", buffer->count);

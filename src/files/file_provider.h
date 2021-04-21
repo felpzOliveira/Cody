@@ -1,5 +1,6 @@
 #pragma once
 #include <types.h>
+#include <lex.h>
 #include <file_buffer.h>
 
 /*
@@ -49,9 +50,16 @@ Tokenizer *FileProvider_GetCppTokenizer();
 Tokenizer *FileProvider_GetGlslTokenizer();
 
 /*
-* Asks the file provider to guess what is the tokenizer to use for a given file
+* Asks the file provider to guess what is the tokenizer to use for a given file,
+* it also returns properties of a linebuffer that would hold this file.
 */
-Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len);
+Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps *props);
+
+/*
+* Queries the file provider for the tokenizer that should be used with the given
+* linebuffer.
+*/
+Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer);
 
 /*
 * Queries the file provider if a file is already opened.

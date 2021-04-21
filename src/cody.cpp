@@ -8,7 +8,7 @@
 
 void StartWithFile(const char *path=nullptr){
     BufferView *bView = AppGetActiveBufferView();
-    BufferView_Initialize(bView, nullptr, nullptr);
+    BufferView_Initialize(bView, nullptr);
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
@@ -16,7 +16,7 @@ void StartWithFile(const char *path=nullptr){
         uint length = strlen(path);
 
         FileProvider_Load((char *)path, length, &lineBuffer, &tokenizer);
-        BufferView_SwapBuffer(bView, lineBuffer, tokenizer);
+        BufferView_SwapBuffer(bView, lineBuffer);
     }
     
     Graphics_Initialize();

@@ -14,6 +14,7 @@
 #include <view_tree.h>
 #include <iostream>
 #include <image_util.h>
+#include <file_provider.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -223,7 +224,7 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
         vec4i color;
         vec2ui cursor;
         int r = -1;
-        Tokenizer *tokenizer = view->tokenizer;
+        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
         SymbolTable *symTable = tokenizer->symbolTable;
 
         if(ghost){
@@ -527,11 +528,23 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
 }
 
 static void OpenGLLoadIcons(OpenGLState *state){
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/folder.png", ".folder");
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cmake.png", ".cmake");
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cpp.png", ".cpp");
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/glsl.png", ".glsl");
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cuda.png", ".cuda");
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/folder.png",
+                        ".folder");
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cmake.png",
+                         ".cmake", FILE_EXTENSION_CMAKE);
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cpp.png",
+                         ".cpp", FILE_EXTENSION_CPP);
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cppheader.png",
+                         ".cppheader");
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/glsl.png",
+                         ".glsl", FILE_EXTENSION_GLSL);
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cuda.png",
+                         ".cu", FILE_EXTENSION_CUDA);
 }
 
 void OpenGLInitialize(OpenGLState *state){
@@ -758,31 +771,56 @@ static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
     //printf("Binding %d = %s (%d)\n", id, tex->bindingname, tex->textureId);
 }
 
-uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e){
+static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *off,
+                                   std::string str = std::string())
+{
+    uint id = 0;
+    // TODO: Maybe create an array so we can easily loop this thing
+    if(strExt == ".cpp" || strExt == ".cc" || strExt == ".c"){
+        id = state->textureMap[".cpp"];
+    }else if(strExt == ".h" || strExt == ".hpp"){
+        //id = state->textureMap[".cppheader"];
+        //*off = 15;
+        id = state->textureMap[".cpp"];
+    }else if(strExt == ".cmake" || str == "CMakeLists.txt"){
+        id = state->textureMap[".cmake"];
+    }else if(strExt == ".glsl" || strExt == ".fs" || strExt == ".vs"
+             || strExt == ".gl")
+    {
+        id = state->textureMap[".glsl"];
+        *off = -25;
+    }else if(strExt == ".cu" || strExt == ".cuh"){
+        id = state->textureMap[".cu"];
+        *off = -20;
+    }else{
+        // TODO: some unknown extension
+    }
+    return id;
+}
+
+uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
     uint id = 0;
     if(e->type == DescriptorFile){
         int p = GetFilePathExtension(e->path, e->pLen);
+        *off = 0;
         if(p > 0){
             char *ext = &e->path[p];
             std::string str(e->path);
             std::string strExt(ext);
-            // TODO: Maybe create an array so we can easily loop this thing
-            if(strExt == ".h" || strExt == ".hpp" ||
-               strExt == ".cpp" || strExt == ".cc" || strExt == ".c")
-            {
-                id = state->textureMap[".cpp"];
-            }else if(strExt == ".cmake" || str == "CMakeLists.txt"){
-                id = state->textureMap[".cmake"];
-            }else if(strExt == ".glsl" || strExt == ".fs" || strExt == ".vs"
-                     || strExt == ".gl")
-            {
-                id = state->textureMap[".glsl"];
-            }else{
-                // TODO: some unknown extension
-            }
+            id = _Graphics_FetchTexture(state, strExt, off, str);
         }else{
             // TODO: no extension, default to something
         }
+    }
+
+    return id;
+}
+
+uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){
+    uint id = 0;
+    if(state->fileMap.find(type) != state->fileMap.end()){
+        std::string key = state->fileMap[type];
+        id = _Graphics_FetchTexture(state, key, off);
     }
 
     return id;
@@ -795,21 +833,31 @@ void Graphics_BindImages(OpenGLState *state){
     }
 }
 
-void Graphics_TextureInit(OpenGLState *state, const char *path, const char *key){
+void Graphics_TextureInit(OpenGLState *state, const char *path,
+                          const char *key, FileExtension type)
+{
     int x = 0, y = 0, n = 0;
     uint8 *data = ImageUtils_LoadPixels(path, &x, &y, &n);
     if(data){
         _Graphics_InitTexture(state, data, x, y, n, key);
         ImageUtils_FreePixels(data);
+        if(type != FILE_EXTENSION_NONE){
+            state->fileMap[type] = key;
+        }
     }
 }
 
-void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len, const char *key){
+void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len,
+                          const char *key, FileExtension type)
+{
     int x = 0, y = 0, n = 0;
     uint8 *data = ImageUtils_LoadPixels(image, len, &x, &y, &n);
     if(data){
         _Graphics_InitTexture(state, data, x, y, n, key);
         ImageUtils_FreePixels(data);
+        if(type != FILE_EXTENSION_NONE){
+            state->fileMap[type] = key;
+        }
     }
 }
 

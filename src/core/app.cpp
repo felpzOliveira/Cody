@@ -269,7 +269,7 @@ void AppCommandFreeTypingArrows(int direction){
 
 void RemountTokensBasedOn(BufferView *view, uint base, uint offset=0){
     LineBuffer *lineBuffer = view->lineBuffer;
-    Tokenizer *tokenizer = view->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, base, offset);
 }
 
@@ -295,13 +295,14 @@ void AppDefaultRemoveOne(){
     BufferView *bufferView = View_GetBufferView(view);
 
     if(state == View_FreeTyping || state == View_AutoComplete){
-        Tokenizer *tokenizer = bufferView->tokenizer;
-        SymbolTable *symTable = tokenizer->symbolTable;
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
         Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
         
         NullRet(buffer);
-        
+        NullRet(bufferView->lineBuffer);
+        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
+        SymbolTable *symTable = tokenizer->symbolTable;
+
         if(cursor.y > 0){
             vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
             if(id.x != (int)cursor.x || id.y != OPERATION_REMOVE_CHAR){
@@ -352,7 +353,7 @@ void AppCommandRemovePreviousToken(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
 
-    Tokenizer *tokenizer = bufferView->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -426,7 +427,7 @@ void AppCommandInsertTab(){
 
 void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end){
     Buffer *buffer = BufferView_GetBufferAt(bufferView, start.x);
-    Tokenizer *tokenizer = bufferView->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     if(start.x == end.x){
         Buffer_EraseSymbols(buffer, symTable);
@@ -456,7 +457,7 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
 vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
     char *lineHelper = nullptr;
     LineBuffer *lineBuffer = BufferView_GetLineBuffer(bufferView);
-    Tokenizer *tokenizer = bufferView->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     Buffer *buffer = BufferView_GetBufferAt(bufferView, at.x);
     Buffer *bufferp1 = BufferView_GetBufferAt(bufferView, at.x+1);
@@ -576,7 +577,7 @@ void AppCommandKillBuffer(){
         ViewTreeIterator iterator;
         ViewTree_Begin(&iterator);
 
-        Tokenizer *tokenizer = bufferView->tokenizer;
+        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
         SymbolTable *symTable = tokenizer->symbolTable;
         for(uint i = 0; i < lineBuffer->lineCount; i++){
             Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
@@ -615,7 +616,7 @@ void AppCommandUndo(){
 
     LineBuffer *lineBuffer = bufferView->lineBuffer;
     BufferChange *bChange = UndoRedoGetNextUndo(&lineBuffer->undoRedo);
-    Tokenizer *tokenizer = bufferView->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     if(bChange){
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -686,8 +687,7 @@ void AppCommandUndo(){
                     uint off = 0;
                     uint startBuffer = start.x;
                     uint n = LineBuffer_InsertRawTextAt(bufferView->lineBuffer, text, size, 
-                                                        start.x, start.y, 
-                                                        bufferView->tokenizer, &off);
+                                                        start.x, start.y, tokenizer, &off);
                     
                     uint endx = start.x + n;
                     uint endy = off;
@@ -749,7 +749,7 @@ void AppCommandQueryBarSearchAndReplace(){
                 BufferView *bView = View_GetBufferView(vview);
                 Buffer *buf = BufferView_GetBufferAt(bView, searchResult->lineNo);
                 if(buf){
-                    Tokenizer *tokenizer = bView->tokenizer;
+                    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bView->lineBuffer);
                     SymbolTable *symTable = tokenizer->symbolTable;
                     vec2ui cursor = BufferView_GetCursorPosition(bView);
 
@@ -967,7 +967,7 @@ void AppCommandPaste(){
     uint size = 0;
     const char *p = ClipboardGetStringX11(&size);
     BufferView *view = AppGetActiveBufferView();
-    Tokenizer *tokenizer = view->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     NullRet(view->lineBuffer);
     
@@ -981,7 +981,7 @@ void AppCommandPaste(){
         Buffer_EraseSymbols(buffer, symTable);
         
         uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
-                                            cursor.x, cursor.y, view->tokenizer, &off);
+                                            cursor.x, cursor.y, tokenizer, &off);
         
         uint endx = cursor.x + n;
         uint endy = off;
@@ -1168,8 +1168,8 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 BufferView *bufferView = AppGetActiveBufferView();
                 NullRet(bufferView);
                 NullRet(bufferView->lineBuffer);
-
-		        SymbolTable *symTable = bufferView->tokenizer->symbolTable;
+                Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
+		        SymbolTable *symTable = tokenizer->symbolTable;
 
                 vec2ui cursor = BufferView_GetCursorPosition(bufferView);
                 Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -1346,7 +1346,7 @@ void AppCommandOpenFile(){
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
                 FileProvider_Load(targetPath, l, &lBuffer, &tokenizer);
-                BufferView_SwapBuffer(bView, lBuffer, tokenizer);
+                BufferView_SwapBuffer(bView, lBuffer);
 
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
@@ -1354,7 +1354,7 @@ void AppCommandOpenFile(){
                     printf("Did not find buffer %s\n", entry->path);
                 }else{
                     printf("Swapped to %s\n", entry->path);
-                    BufferView_SwapBuffer(bView, lBuffer, tokenizer);
+                    BufferView_SwapBuffer(bView, lBuffer);
                 }
             }
         }else{ // is file creation (or dir?)
@@ -1366,7 +1366,7 @@ void AppCommandOpenFile(){
             if(len > 0){
                 printf("Creating file %s\n", content);
                 FileProvider_CreateFile(content, len, &lBuffer, &tokenizer);
-                BufferView_SwapBuffer(bView, lBuffer, tokenizer);
+                BufferView_SwapBuffer(bView, lBuffer);
             }
         }
     };

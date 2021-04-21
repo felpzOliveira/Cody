@@ -36,6 +36,7 @@ std::vector<std::vector<GToken>> glslReservedTable = {
         { .value = "and", .identifier = TOKEN_ID_OPERATOR },
         { .value = "out", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "flat", .identifier = TOKEN_ID_OPERATOR },
         { .value = "lowp", .identifier = TOKEN_ID_OPERATOR },
         { .value = "char", .identifier = TOKEN_ID_DATATYPE },
         { .value = "long", .identifier = TOKEN_ID_DATATYPE },
@@ -210,6 +211,7 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
         { .value = "int", .identifier = TOKEN_ID_DATATYPE },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "flat", .identifier = TOKEN_ID_OPERATOR },
         { .value = "lowp", .identifier = TOKEN_ID_OPERATOR },
         { .value = "char", .identifier = TOKEN_ID_DATATYPE },
         { .value = "long", .identifier = TOKEN_ID_DATATYPE },

@@ -138,12 +138,9 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     return tokenID;
 }
 
-void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
-                           Tokenizer *tokenizer)
-{
+void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer){
     AssertA(view != nullptr, "Invalid initialization");
     view->lineBuffer = lineBuffer;
-    view->tokenizer = tokenizer;
     view->renderLineNbs = 1;
     view->activeNestPoint = -1;
     view->scroll.currX = 0;
@@ -151,7 +148,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer,
     view->scroll.horizontal = Transform();
 }
 
-void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, Tokenizer *tokenizer){
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer){
     // We need to reset geometry because scroll actually holds visible range
     Float lineHeight = view->sController.lineHeight;
     view->lineBuffer = lineBuffer;
@@ -159,9 +156,6 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, Tokenizer *
     view->activeNestPoint = -1;
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
-    if(tokenizer != nullptr){
-        view->tokenizer = tokenizer;
-    }
 }
 
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){

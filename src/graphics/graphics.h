@@ -11,6 +11,7 @@
 #include <fontstash.h>
 #include <x11_display.h>
 #include <map>
+#include <file_provider.h>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -114,7 +115,9 @@ struct OpenGLState{
     Transform projection;
     Transform scale;
     Transform model;
+    // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
+    std::map<FileExtension, std::string> fileMap;
 };
 
 #define RENDER_STAGE_CALL(name) int name(View *view, OpenGLState *state, Theme *theme, Float dt)
@@ -136,13 +139,16 @@ int  Graphics_IsRunning();
 /*
 * Initializes a texture.
 */
-void Graphics_TextureInit(OpenGLState *state, const char *path, const char *key);
-void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len, const char *key);
+void Graphics_TextureInit(OpenGLState *state, const char *path,
+                          const char *key, FileExtension type = FILE_EXTENSION_NONE);
+void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len,
+                          const char *key, FileExtension type = FILE_EXTENSION_NONE);
 
 /*
-* Get the id of a texture for the given file entry.
+* Get the id of a texture for a given file.
 */
-uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e);
+uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
+uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
 
 /*
 * Pushes a new quad into the current OpenGLState quad batch to render.

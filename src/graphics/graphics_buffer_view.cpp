@@ -3,6 +3,7 @@
 #include <gl3corefontstash.h>
 #include <vector>
 #include <app.h>
+#include <file_provider.h>
 
 void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
                                     Transform *model, Transform *projection);
@@ -491,7 +492,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
     int previousGlyph = -1;
     int largeLine = 0;
     OpenGLFont *font = &state->font;
-    Tokenizer *tokenizer = view->tokenizer;
+    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     Buffer *buffer = BufferView_GetBufferAt(view, lineNr);
 
@@ -553,7 +554,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     BufferView *view = View_GetBufferView(vview);
     OpenGLFont *font = &state->font;
     Geometry *geometry = &view->geometry;
-    
+
     int dummyGlyph = -1;
     vec2ui l = vec2ui(0, 0);
     vec2ui u = ScreenToGL(geometry->upper - geometry->lower, state);
@@ -571,10 +572,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     vec2ui a1(u.x, u.y + font->fontMath.fontSizeAtRenderCall);
     vec2ui a0(l.x, u.y - font->fontMath.fontSizeAtRenderCall);
     
-    //vec3f col = ColorRGB(theme->backgroundColor);
-    //vec3f col(0.6);
     vec4f col = GetUIColorf(theme, UIBackground);
-    //vec4f col = GetNestColorf(theme, TOKEN_ID_SCOPE, 0);
     
     if(vview->descLocation == DescriptionTop){
         a0 = vec2ui(l.x, l.y);
@@ -592,8 +590,28 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     Graphics_QuadPush(state, vec2ui((uint)b0.x, (uint)b0.y), a1, cc);
     
     Graphics_QuadFlush(state);
-    
-    
+
+    //TODO: Wut is happening, this is broken, aspect ratio gets f***.
+#if 0
+    uint texId = Graphics_FetchTextureFor(state, ext, &offset);
+    int offset = 0;
+    LineBuffer *lineBuffer = View_GetBufferViewLineBuffer(vview);
+    FileExtension ext = LineBuffer_GetExtension(lineBuffer);
+    if(texId > 0){
+        int size = 80;
+        size -= offset;
+        vec2ui p(a1.x - size, b0.y);
+        printf("Rendering at: %u %u\n", p.x, p.y);
+        int needs_render = Graphics_ImagePush(state, p, p+size, texId);
+        if(needs_render){
+            Graphics_ImageFlush(state);
+            Graphics_ImagePush(state, p, p+size, texId);
+        }
+
+        Graphics_ImageFlush(state);
+    }
+#endif
+
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);

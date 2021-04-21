@@ -32,6 +32,10 @@ LineBuffer *View_SelectableListGetLineBuffer(View *view){
     return view->selectableList.listBuffer;
 }
 
+LineBuffer *View_GetBufferViewLineBuffer(View *view){
+    return view->bufferView.lineBuffer;
+}
+
 BufferView *View_GetBufferView(View *view){
     return &view->bufferView;
 }

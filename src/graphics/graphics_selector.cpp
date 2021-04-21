@@ -20,7 +20,6 @@ typedef struct FrameStyle{
 }FrameStyle;
 
 ///////////////////////////////////////////////////////////////
-//TODO > Tokenizer issue when working with glsl (close/open mixup ?)
 //TODO > missing line during buffer selection on vertical split
 //TODO > pratical way to handle many icons (load all of them or go caching?)
 ///////////////////////////////////////////////////////////////
@@ -69,10 +68,11 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         if(opener && style->with_load){
             if(opener->entries){
                 uint mid = 0;
+                int off = 0;
                 vec2ui p = vec2ui(50, (uint)ym-20);
                 FileEntry *e = &opener->entries[rindex];
-                mid = Graphics_FetchTextureFor(state, e);
-
+                mid = Graphics_FetchTextureFor(state, e, &off);
+                size -= off;
                 int needs_render = Graphics_ImagePush(state, p, p+size, mid);
                 if(needs_render){
                     // before flushing the images we need to flush the quad

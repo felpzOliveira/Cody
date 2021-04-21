@@ -56,12 +56,13 @@ void FileProvider_Remove(char *ptr, uint pSize){
 }
 
 int FileProvider_FindByPath(LineBuffer **lBuffer, char *path, uint len, Tokenizer **tokenizer){
-    *tokenizer = FileProvider_GuessTokenizer(path, len);
+    LineBufferProps props;
+    *tokenizer = FileProvider_GuessTokenizer(path, len, &props);
     return FileBufferList_FindByPath(&fProvider.fileBuffer, lBuffer, path, len);
 }
 
 // TODO: Implement when other languages are supported
-Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len){
+Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps *props){
     int p = GetFilePathExtension(filename, len);
     if(p > 0){
         char *ext = &filename[p];
@@ -70,16 +71,26 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len){
         if(strExt == ".h" || strExt == ".hpp" || strExt == ".cpp"
            || strExt == ".c" || strExt == ".cc")
         {
+            props->type = 0;
+            props->ext = FILE_EXTENSION_CPP;
+            return FileProvider_GetCppTokenizer();
+        }else if(strExt == ".glsl" || strExt == ".gl" || strExt == ".vs" || strExt == ".fs"){
+            props->type = 1;
+            props->ext = FILE_EXTENSION_GLSL;
+            return FileProvider_GetGlslTokenizer();
+        }else if(strExt == ".cu" || strExt == ".cuh"){
+            props->type = 0;
+            props->ext = FILE_EXTENSION_CUDA;
             return FileProvider_GetCppTokenizer();
         }
 
-        if(strExt == ".glsl" || strExt == ".gl" || strExt == ".vs" || strExt == ".fs"){
-            return FileProvider_GetGlslTokenizer();
-        }
+        // TODO: Cmake file should be handled here as well
     }
 
     // TODO: Create an empty tokenizer that simply emits TOKEN_ID_NONE for all tokens
     // so we can edit raw files without colors being all over the place
+    props->type = 0;
+    props->ext = FILE_EXTENSION_NONE;
     return FileProvider_GetCppTokenizer();
 }
 
@@ -87,16 +98,31 @@ int FileProvider_IsFileOpened(char *path, uint len){
     return FileBufferList_FindByPath(&fProvider.fileBuffer, nullptr, path, len);
 }
 
+Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
+    uint id = LineBuffer_GetType(lineBuffer);
+    switch(id){
+        case 0: return FileProvider_GetCppTokenizer();
+        case 1: return FileProvider_GetGlslTokenizer();
+        default:{
+            //TODO: Empty tokenizer
+            return FileProvider_GetCppTokenizer();
+        }
+    }
+}
+
 void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer,
                              Tokenizer **lTokenizer)
 {
+    LineBufferProps props;
     Tokenizer *tokenizer = nullptr;
     LineBuffer *lBuffer = AllocatorGetN(LineBuffer, 1);
     *lBuffer = LINE_BUFFER_INITIALIZER;
 
-    tokenizer = FileProvider_GuessTokenizer(targetPath, len);
+    tokenizer = FileProvider_GuessTokenizer(targetPath, len, &props);
     LineBuffer_InitEmpty(lBuffer);
     LineBuffer_SetStoragePath(lBuffer, targetPath, len);
+    LineBuffer_SetType(lBuffer, props.type);
+    LineBuffer_SetExtension(lBuffer, props.ext);
 
     FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
 
@@ -117,6 +143,7 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     LineBuffer *lBuffer = nullptr;
     Tokenizer *tokenizer = nullptr;
     uint fileSize = 0;
+    LineBufferProps props;
     char *content = nullptr;
 
     AssertA(lineBuffer != nullptr, "Invalid lineBuffer pointer");
@@ -126,7 +153,7 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     lBuffer = AllocatorGetN(LineBuffer, 1);
     *lBuffer = LINE_BUFFER_INITIALIZER;
 
-    tokenizer = FileProvider_GuessTokenizer(targetPath, len);
+    tokenizer = FileProvider_GuessTokenizer(targetPath, len, &props);
     Lex_TokenizerContextReset(tokenizer);
 
     if(fileSize == 0){
@@ -143,6 +170,8 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     }
 
     FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
+    LineBuffer_SetType(lBuffer, props.type);
+    LineBuffer_SetExtension(lBuffer, props.ext);
 
     // allow hooks execution
     for(uint i = 0; i < fProvider.openHooksCount; i++){
