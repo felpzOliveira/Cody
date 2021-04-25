@@ -213,6 +213,27 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
         }
     }
 
+    if(bView){
+        LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+        if(LineBuffer_IsInsideCopySection(lineBuffer, tid, lineNr)){
+            // this token is being pasted interpolate the color
+            CopySection section;
+            vec4i tp = GetUIColor(theme, UIPasteColor); // theme paste color
+
+            LineBuffer_GetCopySection(lineBuffer, &section);
+            Float f = section.currTime / section.interval;
+            Float alpha = Lerp(0.f, 255.f, f);
+            vec3f interp = Lerp(vec3f((Float)tp.x,(Float)tp.y,(Float)tp.z),
+                                vec3f((Float)col.x,(Float)col.y,(Float)col.z), f);
+
+            col = vec4i((uint)interp.x, (uint)interp.y, (uint)interp.z, (uint)alpha);
+
+            // hacky way to inform the main rendering loop that even if this view
+            // is not jumping it is transitioning by alpha interpolation
+            bView->is_transitioning = 1;
+        }
+    }
+
     *color = col;
     return 0;
 }
@@ -527,6 +548,7 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
     Graphics_QuadPush(state, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
 }
 
+// TODO: Figure out paths / memory loading stuff for these
 static void OpenGLLoadIcons(OpenGLState *state){
     Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/folder.png",
                         ".folder");
@@ -545,6 +567,12 @@ static void OpenGLLoadIcons(OpenGLState *state){
 
     Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cuda.png",
                          ".cu", FILE_EXTENSION_CUDA);
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/text.png",
+                         ".txt", FILE_EXTENSION_TEXT);
+
+    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/font.png",
+                         ".ttf", FILE_EXTENSION_FONT);
 }
 
 void OpenGLInitialize(OpenGLState *state){
@@ -792,6 +820,12 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     }else if(strExt == ".cu" || strExt == ".cuh"){
         id = state->textureMap[".cu"];
         *off = -20;
+    }else if(strExt == ".txt"){
+        id = state->textureMap[".txt"];
+        *off = 10;
+    }else if(strExt == ".ttf"){
+        id = state->textureMap[".ttf"];
+        *off = 10;
     }else{
         // TODO: some unknown extension
     }
@@ -809,7 +843,9 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
             std::string strExt(ext);
             id = _Graphics_FetchTexture(state, strExt, off, str);
         }else{
-            // TODO: no extension, default to something
+            // NOTE: file wihtout extensions default to txt icons
+            id = state->textureMap[".txt"];
+            *off = 10;
         }
     }
 
@@ -885,7 +921,8 @@ void OpenGLEntry(){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
-        
+        int transitioning = 0;
+
         lastTime = currTime;
         AppUpdateViews();
 
@@ -898,18 +935,41 @@ void OpenGLEntry(){
         ViewTree_Begin(&iterator);
         while(iterator.value){
             View *view = iterator.value->view;
+            BufferView *bView = View_GetBufferView(view);
             RenderList *pipeline = View_GetRenderPipeline(view);
-            BufferView_UpdateCursorNesting(View_GetBufferView(view));
+            BufferView_UpdateCursorNesting(bView);
 
             // Sets the alpha for the current view rendering stages, makes the dimm effect
             SetAlpha(view->isActive ? 0 : 1);
+            bView->is_transitioning = 0;
 
-            for(uint s = 0; s < pipeline->stageCount; s++){
-                state->model = state->scale; // reset model
-                animating |= pipeline->stages[s].renderer(view, state, defaultTheme, dt);
+            if(BufferView_IsVisible(bView)){
+                for(uint s = 0; s < pipeline->stageCount; s++){
+                    state->model = state->scale; // reset model
+                    animating |= pipeline->stages[s].renderer(view, state,
+                                                              defaultTheme, dt);
+                }
             }
 
+            // account for chromatic transition
+            animating |= bView->is_transitioning;
+            transitioning |= bView->is_transitioning;
             ViewTree_Next(&iterator);
+        }
+
+        if(transitioning){
+            // adjust copy sections running interval
+            ViewTree_Begin(&iterator);
+            while(iterator.value){
+                View *view = iterator.value->view;
+                BufferView *bView = View_GetBufferView(view);
+                if(bView){
+                    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+                    LineBuffer_AdvanceCopySection(lineBuffer, dt);
+                }
+
+                ViewTree_Next(&iterator);
+            }
         }
 
         SwapBuffersX11(state->window);

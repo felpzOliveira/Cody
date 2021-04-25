@@ -33,6 +33,7 @@ const Float kAutoCompleteListScaling = 1.2;
 const Float kAutoCompleteMaxHeightFraction = 0.3;
 const Float kViewSelectableListOffset = 0.05;
 const Float kTransitionControlIndices = 1.5;
+const Float kTransitionCopyFadeIn = 0.35;
 const Float kOnes[] = {1,1,1,1};
 
 typedef enum{

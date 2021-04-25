@@ -14,6 +14,7 @@ typedef struct FileProvider{
     uint openHooksCount, createHooksCount;
     Tokenizer cppTokenizer;
     Tokenizer glslTokenizer;
+    Tokenizer emptyTokenizer;
 }FileProvider;
 
 // Static allocation of the file provider
@@ -27,15 +28,22 @@ void FileProvider_Initialize(){
     //      maybe we can see if we can initialize these as a file for them is requested?
 
     // Tokenizers all share the same Symbol Table as it is very expensive to have multiple
-    fProvider.cppTokenizer  = TOKENIZER_INITIALIZER;
-    fProvider.glslTokenizer = TOKENIZER_INITIALIZER;
+    fProvider.cppTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.glslTokenizer  = TOKENIZER_INITIALIZER;
+    fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
 
     // C/C++
     Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable});
+                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
+                       &cppSupport);
     // GLSL
     Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable});
+                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
+                       &glslSupport);
+    // Empty
+    Lex_BuildTokenizer(&fProvider.emptyTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
+                       &noneSupport);
 
     fProvider.openHooksCount = 0;
     fProvider.createHooksCount = 0;
@@ -82,16 +90,18 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps
             props->type = 0;
             props->ext = FILE_EXTENSION_CUDA;
             return FileProvider_GetCppTokenizer();
+        }else if(strExt == ".txt"){
+            props->type = 2;
+            props->ext = FILE_EXTENSION_TEXT;
+            return FileProvider_GetEmptyTokenizer();
         }
 
         // TODO: Cmake file should be handled here as well
     }
 
-    // TODO: Create an empty tokenizer that simply emits TOKEN_ID_NONE for all tokens
-    // so we can edit raw files without colors being all over the place
-    props->type = 0;
-    props->ext = FILE_EXTENSION_NONE;
-    return FileProvider_GetCppTokenizer();
+    props->type = 2;
+    props->ext = FILE_EXTENSION_TEXT;
+    return FileProvider_GetEmptyTokenizer();
 }
 
 int FileProvider_IsFileOpened(char *path, uint len){
@@ -103,9 +113,10 @@ Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
     switch(id){
         case 0: return FileProvider_GetCppTokenizer();
         case 1: return FileProvider_GetGlslTokenizer();
+        case 2: return FileProvider_GetEmptyTokenizer();
         default:{
             //TODO: Empty tokenizer
-            return FileProvider_GetCppTokenizer();
+            return FileProvider_GetEmptyTokenizer();
         }
     }
 }
@@ -213,4 +224,8 @@ Tokenizer *FileProvider_GetCppTokenizer(){
 
 Tokenizer *FileProvider_GetGlslTokenizer(){
     return &fProvider.glslTokenizer;
+}
+
+Tokenizer *FileProvider_GetEmptyTokenizer(){
+    return &fProvider.emptyTokenizer;
 }

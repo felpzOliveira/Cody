@@ -48,6 +48,7 @@ int FileProvider_IsLineBufferDirty(char *hint_name, uint len);
 */
 Tokenizer *FileProvider_GetCppTokenizer();
 Tokenizer *FileProvider_GetGlslTokenizer();
+Tokenizer *FileProvider_GetEmptyTokenizer();
 
 /*
 * Asks the file provider to guess what is the tokenizer to use for a given file,

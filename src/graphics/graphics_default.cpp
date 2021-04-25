@@ -7,6 +7,7 @@
 
 int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Float dt){
     int pGlyph = -1;
+    // TODO: key bindings should be configurable
     const char *line0 = "Press Alt + F to open a file";
     OpenGLFont *font = &state->font;
     uint line0len = strlen(line0);

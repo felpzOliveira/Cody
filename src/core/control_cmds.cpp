@@ -9,6 +9,7 @@
 typedef struct ControlCmds{
     BindingMap *mapping;
     BindingMap *lastMapping;
+    int is_expanded;
 }ControlCmds;
 
 static ControlCmds controlCmds;
@@ -29,15 +30,18 @@ void ControlCommands_YieldKeyboard(){
 void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size){
     (void)utf8Data; (void)utf8Size;
     // This is generic, but should it be binded?
+
+    // We are going to need to iterate the view tree in any case
+    // so initialize a iterator
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+
     if(StringIsDigits(utf8Data, utf8Size)){
         bool swapped = false;
         uint index = StringToUnsigned(utf8Data, utf8Size);
-        // Select this view
-        ViewTreeIterator iterator;
-        ViewTree_Begin(&iterator);
         int id = -1;
-
         std::stack<View *> viewStack;
+
         if(iterator.value) id = 1;
         while(iterator.value){
             if(iterator.value->view){
@@ -64,8 +68,26 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size){
             }
         }
     }else{
+        // clear the interface in case something was rendering from our side
+        while(iterator.value){
+            // I think we can default to always calling this and not get into
+            // any trouble
+            View_SetControlOpts(iterator.value->view, Control_Opts_None);
+            ViewTree_Next(&iterator);
+        }
         ControlCommands_YieldKeyboard();
     }
+
+}
+
+void ControlCmdsExpandCurrent(){
+    if(controlCmds.is_expanded){
+        ViewTree_ExpandRestore();
+    }else{
+        ViewTree_ExpandCurrent();
+    }
+    ControlCommands_YieldKeyboard();
+    controlCmds.is_expanded = 1 - controlCmds.is_expanded;
 }
 
 void ControlCmdsRenderIndices(){
@@ -74,8 +96,10 @@ void ControlCmdsRenderIndices(){
     ViewTree_Begin(&iterator);
     while(iterator.value){
         if(iterator.value->view){
-            View_SetControlOpts(iterator.value->view, Control_Opts_Indices,
-                                kTransitionControlIndices);
+            if(BufferView_IsVisible(View_GetBufferView(iterator.value->view))){
+                View_SetControlOpts(iterator.value->view, Control_Opts_Indices,
+                                    kTransitionControlIndices);
+            }
         }
 
         ViewTree_Next(&iterator);
@@ -84,15 +108,24 @@ void ControlCmdsRenderIndices(){
     Timing_Update();
 }
 
+void ControlCommands_RestoreExpand(){
+    if(controlCmds.is_expanded){
+        ViewTree_ExpandRestore();
+        controlCmds.is_expanded = 0;
+    }
+}
+
 void ControlCommands_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
 
     RegisterKeyboardDefaultEntry(mapping, ControlCmdsDefaultEntry);
     RegisterRepeatableEvent(mapping, ControlCommands_YieldKeyboard, Key_Escape);
     RegisterRepeatableEvent(mapping, ControlCmdsRenderIndices, Key_Q);
+    RegisterRepeatableEvent(mapping, ControlCmdsExpandCurrent, Key_Z);
 
     controlCmds.mapping = mapping;
     controlCmds.lastMapping = nullptr;
+    controlCmds.is_expanded = 0;
 }
 
 void ControlCommands_BindTrigger(BindingMap *mapping){

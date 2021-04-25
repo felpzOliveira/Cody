@@ -40,11 +40,21 @@ typedef enum{
     FILE_EXTENSION_GLSL,
     FILE_EXTENSION_CUDA,
     FILE_EXTENSION_CMAKE,
+    FILE_EXTENSION_TEXT,
+    FILE_EXTENSION_FONT,
 }FileExtension;
+
+typedef struct{
+    vec2ui start, end;
+    Float currTime;
+    Float interval;
+    int active;
+}CopySection;
 
 struct LineBufferProps{
     uint type;
     FileExtension ext;
+    CopySection cpSection;
 };
 
 /*
@@ -293,12 +303,25 @@ Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint 
 */
 void LineBuffer_SetType(LineBuffer *lineBuffer, uint type);
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext);
+void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section);
 
 /*
 * Generic getter for the linebuffer properties.
 */
 uint LineBuffer_GetType(LineBuffer *lineBuffer);
 FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer);
+void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section);
+
+/*
+* Checks if a token inside a buffer in the given linebuffer is inside the
+* current copy section (in case it is active).
+*/
+int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid);
+
+/*
+* Advances the copy section (if required) of a given linebuffer by dt.
+*/
+void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt);
 
 /*
 * Releases memory taken by a LineBuffer.

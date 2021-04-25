@@ -22,12 +22,23 @@ typedef struct ViewTreeIterator{
 typedef struct ViewTree{
     ViewNode *root;
     ViewNode *activeNode;
+    Geometry savedGeometry;
 }ViewTree;
 
 /*
 * Initializes the view tree
 */
 void ViewTree_Initialize();
+
+/*
+* Saves the current node geometry and expands it to maximum interface size.
+*/
+void ViewTree_ExpandCurrent();
+
+/*
+* Returns from a expanded state.
+*/
+void ViewTree_ExpandRestore();
 
 /*
 * Get the active current node of the view tree.

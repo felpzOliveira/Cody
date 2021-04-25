@@ -46,7 +46,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         int pGlyph = -1;
         Float x = lWidth * 0.03;
         Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
-        Float ym = (y1 + y0) * 0.5 - 0.5 * state->font.fontMath.fontSizeAtRenderCall;
+        Float ym = (y1 + y0) * 0.5 - 0.25 * state->font.fontMath.fontSizeAtRenderCall;
 
         uint rindex = SelectableList_GetRealIndex(list, i);
 
@@ -55,8 +55,10 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
 
         Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lWidth, y1),
                           style->item_background_color);
+        if(opener && style->with_load){
+            x = Max(x, 2 * size);
+        }
 
-        x = Max(x, 2 * size);
         if((int)i == list->active){
             Graphics_PushText(state, x, ym, buffer->data, buffer->taken,
                               style->item_active_foreground_color, &pGlyph);
@@ -65,6 +67,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                               style->item_foreground_color, &pGlyph);
         }
 
+        // TODO: How to compute icon width/height?
         if(opener && style->with_load){
             if(opener->entries){
                 uint mid = 0;
@@ -101,12 +104,13 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         }
 
         if((int)i == list->active && style->with_line_border){
-            Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, 2,
+            int w = GetSelectorBorderWidth(theme);
+            Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, w,
                                     style->item_active_border_color);
         }
 
         if((int)i == list->active && style->with_line_highlight){
-            int w = 2;
+            int w = 2; // TODO: should this be in theme?
             Graphics_QuadPush(state, vec2ui(w, y0+w), vec2ui(lWidth-w, y1-w),
                               style->item_active_background_color);
         }

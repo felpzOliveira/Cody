@@ -96,7 +96,7 @@ void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, Token
                 node->next->prev = prev;
         }
         
-        printf("Removed %s - %s\n", node->label, Symbol_GetIdString(node->id));
+        //printf("Removed %s - %s\n", node->label, Symbol_GetIdString(node->id));
         
         node->next = nullptr;
         AllocatorFree(node->label);

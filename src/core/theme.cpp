@@ -1,6 +1,68 @@
 #include <theme.h>
 #include <utilities.h>
 
+Theme themeEclispe = {
+    .backgroundColor = ColorFromHex(0xffffffff),
+    .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3), // ?
+    .hoverableItemBackgroundColor = ColorFromHex(0xff611449), // ?
+    .selectorBackground = ColorFromHex(0xfff0f0f0),
+
+    .searchBackgroundColor = ColorFromHex(0xff87ffaf), // ?
+    .selectableListBackground = ColorFromHex(0xfff0f0f0),
+    .searchWordColor = ColorFromHex(0xff380c2a), // ?
+    .backgroundLineNumbers = ColorFromHex(0xfffafafa),
+    .lineNumberColor = ColorFromHex(0xff008ba7),
+    .lineNumberHighlitedColor = ColorFromHex(0xff003c48),
+    .cursorLineHighlight = ColorFromHex(0xfff2f2f2),
+
+    .operatorColor   = ColorFromHex(0xff9f1b97),
+    .datatypeColor   = ColorFromHex(0xffd94856),
+    .commentColor    = ColorFromHex(0xff9da0a4),
+    .stringColor     = ColorFromHex(0xff469b51),
+    .numberColor     = ColorFromHex(0xff055ec4),
+    .reservedColor   = ColorFromHex(0xffad7fa8),
+    .functionColor   = ColorFromHex(0xff715a99),
+    .includeColor    = ColorFromHex(0xff227fed),
+
+    .mathColor       = ColorFromHex(0xffd63b49),
+
+    .tokensColor     = ColorFromHex(0xff363a3f),
+    .tokensOverCursorColor = ColorFromHex(0xffffffff),
+
+    .preprocessorColor = ColorFromHex(0xff792951),
+    .preprocessorDefineColor = ColorFromHex(0xff3a3d44),
+
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    .braces = ColorFromHex(0xCC960d01),
+    .cursorColor = ColorFromHex(0xff848484),
+    .querybarCursorColor = ColorFromHex(0xff2664fd),
+    .ghostCursorColor = ColorFromHex(0xff327ff9),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0xfff3f3fd),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xff9f1b97),
+    .userDatatypeEnum = ColorFromHex(0xff3a3d44),
+    .scopeLineColor = ColorFromHex(0x66666666),
+    .scrollbarColor = ColorFromHex(0xfff0f0f0),
+    .querybarTypeLineColor = ColorFromHex(0xff3a3d44),
+    .selectorLoadedColor = ColorFromHex(0xFF2c2e34),
+    .userDefineColor = ColorFromHex(0xff3a3d44),
+    .backTextCount = 1,
+    .lineBorderWidth = 0,
+    .alphaDimm = 1,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+};
+
+
 Theme themeTerminal = {
     .backgroundColor = ColorFromHex(0xff2C001e),
     .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3),
@@ -58,6 +120,8 @@ Theme themeTerminal = {
     .lineBorderWidth = 0,
     .alphaDimm = 1,
     .dynamicCursor = true,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
 Theme themeGruvboxLight = {
@@ -76,7 +140,7 @@ Theme themeGruvboxLight = {
 
     .operatorColor   = ColorFromHex(0xCC960d01),
     .datatypeColor   = ColorFromHex(0xFF9b0511),
-    .commentColor    = ColorFromHex(0xFF726355),
+    .commentColor    = ColorFromHex(0xFFA29385),
     .stringColor     = ColorFromHex(0xff124b28),
     .numberColor     = ColorFromHex(0xFF116677),
     .reservedColor   = ColorFromHex(0xFF116677),
@@ -117,6 +181,8 @@ Theme themeGruvboxLight = {
     .lineBorderWidth = 0,
     .alphaDimm = 1,
     .dynamicCursor = false,
+    .borderWidth = 5,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
 Theme themeDracula = {
@@ -169,6 +235,8 @@ Theme themeDracula = {
     .lineBorderWidth = 0,
     .alphaDimm = 0,
     .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
 Theme themeYavid = {
@@ -178,10 +246,10 @@ Theme themeYavid = {
     .selectorBackground = ColorFromHex(0xFF17171D),
     .searchBackgroundColor = ColorFromHex(0xFF315268),
     .selectableListBackground = ColorFromHex(0xFF13151a),
-    .searchWordColor = ColorFromHex(0xCC8e8620),
+    .searchWordColor = ColorFromHex(0xFF16191C),
     .backgroundLineNumbers = ColorFromHex(0xFF192023),
     .lineNumberColor = ColorFromHex(0xFF4C4D4E),
-    .lineNumberHighlitedColor = ColorFromHex(0xFFF9F901),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF858688),
     .cursorLineHighlight = ColorFromHex(0xFF272729),
     .operatorColor   = ColorFromHex(0xCCD38545),
     .datatypeColor   = ColorFromHex(0xCC719FAE),
@@ -213,14 +281,16 @@ Theme themeYavid = {
     .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
-    .scrollbarColor = ColorFromHex(0xff353f25),
-    .querybarTypeLineColor = ColorFromHex(0xFFFF4040),
+    .scrollbarColor = ColorFromHex(0xff20232c),
+    .querybarTypeLineColor = ColorFromHex(0xFF323744),
     .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .userDefineColor = ColorFromHex(0xCCCD950C),
     .backTextCount = 1,
     .lineBorderWidth = 0,
     .alphaDimm = 0,
     .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
 Theme themeRadical = {
@@ -241,7 +311,7 @@ Theme themeRadical = {
     //.operatorColor = ColorFromHex(0xCCfaaf05),
     .operatorColor = ColorFromHex(0xCCc7ff00),
     
-    .datatypeColor   = ColorFromHex(0xCCff427c),
+    .datatypeColor   = ColorFromHex(0xCCf67397),
     .commentColor    = ColorFromHex(0x48cff0e9),
     .stringColor     = ColorFromHex(0xCCbaf7fc),
     .numberColor     = ColorFromHex(0xCCfffc7f),
@@ -269,7 +339,7 @@ Theme themeRadical = {
         ColorFromHex(0xFF190A25),
     },
     
-    .userDatatypeColor = ColorFromHex(0xCCff427c),
+    .userDatatypeColor = ColorFromHex(0xCCf67397),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAd5348f),
     .scrollbarColor = ColorFromHex(0xff353f25),
@@ -280,9 +350,10 @@ Theme themeRadical = {
     .lineBorderWidth = 0,
     .alphaDimm = 1,
     .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
-//TODO: Apply the 1.3 multiplication term, is it done?
 Theme theme4Coder = {
     .backgroundColor = ColorFromHex(0xFF0C0C0C),
     .hoverableItemForegroundColor = ColorFromHex(0xCCfffc7f),
@@ -342,6 +413,8 @@ Theme theme4Coder = {
     .lineBorderWidth = 0,
     .alphaDimm = 1,
     .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
 };
 
 //Theme *defaultTheme = &themeRadical;
@@ -358,6 +431,7 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "Gruvbox Light", .theme = &themeGruvboxLight, },
     { .name = "Yavid", .theme = &themeYavid, },
     { .name = "Terminal", .theme = &themeTerminal, },
+    { .name = "Eclipse", .theme = &themeEclispe, },
 };
 
 static int globalActive = 0;
@@ -495,6 +569,7 @@ vec4i GetUIColor(Theme *theme, UIElement id){
         COLOR_RET(UISelectorLoadedColor, selectorLoadedColor);
         COLOR_RET(UIHoverableListItem, hoverableItemForegroundColor);
         COLOR_RET(UIHoverableListItemBackground, hoverableItemBackgroundColor);
+        COLOR_RET(UIPasteColor, pasteColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);
@@ -529,8 +604,12 @@ Float GetLineBorderWidth(Theme *theme){
     return theme->lineBorderWidth;
 }
 
+int GetSelectorBorderWidth(Theme *theme){
+    return theme->borderWidth;
+}
+
 int ThemeNeedsEffect(Theme *theme){
-    if(theme == &theme4Coder){
+    if(theme == &theme4Coder || theme == &themeEclispe){
         return 1;
     }
 

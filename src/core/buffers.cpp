@@ -617,6 +617,14 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     lineBuffer->undoRedo.undoStack = DoStack_Create();
     lineBuffer->undoRedo.redoStack = DoStack_Create();
     lineBuffer->activeBuffer = vec2i(-1, -1);
+    lineBuffer->props.cpSection = {
+        .start = vec2ui(),
+        .end = vec2ui(),
+        .currTime = 0,
+        .interval = 0,
+        .active = 0,
+    };
+
     for(uint i = 0; i < DefaultAllocatorSize; i++){
         lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));
         *(lineBuffer->lines[i]) = BUFFER_INITIALIZER;
@@ -1225,12 +1233,19 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
         char *ptr = buffer->data;
         bool process = true;
         uint c = 0;
+        uint taken = buffer->taken;
         ic = 0;
         if(buffer->is_ours){
+            // skip visualy empty lines and remove pending spaces at end of the line
             process = !Buffer_IsBlank(buffer);
+            if(process){
+                for(taken = buffer->taken; taken > 1; taken--){
+                    if(buffer->data[taken-1] != ' ') break;
+                }
+            }
         }
         
-        while(buffer->taken > c && process){
+        while(taken > c && process){
             linePtr[ic++] = *ptr;
             if(*ptr == '\t'){
                 for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
@@ -1261,6 +1276,43 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     lineBuffer->is_dirty = 0;
 }
 
+int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){
+    int rv = 0;
+    if(lineBuffer){
+        CopySection *section = &lineBuffer->props.cpSection;
+        if(section->active && bid >= section->start.x && bid <= section->end.x){
+            if(bid < section->end.x) return 1;
+
+            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, bid);
+            if(id < buffer->tokenCount){
+                Token *token = &buffer->tokens[id];
+                uint s = token->position + token->size;
+                uint ps = Buffer_Utf8RawPositionToPosition(buffer, token->position);
+                uint pe = Buffer_Utf8RawPositionToPosition(buffer, s);
+                uint start = section->start.x == section->end.x ? section->start.y : 0;
+                uint end = section->end.x == bid ? section->end.y : buffer->count;
+                if(ps >= start && pe <= end){
+                    rv = 1;
+                }
+            }
+        }
+    }
+
+    return rv;
+}
+
+void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt){
+    if(lineBuffer){
+        CopySection *section = &lineBuffer->props.cpSection;
+        if(section->active){
+            section->currTime += dt;
+            if(section->currTime > section->interval){
+                section->active = 0;
+            }
+        }
+    }
+}
+
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext){
     if(lineBuffer){
         lineBuffer->props.ext = ext;
@@ -1270,6 +1322,12 @@ void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext){
 void LineBuffer_SetType(LineBuffer *lineBuffer, uint type){
     if(lineBuffer){
         lineBuffer->props.type = type;
+    }
+}
+
+void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section){
+    if(lineBuffer){
+        lineBuffer->props.cpSection = section;
     }
 }
 
@@ -1287,6 +1345,12 @@ uint LineBuffer_GetType(LineBuffer *lineBuffer){
     }
 
     return 0;
+}
+
+void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section){
+    if(lineBuffer && section){
+        *section = lineBuffer->props.cpSection;
+    }
 }
 
 /* Debug stuff */

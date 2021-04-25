@@ -69,16 +69,21 @@ void AppSetActiveView(View *view);
 char *AppGetContextDirectory();
 
 /*
-* Computes a indentation level of a line.
-*/
-uint AppComputeLineIndentLevel(Buffer *buffer);
-
-/*
 * Computes the indentation level of the line given by buffer+1.
 * This is slower than 'AppComputeLineIndentLevel' but can be used to
 * generate new lines when the line buffer+1 has not yet been constructed.
 */
 uint AppComputeLineLastIndentLevel(Buffer *buffer);
+
+/*
+* Computes a indentation level of a line until a UTF-8 position 'p'.
+*/
+uint AppComputeLineIndentLevel(Buffer *buffer, uint p);
+
+/*
+* Computes a indentation level of a line until the first non-empty character.
+*/
+uint AppComputeLineIndentLevel(Buffer *buffer);
 
 /*
 * Allow views to synchronize their properties.
@@ -99,6 +104,11 @@ void AppDefaultReturn();
 * Removes one character from the current active view.
 */
 void AppDefaultRemoveOne();
+
+/*
+* Gets the current geometry configured being used.
+*/
+Geometry AppGetScreenGeometry(Float *lineHeight);
 
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();

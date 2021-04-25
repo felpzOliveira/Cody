@@ -228,6 +228,9 @@ struct Tokenizer{
     
     // #include 
     int inclusion;
+
+    // support
+    TokenizerSupport support;
 };
 
 //TODO: I fell like I want to refactor this and write a Token streamer.
@@ -262,7 +265,8 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
 * Builds a tokenizer from default tables.
 */
 void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable,
-                        std::vector<std::vector<std::vector<GToken>> *> refTables);
+                        std::vector<std::vector<std::vector<GToken>> *> refTables,
+                        TokenizerSupport *support);
 
 /*
 * Pushes a new token into the given lookup table.

@@ -512,7 +512,8 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                 }
                 
                 if(v == '\t' || v == ' '){
-                    x += fonsComputeStringAdvance(font->fsContext, " ", 1, &previousGlyph);
+                    x += fonsComputeStringAdvance(font->fsContext, " ", 1,
+                                                  &previousGlyph);
                     pos ++;
                     continue;
                 }
@@ -527,7 +528,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
             }
 
             if(token->identifier == TOKEN_ID_SPACE){
-                // NOTE: nothing to do
+                // NOTE: nothing to do, space was already inserted
             }else if(token->position < (int)buffer->taken){
                 char *p = &buffer->data[token->position];
                 char *e = &buffer->data[token->position + token->size];

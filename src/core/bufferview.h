@@ -26,9 +26,6 @@ typedef struct{
     Transform horizontal;
 }Scroll;
 
-// TODO: The tokenizer should really be inside the LineBuffer as it
-// is umatable there. Being in a bufferview only introduces difficulties
-// synchornizing access to both and making sure they are correct.
 struct BufferView{
     LineBuffer *lineBuffer;
     VScroll sController;
@@ -46,7 +43,9 @@ struct BufferView{
     NestPoint endNest[64];
     int startNestCount;
     int endNestCount;
-    
+    int is_visible;
+
+    int is_transitioning;
 };
 
 Float InterpolateValueCubic(Float dt, Float remaining,
@@ -252,6 +251,11 @@ void BufferView_Synchronize(BufferView *view);
 * Marks the linebuffer present in the bufferview 'view' as dirty, i.e.: needing save.
 */
 void BufferView_Dirty(BufferView *view);
+
+/*
+* Checks if a given bufferview is currently being rendered.
+*/
+int BufferView_IsVisible(BufferView *view);
 
 void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

@@ -6,6 +6,18 @@
 #include <vector>
 #include <buffers.h>
 
+#if 0
+#define PRINT_SAFE(head, ptr, len)do{\
+    char __mem[128], __n[64];\
+    memcpy(__n, ptr, len);\
+    __n[len] = 0;\
+    snprintf(__mem, sizeof(__mem), head "%s", __n);\
+    printf("%s\n", __mem);\
+}while(0)
+#else
+#define PRINT_SAFE(...)
+#endif
+
 #define MODULE_NAME "Lex"
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
@@ -153,7 +165,7 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
     }
     
     //TODO: This tests avoid broken statements to propagate
-    //      the logical expression to the hole doc. Check if it is sane.
+    //      the logical expression to the whole doc. Check if it is sane.
     if(Lex_IsTokenReserved(token)){
         BoundedStack_Pop(tokenizer->procStack);
         filtered = 1;
@@ -165,8 +177,8 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
 /* (Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p) */
 LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
     /*
-* class A
-*/
+    * class A
+    */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_CLASS_DEF, p);
@@ -189,12 +201,13 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
                 proc->range.y = tokenizer->runningLine;
                 proc->currentState = 1;
                 grabbed = 1;
+                PRINT_SAFE("CLASS > ", h, token->size);
             }else if(proc->nestedLevel == 0 && proc->currentState == 1){
                 /*
-* This means we already got our token but there is another
-* this is most likely a construction of either invalid struct
-* or a forward declaration.
-*/
+                * This means we already got our token but there is another
+                * this is most likely a construction of either invalid struct
+                * or a forward declaration.
+                */
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
@@ -204,9 +217,9 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
         case TOKEN_ID_BRACE_OPEN:{
             if(proc->nestedLevel == 1 && proc->currentState == 1){
                 /*
-* We got our token but there is a definition following, allow
-* outter components to process.
-*/
+                * We got our token but there is a definition following, allow
+                * outter components to process.
+                */
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
@@ -244,11 +257,11 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
 /* (Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p) */
 LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
     /*
-* enum A{ <Anything> };
-* The way we did this thing we will never be able to capture
-* 'enum class <Something>{ <Anything> };' because class will consume
-* <Something> 
-*/
+    * enum A{ <Anything> };
+    * The way we did this thing we will never be able to capture
+    * 'enum class <Something>{ <Anything> };' because class will consume
+    * <Something> 
+    */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_ENUM_DEF, p);
@@ -268,17 +281,17 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
                 proc->currentState = 1;
             }else if(proc->nestedLevel == 0 && proc->currentState == 1){
                 /*
-* This means we already got our token but there is another
-* this is most likely a construction of either invalid struct
-* or a forward declaration.
-*/
+                * This means we already got our token but there is another
+                * this is most likely a construction of either invalid struct
+                * or a forward declaration.
+                */
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
             }else if(proc->nestedLevel == 1){
                 /*
-* We got one of the values inside the enum, this is a very soft test tho
-*/
+                * We got one of the values inside the enum, this is a very soft test tho
+                */
                 char *h = (*p) - token->size;
                 token->identifier = TOKEN_ID_DATATYPE_USER_ENUM_VALUE;
                 if(SymbolTable_Insert(tokenizer->symbolTable, h,
@@ -312,9 +325,9 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
 /* (Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p) */
 LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     /*
-* struct A;
-* struct A{ <Anything> };
-*/
+    * struct A;
+    * struct A{ <Anything> };
+    */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_STRUCT_DEF, p);
@@ -337,12 +350,13 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
                 token->identifier = TOKEN_ID_DATATYPE_USER_STRUCT;
                 proc->currentState = 1;
                 grabbed = 1;
+                PRINT_SAFE("STRUCT > ", h, token->size);
             }else if(proc->nestedLevel == 0 && proc->currentState == 1){
                 /*
-* This means we already got our token but there is another
-* this is most likely a constr  uction of either invalid struct
-* or a forward declaration.
-*/
+                * This means we already got our token but there is another
+                * this is most likely a construction of either invalid struct
+                * or a forward declaration.
+                */
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
@@ -372,6 +386,9 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
         }else{
             token->reserved = StringDup(h, token->size);
         }
+        // experimental, let other procs be called instead, hopefully
+        // this stabilizes the typedef struct{}<type>; synthax
+        BoundedStack_Pop(tokenizer->procStack);
     }
     
     
@@ -382,12 +399,12 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
 LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
     //TODO: This needs to be seriously reviewd;
     /*
-* Very soft representation of typedef as function pointers are quite annoying.
-*
-* typedef <SOMETHING> A;
-* typedef <SOMETHING> A, B, *C;
-* typedef int (*myFuncDef)(int b, int a);
-*/
+    * Very soft representation of typedef as function pointers are quite annoying.
+    *
+    * typedef <SOMETHING> A;
+    * typedef <SOMETHING> A, B, *C;
+    * typedef int (*myFuncDef)(int b, int a);
+    */
     Token *lastToken = &tokenizer->lastToken;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_TYPEDEF_DEF, p);
@@ -410,6 +427,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
             proc->range.y = tokenizer->runningLine;
             grabbed = 1;
+            PRINT_SAFE("TYPEDEF > ", h, token->size);
         }else if(token->identifier == TOKEN_ID_NONE && 
                  proc->nestedLevel == 0 && proc->currentState == 1)
         {
@@ -417,6 +435,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
             proc->range.y = tokenizer->runningLine;
             grabbed = 1;
+            PRINT_SAFE("TYPEDEF > ", h, token->size);
         }else if(proc->currentState == 2 && token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
             proc->currentState = 1;
         }else if(proc->nestedLevel == 0 && proc->currentState == 0){
@@ -456,7 +475,11 @@ LEX_PROCESSOR(Lex_Number){
     *head = *p;
     
     LEX_DEBUG("Starting Numeric parser at \'%c\'\n", **p);
-    
+
+    if(!tokenizer->support.numbers){
+        return 0;
+    }
+
     iValue = (**p) - '0';
     
     if(**p == '.'){
@@ -634,6 +657,7 @@ LEX_PROCESSOR(Lex_Inclusion){
 }
 
 //TODO: This does not capture the pattern: R"<*>(...)<*>"
+//TODO: Figure out multiline string declaration
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_String){
     int level = 0;
@@ -643,7 +667,11 @@ LEX_PROCESSOR(Lex_String){
     *len = 0;
     *head = *p;
     LEX_DEBUG("Starting String parser at \'%c\'\n", **p);
-    
+
+    if(!tokenizer->support.strings){
+        return 0;
+    }
+
     if(**p == '\'' || **p == '\"'){
         level += 1;
         lastSep = **p;
@@ -682,6 +710,10 @@ LEX_PROCESSOR(Lex_Comments){
     char prev = 0;
     *len = 0;
     *head = *p;
+    if(!tokenizer->support.comments){
+        return 0;
+    }
+
     if(aggregate == 0){
         if(n < 2) return 0;
         if(**p == '/' && *((*p)+1) == '/'){
@@ -747,6 +779,11 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     char *h = *p;
     int matched = 0;
     uint length = 1;
+
+    if(!tokenizer->support.lookups){
+        return 0;
+    }
+
     token->identifier = TOKEN_ID_NONE;
     
     if(TerminatorChar(**p)){
@@ -1176,7 +1213,9 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     AssertA(lookupTable != nullptr, "Invalid lookup table given");
     AssertA(lookupTable->table == nullptr, 
             "Re-generation of lookup table is not supported");
-    
+
+    if(cppTable->size() == 0) return;
+
     std::vector<GToken> tokens = cppTable->at(0);
     int elements = cppTable->size();
     
@@ -1205,10 +1244,12 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
 }
 
 void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable,
-                        std::vector<std::vector<std::vector<GToken>> *> refTables){
+                        std::vector<std::vector<std::vector<GToken>> *> refTables,
+                        TokenizerSupport *support)
+{
     TokenLookupTable *tables = nullptr;
     TokenizerWorkContext *workContext = nullptr;
-    AssertA(tokenizer != nullptr, "Invalid tokenizer context given");
+    AssertA(tokenizer != nullptr && support != nullptr, "Invalid tokenizer context given");
     tokenizer->contexts = AllocatorGetN(TokenizerContext, refTables.size());
     tokenizer->contextCount = refTables.size();
     tokenizer->unfinishedContext = 0;
@@ -1255,6 +1296,7 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTa
     tokenizer->runningLine = 0;
     tokenizer->symbolTable = symTable;
     tokenizer->procStack = BoundedStack_Create();
+    tokenizer->support = *support;
 }
 
 void Lex_TokenizerContextReset(Tokenizer *tokenizer){

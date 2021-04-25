@@ -18,3 +18,8 @@ void ControlCommands_BindTrigger(BindingMap *mapping);
 * before it took it.
 */
 void ControlCommands_YieldKeyboard();
+
+/*
+* Restore the interface if it was in a expanded state.
+*/
+void ControlCommands_RestoreExpand();

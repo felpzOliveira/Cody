@@ -1,10 +1,12 @@
 #include <view_tree.h>
 #include <stack>
 #include <view.h>
+#include <app.h>
 
 static ViewTree viewTree = {
     .root = nullptr,
     .activeNode = nullptr,
+    .savedGeometry = Geometry(),
 };
 
 ViewNode *ViewTree_CreateNode(int is_leaf=1){
@@ -25,6 +27,59 @@ ViewNode *ViewTree_CreateNode(int is_leaf=1){
     }
 
     return node;
+}
+
+void ViewTree_ExpandRestore(){
+    Float lineHeight = 0;
+    Geometry geometry;
+    ViewNode *node = viewTree.activeNode;
+    auto show = [](ViewNode *node) -> int{
+        BufferView *bView = View_GetBufferView(node->view);
+        if(bView){
+            bView->is_visible = 1;
+        }
+        return 0;
+    };
+
+    ViewTree_ForAllViews(show);
+    geometry = AppGetScreenGeometry(&lineHeight);
+    View_SetGeometry(node->view, viewTree.savedGeometry, lineHeight);
+}
+
+void ViewTree_ExpandCurrent(){
+    Geometry geometry;
+    Float lineHeight = 0;
+    ViewNode *node = viewTree.activeNode;
+    BufferView *bView = View_GetBufferView(node->view);
+    auto hide = [](ViewNode *node) -> int{
+        BufferView *bView = View_GetBufferView(node->view);
+        if(bView){
+            bView->is_visible = 0;
+        }
+        return 0;
+    };
+
+    ViewTree_ForAllViews(hide);
+    BufferView_GetGeometry(bView, &viewTree.savedGeometry);
+
+    geometry = AppGetScreenGeometry(&lineHeight);
+    Float w = (Float)(geometry.upper.x - geometry.lower.x);
+    Float h = (Float)(geometry.upper.y - geometry.lower.y);
+    geometry.extensionX = vec2f(0, 1);
+    geometry.extensionY = vec2f(0, 1);
+
+    uint x0 = (uint)(w * geometry.extensionX.x);
+    uint x1 = (uint)(w * geometry.extensionX.y);
+    uint y0 = (uint)(h * geometry.extensionY.x);
+    uint y1 = (uint)(h * geometry.extensionY.y);
+
+    Geometry targetGeo;
+    targetGeo.lower = vec2ui(x0, y0);
+    targetGeo.upper = vec2ui(x1, y1);
+    targetGeo.extensionX = vec2f(0, 1);
+    targetGeo.extensionY = vec2f(0, 1);
+    View_SetGeometry(node->view, targetGeo, lineHeight);
+    bView->is_visible = 1;
 }
 
 void ViewTree_Initialize(){

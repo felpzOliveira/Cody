@@ -146,6 +146,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer){
     view->scroll.currX = 0;
     VScroll_Init(&view->sController);
     view->scroll.horizontal = Transform();
+    view->is_visible = 1;
 }
 
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer){
@@ -500,6 +501,14 @@ void BufferView_Dirty(BufferView *view){
             view->lineBuffer->is_dirty = 1;
         }
     }
+}
+
+int BufferView_IsVisible(BufferView *view){
+    if(view){
+        return view->is_visible;
+    }
+
+    return 0;
 }
 
 uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){

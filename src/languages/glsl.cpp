@@ -1,5 +1,12 @@
 #include <languages.h>
 
+TokenizerSupport glslSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+};
+
 /* glsl that can happen inside a code and are not preprocessor */
 std::vector<std::vector<GToken>> glslReservedTable = {
     {

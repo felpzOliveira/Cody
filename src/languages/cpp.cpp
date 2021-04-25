@@ -1,5 +1,12 @@
 #include <languages.h>
 
+TokenizerSupport cppSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+};
+
 /* C/C++ tokens that can happen inside a code and are not preprocessor */
 std::vector<std::vector<GToken>> cppReservedTable = {
     {

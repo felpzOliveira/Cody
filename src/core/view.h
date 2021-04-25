@@ -75,9 +75,9 @@ void View_SetActive(View *view, int isActive);
 * Triggers a view to be in a selectable list mode.
 */
 void View_SelectableListSet(View *view, LineBuffer *sourceBuffer,
-char *title, uint titlelen, OnQueryBarEntry entry,
-OnQueryBarCancel cancel, OnQueryBarCommit commit,
-QueryBarInputFilter *filter);
+                            char *title, uint titlelen, OnQueryBarEntry entry,
+                            OnQueryBarCancel cancel, OnQueryBarCommit commit,
+                            QueryBarInputFilter *filter);
 
 /*
 * Gets the view range of a views selectable list.

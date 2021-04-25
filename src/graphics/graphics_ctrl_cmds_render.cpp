@@ -14,7 +14,7 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
     int id = -1;
     OpenGLFont *font = &state->font;
     uint currFontSize = font->fontMath.fontSizeAtDisplay;
-    uint fontSize = currFontSize + 84; // TODO: Can we compute this size?
+    uint fontSize = currFontSize + 104; // TODO: Can we compute this size?
     int pGlyph = -1;
     Geometry *geometry = &view->geometry;
     vec4i color(255, 0, 0, 255);

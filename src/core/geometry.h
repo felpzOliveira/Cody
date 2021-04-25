@@ -974,6 +974,13 @@ inline int Geometry_IsPointInside(Geometry *geometry, vec2ui p){
             (p.y <= geometry->upper.y && p.y >= geometry->lower.y)) ? 1 : 0;
 }
 
+/*
+* Checks if a point 'p' is inside the box given by bottom 'b' and top 't'.
+*/
+inline int IsInsideBox(vec2ui p, vec2ui b, vec2ui t){
+    return ((p.x <= t.x && p.x >= b.x) && (p.y <= t.y && p.y >= b.y)) ? 1 : 0;
+}
+
 typedef struct{
     vec2ui textPosition;
     vec2ui ghostPosition;

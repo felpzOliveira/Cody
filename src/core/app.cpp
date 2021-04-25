@@ -72,6 +72,11 @@ void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     appContext.currentLineHeight = lineHeight;
 }
 
+Geometry AppGetScreenGeometry(Float *lineHeight){
+    *lineHeight = appContext.currentLineHeight;
+    return appContext.currentGeometry;
+}
+
 void AppEarlyInitialize(){
     View *view = nullptr;
 
@@ -460,16 +465,23 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
     Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     Buffer *buffer = BufferView_GetBufferAt(bufferView, at.x);
-    Buffer *bufferp1 = BufferView_GetBufferAt(bufferView, at.x+1);
+    Buffer *bufferp1 = nullptr;
     uint len = 0;
 
     Buffer_EraseSymbols(buffer, symTable);
-    if(bufferp1){
-        TokenizerStateContext *ctx = &bufferp1->stateContext;
-        len = appGlobalConfig.tabSpacing * ctx->indentLevel;
-    }else{
-        uint s = AppComputeLineLastIndentLevel(buffer);
-        len = appGlobalConfig.tabSpacing * s;
+
+    uint s = AppComputeLineIndentLevel(buffer, at.y);
+    uint tid = Buffer_GetTokenAt(buffer, at.y);
+    len = appGlobalConfig.tabSpacing * s;
+
+    // consider the case where the next token is a brace close and the user want to
+    // ignore the last indent level
+    if(tid < buffer->tokenCount){
+        if(buffer->tokens[tid].identifier == TOKEN_ID_BRACE_CLOSE){
+            if((int)len >= appGlobalConfig.tabSpacing){
+                len -= appGlobalConfig.tabSpacing;
+            }
+        }
     }
 
     int toNextLine = Max((int)buffer->count - (int)at.y, 0);
@@ -602,6 +614,10 @@ void AppCommandKillBuffer(){
 }
 
 void AppCommandKillView(){
+    // we need to make sure the interface is not expanded otherwise
+    // UI will get weird.
+    ControlCommands_RestoreExpand();
+
     AppCommandKillBuffer();
      // TODO: Check if it is safe to erase the view in the vnode here
     ViewNode *vnode = ViewTree_DestroyCurrent(1);
@@ -845,8 +861,12 @@ void AppCommandSwapView(){
     }
 
     if(vnode){
-        ViewTree_SetActive(vnode);
-        AppSetActiveView(vnode->view);
+        if(vnode->view){
+            if(BufferView_IsVisible(&vnode->view->bufferView)){
+                ViewTree_SetActive(vnode);
+                AppSetActiveView(vnode->view);
+            }
+        }
     }
 }
 
@@ -972,23 +992,34 @@ void AppCommandPaste(){
     NullRet(view->lineBuffer);
     
     if(size > 0 && p){
+        CopySection section;
         Buffer *buffer = nullptr;
         uint off = 0;
         vec2ui cursor = BufferView_GetCursorPosition(view);
         uint startBuffer = cursor.x;
+
         buffer = BufferView_GetBufferAt(view, cursor.x);
         
         Buffer_EraseSymbols(buffer, symTable);
         
         uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
                                             cursor.x, cursor.y, tokenizer, &off);
-        
+
+        section = {
+            .start = cursor,
+            .end = vec2ui(cursor.x + n, off),
+            .currTime = 0,
+            .interval = kTransitionCopyFadeIn,
+            .active = 1,
+        };
+
         uint endx = cursor.x + n;
         uint endy = off;
         
         UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
                                     cursor, vec2ui(endx, endy));
         LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1));
+        LineBuffer_SetCopySection(view->lineBuffer, section);
         
         RemountTokensBasedOn(view, startBuffer, n);
         
@@ -1004,6 +1035,21 @@ void AppCommandPaste(){
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
         view->lineBuffer->is_dirty = 1;
     }
+}
+
+uint AppComputeLineIndentLevel(Buffer *buffer, uint p){
+    TokenizerStateContext *ctx = &buffer->stateContext;
+    uint tid = Min(Buffer_GetTokenAt(buffer, p), buffer->tokenCount);
+    uint l = ctx->indentLevel;
+    for(uint i = 0; i < tid; i++){
+        Token *token = &buffer->tokens[i];
+        if(token->identifier == TOKEN_ID_BRACE_CLOSE){
+            l = l > 0 ? l - 1 : 0;
+        }else if(token->identifier == TOKEN_ID_BRACE_OPEN){
+            l++;
+        }
+    }
+    return l;
 }
 
 uint AppComputeLineLastIndentLevel(Buffer *buffer){
@@ -1117,9 +1163,10 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         if(llen > 0)
             Memcpy(&lineHelper[len], &buffer->data[targetP], llen * sizeof(char));
         
-        //TODO: Maybe we can batch all lines as a CHANGE_BLOCK_INSERT for simpler undo.
+        //TODO: Maybe we can batch all lines as a CHANGE_BLOCK_INSERT for simpler undo,
+        // this undo is currently broken and I'm not sure why.
         // Save undo - redo stuff as simple inserts
-        UndoRedoUndoPushInsert(&view->lineBuffer->undoRedo, buffer, vec2ui(i, 0));
+        //UndoRedoUndoPushInsert(&view->lineBuffer->undoRedo, buffer, vec2ui(i, 0));
         
         // Re-insert the line in raw mode to avoid processing
         Buffer_RemoveRange(buffer, 0, buffer->count);

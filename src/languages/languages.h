@@ -11,12 +11,26 @@ typedef struct{
     TokenId identifier;
 }GToken; // TODO: At least TRY to parse from this and see if it is ok
 
+typedef struct{
+    bool comments;
+    bool strings;
+    bool numbers;
+    bool lookups;
+}TokenizerSupport;
+
 // C/C++
 extern std::vector<std::vector<GToken>> cppReservedPreprocessor;
 extern std::vector<std::vector<GToken>> cppReservedTable;
+extern TokenizerSupport cppSupport;
 
 // GLSL
 extern std::vector<std::vector<GToken>> glslReservedPreprocessor;
 extern std::vector<std::vector<GToken>> glslReservedTable;
+extern TokenizerSupport glslSupport;
+
+// Empty
+extern std::vector<std::vector<GToken>> noneReservedPreprocessor;
+extern std::vector<std::vector<GToken>> noneReservedTable;
+extern TokenizerSupport noneSupport;
 
 #endif //LANGUAGES_H
