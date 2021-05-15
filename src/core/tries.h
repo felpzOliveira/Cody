@@ -15,13 +15,26 @@ typedef struct Trie{
     std::unordered_map<int, Trie *> children;
 }Trie;
 
+/*
+* Inserts a word given in 'value' into the given trie 'root'.
+*/
 int Trie_Insert(Trie *root, char *value, uint valuelen);
 
+/*
+* Transverse a given trie root node calling 'fn' on each word.
+*/
 void Trie_Transverse(Trie *root, std::function<void(char *, uint, Trie *)> fn);
 
+/*
+* Perform a search based on the infix given in 'value' applying 'fn' on every
+* word that matches.
+*/
 void Trie_Search(Trie *root, char *value, uint valuelen,
                  std::function<void(char *, uint, Trie *)> fn);
 
+/*
+* Removes a word given in 'value' from a given trie.
+*/
 int Trie_Remove(Trie *root, char *value, uint valuelen);
 
 #endif // TRIES_H

@@ -30,10 +30,10 @@ const Float kTransitionScrollInterval = 0.15;
 const Float kTransitionJumpInterval = 0.1;
 const Float kViewSelectableListScaling = 2.0;
 const Float kAutoCompleteListScaling = 1.2;
-const Float kAutoCompleteMaxHeightFraction = 0.3;
+const Float kAutoCompleteMaxHeightFraction = 0.35;
 const Float kViewSelectableListOffset = 0.05;
 const Float kTransitionControlIndices = 1.5;
-const Float kTransitionCopyFadeIn = 0.35;
+const Float kTransitionCopyFadeIn = 0.28;
 const Float kOnes[] = {1,1,1,1};
 
 typedef enum{

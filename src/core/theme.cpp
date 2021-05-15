@@ -1,68 +1,6 @@
 #include <theme.h>
 #include <utilities.h>
 
-Theme themeEclispe = {
-    .backgroundColor = ColorFromHex(0xffffffff),
-    .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3), // ?
-    .hoverableItemBackgroundColor = ColorFromHex(0xff611449), // ?
-    .selectorBackground = ColorFromHex(0xfff0f0f0),
-
-    .searchBackgroundColor = ColorFromHex(0xff87ffaf), // ?
-    .selectableListBackground = ColorFromHex(0xfff0f0f0),
-    .searchWordColor = ColorFromHex(0xff380c2a), // ?
-    .backgroundLineNumbers = ColorFromHex(0xfffafafa),
-    .lineNumberColor = ColorFromHex(0xff008ba7),
-    .lineNumberHighlitedColor = ColorFromHex(0xff003c48),
-    .cursorLineHighlight = ColorFromHex(0xfff2f2f2),
-
-    .operatorColor   = ColorFromHex(0xff9f1b97),
-    .datatypeColor   = ColorFromHex(0xffd94856),
-    .commentColor    = ColorFromHex(0xff9da0a4),
-    .stringColor     = ColorFromHex(0xff469b51),
-    .numberColor     = ColorFromHex(0xff055ec4),
-    .reservedColor   = ColorFromHex(0xffad7fa8),
-    .functionColor   = ColorFromHex(0xff715a99),
-    .includeColor    = ColorFromHex(0xff227fed),
-
-    .mathColor       = ColorFromHex(0xffd63b49),
-
-    .tokensColor     = ColorFromHex(0xff363a3f),
-    .tokensOverCursorColor = ColorFromHex(0xffffffff),
-
-    .preprocessorColor = ColorFromHex(0xff792951),
-    .preprocessorDefineColor = ColorFromHex(0xff3a3d44),
-
-    .borderColor = ColorFromHex(0xFFFF7F50),
-    .braces = ColorFromHex(0xCC960d01),
-    .cursorColor = ColorFromHex(0xff848484),
-    .querybarCursorColor = ColorFromHex(0xff2664fd),
-    .ghostCursorColor = ColorFromHex(0xff327ff9),
-    .parenthesis = {
-        ColorFromHex(0xFFFF0000),
-        ColorFromHex(0xFF00FF00),
-        ColorFromHex(0xFF0000FF),
-        ColorFromHex(0xFFAAAA00),
-    },
-    .backTextColors = {
-        ColorFromHex(0xfff3f3fd),
-    },
-
-    .userDatatypeColor = ColorFromHex(0xff9f1b97),
-    .userDatatypeEnum = ColorFromHex(0xff3a3d44),
-    .scopeLineColor = ColorFromHex(0x66666666),
-    .scrollbarColor = ColorFromHex(0xfff0f0f0),
-    .querybarTypeLineColor = ColorFromHex(0xff3a3d44),
-    .selectorLoadedColor = ColorFromHex(0xFF2c2e34),
-    .userDefineColor = ColorFromHex(0xff3a3d44),
-    .backTextCount = 1,
-    .lineBorderWidth = 0,
-    .alphaDimm = 1,
-    .dynamicCursor = false,
-    .borderWidth = 3,
-    .pasteColor = ColorFromHex(0xffffddee),
-};
-
-
 Theme themeTerminal = {
     .backgroundColor = ColorFromHex(0xff2C001e),
     .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3),
@@ -158,7 +96,7 @@ Theme themeGruvboxLight = {
     .borderColor = ColorFromHex(0xFFFF7F50),
     .braces = ColorFromHex(0xCC960d01),
     .cursorColor = ColorFromHex(0xFF928375),
-    .querybarCursorColor = ColorFromHex(0xFFFF4040),
+    .querybarCursorColor = ColorFromHex(0xFF928375),
     .ghostCursorColor = ColorFromHex(0xFF5B4D3C),
     .parenthesis = {
         ColorFromHex(0xFFFF0000),
@@ -181,7 +119,7 @@ Theme themeGruvboxLight = {
     .lineBorderWidth = 0,
     .alphaDimm = 1,
     .dynamicCursor = false,
-    .borderWidth = 5,
+    .borderWidth = 6,
     .pasteColor = ColorFromHex(0xffffddee),
 };
 
@@ -364,7 +302,7 @@ Theme theme4Coder = {
     .searchWordColor = ColorFromHex(0xCCb9af2a),
     .backgroundLineNumbers = ColorFromHex(0xFF171717),
     .lineNumberColor = ColorFromHex(0xFF4C4D4E),
-    .lineNumberHighlitedColor = ColorFromHex(0xFFF9F901),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF7a7c7d),
     .cursorLineHighlight = ColorFromHex(0xFF232330),
     .operatorColor   = ColorFromHex(0xCCffc110),
     
@@ -401,7 +339,7 @@ Theme theme4Coder = {
     },
     
     //.userDatatypeColor = ColorFromHex(0xCC8EE7BF),
-    .userDatatypeColor = ColorFromHex(0xCCffdf10), //223, 16
+    .userDatatypeColor = ColorFromHex(0xCCffc110),//0xCCffdf10), //223, 16
     .userDatatypeEnum = ColorFromHex(0xCCffffe1),
     //.userDatatypeColor = ColorFromHex(0xCC00CCCC),
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
@@ -417,12 +355,70 @@ Theme theme4Coder = {
     .pasteColor = ColorFromHex(0xffffddee),
 };
 
+Theme themeNoah = {
+    .backgroundColor = ColorFromHex(0xff21222f),
+    .hoverableItemForegroundColor = ColorFromHex(0xCCfffc7f),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFF232330),
+    .selectorBackground = ColorFromHex(0xff21222f),
+    .searchBackgroundColor = ColorFromHex(0xff87ffaf),
+    .selectableListBackground = ColorFromHex(0xff21222f),
+    .searchWordColor = ColorFromHex(0xff380c2a),
+    .backgroundLineNumbers = ColorFromHex(0xff21222f),
+    .lineNumberColor = ColorFromHex(0xff3e455f),
+    .lineNumberHighlitedColor = ColorFromHex(0xff565f83),
+    .cursorLineHighlight = ColorFromHex(0xff252838),
+
+    .operatorColor   = ColorFromHex(0xffffcf7a),
+    .datatypeColor   = ColorFromHex(0xff00cdd0),
+    .commentColor    = ColorFromHex(0xff565f83),
+    .stringColor     = ColorFromHex(0xffc2ed94),
+    .numberColor     = ColorFromHex(0xffffcf7a),
+    .reservedColor   = ColorFromHex(0xff00cdd0),
+    .functionColor   = ColorFromHex(0xff00f5c7),
+    .includeColor    = ColorFromHex(0xffffcf7a),
+    .mathColor       = ColorFromHex(0xff00cdd0),
+    .tokensColor     = ColorFromHex(0xffb3d2db),
+    .tokensOverCursorColor = ColorFromHex(0xff21222f),
+    .preprocessorColor = ColorFromHex(0xCCfff0ba),
+    .preprocessorDefineColor = ColorFromHex(0xffffcf7a),
+
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    .braces = ColorFromHex(0xFF00FFFF),
+    .cursorColor = ColorFromHex(0xff00f5c7),
+    .querybarCursorColor = ColorFromHex(0xff00f5c7),
+    .ghostCursorColor = ColorFromHex(0xff00f5c7),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0xff21222f),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xff00cdd0),
+    .userDatatypeEnum = ColorFromHex(0xCCffffe1),
+    .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff303144),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
+    .userDefineColor = ColorFromHex(0xffffcf7a),
+    .backTextCount = 1,
+    .lineBorderWidth = 0,
+    .alphaDimm = 1,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+};
+
 //Theme *defaultTheme = &themeRadical;
 //Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
-Theme *defaultTheme = &themeTerminal;
+//Theme *defaultTheme = &themeTerminal;
 //Theme *defaultTheme = &themeGruvboxLight;
+Theme *defaultTheme = &themeNoah;
 
 std::vector<ThemeDescription> themesDesc = {
     { .name = "Radical", .theme = &themeRadical, },
@@ -431,7 +427,7 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "Gruvbox Light", .theme = &themeGruvboxLight, },
     { .name = "Yavid", .theme = &themeYavid, },
     { .name = "Terminal", .theme = &themeTerminal, },
-    { .name = "Eclipse", .theme = &themeEclispe, },
+    { .name = "Noah", .theme = &themeNoah, },
 };
 
 static int globalActive = 0;
@@ -609,7 +605,7 @@ int GetSelectorBorderWidth(Theme *theme){
 }
 
 int ThemeNeedsEffect(Theme *theme){
-    if(theme == &theme4Coder || theme == &themeEclispe){
+    if(theme == &theme4Coder){
         return 1;
     }
 

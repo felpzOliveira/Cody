@@ -11,9 +11,11 @@
 #define MAX_BINDINGS_PER_ENTRY 256
 #define KEYSET_EVENT(name) void name()
 #define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size)
+#define KEY_ENTRY_RAW_EVENT(name) void name(int rawKeyCode)
 
 typedef KEYSET_EVENT(KeySetEventCallback);
 typedef KEY_ENTRY_EVENT(KeyEntryCallback);
+typedef KEY_ENTRY_RAW_EVENT(KeyRawEntryCallback);
 
 #define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, callback, __VA_ARGS__, -1)
 
@@ -101,22 +103,63 @@ typedef struct{
     Binding *bindings;
     int *bindingCount;
     KeyEntryCallback *entryCallback;
+    KeyRawEntryCallback *entryRawCallback;
 }BindingMap;
 
+/*
+* Initializes the keyboard API.
+*/
 void KeyboardInitMappings();
+
+/*
+* Get readable name for keys.
+*/
 const char *KeyboardGetKeyName(Key key);
 const char *KeyboardGetStateName(int state);
 
+/*
+* Creates a new keyboard mapping to handle key events.
+*/
 BindingMap *KeyboardCreateMapping();
+
+/*
+* Sets the active mapping to handle key events.
+*/
 void KeyboardSetActiveMapping(BindingMap *mapping);
+
+/*
+* Queries the keyboard API for the current active mapping.
+*/
 BindingMap *KeyboardGetActiveMapping();
 
+/*
+* Register default callback for key entry values for unbinded UTF-8 strings.
+*/
 void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback);
+
+/*
+* Register a raw key event callback. This function (when binded) is called
+* whenever a key event happens and it was not consumed by the current binding,
+* note however that this passes raw events and does not process keys.
+*/
+void RegisterKeyboardRawEntry(BindingMap *mapping, KeyRawEntryCallback *callback);
+
+/*
+* Register a key combination to a specific callback. Do not call directly, use
+* the macro 'RegisterRepeatableEvent' or 'RegisterEvent' for easier setup.
+*/
 void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
                              KeySetEventCallback *callback, ...);
 
+/*
+* Reports a key event. This should be called by the underlying OS keyboard system.
+*/
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
                    int rawKeyCode);
+
+/*
+* Forces the keyboard API table to restore all key states, no callbacks are triggered.
+*/
 void KeyboardResetState();
 
 #endif //KEYBOARD_H

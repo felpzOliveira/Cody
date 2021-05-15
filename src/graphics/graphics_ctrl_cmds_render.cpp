@@ -14,7 +14,7 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
     int id = -1;
     OpenGLFont *font = &state->font;
     uint currFontSize = font->fontMath.fontSizeAtDisplay;
-    uint fontSize = currFontSize + 104; // TODO: Can we compute this size?
+    uint fontSize = currFontSize + 140; // TODO: Can we compute this size?
     int pGlyph = -1;
     Geometry *geometry = &view->geometry;
     vec4i color(255, 0, 0, 255);
@@ -47,7 +47,9 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
 
     // Render the number at center
     ActivateViewportAndProjection(state, view, ViewportAllView);
-    Graphics_SetFontSize(state, fontSize);
+    Graphics_FlushText(state);
+
+    Graphics_SetFontSize(state, fontSize, fontSize + FONT_UPSCALE_DEFAULT_OFFSET);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 
     Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
@@ -58,7 +60,8 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
 
     Graphics_PushText(state, x, y, (char *)line, len, color, &pGlyph);
     Graphics_FlushText(state);
-    Graphics_SetFontSize(state, currFontSize);
+    Graphics_SetFontSize(state, currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
+    Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 
     // TODO: Can we do this somewhere else?
     if(animating == 0){
@@ -68,7 +71,7 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
         animating = 1;
 
         // TODO: This should be on a timer callback, however we don't support
-        // that yet and theres the hole treading issue
+        // that yet and theres the hole threading issue
         ControlCommands_YieldKeyboard();
     }
     return animating;

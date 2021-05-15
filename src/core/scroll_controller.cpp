@@ -73,7 +73,7 @@ void VScroll_AdjustGhostIfNeeded(VScroll *ss, LineBuffer *lineBuffer){
     Buffer *b = LineBuffer_GetBufferAt(lineBuffer, ss->cursor.ghostPosition.x);
     if(b == nullptr){ // in case there was a delete this will be nullptr
         VScroll_GhostCursorFollow(ss);
-    }else if(!(ss->cursor.ghostPosition.y < b->count)){
+    }else if(!(ss->cursor.ghostPosition.y <= b->count)){
         VScroll_GhostCursorFollow(ss);
     }
 }

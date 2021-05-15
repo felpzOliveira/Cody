@@ -188,7 +188,7 @@ int Graphics_RenderAutoComplete(View *view, OpenGLState *state, Theme *theme, Fl
     LineBuffer *lineBuffer = SelectableList_GetLineBuffer(list);
     vec2ui cursor = BufferView_GetCursorPosition(bView);
 
-    yoff = font->fontMath.fontSizeAtDisplay * lineBuffer->lineCount * kAutoCompleteListScaling;
+    yoff = font->fontMath.fontSizeAtDisplay * (lineBuffer->lineCount + 0.5) * kAutoCompleteListScaling;
     for(uint i = 0; i < lineBuffer->lineCount; i++){
         Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
         if(maxn < buffer->taken){

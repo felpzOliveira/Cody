@@ -63,6 +63,11 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps
 Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer);
 
 /*
+* Queries the file provider for the active symbol table.
+*/
+SymbolTable *FileProvider_GetSymbolTable();
+
+/*
 * Queries the file provider if a file is already opened.
 */
 int FileProvider_IsFileOpened(char *path, uint len);

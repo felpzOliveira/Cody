@@ -363,8 +363,8 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
 }
 
 int Buffer_IsBlank(Buffer *buffer){
-    if(buffer->count == 0) return 1;
-    for(uint i = 0; i < buffer->count; i++){
+    if(buffer->taken == 0) return 1;
+    for(uint i = 0; i < buffer->taken; i++){
         char p = buffer->data[i];
         if(p != ' ' && p != '\r' && p != '\t' && p != '\n') return 0;
     }
@@ -418,9 +418,10 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
                               uint len, int decode_tab)
 {
     uint ic = 0;
+    uint osize = len;
     if(len > 0){
         if(decode_tab){
-            for(uint i = 0; i < len; i++){
+            for(uint i = 0; i < osize; i++){
                 if(str[i] == '\t') len += appGlobalConfig.tabSpacing-1;
             }
         }
@@ -445,7 +446,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
             }
         }
         
-        for(uint i = 0; i < len; i++){
+        for(uint i = 0; i < osize; i++){
             char v = str[i];
             if(decode_tab && v == '\t'){
                 for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
@@ -461,10 +462,11 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         buffer->taken += len;
         buffer->count = Buffer_GetUtf8Count(buffer);
         buffer->data[buffer->taken] = 0;
+
         if(buffer->size > buffer->taken){
             // ??? buffer->data[buffer->taken] = 0;
         }
-        
+
     }else if(buffer->size == 0 || buffer->data == nullptr){
         Buffer_Init(buffer, DefaultAllocatorSize);
     }
@@ -1253,7 +1255,6 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
                     AssertA(*ptr == '\t', "Incorrect line tab configuration");
                 }
             }
-            
             AssertA(*ptr != '\n', "Invalid line configuration {break point}");
             ptr++; c++;
         }

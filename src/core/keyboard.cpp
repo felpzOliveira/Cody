@@ -101,8 +101,16 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
     if(activeMapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE
        && consumed == 0)
     {
-        if(activeMapping->entryCallback)
+        if(activeMapping->entryCallback){
             activeMapping->entryCallback(utf8Data, utf8Size);
+            consumed = 1;
+        }
+    }
+
+    if(activeMapping && consumed == 0){
+        if(activeMapping->entryRawCallback){
+            activeMapping->entryRawCallback(rawKeyCode);
+        }
     }
 }
 
@@ -155,6 +163,10 @@ void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callbac
     mapping->entryCallback = callback;
 }
 
+void RegisterKeyboardRawEntry(BindingMap *mapping, KeyRawEntryCallback *callback){
+    mapping->entryRawCallback = callback;
+}
+
 BindingMap *KeyboardCreateMapping(){
     int keyCodes = GetMappedKeysCountX11();
     BindingMap *mapping = (BindingMap *)AllocatorGet(sizeof(BindingMap));
@@ -163,6 +175,7 @@ BindingMap *KeyboardCreateMapping(){
     mapping->bindings = (Binding *)AllocatorGet(sizeof(Binding) * allocationSize);
     mapping->bindingCount = (int *)AllocatorGet(sizeof(int) * keyCodes);
     mapping->entryCallback = nullptr;
+    mapping->entryRawCallback = nullptr;
     
     for(int i = 0; i < allocationSize; i++){
         Binding *binding = &mapping->bindings[i];

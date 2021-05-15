@@ -17,6 +17,12 @@
 #define MAX_TEXTURES_COUNT 256
 #define MAX_TEXTURES_PER_BATCH 16
 
+// Our OpenGL rendering renders everything in very high resolution and
+// than reduce scaling to get simple AA. This could potentially be slow
+// but it is working fine for me.
+#define FONT_UPSCALE_DEFAULT_SIZE 65
+#define FONT_UPSCALE_DEFAULT_OFFSET 47
+
 #if defined(DEBUG_BUILD)
 #define OpenGLCHK(fn) do{\
     OpenGLClearErrors();\
@@ -192,7 +198,8 @@ void Graphics_ImageFlush(OpenGLState *state, int reset=1);
 * Sets the font size being used.
 * Warning: Be carefull with viewports and projections.
 */
-void Graphics_SetFontSize(OpenGLState *state, Float fontSize);
+void Graphics_SetFontSize(OpenGLState *state, Float fontSize,
+                          Float reference=FONT_UPSCALE_DEFAULT_SIZE);
 
 /*
 * Queries the opengl state for the last known cursor position.

@@ -80,6 +80,16 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size){
 
 }
 
+void ControlCmdsClear(){
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        View_SetControlOpts(iterator.value->view, Control_Opts_None);
+        ViewTree_Next(&iterator);
+    }
+    ControlCommands_YieldKeyboard();
+}
+
 void ControlCmdsExpandCurrent(){
     if(controlCmds.is_expanded){
         ViewTree_ExpandRestore();
@@ -88,6 +98,12 @@ void ControlCmdsExpandCurrent(){
     }
     ControlCommands_YieldKeyboard();
     controlCmds.is_expanded = 1 - controlCmds.is_expanded;
+}
+
+void ControlCmdsSpaceView(){
+
+    ControlCommands_YieldKeyboard();
+    Timing_Update();
 }
 
 void ControlCmdsRenderIndices(){
@@ -119,9 +135,15 @@ void ControlCommands_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
 
     RegisterKeyboardDefaultEntry(mapping, ControlCmdsDefaultEntry);
+
     RegisterRepeatableEvent(mapping, ControlCommands_YieldKeyboard, Key_Escape);
     RegisterRepeatableEvent(mapping, ControlCmdsRenderIndices, Key_Q);
     RegisterRepeatableEvent(mapping, ControlCmdsExpandCurrent, Key_Z);
+    RegisterRepeatableEvent(mapping, ControlCmdsSpaceView, Key_Space);
+    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Left);
+    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Right);
+    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Down);
+    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Up);
 
     controlCmds.mapping = mapping;
     controlCmds.lastMapping = nullptr;

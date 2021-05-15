@@ -158,11 +158,11 @@ Float GLToScreen(Float x, OpenGLState *state){
     return p.x;
 }
 
-void Graphics_SetFontSize(OpenGLState *state, Float fontSize){
+void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
     OpenGLFont *font = &state->font;
     FontMath *fMath = &font->fontMath;
-    fMath->fontSizeAtRenderCall = 65; // NOTE: 65 
-    fMath->fontSizeAtDisplay = fontSize; // TODO: user
+    fMath->fontSizeAtRenderCall = reference;
+    fMath->fontSizeAtDisplay = fontSize;
     
     fMath->reduceScale = fMath->fontSizeAtDisplay / fMath->fontSizeAtRenderCall;
     fMath->invReduceScale = 1.0 / fMath->reduceScale;

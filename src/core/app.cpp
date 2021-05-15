@@ -42,7 +42,6 @@ AppConfig appGlobalConfig;
 
 void AppInitializeFreeTypingBindings();
 void AppInitializeQueryBarBindings();
-BufferView *AppGetActiveBufferView();
 void AppCommandAutoComplete();
 
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
@@ -1320,6 +1319,35 @@ vec2ui AppActivateViewAt(int x, int y){
     return r;
 }
 
+void AppCommandInsertSymbol(){
+    vec2ui start, end;
+    BufferView *bView = AppGetActiveBufferView();
+    NullRet(bView->lineBuffer);
+    if(BufferView_GetCursorSelectionRange(bView, &start, &end)){
+        if(start.x == end.x){
+            Buffer *buffer = BufferView_GetBufferAt(bView, start.x);
+            NullRet(buffer);
+
+            // only do this if the token is either one or a subrange of one token
+            uint tid1 = Buffer_GetTokenAt(buffer, start.y);
+            uint tid2 = Buffer_GetTokenAt(buffer, end.y > 0 ? end.y - 1 : 0);
+
+            if(tid1 == tid2 && tid1 < buffer->tokenCount){
+                // grab content
+                uint p0 = Buffer_Utf8PositionToRawPosition(buffer, start.y);
+                uint p1 = Buffer_Utf8PositionToRawPosition(buffer, end.y);
+
+                if(p1 > p0){
+                    char *ptr = &buffer->data[buffer->tokens[tid1].position];
+                    SymbolTable *symTable = FileProvider_GetSymbolTable();
+                    SymbolTable_Insert(symTable, ptr, p1 - p0,
+                                       TOKEN_ID_DATATYPE_USER_DATATYPE);
+                }
+            }
+        }
+    }
+}
+
 void AppCommandQueryBarLeftArrow(){
     View *view = AppGetActiveView();
     QueryBar *bar = View_GetQueryBar(view);
@@ -1543,6 +1571,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
+    RegisterRepeatableEvent(mapping, AppCommandInsertSymbol, Key_LeftControl, Key_I);
 
 
     // Let the control commands bind its things

@@ -81,6 +81,9 @@ void BufferView_Synchronize(BufferView *view){
 
         // 2- Update the scroll controller so that viewing range also gets updated
         VScroll_CursorToPosition(ss, cursor.x, cursor.y, view->lineBuffer);
+
+        // adjust ghost cursor if needed
+        VScroll_AdjustGhostIfNeeded(ss, view->lineBuffer);
     }else{ // our buffer got killed
         BufferView_SwapBuffer(view, nullptr);
     }

@@ -218,6 +218,10 @@ void RegisterFileCreateHook(file_hook hook){
     }
 }
 
+SymbolTable *FileProvider_GetSymbolTable(){
+    return &fProvider.symbolTable;
+}
+
 Tokenizer *FileProvider_GetCppTokenizer(){
     return &fProvider.cppTokenizer;
 }
