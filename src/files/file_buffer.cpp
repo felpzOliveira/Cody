@@ -18,7 +18,7 @@ static int FileBufferList_FindEntry(FileBufferList *list, FileBuffer **fBuffer,
                     len = len - k;
                     ptr = &buf->lineBuffer->filePath[k];
                 }
-                
+
                 if(len == keylen){
                     rv = StringEqual(ptr, key, len);
                 }

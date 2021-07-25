@@ -264,15 +264,26 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size){
     Float pct = ((Float) pos.x) / ((Float) lineCount);
     uint st = GetSimplifiedPathName(view->lineBuffer->filePath,
                                     view->lineBuffer->filePathSize);
-    
+
+    int p = 0;
     if(view->lineBuffer->is_dirty == 0){
-        snprintf(content, size, " %s - Row: %u Col: %u", &view->lineBuffer->filePath[st],
-                 pos.x+1, pos.y+1);
+        p = snprintf(content, size, " %s - Row: %u Col: %u", &view->lineBuffer->filePath[st],
+                     pos.x+1, pos.y+1);
     }else{
-        snprintf(content, size, " %s - Row: %u Col: %u *", &view->lineBuffer->filePath[st],
-                 pos.x+1, pos.y+1);
+        p = snprintf(content, size, " %s - Row: %u Col: %u *", &view->lineBuffer->filePath[st],
+                     pos.x+1, pos.y+1);
     }
-    
+
+    std::string path = std::string(view->lineBuffer->filePath);
+    if(!AppIsPathFromRoot(path)){
+        path = AppGetRootDirectory() + std::string("/") + path;
+    }
+
+    if(AppIsStoredFile(path)){
+        char dagger[3] = {(char)0xE2, (char)0x80, (char)0xA0};
+        snprintf(&content[p], size-p, " %s", dagger);
+    }
+
     return pct;
 }
 

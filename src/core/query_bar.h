@@ -89,6 +89,7 @@ void QueryBar_MoveRight(QueryBar *queryBar);
 /*
 * Returns a accessor to the data written into a QueryBar after title
 * passed during activation. Length 'len' is returned in bytes.
+* NOTE: DO NOT free the pointer returned as it points to internal data.
 */
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len);
 
@@ -142,7 +143,8 @@ void QueryBar_GetSearchResult(QueryBar *queryBar, QueryBarCmdSearch **result);
 * Sets the default callback for the interactive search to be called when user
 * confirms/denies a search value.
 */
-void QueryBar_SetInteractiveSearchCallback(QueryBar *queryBar, OnInteractiveSearch onConfirm);
+void QueryBar_SetInteractiveSearchCallback(QueryBar *queryBar,
+                                           OnInteractiveSearch onConfirm);
 
 /*
 * Gets the active command in a QueryBar, if any.

@@ -131,6 +131,23 @@ uint GetSimplifiedPathName(char *fullPath, uint len){
     return 0;
 }
 
+int StringFirstNonEmpty(char *s0, uint s0len){
+    for(uint i = 0; i < s0len; i++){
+        // TODO: other empty chars?
+        if(s0[i] != ' ') return (int)i;
+    }
+    return -1;
+}
+
+int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len){
+    if(s1len > s0len) return 0;
+    for(uint i = 0; i < s1len; i++){
+        if(s0[i] != s1[i]) return 0;
+    }
+
+    return 1;
+}
+
 uint StringComputeU8Count(char *s0, uint len){
     uint r = 0;
     if(len > 0){

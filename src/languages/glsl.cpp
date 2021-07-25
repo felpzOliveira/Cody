@@ -125,6 +125,7 @@ std::vector<std::vector<GToken>> glslReservedTable = {
         { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__device__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__global__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__inline__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
         { .value = "gl_TexCoord", .identifier = TOKEN_ID_RESERVED },

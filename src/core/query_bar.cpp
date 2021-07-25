@@ -141,6 +141,8 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
         case QUERY_BAR_CMD_CUSTOM:{
             if(title && titleLen > 0){
                 len = snprintf(title, sizeof(title), "%s: ", name);
+            }else{
+                len = snprintf(title, sizeof(title), ": ");
             }
         } break;
         case QUERY_BAR_CMD_SEARCH_AND_REPLACE:{

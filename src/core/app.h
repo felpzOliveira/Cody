@@ -5,6 +5,7 @@
 #include <geometry.h>
 #include <view.h>
 #include <file_buffer.h>
+#include <vector>
 
 struct BufferView;
 struct Buffer;
@@ -17,6 +18,10 @@ typedef enum{
 typedef struct{
     int tabSpacing;
     int useTabs;
+    std::string rootFolder;
+    std::string configFile;
+    std::string configFolder;
+    std::vector<std::string> filesStored;
     CursorStyle cStyle;
 }AppConfig;
 
@@ -109,6 +114,25 @@ void AppDefaultRemoveOne();
 * Gets the current geometry configured being used.
 */
 Geometry AppGetScreenGeometry(Float *lineHeight);
+
+/*
+* Gets path related to the global configuration file.
+*/
+std::string AppGetConfigFilePath();
+std::string AppGetConfigDirectory();
+std::string AppGetRootDirectory();
+bool AppIsPathFromRoot(std::string path);
+
+/*
+* Adds a file path into the list of stored paths.
+*/
+void AppAddStoredFile(std::string basePath);
+
+/*
+* Checks if a path given in relation to the root directory is already
+* present in the stored files list.
+*/
+int AppIsStoredFile(std::string path);
 
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();

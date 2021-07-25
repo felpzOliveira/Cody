@@ -46,7 +46,7 @@ static void Hook_OnCreate(char *path, uint len, LineBuffer *lineBuffer, Tokenize
 }
 
 static void Hook_OnOpen(char *path, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer){
-    printf("[HOOK] Default file open hook: %s\n", path);
+    //printf("[HOOK] Default file open hook: %s\n", path);
 }
 
 void FileHooks_RegisterDefault(){

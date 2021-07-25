@@ -22,7 +22,7 @@ static FileProvider fProvider;
 
 void FileProvider_Initialize(){
     FileBufferList_Init(&fProvider.fileBuffer);
-    SymbolTable_Initialize(&fProvider.symbolTable);
+    SymbolTable_Initialize(&fProvider.symbolTable, true);
 
     //TODO: Initialize all tokenizers, add as support for new languages are added
     //      maybe we can see if we can initialize these as a file for them is requested?
@@ -157,8 +157,6 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     LineBufferProps props;
     char *content = nullptr;
 
-    AssertA(lineBuffer != nullptr, "Invalid lineBuffer pointer");
-
     content = GetFileContents(targetPath, &fileSize);
 
     lBuffer = AllocatorGetN(LineBuffer, 1);
@@ -191,8 +189,13 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
         }
     }
 
-    *lineBuffer = lBuffer;
-    *lTokenizer = tokenizer;
+    if(lineBuffer){
+        *lineBuffer = lBuffer;
+    }
+
+    if(lTokenizer){
+        *lTokenizer = tokenizer;
+    }
 }
 
 int FileProvider_IsLineBufferDirty(char *hint_name, uint len){

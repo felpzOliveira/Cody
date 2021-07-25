@@ -896,14 +896,14 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     
     Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
     
-    clock_t start = clock();
+    //clock_t start = clock();
     
     Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
                     0, &lineBufferTokenizer);
     
-    clock_t end = clock();
-    double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
-    DEBUG_MSG("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
+    //clock_t end = clock();
+    //double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
+    //DEBUG_MSG("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
     activeLineBuffer = nullptr;
     current = 0;
     totalSize = 0;

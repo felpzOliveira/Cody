@@ -1,7 +1,7 @@
 #include <languages.h>
 
 TokenizerSupport noneSupport = {
-    .comments = true,
+    .comments = false,
     .strings = true,
     .numbers = true,
     .lookups = true,

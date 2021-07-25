@@ -86,8 +86,8 @@ void UndoSystemGetMemory(){
         uSystem.bufferPool[i] = buffer;
     }
     count += uSystem.size;
-    DEBUG_MSG("Allocated %d more buffers, current: %ld\n",
-              MAX_DO_STACK_SIZE, count);
+    //DEBUG_MSG("Allocated %d more buffers, current: %ld\n",
+    //          MAX_DO_STACK_SIZE, count);
 }
 
 void UndoSystemTakeBuffer(Buffer *buffer){
@@ -95,7 +95,7 @@ void UndoSystemTakeBuffer(Buffer *buffer){
         uint h = uSystem.head-1;
         uSystem.bufferPool[h] = buffer;
         uSystem.head--;
-        DEBUG_MSG("Grabbed buffer, head: %u, size: %u\n", uSystem.head, uSystem.size);
+        //DEBUG_MSG("Grabbed buffer, head: %u, size: %u\n", uSystem.head, uSystem.size);
     }else{ // cannot hold this buffer, free it
         Buffer_Free(buffer);
         AllocatorFree(buffer);
@@ -114,6 +114,7 @@ Buffer *UndoSystemGetBuffer(){
 void _UndoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor, int is_undo){
     BufferChange bufferChange = {
         .bufferInfo = cursor,
+        .bufferInfoEnd = vec2ui(),
         .buffer = nullptr,
         .text = nullptr,
         .size = 0,
@@ -240,8 +241,8 @@ BufferChange *UndoRedoGetNextRedo(UndoRedo *redo){
 BufferChange *UndoRedoGetNextUndo(UndoRedo *redo){
     BufferChange *bChange = DoStack_Peek(redo->undoStack);
     if(bChange){
-        DEBUG_MSG("[UNDO] Undo for %s - Stack size: %u\n",
-                  UndoRedo_GetStringID(bChange->change), redo->undoStack->elements);
+        //DEBUG_MSG("[UNDO] Undo for %s - Stack size: %u\n",
+        //          UndoRedo_GetStringID(bChange->change), redo->undoStack->elements);
     }
     return bChange;
 }

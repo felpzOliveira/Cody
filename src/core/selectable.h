@@ -2,7 +2,7 @@
 #define SELECTABLE_H
 #include <buffers.h>
 
-#define SELECTABLE_LIST_INITIALIZER { .listBuffer = nullptr, .selectable = nullptr, .selectableSize = 0, .used = 0, }
+#define SELECTABLE_LIST_INITIALIZER { .listBuffer = nullptr, .viewRange = vec2ui(), .selectable = nullptr, .selectableSize = 0, .used = 0, .currentLineRange = 0, .currentDisplayRange = 0, .active = 0}
 
 struct SelectableList{
     LineBuffer *listBuffer;

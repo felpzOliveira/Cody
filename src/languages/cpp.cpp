@@ -1,5 +1,8 @@
 #include <languages.h>
 
+/* Because I like to program in CUDA, this contains keywords for that */
+
+
 TokenizerSupport cppSupport = {
     .comments = true,
     .strings = true,
@@ -44,6 +47,8 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "new", .identifier = TOKEN_ID_OPERATOR },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "FILE", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "dim3", .identifier = TOKEN_ID_DATATYPE },
         { .value = "this", .identifier = TOKEN_ID_OPERATOR },
         { .value = "char", .identifier = TOKEN_ID_DATATYPE },
         { .value = "long", .identifier = TOKEN_ID_DATATYPE },
@@ -88,6 +93,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "mutable", .identifier = TOKEN_ID_OPERATOR },
         { .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
         { .value = "alignas", .identifier = TOKEN_ID_OPERATOR },
@@ -100,6 +106,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "default", .identifier = TOKEN_ID_OPERATOR },
         { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },
         { .value = "private", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
         { .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
     {
         { .value = "decltype", .identifier = TOKEN_ID_OPERATOR },
@@ -119,8 +126,12 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "typename", .identifier = TOKEN_ID_OPERATOR },
         { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },
         { .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "blockDim", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "blockIdx", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "warpSize", .identifier = TOKEN_ID_RESERVED },
         { .value = "continue", .identifier = TOKEN_ID_OPERATOR }, },
     {
+		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
         { .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },
         { .value = "protected", .identifier = TOKEN_ID_OPERATOR },
         { .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
@@ -128,17 +139,27 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__device__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__global__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__inline__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
+        { .value = "cudaSuccess", .identifier = TOKEN_ID_RESERVED },
+        { .value = "cudaEvent_t", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "thread_local", .identifier = TOKEN_ID_OPERATOR }, },
     {
         { .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED } },
     {
+        { .value = "__forceinline__", .identifier = TOKEN_ID_RESERVED } },
+    {
         { .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR } },
+    {
+        { .value = "cudaMemcpyHostToDevice", .identifier = TOKEN_ID_RESERVED },
+        { .value = "cudaMemcpyDeviceToHost", .identifier = TOKEN_ID_RESERVED } }
 };
 
 /* C/C++ tokens that can happen inside a preprocessor */
@@ -179,6 +200,8 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "new", .identifier = TOKEN_ID_OPERATOR },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "FILE", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "dim3", .identifier = TOKEN_ID_DATATYPE },
         { .value = "this", .identifier = TOKEN_ID_OPERATOR },
         { .value = "char", .identifier = TOKEN_ID_DATATYPE },
         { .value = "long", .identifier = TOKEN_ID_DATATYPE },
@@ -231,6 +254,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
         { .value = "defined", .identifier = TOKEN_ID_OPERATOR },
         { .value = "warning", .identifier = TOKEN_ID_PREPROCESSOR },
@@ -246,6 +270,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "default", .identifier = TOKEN_ID_OPERATOR },
         { .value = "alignof", .identifier = TOKEN_ID_OPERATOR },
         { .value = "private", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
         { .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
     {
         { .value = "decltype", .identifier = TOKEN_ID_OPERATOR },
@@ -265,8 +290,12 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "typename", .identifier = TOKEN_ID_OPERATOR },
         { .value = "volatile", .identifier = TOKEN_ID_OPERATOR },
         { .value = "unsigned", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "blockDim", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "blockIdx", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "warpSize", .identifier = TOKEN_ID_RESERVED },
         { .value = "continue", .identifier = TOKEN_ID_OPERATOR }, },
     {
+		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
         { .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },
         { .value = "protected", .identifier = TOKEN_ID_OPERATOR },
         { .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
@@ -274,15 +303,25 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__device__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__global__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__inline__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
+        { .value = "cudaSuccess", .identifier = TOKEN_ID_RESERVED },
+        { .value = "cudaEvent_t", .identifier = TOKEN_ID_DATATYPE },
+        { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "thread_local", .identifier = TOKEN_ID_OPERATOR }, },
     {
         { .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED } },
     {
-        { .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR } }
+        { .value = "__forceinline__", .identifier = TOKEN_ID_RESERVED } },
+    {
+        { .value = "reinterpret_cast", .identifier = TOKEN_ID_OPERATOR } },
+    {
+        { .value = "cudaMemcpyHostToDevice", .identifier = TOKEN_ID_RESERVED },
+        { .value = "cudaMemcpyDeviceToHost", .identifier = TOKEN_ID_RESERVED } }
 };

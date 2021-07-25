@@ -100,6 +100,34 @@ void AppEarlyInitialize(){
     GetCurrentWorkingDirectory(appContext.cwd, PATH_MAX);
 
     appContext.autoCompleteMapping = AutoComplete_Initialize();
+    std::string dir(appContext.cwd); dir += "/.cody";
+    appGlobalConfig.configFolder = dir;
+    appGlobalConfig.rootFolder = appContext.cwd;
+    appGlobalConfig.configFile = dir + std::string("/.config");
+}
+
+void AppAddStoredFile(std::string basePath){
+    std::string fullPath = appGlobalConfig.rootFolder + std::string("/") + basePath;
+    appGlobalConfig.filesStored.push_back(fullPath);
+}
+
+int AppIsStoredFile(std::string path){
+    for(std::string &s : appGlobalConfig.filesStored){
+        if(s == path) return 1;
+    }
+    return false;
+}
+
+std::string AppGetConfigFilePath(){
+    return appGlobalConfig.configFile;
+}
+
+std::string AppGetConfigDirectory(){
+    return std::string(appGlobalConfig.configFolder);
+}
+
+std::string AppGetRootDirectory(){
+    return std::string(appGlobalConfig.rootFolder);
 }
 
 char *AppGetContextDirectory(){
@@ -685,8 +713,8 @@ void AppCommandUndo(){
                 vec2ui end   = bChange->bufferInfoEnd;
                 cursor = start;
                 
-                printf("Removing range [%u %u] x [%u %u]\n",
-                       start.x, start.y, end.x, end.y); 
+                //printf("Removing range [%u %u] x [%u %u]\n",
+                //       start.x, start.y, end.x, end.y); 
                 
                 AppCommandRemoveTextBlock(bufferView, start, end);
                 
@@ -788,6 +816,54 @@ void AppCommandQueryBarSearchAndReplace(){
         View_ReturnToState(view, View_QueryBar);
         KeyboardSetActiveMapping(appContext.queryBarMapping);
     }
+}
+
+bool AppIsPathFromRoot(std::string path){
+    std::string rootDir = AppGetRootDirectory();
+    return StringStartsWith((char *)path.c_str(), path.size(),
+                            (char *)rootDir.c_str(), rootDir.size());
+}
+
+void AppCommandQueryBarInteractiveCommand(){
+    View *view = AppGetActiveView();
+#if 0 // set a default command
+    ViewState state = View_GetState(view);
+    if(state != View_QueryBar){
+        QueryBar *qbar = View_GetQueryBar(view);
+
+        auto emptyFunc = [&](QueryBar *bar, View *view) -> int{ return 0; };
+        auto onCommit = [&](QueryBar *bar, View *view) -> int{
+            char *content = nullptr;
+            uint size = 0;
+            QueryBar_GetWrittenContent(bar, &content, &size);
+            BaseCommand_Interpret(content, size, view);
+            return -1;
+        };
+
+        QueryBar_ActivateCustom(qbar, nullptr, 0, emptyFunc,
+                                emptyFunc, onCommit, nullptr);
+
+        View_ReturnToState(view, View_QueryBar);
+        KeyboardSetActiveMapping(appContext.queryBarMapping);
+    }
+#else
+    NullRet(view->bufferView.lineBuffer);
+    std::string writtenPath = std::string(view->bufferView.lineBuffer->filePath);
+    std::string rootDir = AppGetRootDirectory();
+    if(AppIsPathFromRoot(writtenPath)){
+        writtenPath = std::string(&view->bufferView.lineBuffer->filePath[rootDir.size()+1]);
+    }else{
+        printf("Warning: linebuffer has inconsistent path\n");
+        printf("File Path : %s\n", view->bufferView.lineBuffer->filePath);
+        return;
+    }
+
+    int r = BaseCommand_AddFileEntryIntoAutoLoader((char *)writtenPath.c_str(),
+                                                   writtenPath.size());
+    if(r == 0){
+        AppAddStoredFile(writtenPath);
+    }
+#endif
 }
 
 void AppCommandQueryBarSearch(){
@@ -934,7 +1010,7 @@ void AppCommandCopy(){
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         uint size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
-        printf("Copied %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
+        //printf("Copied %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
     }
 }
 
@@ -970,7 +1046,7 @@ void AppCommandCut(){
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
-        printf("Cut %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
+        //printf("Cut %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
         
         UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
         AppCommandRemoveTextBlock(view, start, end);
@@ -1428,7 +1504,7 @@ void AppCommandOpenFile(){
                 if(f == 0 || lBuffer == nullptr){
                     printf("Did not find buffer %s\n", entry->path);
                 }else{
-                    printf("Swapped to %s\n", entry->path);
+                    //printf("Swapped to %s\n", entry->path);
                     BufferView_SwapBuffer(bView, lBuffer);
                 }
             }
@@ -1439,7 +1515,7 @@ void AppCommandOpenFile(){
             QueryBar *querybar = View_GetQueryBar(view);
             QueryBar_GetWrittenContent(querybar, &content, &len);
             if(len > 0){
-                printf("Creating file %s\n", content);
+                //printf("Creating file %s\n", content);
                 FileProvider_CreateFile(content, len, &lBuffer, &tokenizer);
                 BufferView_SwapBuffer(bView, lBuffer);
             }
@@ -1565,7 +1641,9 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_Q);
     
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
-    //RegisterRepeatableEvent(mapping, AppCommandRedo, Key_LeftControl, Key_R);
+
+    //TODO: re-do (AppCommandRedo)
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand, Key_LeftControl, Key_E);
     
     RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);

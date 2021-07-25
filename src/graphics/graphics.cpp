@@ -576,7 +576,7 @@ static void OpenGLLoadIcons(OpenGLState *state){
 }
 
 void OpenGLInitialize(OpenGLState *state){
-    DEBUG_MSG("Initializing OpenGL graphics\n");
+    //DEBUG_MSG("Initializing OpenGL graphics\n");
     OpenGLBuffer *quad      = &state->glQuadBuffer;
     OpenGLBuffer *lines     = &state->glLineBuffer;
     OpenGLImageQuadBuffer *imageQuad = &state->glQuadImageBuffer;
@@ -980,7 +980,7 @@ void OpenGLEntry(){
         }
     }
     
-    DEBUG_MSG("Finalizing OpenGL graphics\n");
+    //DEBUG_MSG("Finalizing OpenGL graphics\n");
     DestroyWindowX11(state->window);
     TerminateX11();
     

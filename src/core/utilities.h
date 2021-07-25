@@ -106,6 +106,17 @@ int StringIsDigits(char *s0, uint len);
 uint StringToUnsigned(char *s0, uint len);
 
 /*
+* Checks if a given string starts with another string.
+*/
+int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len);
+
+/*
+* Return address of first non-empty character in string, returns -1
+* in case of failures.
+*/
+int StringFirstNonEmpty(char *s0, uint s0len);
+
+/*
 * Get the n-th digit of value. Digits are count backwards, i.e.:
 * the number '1234567' will give '7' for GetDigitOf(1234567, 0) in
 * order to avoid stacking numbers and perform multiple loops.

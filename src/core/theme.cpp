@@ -297,9 +297,9 @@ Theme theme4Coder = {
     .hoverableItemForegroundColor = ColorFromHex(0xCCfffc7f),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF232330),
     .selectorBackground = ColorFromHex(0xFF17171D),
-    .searchBackgroundColor = ColorFromHex(0xFF315268),
+    .searchBackgroundColor = ColorFromHex(0xff87ffaf),
     .selectableListBackground = ColorFromHex(0xFF1C1C1C),
-    .searchWordColor = ColorFromHex(0xCCb9af2a),
+    .searchWordColor = ColorFromHex(0xFF0C0C0C),
     .backgroundLineNumbers = ColorFromHex(0xFF171717),
     .lineNumberColor = ColorFromHex(0xFF4C4D4E),
     .lineNumberHighlitedColor = ColorFromHex(0xFF7a7c7d),
@@ -412,13 +412,13 @@ Theme themeNoah = {
     .pasteColor = ColorFromHex(0xffffddee),
 };
 
-//Theme *defaultTheme = &themeRadical;
+Theme *defaultTheme = &themeRadical;
 //Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
 //Theme *defaultTheme = &themeTerminal;
 //Theme *defaultTheme = &themeGruvboxLight;
-Theme *defaultTheme = &themeNoah;
+//Theme *defaultTheme = &themeNoah;
 
 std::vector<ThemeDescription> themesDesc = {
     { .name = "Radical", .theme = &themeRadical, },

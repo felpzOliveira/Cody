@@ -318,7 +318,7 @@ int ChooseVisualGLX(Framebuffer *desired, LibHelperX11 *x11, Visual **visual, in
     const char *vendor;
     
     vendor = glXGetClientString(x11->display, GLX_VENDOR);
-    printf("Vendor: %s\n", vendor);
+    //printf("Vendor: %s\n", vendor);
     
     (void)ChooseGLXFBConfig(desired, x11, &fbConfig);
     
@@ -375,7 +375,7 @@ int InitGLX(LibHelperX11 *x11){
     AssertA(glXQueryVersion(x11->display, &glxHelper.major, &glxHelper.minor),
             "Failed to query GLX version");
     
-    printf("GLX version: %d.%d\n", glxHelper.major, glxHelper.minor);
+    //printf("GLX version: %d.%d\n", glxHelper.major, glxHelper.minor);
     
 #if 0
     AssertA(!(glxHelper.major == 1 && glxHelper.minor < 3),

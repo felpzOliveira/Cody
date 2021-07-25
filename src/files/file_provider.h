@@ -76,8 +76,8 @@ int FileProvider_IsFileOpened(char *path, uint len);
 * Loads a file given its path. lineBuffer returns a new line buffer for the file
 * and lTokenizer returns the guessesd tokenizer.
 */
-void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
-                       Tokenizer **lTokenizer);
+void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
+                       Tokenizer **lTokenizer=nullptr);
 
 /*
 * Creates a new file. lineBuffer returns a new line buffer allocated for the file

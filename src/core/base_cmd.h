@@ -60,6 +60,9 @@ typedef struct QueryBarCmdSearchAndReplace{
 int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                           DoubleCursor *dcursor, char *toSearch = nullptr,
                           uint toSearchLen = 0);
+
+
+
 /*
 * Perform setup to start a command of file opening.
 */
@@ -74,5 +77,15 @@ int SwitchBufferCommandStart(View *view);
 * Performs setup to start a command theme.
 */
 int SwitchThemeCommandStart(View *view);
+
+/*
+* Interpret and execute a given command applied to a given view.
+*/
+int BaseCommand_Interpret(char *cmd, uint size, View *view);
+
+/*
+* Pushes a new filename, existing or not, into the config for auto-loading.
+*/
+int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size);
 
 #endif //BASE_CMD_H

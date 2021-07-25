@@ -34,12 +34,72 @@ static int SelectableListDefaultCancel(QueryBar *queryBar, View *view){
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
+// Interpretation commands
+//////////////////////////////////////////////////////////////////////////////////////////
+int BaseCommand_CreateCodyFolderIfNeeded(){
+    int rv = -1;
+    std::string dir = AppGetConfigDirectory();
+    FileEntry entry;
+    char folder[PATH_MAX];
+    int r = GuessFileEntry((char *)dir.c_str(), dir.size(), &entry, folder);
+
+    if(r < 0){
+        //TODO: mkdir
+        rv = mkdir(dir.c_str(), 0777);
+    }else if(entry.type == DescriptorDirectory){
+        // already created
+        rv = 0;
+    }else{
+        printf("Cannot create cody folder, would corrupt filesystem\n");
+    }
+
+    return rv;
+}
+
+int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
+    if(BaseCommand_CreateCodyFolderIfNeeded() < 0){
+        return -1;
+    }
+
+    if(size > 0){
+        std::string path = AppGetConfigFilePath();
+        FILE *fp = fopen(path.c_str(), "a+");
+        if(fp){
+            fprintf(fp, "%s\n", entry);
+            fclose(fp);
+        }
+    }
+
+    return 0;
+}
+
+int BaseCommand_Interpret(char *cmd, uint size, View *view){
+    // TODO: map of commands? maybe set some function pointers to this
+    // TODO: create a standard for this, a json or at least something like bubbles
+    int rv = -1;
+    std::string add_to_config("add-to-config");
+    if(StringStartsWith(cmd, size, (char*)add_to_config.c_str(), add_to_config.size())){
+        uint len = size - add_to_config.size();
+        char *ptr = &cmd[add_to_config.size()];
+        int at = StringFirstNonEmpty(ptr, len);
+        rv = BaseCommand_AddFileEntryIntoAutoLoader(&ptr[at], len-at);
+    }
+
+    return rv;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////
 // File opening handling routines
 //////////////////////////////////////////////////////////////////////////////////////////
 static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
                                          uint *n, uint *size)
 {
-    if(ListFileEntries(basePath, entries, n, size) < 0){
+    std::string refPath(basePath);
+    if(refPath[refPath.size()-1] != '/'){
+        refPath += "/";
+    }
+
+    if(ListFileEntries((char *)refPath.c_str(), entries, n, size) < 0){
         return -1;
     }
     
@@ -47,7 +107,7 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
     FileEntry *arr = *entries;
     for(uint i = 0; i < *n; i++){
         FileEntry *e = &arr[i];
-        uint s = snprintf(path, PATH_MAX, "%s%s", basePath, e->path);
+        uint s = snprintf(path, PATH_MAX, "%s%s", refPath.c_str(), e->path);
         if(FileProvider_IsFileOpened(path, s)){
             e->isLoaded = 1;
         }

@@ -5,6 +5,36 @@
 #include <unistd.h>
 #include <app.h>
 #include <file_provider.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+void LoadStaticFilesOnStart(){
+    std::string path = AppGetConfigFilePath();
+    FILE *fp = fopen(path.c_str(), "r");
+    if(fp){
+        char *line = nullptr;
+        size_t lineSize = 0;
+        int read = -1;
+        char folder[PATH_MAX];
+        FileEntry entry;
+        std::string rootPath = AppGetRootDirectory();
+        while((read = getline(&line, &lineSize, fp)) != -1){
+            if(read > 0){
+                line[read-1] = 0; // remove \n
+                std::string p = rootPath + std::string("/") + std::string(line);
+
+                if(AppIsStoredFile(p)) continue;
+
+                int r = GuessFileEntry((char *)p.c_str(), p.size(), &entry, folder);
+                if(!(r < 0) && entry.type == DescriptorFile){
+                    FileProvider_Load((char *)p.c_str(), p.size());
+                    AppAddStoredFile(line);
+                }
+            }
+        }
+        fclose(fp);
+    }
+}
 
 void StartWithFile(const char *path=nullptr){
     BufferView *bView = AppGetActiveBufferView();
@@ -18,7 +48,9 @@ void StartWithFile(const char *path=nullptr){
         FileProvider_Load((char *)path, length, &lineBuffer, &tokenizer);
         BufferView_SwapBuffer(bView, lineBuffer);
     }
-    
+
+    LoadStaticFilesOnStart();
+
     Graphics_Initialize();
 }
 
