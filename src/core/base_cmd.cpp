@@ -3,6 +3,9 @@
 #include <string.h>
 #include <app.h>
 #include <file_provider.h>
+#include <parallel.h>
+#include <bufferview.h>
+#include <sstream>
 
 /* Default helper functions */
 static void SelectableListFreeLineBuffer(View *view){
@@ -77,6 +80,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: map of commands? maybe set some function pointers to this
     // TODO: create a standard for this, a json or at least something like bubbles
     int rv = -1;
+#if 0
     std::string add_to_config("add-to-config");
     if(StringStartsWith(cmd, size, (char*)add_to_config.c_str(), add_to_config.size())){
         uint len = size - add_to_config.size();
@@ -84,7 +88,30 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
         int at = StringFirstNonEmpty(ptr, len);
         rv = BaseCommand_AddFileEntryIntoAutoLoader(&ptr[at], len-at);
     }
+#endif
 
+    std::string make("make");
+    if(StringStartsWith(cmd, size, (char *)make.c_str(), make.size())){
+        std::string rootDir = AppGetRootDirectory() + std::string("/build");
+        std::stringstream ss;
+        ss << "cd " << rootDir << " && " << "make";
+
+        std::string md = ss.str();
+        LockedLineBuffer *lockedBuffer = nullptr;
+        GetExecutorLockedLineBuffer(&lockedBuffer);
+        ViewNode *vnode = AppGetNextViewNode();
+        BufferView *bView = View_GetBufferView(view);
+        if(vnode){
+            if(vnode->view){
+                bView = View_GetBufferView(vnode->view);
+            }
+        }
+
+        BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+        // TODO: function LockedBufferStartRender() or something
+        lockedBuffer->render_state = 0;
+        ExecuteCommand(md);
+    }
     return rv;
 }
 

@@ -68,7 +68,7 @@ Theme themeGruvboxLight = {
     .hoverableItemBackgroundColor = ColorFromHex(0xFFebdbb2),
     .selectorBackground = ColorFromHex(0xFFfbf1c7),
 
-    .searchBackgroundColor = ColorFromHex(0xff447a59),
+    .searchBackgroundColor = ColorFromHex(0xff6a191d),
     .selectableListBackground = ColorFromHex(0xFFfbf1c7),
     .searchWordColor = ColorFromHex(0xCCd5c4a1),
     .backgroundLineNumbers = ColorFromHex(0xFFfbf1c7),
@@ -182,7 +182,7 @@ Theme themeYavid = {
     .hoverableItemForegroundColor = ColorFromHex(0xCCfffc7f),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF272729),
     .selectorBackground = ColorFromHex(0xFF17171D),
-    .searchBackgroundColor = ColorFromHex(0xFF315268),
+    .searchBackgroundColor = ColorFromHex(0xff87ffaf),
     .selectableListBackground = ColorFromHex(0xFF13151a),
     .searchWordColor = ColorFromHex(0xFF16191C),
     .backgroundLineNumbers = ColorFromHex(0xFF192023),

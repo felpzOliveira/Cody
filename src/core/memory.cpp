@@ -9,6 +9,7 @@ bool cmpr(void* a, void*b) { return (intptr_t)a < (intptr_t)b; }
 DebugMap freezed(&cmpr);
 DebugMap debug_memory_map(&cmpr);
 long unsigned int debug_memory_usage = 0;
+std::mutex debug_memory_mutex;
 
 void __memory_freeze(){
     freezed.clear();

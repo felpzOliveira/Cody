@@ -55,6 +55,7 @@ struct LineBufferProps{
     uint type;
     FileExtension ext;
     CopySection cpSection;
+    bool isWrittable;
 };
 
 /*
@@ -232,8 +233,14 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
 * line inserted.
 */
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, Tokenizer *tokenizer,
-                                uint *offset);
+                                uint base, uint u8offset, uint *offset);
+
+/*
+* Inserts a (possible) multiline UTF-8 text at the end of a linebuffer.
+* Returns the amount of lines that were actually inserted.
+*/
+uint LineBuffer_InsertRawText(LineBuffer *lineBuffer, char *text, uint size);
+
 /*
 * Merge two lines of the LineBuffer, merges line (base+1) into base.
 */
@@ -265,6 +272,13 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
                                      uint base, uint offset);
 
 /*
+* Generates tokens without tokenization. This simply splits the strings
+* and generates TOKEN_ID_NONE and TOKEN_ID_SPACE values to force a linebuffer
+* to be renderable without needing to perform tokenization and symbol table lookups.
+*/
+void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
+
+/*
 * Generates the raw text from a range with the contents of this linebuffer.
 * Interior formatted tabs are removed from this string, this routine allocates
 * the pointer 'ptr'.
@@ -273,9 +287,26 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
                                  vec2ui start, vec2ui end);
 
 /*
+* Clears a linebuffer wihtout actually deleting data, it just marks as free.
+*/
+void LineBuffer_SoftClear(LineBuffer *lineBuffer);
+
+/*
 * Sets the storage path for the contents of the LineBuffer given.
 */
 void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size);
+
+/*
+* Sets flag indicating if a given linebuffer is writtable.
+* NOTE: this is a flag used for external operations the buffer
+*       interface does not care about this value.
+*/
+void LineBuffer_SetWrittable(LineBuffer *lineBuffer, bool isWrittable);
+
+/*
+* Checks if the is writtable flag is set on a given linebuffer.
+*/
+bool LineBuffer_IsWrittable(LineBuffer *lineBuffer);
 
 /*
 * Saves the contents of the lineBuffer to storage.

@@ -6,6 +6,7 @@
 #include <view.h>
 #include <file_buffer.h>
 #include <vector>
+#include <view_tree.h>
 
 struct BufferView;
 struct Buffer;
@@ -18,6 +19,7 @@ typedef enum{
 typedef struct{
     int tabSpacing;
     int useTabs;
+    int autoCompleteSize;
     std::string rootFolder;
     std::string configFile;
     std::string configFolder;
@@ -42,6 +44,12 @@ void AppInitialize();
 * Gets the bufferview from the active View.
 */
 BufferView *AppGetActiveBufferView();
+
+/*
+* Gets tab configuration. Returns the tab spacing and 'using_tab' returns
+* 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
+*/
+int AppGetTabConfiguration(int *using_tab);
 
 /*
 * Triggers the view at (x,y) to be active.
@@ -79,6 +87,11 @@ char *AppGetContextDirectory();
 * generate new lines when the line buffer+1 has not yet been constructed.
 */
 uint AppComputeLineLastIndentLevel(Buffer *buffer);
+
+/*
+* Returns an accessor to the next view node in the view node tree if possible.
+*/
+ViewNode *AppGetNextViewNode();
 
 /*
 * Computes a indentation level of a line until a UTF-8 position 'p'.

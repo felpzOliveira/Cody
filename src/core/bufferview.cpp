@@ -258,20 +258,24 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
                                        cursorAt, transform, view->lineBuffer);
 }
 
-Float BufferView_GetDescription(BufferView *view, char *content, uint size){
+Float BufferView_GetDescription(BufferView *view, char *content, uint size,
+                                char *endDesc, uint endSize)
+{
     vec2ui pos = VScroll_GetCursorPosition(&view->sController);
     uint lineCount = view->lineBuffer->lineCount;
     Float pct = ((Float) pos.x) / ((Float) lineCount);
     uint st = GetSimplifiedPathName(view->lineBuffer->filePath,
                                     view->lineBuffer->filePathSize);
 
-    int p = 0;
+    char *name = (char *)&view->lineBuffer->filePath[st];
+    if(view->lineBuffer->filePathSize == 0){
+        name = (char *)"Build";
+    }
+
     if(view->lineBuffer->is_dirty == 0){
-        p = snprintf(content, size, " %s - Row: %u Col: %u", &view->lineBuffer->filePath[st],
-                     pos.x+1, pos.y+1);
+        snprintf(content, size, " %s - Row: %u Col: %u", name, pos.x+1, pos.y+1);
     }else{
-        p = snprintf(content, size, " %s - Row: %u Col: %u *", &view->lineBuffer->filePath[st],
-                     pos.x+1, pos.y+1);
+        snprintf(content, size, " %s - Row: %u Col: %u *", name, pos.x+1, pos.y+1);
     }
 
     std::string path = std::string(view->lineBuffer->filePath);
@@ -280,10 +284,10 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size){
     }
 
     if(AppIsStoredFile(path)){
-        char dagger[3] = {(char)0xE2, (char)0x80, (char)0xA0};
-        snprintf(&content[p], size-p, " %s", dagger);
+        char dagger[3] = {(char)0xCF, (char)0xAE, (char)0};
+        snprintf(endDesc, endSize, "%s", dagger);
     }
-
+    
     return pct;
 }
 

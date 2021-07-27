@@ -516,6 +516,21 @@ void Buffer_Free(Buffer *buffer){
     }
 }
 
+uint LineBuffer_InsertRawText(LineBuffer *lineBuffer, char *text, uint size){
+    AssertA(lineBuffer != nullptr, "Invalid line initialization");
+    if(lineBuffer->lineCount == 0){
+        printf("Empty lineBuffer given\n"); // should never happen
+        return 0;
+    }
+    uint lastLine = lineBuffer->lineCount - 1;
+    Buffer *buffer = lineBuffer->lines[lastLine];
+    uint u8offset = buffer->count;
+    uint dummy = 0;
+
+    return LineBuffer_InsertRawTextAt(lineBuffer, text, size, lastLine,
+                                      u8offset, &dummy);
+}
+
 void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int decode_tab){
     AssertA(lineBuffer != nullptr, "Invalid line initialization");
     if(!(lineBuffer->lineCount < lineBuffer->size)){
@@ -535,6 +550,15 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
     else
         Buffer_Init(lineBuffer->lines[lineBuffer->lineCount], DefaultAllocatorSize);
     lineBuffer->lineCount++;
+}
+
+void LineBuffer_SoftClear(LineBuffer *lineBuffer){
+    for(uint i = 0; i < lineBuffer->lineCount; i++){
+        Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        Buffer_RemoveRangeRaw(buffer, 0, buffer->taken);
+    }
+    // need to give the empty line address
+    lineBuffer->lineCount = 1;
 }
 
 void LineBuffer_RemoveLineAt(LineBuffer *lineBuffer, uint at){
@@ -626,6 +650,8 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
         .interval = 0,
         .active = 0,
     };
+
+    lineBuffer->props.isWrittable = true;
 
     for(uint i = 0; i < DefaultAllocatorSize; i++){
         lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -820,6 +846,67 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     }
 }
 
+void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset){
+    Buffer *buffer = nullptr;
+    uint i = base;
+    uint expectedEnd = base + offset + 1;
+
+    std::vector<Token> tokens; // slow?
+
+    while(i < expectedEnd){
+        buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        int start = -1;
+        int end = -1;
+        for(uint k = 0; k < buffer->taken; k++){
+            char p = buffer->data[k];
+            if(p != ' ' && p != '\r' && p != '\t' && p != '\n'){
+                if(end >= 0){
+                    tokens.push_back({
+                        .size = (int)k - end,
+                        .position = (int)k,
+                        .source = LEX_CONTEXT_ID_EXEC_CODE,
+                        .identifier = TOKEN_ID_SPACE,
+                        .reserved = nullptr,
+                    });
+                    end = -1;
+                }
+
+                if(start < 0){
+                    start = (int)k;
+                }
+            }else{
+                if(start >= 0){
+                    end = (int)k;
+                    tokens.push_back({
+                        .size = end - start,
+                        .position = start,
+                        .source = LEX_CONTEXT_ID_EXEC_CODE,
+                        .identifier = TOKEN_ID_NONE,
+                        .reserved = nullptr,
+                    });
+                    start = -1;
+                }
+            }
+        }
+
+        if(start >= 0){
+            end = (int)buffer->taken;
+            tokens.push_back({
+                .size = end - start,
+                .position = start,
+                .source = LEX_CONTEXT_ID_EXEC_CODE,
+                .identifier = TOKEN_ID_NONE,
+                .reserved = nullptr,
+            });
+            start = -1;
+        }
+
+        Buffer_UpdateTokens(buffer, tokens.data(), tokens.size());
+        tokens.clear();
+        i++;
+    }
+}
+
 void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenizer, 
                                      uint base, uint offset)
 {
@@ -913,8 +1000,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
 }
 
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, Tokenizer *tokenizer,
-                                uint *offset)
+                                uint base, uint u8offset, uint *offset)
 {
     /*
     * Algorithm: We need to insert a possible multi-line text at a given position.
@@ -1115,8 +1201,21 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
 }
 
 void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size){
-    strncpy(lineBuffer->filePath, path, Min(size, sizeof(lineBuffer->filePath)));
-    lineBuffer->filePathSize = strlen(lineBuffer->filePath);
+    if(path && size > 0){
+        strncpy(lineBuffer->filePath, path, Min(size, sizeof(lineBuffer->filePath)));
+        lineBuffer->filePathSize = strlen(lineBuffer->filePath);
+    }else{
+        lineBuffer->filePathSize = 0;
+        lineBuffer->filePath[0] = 0;
+    }
+}
+
+void LineBuffer_SetWrittable(LineBuffer *lineBuffer, bool isWrittable){
+    lineBuffer->props.isWrittable = isWrittable;
+}
+
+bool LineBuffer_IsWrittable(LineBuffer *lineBuffer){
+    return lineBuffer->props.isWrittable;
 }
 
 uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr, 
@@ -1181,7 +1280,7 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
                 size += DefaultAllocatorSize;
             }
             data[ic++] = '\n';
-		}
+        }
         c = 0;
     }
     
@@ -1214,6 +1313,11 @@ vec2i LineBuffer_GetActiveBuffer(LineBuffer *lineBuffer){
 }
 
 void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
+    if(lineBuffer->filePathSize < 1){
+        printf("Skipping un-writtable linebuffer\n");
+        return;
+    }
+
     uint lines = lineBuffer->lineCount;
     FILE *fp = fopen(lineBuffer->filePath, "wb");
     uint maxSize = 0;
@@ -1241,6 +1345,7 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
             // skip visualy empty lines and remove pending spaces at end of the line
             process = !Buffer_IsBlank(buffer);
             if(process){
+                // remove spaces at end of line also
                 for(taken = buffer->taken; taken > 1; taken--){
                     if(buffer->data[taken-1] != ' ') break;
                 }

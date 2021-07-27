@@ -15,6 +15,7 @@
 #include <iostream>
 #include <image_util.h>
 #include <file_provider.h>
+#include <parallel.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -986,6 +987,7 @@ void OpenGLEntry(){
     
     state->running = 0;
     state->window = nullptr;
+    FinishExecutor();
 }
 
 int Graphics_IsRunning(){

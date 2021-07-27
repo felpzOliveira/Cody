@@ -23,12 +23,19 @@ void AutoComplete_Commit(){
     if(id >= 0){
         Buffer *buffer = nullptr;
         SelectableList_GetItem(list, id, &buffer);
-        char *data = &buffer->data[autoComplete.lastSearchLen];
-        AppDefaultEntry(data, buffer->taken - autoComplete.lastSearchLen);
-        AppDefaultReturn();
-        if(autoComplete.lastSearchValue) AllocatorFree(autoComplete.lastSearchValue);
-        autoComplete.lastSearchLen = 0;
+        if(buffer){
+            char *data = &buffer->data[autoComplete.lastSearchLen];
+            AppDefaultEntry(data, buffer->taken - autoComplete.lastSearchLen);
+            if(autoComplete.lastSearchValue) AllocatorFree(autoComplete.lastSearchValue);
+            autoComplete.lastSearchLen = 0;
+        }
     }
+
+    AppDefaultReturn();
+}
+
+void AutoComplete_Interrupt(){
+    AppDefaultReturn();
 }
 
 BindingMap *AutoComplete_Initialize(){

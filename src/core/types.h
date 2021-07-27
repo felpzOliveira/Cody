@@ -113,6 +113,8 @@ inline void __gpu_check_binding(int bufferId, long int bindingSize,
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>
+#include <thread>
+#include <mutex>
 #define DebugMap std::map<void*,MemoryEntry,bool(*)(void*, void*)>
 
 struct MemoryEntry{
@@ -124,6 +126,11 @@ struct MemoryEntry{
 extern DebugMap freezed;
 extern DebugMap debug_memory_map;
 extern long unsigned int debug_memory_usage;
+// When running in debug mode we need to lock the allocations
+// since our map is not thread-safe but the memory allocation routines
+// are. This allows to debug the command executor but will slow everything
+// **a lot** when running in debug mode.
+extern std::mutex debug_memory_mutex;
 
 #endif
 
@@ -146,6 +153,7 @@ inline void _debugger_trace(int sig){
 
 inline void *_get_memory(long size, const char *filename, uint line){
 #if defined(MEMORY_DEBUG)
+    std::lock_guard<std::mutex> locker(debug_memory_mutex);
     printf("CALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
 #endif
 
@@ -173,6 +181,7 @@ inline void *_expand_memory(long size, long osize, void *p,
                             const char *filename, uint line)
 {
 #if defined(MEMORY_DEBUG)
+    std::lock_guard<std::mutex> locker(debug_memory_mutex);
     if(p != nullptr){
         printf("REALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
     }else{
@@ -215,6 +224,9 @@ inline void *_expand_memory(long size, long osize, void *p,
 }
 
 inline void _free_memory(void **ptr, const char *filename, uint line){
+#if defined(MEMORY_DEBUG)
+    std::lock_guard<std::mutex> locker(debug_memory_mutex);
+#endif
     if(ptr){
         if(*ptr){
 #if defined(MEMORY_DEBUG)

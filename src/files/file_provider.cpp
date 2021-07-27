@@ -134,6 +134,7 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
     LineBuffer_SetStoragePath(lBuffer, targetPath, len);
     LineBuffer_SetType(lBuffer, props.type);
     LineBuffer_SetExtension(lBuffer, props.ext);
+    LineBuffer_SetWrittable(lBuffer, true);
 
     FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
 
@@ -181,6 +182,7 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
     LineBuffer_SetType(lBuffer, props.type);
     LineBuffer_SetExtension(lBuffer, props.ext);
+    LineBuffer_SetWrittable(lBuffer, true);
 
     // allow hooks execution
     for(uint i = 0; i < fProvider.openHooksCount; i++){

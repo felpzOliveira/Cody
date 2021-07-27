@@ -67,6 +67,7 @@ static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback
     uint runLen = maxn;
     uint n = 0;
     uint fetched = start;
+
     while(s != NULL){
         while((*s == ' ' || *s == '\n' || *s == '\t' || *s == '\r') && n < runLen){
             s++;

@@ -4,6 +4,7 @@
 #include <vector>
 #include <app.h>
 #include <file_provider.h>
+#include <parallel.h>
 
 void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
                                     Transform *model, Transform *projection);
@@ -563,7 +564,10 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     // Render the file description of this buffer view
     // TODO: states
     char desc[256];
-    Float pc = BufferView_GetDescription(view, desc, sizeof(desc));
+    char enddesc[256];
+    enddesc[0] = 0;
+    Float pc = BufferView_GetDescription(view, desc, sizeof(desc),
+                                         enddesc, sizeof(enddesc));
     
     glDisable(GL_BLEND);
     glUseProgram(font->cursorShader.id);
@@ -629,15 +633,82 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     vec4i c = GetColor(theme, TOKEN_ID_DATATYPE);
     fonsStashMultiTextColor(font->fsContext, x, y, c.ToUnsigned(),
                             desc, NULL, &dummyGlyph);
+    int n = strlen(enddesc);
+    Float w = 0;
+    if(n > 0){
+        w = fonsComputeStringAdvance(font->fsContext, enddesc, n, &dummyGlyph);
+        fonsStashMultiTextColor(font->fsContext, a1.x - 1.5 * w, y, c.ToUnsigned(),
+                                enddesc, NULL, &dummyGlyph);
+    }
     
     fonsStashFlush(font->fsContext);
+
+    uint currFontSize = font->fontMath.fontSizeAtDisplay;
+    uint fSize = currFontSize > 5 ? currFontSize - 5 : currFontSize;
+    Float scale = font->fontMath.invReduceScale;
+    
+    Graphics_SetFontSize(state, fSize, fSize + FONT_UPSCALE_DEFAULT_OFFSET);
+    Graphics_PrepareTextRendering(state, projection, &state->scale);
+    
+    int is_tab = 0;
+    int tabSpace = AppGetTabConfiguration(&is_tab);
+    enddesc[0] = 0;
+    int k = 0;
+    if(is_tab){
+        k = snprintf(enddesc, sizeof(enddesc), " TAB - %d", tabSpace);
+    }else{
+        k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d", tabSpace);
+    }
+    
+    Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph);
+    Float rScale = font->fontMath.invReduceScale / scale;
+    w = w * rScale;
+    vec2f half = (vec2f(geometry->upper) - vec2f(geometry->lower)) * 
+                        font->fontMath.invReduceScale * 0.5;
+    x = 2.0 * half.x;
+    if(n > 0){
+        x -= (1.5 * w + 1.5 * f);
+    }else{
+        x -= 1.5 * f;
+    }
+
+    y = (a1.y + a0.y) * 0.5 - 0.25 * font->fontMath.fontSizeAtRenderCall;
+    Graphics_PushText(state, x, y, (char *)enddesc, k, c, &dummyGlyph);
+    Graphics_FlushText(state);
+    
+    Graphics_SetFontSize(state, currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
+    Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
+
     glDisable(GL_BLEND);
 }
 
 int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
     BufferView *bView = View_GetBufferView(view);
     if(bView->lineBuffer != nullptr){
-        return Graphics_RenderBufferView(view, state, theme, dt);
+        //TODO: Maybe generalize this for any linebuffer?
+        int is_locked = 0;
+        LockedLineBuffer *lockedBuffer = nullptr;
+        GetExecutorLockedLineBuffer(&lockedBuffer);
+        if(lockedBuffer->lineBuffer == bView->lineBuffer){
+            lockedBuffer->mutex.lock();
+            is_locked = 1;
+        }
+
+        int r =  Graphics_RenderBufferView(view, state, theme, dt);
+
+        if(is_locked){
+            r = 1;
+            if(lockedBuffer->render_state == 1){
+                lockedBuffer->render_state = -1;
+                r = 0;
+            }else if(lockedBuffer->render_state == -1){
+                r = 0;
+            }
+
+            lockedBuffer->mutex.unlock();
+        }
+
+        return r;
     }else{
         return Graphics_RenderDefaultView(view, state, theme, dt);
     }

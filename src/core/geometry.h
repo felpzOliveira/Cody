@@ -106,6 +106,10 @@ template<typename T> class vec2{
     vec2(T a, T b): x(a), y(b){
         Assert(!HasNaN());
     }
+
+    template<typename Q> vec2(vec2<Q> other): x(other.x), y(other.y){
+        Assert(!HasNaN());
+    }
     
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
@@ -209,6 +213,10 @@ template<typename T> class vec3{
     vec3(){ x = y = z = (T)0; }
     vec3(T a){ x = y = z = a; }
     vec3(T a, T b, T c): x(a), y(b), z(c){
+        Assert(!HasNaN());
+    }
+
+    template<typename Q> vec3(vec3<Q> other): x(other.x), y(other.y), z(other.z){
         Assert(!HasNaN());
     }
     

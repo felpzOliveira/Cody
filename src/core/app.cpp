@@ -85,6 +85,7 @@ void AppEarlyInitialize(){
     appGlobalConfig.tabSpacing = 4;
     appGlobalConfig.useTabs = 0;
     appGlobalConfig.cStyle = CURSOR_RECT;
+    appGlobalConfig.autoCompleteSize = 0;
 
     ViewTree_Initialize();
     FileProvider_Initialize();
@@ -104,6 +105,13 @@ void AppEarlyInitialize(){
     appGlobalConfig.configFolder = dir;
     appGlobalConfig.rootFolder = appContext.cwd;
     appGlobalConfig.configFile = dir + std::string("/.config");
+}
+
+int AppGetTabConfiguration(int *using_tab){
+    if(using_tab){
+        *using_tab = appGlobalConfig.useTabs;
+    }
+    return appGlobalConfig.tabSpacing;
 }
 
 void AppAddStoredFile(std::string basePath){
@@ -325,6 +333,7 @@ void AppDefaultRemoveOne(){
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
     BufferView *bufferView = View_GetBufferView(view);
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     if(state == View_FreeTyping || state == View_AutoComplete){
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -370,7 +379,15 @@ void AppDefaultRemoveOne(){
         BufferView_AdjustGhostCursorIfOut(bufferView);
         BufferView_Dirty(bufferView);
         if(state == View_AutoComplete){
-            AppCommandAutoComplete();
+            /* help auto-complete better detect interrupt events since it is using
+               the default entry/removal routines */
+            appGlobalConfig.autoCompleteSize -= 1;
+            if(appGlobalConfig.autoCompleteSize <= 0){
+                AutoComplete_Interrupt();
+                appGlobalConfig.autoCompleteSize = 0;
+            }else{
+                AppCommandAutoComplete();
+            }
         }
     }else if(View_IsQueryBarActive(view)){
         QueryBar *bar = View_GetQueryBar(view);
@@ -384,6 +401,7 @@ void AppCommandRemovePreviousToken(){
     Token *token = nullptr;
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
@@ -428,6 +446,7 @@ void AppCommandRemovePreviousToken(){
 void AppCommandInsertTab(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -557,6 +576,7 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
 void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -582,6 +602,7 @@ void AppCommandKillEndOfLine(){
     BufferView *bView = AppGetActiveBufferView();
     NullRet(bView);
     NullRet(bView->lineBuffer);
+    NullRet(LineBuffer_IsWrittable(bView->lineBuffer));
 
     vec2ui cursor = BufferView_GetCursorPosition(bView);
     Buffer *buffer = BufferView_GetBufferAt(bView, cursor.x);
@@ -610,6 +631,7 @@ void AppCommandKillBuffer(){
     BufferView *bufferView = AppGetActiveBufferView();
     NullRet(bufferView);
     if(!bufferView->lineBuffer) return;
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     LineBuffer *lineBuffer = bufferView->lineBuffer;
     if(lineBuffer){
@@ -656,6 +678,7 @@ void AppCommandKillView(){
 void AppCommandUndo(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
+    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     LineBuffer *lineBuffer = bufferView->lineBuffer;
     BufferChange *bChange = UndoRedoGetNextUndo(&lineBuffer->undoRedo);
@@ -730,7 +753,7 @@ void AppCommandUndo(){
                     uint off = 0;
                     uint startBuffer = start.x;
                     uint n = LineBuffer_InsertRawTextAt(bufferView->lineBuffer, text, size, 
-                                                        start.x, start.y, tokenizer, &off);
+                                                        start.x, start.y, &off);
                     
                     uint endx = start.x + n;
                     uint endy = off;
@@ -778,6 +801,7 @@ void AppCommandQueryBarSearchAndReplace(){
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
     NullRet(view->bufferView.lineBuffer);
+    NullRet(LineBuffer_IsWrittable(view->bufferView.lineBuffer));
     if(state != View_QueryBar){
         QueryBar *bar = View_GetQueryBar(view);
         QueryBarCmdSearchAndReplace *replace = &bar->replaceCmd;
@@ -826,7 +850,6 @@ bool AppIsPathFromRoot(std::string path){
 
 void AppCommandQueryBarInteractiveCommand(){
     View *view = AppGetActiveView();
-#if 0 // set a default command
     ViewState state = View_GetState(view);
     if(state != View_QueryBar){
         QueryBar *qbar = View_GetQueryBar(view);
@@ -846,8 +869,12 @@ void AppCommandQueryBarInteractiveCommand(){
         View_ReturnToState(view, View_QueryBar);
         KeyboardSetActiveMapping(appContext.queryBarMapping);
     }
-#else
+}
+
+void AppCommandStoreFileCommand(){
+    View *view = AppGetActiveView();
     NullRet(view->bufferView.lineBuffer);
+    NullRet(LineBuffer_IsWrittable(view->bufferView.lineBuffer));
     std::string writtenPath = std::string(view->bufferView.lineBuffer->filePath);
     std::string rootDir = AppGetRootDirectory();
     if(AppIsPathFromRoot(writtenPath)){
@@ -863,7 +890,6 @@ void AppCommandQueryBarInteractiveCommand(){
     if(r == 0){
         AppAddStoredFile(writtenPath);
     }
-#endif
 }
 
 void AppCommandQueryBarSearch(){
@@ -915,7 +941,7 @@ void AppCommandEndLine(){
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
-void AppCommandSwapView(){
+ViewNode *AppGetNextViewNode(){
     int n = 0;
     View *view = appContext.activeView;
     ViewTreeIterator iterator;
@@ -935,12 +961,15 @@ void AppCommandSwapView(){
         ViewTree_Next(&iterator);
     }
 
-    if(vnode){
-        if(vnode->view){
-            if(BufferView_IsVisible(&vnode->view->bufferView)){
-                ViewTree_SetActive(vnode);
-                AppSetActiveView(vnode->view);
-            }
+    return vnode;
+}
+
+void AppCommandSwapView(){
+    ViewNode *vnode = AppGetNextViewNode();
+    if(vnode->view){
+        if(BufferView_IsVisible(&vnode->view->bufferView)){
+            ViewTree_SetActive(vnode);
+            AppSetActiveView(vnode->view);
         }
     }
 }
@@ -962,6 +991,8 @@ void AppCommandAutoComplete(){
     BufferView *bView = AppGetActiveBufferView();
     NullRet(bView);
     NullRet(bView->lineBuffer);
+    NullRet(LineBuffer_IsWrittable(bView->lineBuffer));
+
     vec2ui cursor = BufferView_GetCursorPosition(bView);
     Buffer *buffer = BufferView_GetBufferAt(bView, cursor.x);
     NullRet(buffer);
@@ -974,6 +1005,10 @@ void AppCommandAutoComplete(){
             if(token->identifier != TOKEN_ID_SPACE){
                 SelectableList *list = view->autoCompleteList;
                 char *ptr = &buffer->data[token->position];
+                if(View_GetState(view) != View_AutoComplete){
+                    appGlobalConfig.autoCompleteSize = (int)token->size;
+                }
+
                 int n = AutoComplete_Search(ptr, token->size, list);
                 if(n > 0 && View_GetState(view) != View_AutoComplete){
                     View_ReturnToState(view, View_AutoComplete);
@@ -981,6 +1016,7 @@ void AppCommandAutoComplete(){
                     SelectableList_ResetView(list);
                     if(n == 1){
                         AutoComplete_Commit();
+                        appGlobalConfig.autoCompleteSize = 0;
                     }
                 }
             }
@@ -1042,7 +1078,8 @@ void AppCommandCut(){
     BufferView *view = AppGetActiveBufferView();
     
     NullRet(view->lineBuffer);
-    
+    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
@@ -1065,7 +1102,8 @@ void AppCommandPaste(){
     Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
     NullRet(view->lineBuffer);
-    
+    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+
     if(size > 0 && p){
         CopySection section;
         Buffer *buffer = nullptr;
@@ -1078,7 +1116,7 @@ void AppCommandPaste(){
         Buffer_EraseSymbols(buffer, symTable);
         
         uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
-                                            cursor.x, cursor.y, tokenizer, &off);
+                                            cursor.x, cursor.y, &off);
 
         section = {
             .start = cursor,
@@ -1261,6 +1299,7 @@ void AppCommandIndent(){
     vec2ui start, end;
     BufferView *view = AppGetActiveBufferView();
     NullRet(view->lineBuffer);
+    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         AppCommandIndentRegion(view, start, end);
         view->lineBuffer->is_dirty = 1;
@@ -1290,6 +1329,8 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 BufferView *bufferView = AppGetActiveBufferView();
                 NullRet(bufferView);
                 NullRet(bufferView->lineBuffer);
+                NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+
                 Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
 		        SymbolTable *symTable = tokenizer->symbolTable;
 
@@ -1338,7 +1379,11 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 bufferView->lineBuffer->is_dirty = 1;
 
                 if(state == View_AutoComplete){
-                    AppCommandAutoComplete();
+                    if(utf8Size == 1 && (*utf8Data == ' ')){
+                        AutoComplete_Interrupt();
+                    }else{
+                        AppCommandAutoComplete();
+                    }
                 }
 
             }else if(View_IsQueryBarActive(view)){
@@ -1643,7 +1688,8 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
 
     //TODO: re-do (AppCommandRedo)
-    RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand, Key_LeftControl, Key_E);
+    RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand, Key_LeftControl, Key_Semicolon);
     
     RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);

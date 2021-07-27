@@ -54,8 +54,12 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
+void CommandExecutorInit();
 int main(int argc, char **argv){
     DebuggerRoutines();
+
+    CommandExecutorInit();
+
     if(argc > 1){
         char folder[PATH_MAX];
         char *p = argv[1];

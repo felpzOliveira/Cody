@@ -43,4 +43,9 @@ void AutoComplete_Remove(char *value, uint valuelen);
 */
 void AutoComplete_Commit();
 
+/*
+* Interrupts the autocomplete.
+*/
+void AutoComplete_Interrupt();
+
 #endif

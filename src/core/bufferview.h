@@ -239,7 +239,8 @@ uint BufferView_GetLineCount(BufferView *view);
 * cursor position, in relation to the file head, .i.e: percetage, 0 means
 * cursor at the head while 1 is at the end of the file.
 */
-Float BufferView_GetDescription(BufferView *view, char *content, uint size);
+Float BufferView_GetDescription(BufferView *view, char *content, uint size,
+                                char *endDesc, uint endSize);
 
 /*
 * Allows the bufferview 'view' to synchronize and avoid out of bounds

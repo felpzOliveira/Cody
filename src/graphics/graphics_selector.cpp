@@ -46,7 +46,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         int pGlyph = -1;
         Float x = lWidth * 0.03;
         Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
-        Float ym = (y1 + y0) * 0.5 - 0.25 * state->font.fontMath.fontSizeAtRenderCall;
+        Float ym = (y1 + y0) * 0.5 - 0.4 * state->font.fontMath.fontSizeAtRenderCall;
 
         uint rindex = SelectableList_GetRealIndex(list, i);
 
