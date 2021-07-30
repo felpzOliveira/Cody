@@ -77,6 +77,11 @@ View *AppGetActiveView();
 void AppSetActiveView(View *view);
 
 /*
+* Forces the current view to swap to the binding for the given state.
+*/
+void AppSetBindingsForState(ViewState state);
+
+/*
 * Gets cwd from app context.
 */
 char *AppGetContextDirectory();

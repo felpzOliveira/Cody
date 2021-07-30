@@ -69,6 +69,18 @@ int TranslateKeyCodeX11(int scancode){
         case XK_Right:          return Key_Right;
         case XK_Down:           return Key_Down;
         case XK_Up:             return Key_Up;
+        case XK_F1:             return Key_F1;
+        case XK_F2:             return Key_F2;
+        case XK_F3:             return Key_F3;
+        case XK_F4:             return Key_F4;
+        case XK_F5:             return Key_F5;
+        case XK_F6:             return Key_F6;
+        case XK_F7:             return Key_F7;
+        case XK_F8:             return Key_F8;
+        case XK_F9:             return Key_F9;
+        case XK_F10:            return Key_F10;
+        case XK_F11:            return Key_F11;
+        case XK_F12:            return Key_F12;
         
         case XK_KP_Insert:      return Key_0;
         case XK_KP_End:         return Key_1;

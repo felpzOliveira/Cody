@@ -690,7 +690,7 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         LockedLineBuffer *lockedBuffer = nullptr;
         GetExecutorLockedLineBuffer(&lockedBuffer);
         if(lockedBuffer->lineBuffer == bView->lineBuffer){
-            lockedBuffer->mutex.lock();
+            //lockedBuffer->mutex.lock();
             is_locked = 1;
         }
 
@@ -705,7 +705,7 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
                 r = 0;
             }
 
-            lockedBuffer->mutex.unlock();
+            //lockedBuffer->mutex.unlock();
         }
 
         return r;

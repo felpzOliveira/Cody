@@ -131,6 +131,20 @@ uint GetSimplifiedPathName(char *fullPath, uint len){
     return 0;
 }
 
+int StringFindFirstChar(char *s0, uint s0len, char v){
+    for(int i = 0; i < (int)s0len; i++){
+        if(s0[i] == v) return i;
+    }
+    return -1;
+}
+
+int StringFindLastChar(char *s0, uint s0len, char v){
+    for(int i = (int)s0len-1; i >= 0; i--){
+        if(s0[i] == v) return i;
+    }
+    return -1;
+}
+
 int StringFirstNonEmpty(char *s0, uint s0len){
     for(uint i = 0; i < s0len; i++){
         // TODO: other empty chars?

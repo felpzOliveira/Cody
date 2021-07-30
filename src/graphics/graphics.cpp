@@ -904,6 +904,7 @@ void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len,
 *       transitions and the viewing interface? Also it allows us to by-pass
 *       the 'translate at end of file' issue we have right now.
 */
+
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
@@ -980,11 +981,10 @@ void OpenGLEntry(){
             WaitForEventsX11();
         }
     }
-    
+
     //DEBUG_MSG("Finalizing OpenGL graphics\n");
     DestroyWindowX11(state->window);
     TerminateX11();
-    
     state->running = 0;
     state->window = nullptr;
     FinishExecutor();

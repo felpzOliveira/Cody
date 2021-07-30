@@ -528,7 +528,7 @@ uint LineBuffer_InsertRawText(LineBuffer *lineBuffer, char *text, uint size){
     uint dummy = 0;
 
     return LineBuffer_InsertRawTextAt(lineBuffer, text, size, lastLine,
-                                      u8offset, &dummy);
+                                      u8offset, &dummy, 1);
 }
 
 void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int decode_tab){
@@ -1000,7 +1000,8 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
 }
 
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, uint *offset)
+                                uint base, uint u8offset, uint *offset,
+                                int replaceDashR)
 {
     /*
     * Algorithm: We need to insert a possible multi-line text at a given position.
@@ -1068,6 +1069,11 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     
     while(proc < size){
         char s = text[proc];
+        if(s == '\r' && replaceDashR){
+            text[proc] = '\n';
+            s = '\n';
+        }
+
         if(s == '\r') proc++;
         else if(s == '\n'){
             //Buffer *buffer = lineBuffer->lines[base];
@@ -1211,11 +1217,21 @@ void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size){
 }
 
 void LineBuffer_SetWrittable(LineBuffer *lineBuffer, bool isWrittable){
-    lineBuffer->props.isWrittable = isWrittable;
+    if(lineBuffer){
+        lineBuffer->props.isWrittable = isWrittable;
+    }else{
+        printf("Warning: Attempted to set null linebuffer writtable flag\n");
+    }
 }
 
 bool LineBuffer_IsWrittable(LineBuffer *lineBuffer){
-    return lineBuffer->props.isWrittable;
+    if(lineBuffer){
+        return lineBuffer->props.isWrittable;
+    }
+    // if no linebuffer is given it is potentially a flow execution
+    // for outer components (autocomplete, querybar, ...) in this
+    // case do not reject the caller.
+    return true;
 }
 
 uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr, 

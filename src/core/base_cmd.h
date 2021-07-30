@@ -5,6 +5,7 @@
 #include <types.h>
 #include <geometry.h>
 #include <functional>
+#include <string>
 
 struct QueryBar;
 struct LineBuffer;
@@ -14,6 +15,20 @@ struct FileEntry;
 
 #define OnFileOpenCallback std::function<void(View *view, FileEntry *entry)>
 #define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
+
+#define MAX_THREADS 16
+#define MAX_SEARCH_ENTRIES 256
+#define MAX_QUERIABLE_BUFFERS 256
+struct GlobalSearchResult{
+    LineBuffer *lineBuffer;
+    int line;
+    int col;
+};
+
+struct GlobalSearch{
+    GlobalSearchResult results[MAX_SEARCH_ENTRIES];
+    uint count;
+};
 
 /* Commands are pre-defined by their enum id */
 typedef enum{
@@ -61,8 +76,6 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                           DoubleCursor *dcursor, char *toSearch = nullptr,
                           uint toSearchLen = 0);
 
-
-
 /*
 * Perform setup to start a command of file opening.
 */
@@ -87,5 +100,15 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view);
 * Pushes a new filename, existing or not, into the config for auto-loading.
 */
 int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size);
+
+/*
+* Gets the current global search result. You are not allowed to touch this data,
+* it is only available for reading in order to render or interact with user.
+* It returns the amount of entries in the search list, this value is hardcoded
+* to MAX_THREADS, unless it is not possible to return the value, in which case
+* 0 is returned instead. In order to inspect how many entries are available it
+* is required to loop the list and check each individual 'count' value.
+*/
+uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch);
 
 #endif //BASE_CMD_H

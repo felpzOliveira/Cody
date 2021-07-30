@@ -106,7 +106,7 @@ int StringIsDigits(char *s0, uint len);
 uint StringToUnsigned(char *s0, uint len);
 
 /*
-* Checks if a given string starts with another string.
+* Checks if a given string 's0' starts with another string 's1'.
 */
 int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len);
 
@@ -115,6 +115,16 @@ int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len);
 * in case of failures.
 */
 int StringFirstNonEmpty(char *s0, uint s0len);
+
+/*
+* Find the first ocurrency of 'v' inside 's0'.
+*/
+int StringFindFirstChar(char *s0, uint s0len, char v);
+
+/*
+* Find the last ocurrency of 'v' inside 's0'.
+*/
+int StringFindLastChar(char *s0, uint s0len, char v);
 
 /*
 * Get the n-th digit of value. Digits are count backwards, i.e.:
@@ -238,6 +248,25 @@ struct List{
     ListNode<T> *tail;
     uint size;
 };
+
+template<typename T> inline uint List_FetchAsArray(List<T> *list, T **array,
+                                                   uint arraySize, uint start=0)
+{
+    if(start >= list->size) return 0;
+    uint count = Min(list->size - start, arraySize);
+    ListNode<T> *ptr = list->head;
+    uint s = 0;
+    for(uint i = 0; i < start && ptr; i++){
+        ptr = ptr->next;
+    }
+
+    for(uint i = 0; i < count && ptr; i++){
+        array[s++] = ptr->item;
+        ptr = ptr->next;
+    }
+
+    return s;
+}
 
 template<typename T> inline List<T> *List_Create(){
     List<T> *list = AllocatorGetN(List<T>, 1);

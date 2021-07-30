@@ -233,7 +233,8 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
 * line inserted.
 */
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
-                                uint base, uint u8offset, uint *offset);
+                                uint base, uint u8offset, uint *offset,
+                                int replaceDashR=0);
 
 /*
 * Inserts a (possible) multiline UTF-8 text at the end of a linebuffer.

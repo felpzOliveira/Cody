@@ -242,6 +242,10 @@ int WindowShouldCloseX11(WindowX11 *window){
     return window->shouldClose;
 }
 
+void SetWindowShouldCloseX11(WindowX11 *window){
+    window->shouldClose = 1;
+}
+
 int IsWindowVisibleX11(WindowX11 *window, LibHelperX11 *x11){
     XWindowAttributes wa;
     XGetWindowAttributes(x11->display, window->handle, &wa);

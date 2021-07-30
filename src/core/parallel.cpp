@@ -56,6 +56,7 @@ int ExecuteCommand(std::string cmd, const Fn &callback){
     }
 
     try{
+        memset(buffer, 0, sizeof(buffer));
         while(fgets(buffer, sizeof(buffer), fp) != NULL){
             callback(std::string(buffer), 0);
         }
@@ -74,11 +75,12 @@ int ExecuteCommand(std::string cmd, const Fn &callback){
     return rv;
 }
 
+static int state = 1;
 void ExecutorMainLoop(){
     while(1){
         std::string cmd = commandQ.pop();
         if(cmd.size() > 0){
-            if(cmd == std::string(CMD_EXIT)) return;
+            if(cmd == std::string(CMD_EXIT)) break;
             LineBuffer_SoftClear(lockedBuffer.lineBuffer);
             ExecuteCommand(cmd, [&](std::string msg, int done) -> void{
                 //printf("[LOOP]: %s", msg.c_str());
@@ -101,6 +103,8 @@ void ExecutorMainLoop(){
             printf("Got empty cmd\n");
         }
     }
+
+    state = 1;
 }
 
 int ExecuteCommand(std::string cmd){
@@ -109,7 +113,13 @@ int ExecuteCommand(std::string cmd){
 }
 
 void FinishExecutor(){
+    // cleanup of threaded queue is generating errors if we terminate before cleanup
+    // so we are just going to sleep and wait for it
+    state = 0;
     commandQ.push(CMD_EXIT);
+    while(state == 0){
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
 }
 
 void GetExecutorLockedLineBuffer(LockedLineBuffer **ptr){

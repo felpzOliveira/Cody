@@ -158,6 +158,7 @@ void InitializeX11();
 void SetSamplesX11(int samples);
 void SetOpenGLVersionX11(int major, int minor);
 int  WindowShouldCloseX11(WindowX11 *window);
+void SetWindowShouldCloseX11(WindowX11 *window);
 void SwapBuffersX11(WindowX11 *window);
 void SwapIntervalX11(WindowX11 *window, int interval);
 void PoolEventsX11();

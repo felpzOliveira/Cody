@@ -13,6 +13,7 @@
 #include <types.h>
 #include <view_tree.h>
 #include <control_cmds.h>
+#include <parallel.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -333,7 +334,6 @@ void AppDefaultRemoveOne(){
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
     BufferView *bufferView = View_GetBufferView(view);
-    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
     if(state == View_FreeTyping || state == View_AutoComplete){
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -341,6 +341,7 @@ void AppDefaultRemoveOne(){
         
         NullRet(buffer);
         NullRet(bufferView->lineBuffer);
+        NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
         Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
         SymbolTable *symTable = tokenizer->symbolTable;
 
@@ -859,8 +860,8 @@ void AppCommandQueryBarInteractiveCommand(){
             char *content = nullptr;
             uint size = 0;
             QueryBar_GetWrittenContent(bar, &content, &size);
-            BaseCommand_Interpret(content, size, view);
-            return -1;
+            int r = BaseCommand_Interpret(content, size, view);
+            return r == 2 ? 0 : -1;
         };
 
         QueryBar_ActivateCustom(qbar, nullptr, 0, emptyFunc,
@@ -1469,6 +1470,22 @@ void AppCommandInsertSymbol(){
     }
 }
 
+void AppCommandSwapToBuildBuffer(){
+    View *view = AppGetActiveView();
+    LockedLineBuffer *lockedBuffer = nullptr;
+    GetExecutorLockedLineBuffer(&lockedBuffer);
+    GetExecutorLockedLineBuffer(&lockedBuffer);
+    ViewNode *vnode = AppGetNextViewNode();
+    BufferView *bView = View_GetBufferView(view);
+    if(vnode){
+        if(vnode->view){
+            bView = View_GetBufferView(vnode->view);
+        }
+    }
+
+    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+}
+
 void AppCommandQueryBarLeftArrow(){
     View *view = AppGetActiveView();
     QueryBar *bar = View_GetQueryBar(view);
@@ -1684,6 +1701,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandPaste, Key_LeftControl, Key_V);
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_C);
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_Q);
+    RegisterRepeatableEvent(mapping, AppCommandSwapToBuildBuffer, Key_LeftControl, Key_M);
     
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
 
@@ -1696,7 +1714,6 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
     RegisterRepeatableEvent(mapping, AppCommandInsertSymbol, Key_LeftControl, Key_I);
-
 
     // Let the control commands bind its things
     ControlCommands_Initialize();

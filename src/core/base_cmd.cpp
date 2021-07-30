@@ -6,6 +6,10 @@
 #include <parallel.h>
 #include <bufferview.h>
 #include <sstream>
+#include <map>
+
+static std::map<std::string, std::string> aliasMap;
+static std::string envDir;
 
 /* Default helper functions */
 static void SelectableListFreeLineBuffer(View *view){
@@ -76,42 +80,307 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
     return 0;
 }
 
+struct QueriableSearchResult{
+    GlobalSearchResult res[MAX_SEARCH_ENTRIES * MAX_THREADS];
+    int count;
+};
+
+GlobalSearch results[MAX_THREADS];
+QueriableSearchResult linearResults;
+
+uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch){
+    if(gSearch){
+        *gSearch = &results[0];
+        return MAX_THREADS;
+    }else{
+        return 0;
+    }
+}
+
+void BaseCommand_JumpViewToBuffer(View *view, LineBuffer *lineBuffer, vec2i p){
+    BufferView *bView = View_GetBufferView(view);
+    BufferView_SwapBuffer(bView, lineBuffer);
+    BufferView_CursorToPosition(bView, p.x, p.y);
+    BufferView_GhostCursorFollow(bView);
+}
+
+int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
+    int active = View_SelectableListGetActiveIndex(view);
+    if(active == -1){
+        return 0;
+    }
+
+    GlobalSearchResult *result = &linearResults.res[active];
+    LineBuffer *targetLineBuffer = result->lineBuffer;
+#if 0
+    Buffer *buffer = LineBuffer_GetBufferAt(targetLineBuffer, result->line);
+    printf("Picked %s:%d:%d : %s\n", targetLineBuffer->filePath,
+           result->line, result->col, buffer->data);
+#endif
+
+    BaseCommand_JumpViewToBuffer(view, targetLineBuffer,
+                                 vec2i(result->line, result->col));
+
+    SelectableListFreeLineBuffer(view);
+    return 1;
+}
+
+int SearchAllFilesCommandStart(View *view){
+    AssertA(view != nullptr, "Invalid view pointer");
+    const char *header = "Search Files";
+    uint hlen = strlen(header);
+    LineBuffer *lineBuffer = AllocatorGetN(LineBuffer, 1);
+    LineBuffer_InitBlank(lineBuffer);
+    std::string root = AppGetRootDirectory();
+
+    char *rootStr = (char *)root.c_str();
+    uint rootLen = root.size();
+
+    linearResults.count = 0;
+    for(int tid = 0; tid < MAX_THREADS; tid++){
+        GlobalSearch *res = &results[tid];
+        for(uint i = 0; i < res->count; i++){
+            if(!res->results[i].lineBuffer) continue;
+            char *p = (char *)res->results[i].lineBuffer->filePath;
+            uint l = res->results[i].lineBuffer->filePathSize;
+            uint at = 0;
+            int insert = 1;
+            for(int k = 0; k < linearResults.count; k++){
+                GlobalSearchResult *r = &linearResults.res[k];
+                if(r->lineBuffer == res->results[i].lineBuffer &&
+                   r->line == res->results[i].line)
+                {
+                    insert = 0; break;
+                }
+            }
+
+            if(!insert) continue;
+
+            if(StringStartsWith(p, l, rootStr, rootLen)){
+                at = rootLen;
+                while(at < l && p[at] == '/') at ++;
+            }
+
+            LineBuffer *lBuffer = res->results[i].lineBuffer;
+            char *pptr = &(res->results[i].lineBuffer->filePath[at]);
+            char m[256];
+
+            Buffer *buffer = LineBuffer_GetBufferAt(lBuffer, res->results[i].line);
+            uint f = buffer->taken;
+            char ss = buffer->data[f];
+            buffer->data[f] = 0;
+            uint len = snprintf(m, sizeof(m), "%s:%d:%s", pptr,
+                                res->results[i].line, buffer->data);
+            buffer->data[f] = ss;
+            linearResults.res[linearResults.count++] = res->results[i];
+
+            LineBuffer_InsertLine(lineBuffer, (char *)m, len, 0);
+        }
+    }
+
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+    filter.allowFreeType = 0;
+    View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
+                           SelectableListDefaultEntry, SelectableListDefaultCancel,
+                           GlobalSearchCommandCommit, &filter);
+    return 0;
+}
+
+int BaseCommand_SearchAllFiles(char *cmd, uint size){
+    int r = 0;
+    std::string search("search ");
+    if(StringStartsWith(cmd, size, (char *)search.c_str(), search.size())){
+        r = 1;
+        int e = StringFirstNonEmpty(&cmd[search.size()], size - search.size());
+        if(e < 0) return r;
+        e += search.size();
+
+        std::string searchStr(&cmd[e]);
+
+        FileBufferList *bufferList = FileProvider_GetBufferList();
+        FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
+        uint size = List_FetchAsArray(bufferList->fList, bufferArray,
+                                      MAX_QUERIABLE_BUFFERS, 0);
+
+        for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
+
+        const char *strPtr = searchStr.c_str();
+        uint stringLen = searchStr.size();
+
+        ParallelFor("String Seach", 0, size, [&](int i, int tid){
+            LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
+            //printf("[%d] ==> %s\n", tid, lineBuffer->filePath);
+            if(tid > MAX_THREADS-1){
+                printf("Ooops cannot query, too many threads\n");
+                return;
+            }
+
+            GlobalSearch *threadResult = &results[tid];
+            if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
+                printf("Too many results\n");
+                return;
+            }
+
+            for(uint i = 0; i < lineBuffer->lineCount; i++){
+                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+                if(buffer->taken > 0){
+                    int at = 0;
+                    uint start = 0;
+                    do{
+                        at = StringSearch((char *)strPtr, &buffer->data[start],
+                                          stringLen, buffer->taken - start);
+                        if(at >= 0){
+                            uint loc = threadResult->count;
+                            if(loc >= MAX_SEARCH_ENTRIES-1){
+                                printf("Too many results\n");
+                                return;
+                            }
+
+                            threadResult->results[loc].line = i;
+                            threadResult->results[loc].col = at + start;
+                            threadResult->results[loc].lineBuffer = lineBuffer;
+                            start += at + stringLen;
+                            threadResult->count++;
+                        }
+                    }while(at >= 0);
+                }
+            }
+        });
+#if 0
+        for(int tid = 0; tid < MAX_THREADS; tid++){
+            GlobalSearch *threadResult = &results[tid];
+            for(uint i = 0; i < threadResult->count; i++){
+                printf("[%s] = line (%d) col (%d)\n",
+                        threadResult->results[i].lineBuffer->filePath,
+                        threadResult->results[i].line,
+                        threadResult->results[i].col);
+            }
+        }
+#endif
+
+        View *view = AppGetActiveView();
+        if(SearchAllFilesCommandStart(view) >= 0){
+            AppSetBindingsForState(View_SelectableList);
+            r = 2;
+        }
+    }
+
+    return r;
+}
+
+int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
+    int r = 0;
+    std::string alias("alias ");
+    if(StringStartsWith(cmd, size, (char *)alias.c_str(), alias.size())){
+        r = 1;
+        int e = StringFirstNonEmpty(&cmd[alias.size()], size - alias.size());
+        if(e < 0) return r;
+        e += alias.size();
+
+        char *target = &cmd[e];
+
+        int p = StringFindFirstChar(target, size - e, '=');
+        if(p < 0) return r;
+
+        int n = p-1;
+        // rewind and remove space
+        for(int f = p-1; f > e; f--){
+            if(cmd[f] == ' ') n--;
+            else break;
+        }
+
+        char t = target[n];
+        target[n] = 0;
+
+        std::string targetStr(target);
+        target[n] = t;
+
+        int s = StringFirstNonEmpty(&target[p+1], size - e - p - 1);
+        if(s < 0) return r;
+
+        char *value = &target[p+1+s];
+
+        char vv = cmd[size];
+        cmd[size] = 0;
+        std::string valueStr(value);
+        cmd[size] = vv;
+
+        aliasMap[targetStr] = valueStr;
+        printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
+    }
+
+    return r;
+}
+
+std::string BaseCommand_GetBasePath(){
+    if(envDir.size() > 0) return std::string("/") + envDir;
+    return "/build";
+}
+
+int BaseCommand_SetExecPath(char *cmd, uint size){
+    int r = 0;
+    // TODO: options?
+    std::string senv("set-env ");
+    if(StringStartsWith(cmd, size, (char *)senv.c_str(), senv.size())){
+        r = 1;
+        int e = StringFirstNonEmpty(&cmd[senv.size()], size - senv.size());
+        if(e < 0) return r;
+        char v = cmd[size];
+        cmd[size] = 0;
+
+        envDir = std::string(&cmd[senv.size() + e]);
+        cmd[size] = v;
+    }
+
+    return r;
+}
+
+std::string BaseCommand_Interpret_Alias(char *cmd, uint size){
+    std::string strCmd(cmd);
+    if(aliasMap.find(strCmd) != aliasMap.end()){
+        strCmd = aliasMap[strCmd];
+    }
+
+    return strCmd;
+}
+
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: map of commands? maybe set some function pointers to this
     // TODO: create a standard for this, a json or at least something like bubbles
     int rv = -1;
-#if 0
-    std::string add_to_config("add-to-config");
-    if(StringStartsWith(cmd, size, (char*)add_to_config.c_str(), add_to_config.size())){
-        uint len = size - add_to_config.size();
-        char *ptr = &cmd[add_to_config.size()];
-        int at = StringFirstNonEmpty(ptr, len);
-        rv = BaseCommand_AddFileEntryIntoAutoLoader(&ptr[at], len-at);
+    if(BaseCommand_Interpret_AliasInsert(cmd, size, view)){
+        return 0;
+    }else if(BaseCommand_SetExecPath(cmd, size)){
+        return 0;
+    }else{
+        rv = BaseCommand_SearchAllFiles(cmd, size);
+        if(rv != 0) return rv;
+
+        rv = -1;
     }
-#endif
 
-    std::string make("make");
-    if(StringStartsWith(cmd, size, (char *)make.c_str(), make.size())){
-        std::string rootDir = AppGetRootDirectory() + std::string("/build");
-        std::stringstream ss;
-        ss << "cd " << rootDir << " && " << "make";
+    std::string strCmd = BaseCommand_Interpret_Alias(cmd, size);
 
-        std::string md = ss.str();
-        LockedLineBuffer *lockedBuffer = nullptr;
-        GetExecutorLockedLineBuffer(&lockedBuffer);
-        ViewNode *vnode = AppGetNextViewNode();
-        BufferView *bView = View_GetBufferView(view);
-        if(vnode){
-            if(vnode->view){
-                bView = View_GetBufferView(vnode->view);
-            }
+    std::string rootDir = AppGetRootDirectory() + BaseCommand_GetBasePath();
+    std::stringstream ss;
+    ss << "cd " << rootDir << " && " << strCmd;
+
+    std::string md = ss.str();
+    LockedLineBuffer *lockedBuffer = nullptr;
+    GetExecutorLockedLineBuffer(&lockedBuffer);
+    ViewNode *vnode = AppGetNextViewNode();
+    BufferView *bView = View_GetBufferView(view);
+    if(vnode){
+        if(vnode->view){
+            bView = View_GetBufferView(vnode->view);
         }
-
-        BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
-        // TODO: function LockedBufferStartRender() or something
-        lockedBuffer->render_state = 0;
-        ExecuteCommand(md);
     }
+
+    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+    // TODO: function LockedBufferStartRender() or something
+    lockedBuffer->render_state = 0;
+    ExecuteCommand(md);
+
     return rv;
 }
 
