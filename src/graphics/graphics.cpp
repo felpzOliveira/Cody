@@ -505,22 +505,13 @@ void OpenGLFontSetup(OpenGLState *state){
     uint filesize = 0;
     char *fontfileContents = nullptr;
     OpenGLFont *font = &state->font;
-    
-    //TODO: These should not be files
-    const char *v0 = "/home/felipe/Documents/Mayhem/shaders/text.v.glsl";
-    const char *f0 = "/home/felipe/Documents/Mayhem/shaders/text.f.glsl";
-    const char *v1 = "/home/felipe/Documents/Mayhem/shaders/cursor.v.glsl";
-    const char *f1 = "/home/felipe/Documents/Mayhem/shaders/cursor.f.glsl";
 
-    const char *v2 = "/home/felipe/Documents/Mayhem/shaders/icon.v.glsl";
-    const char *f2 = "/home/felipe/Documents/Mayhem/shaders/icon.f.glsl";
-    
-    uint vertex    = Shader_CompileFile(v0, SHADER_TYPE_VERTEX);
-    uint fragment  = Shader_CompileFile(f0, SHADER_TYPE_FRAGMENT);
-    uint cvertex   = Shader_CompileFile(v1, SHADER_TYPE_VERTEX);
-    uint cfragment = Shader_CompileFile(f1, SHADER_TYPE_FRAGMENT);
-    uint ivertex   = Shader_CompileFile(v2, SHADER_TYPE_VERTEX);
-    uint ifragment = Shader_CompileFile(f2, SHADER_TYPE_FRAGMENT);
+    uint vertex    = Shader_CompileSource(shader_text_v, SHADER_TYPE_VERTEX);
+    uint fragment  = Shader_CompileSource(shader_text_f, SHADER_TYPE_FRAGMENT);
+    uint cvertex   = Shader_CompileSource(shader_cursor_v, SHADER_TYPE_VERTEX);
+    uint cfragment = Shader_CompileSource(shader_cursor_f, SHADER_TYPE_FRAGMENT);
+    uint ivertex   = Shader_CompileSource(shader_icon_v, SHADER_TYPE_VERTEX);
+    uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
     
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
@@ -549,31 +540,15 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
     Graphics_QuadPush(state, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
 }
 
-// TODO: Figure out paths / memory loading stuff for these
 static void OpenGLLoadIcons(OpenGLState *state){
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/folder.png",
-                        ".folder");
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cmake.png",
-                         ".cmake", FILE_EXTENSION_CMAKE);
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cpp.png",
-                         ".cpp", FILE_EXTENSION_CPP);
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cppheader.png",
-                         ".cppheader");
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/glsl.png",
-                         ".glsl", FILE_EXTENSION_GLSL);
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/cuda.png",
-                         ".cu", FILE_EXTENSION_CUDA);
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/text.png",
-                         ".txt", FILE_EXTENSION_TEXT);
-
-    Graphics_TextureInit(state, "/home/felipe/Documents/vscode-icons/icons/font.png",
-                         ".ttf", FILE_EXTENSION_FONT);
+    Graphics_TextureInit(state, folder_png, folder_png_len, ".folder");
+    Graphics_TextureInit(state, cmake_png, cmake_png_len, ".cmake", FILE_EXTENSION_CMAKE);
+    Graphics_TextureInit(state, cpp_png, cpp_png_len, ".cpp", FILE_EXTENSION_CPP);
+    Graphics_TextureInit(state, cppheader_png, cppheader_png_len, ".cppheader");
+    Graphics_TextureInit(state, glsl_png, glsl_png_len, ".glsl", FILE_EXTENSION_GLSL);
+    Graphics_TextureInit(state, cuda_png, cuda_png_len, ".cu", FILE_EXTENSION_CUDA);
+    Graphics_TextureInit(state, text_png, text_png_len, ".txt", FILE_EXTENSION_TEXT);
+    Graphics_TextureInit(state, font_png, font_png_len, ".ttf", FILE_EXTENSION_FONT);
 }
 
 void OpenGLInitialize(OpenGLState *state){
@@ -942,7 +917,14 @@ void OpenGLEntry(){
             BufferView_UpdateCursorNesting(bView);
 
             // Sets the alpha for the current view rendering stages, makes the dimm effect
-            SetAlpha(view->isActive ? 0 : 1);
+
+            // TODO: quick hack to disable dimm for build buffer
+            int dim = view->isActive ? 0 : 1;
+            if(bView->lineBuffer){
+                if(bView->lineBuffer->filePathSize == 0) dim = 0;
+            }
+
+            SetAlpha(dim);
             bView->is_transitioning = 0;
 
             if(BufferView_IsVisible(bView)){

@@ -539,16 +539,16 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
     FileEntry *entry = nullptr;
     FileOpener *opener = View_GetFileOpener(view);
     int active = View_SelectableListGetActiveIndex(view);
+    int rv = 1;
     if(active == -1){ // is a creation
         queryBar->fileOpenCallback(view, entry);
-        SelectableListFreeLineBuffer(view);
-        return 1;
+        goto end;
     }
     
     View_SelectableListGetItem(view, active, &buffer);
     if(!buffer){
-        SelectableListFreeLineBuffer(view);
-        return -1;
+        rv = -1;
+        goto end;
     }
     
     rindex = View_SelectableListGetRealIndex(view, active);
@@ -563,7 +563,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
         opener->pathLen += entry->pLen + 1;
         if(CHDIR(opener->basePath) < 0){
             printf("Failed to change to %s directory\n", opener->basePath);
-            return 1;
+            goto end;
         }
         
         if(ListFileEntriesAndCheckLoaded(opener->basePath, &opener->entries,
@@ -571,7 +571,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
         {
             printf("Failed to list files from %s\n", opener->basePath);
             IGNORE(CHDIR(opener->basePath));
-            return 1;
+            goto end;
         }
         
         Memset(p, 0x00, PATH_MAX);
@@ -584,13 +584,13 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
     }
     
     queryBar->fileOpenCallback(view, entry);
-    
+end:
     SelectableListFreeLineBuffer(view);
     AllocatorFree(opener->entries);
     opener->entries = nullptr;
     opener->entryCount = 0;
     opener->entrySize = 0;
-    return 1;
+    return rv;
 }
 
 int FileOpenerCommandStart(View *view, char *basePath, ushort len,

@@ -1586,8 +1586,9 @@ void AppCommandOpenFile(){
     
     int r = FileOpenerCommandStart(view, appContext.cwd, 
                                    strlen(appContext.cwd), fileOpen);
-    if(r >= 0)
+    if(r >= 0){
         AppSetBindingsForState(View_SelectableList);
+    }
 }
 
 void AppInitialize(){

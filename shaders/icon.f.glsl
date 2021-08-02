@@ -27,8 +27,8 @@ void main(){
     else if(fmid > 6.5 && fmid < 7.5) fragColor = texture2D(image7, texCoords);
     else fragColor = vec4(vec3(fmid), 1.0);
 
-    float f = mid;
-    float ff = f / 2.0;
+    //float f = mid;
+    //float ff = f / 2.0;
 
     //fragColor = fragColor * 0.01 + vec4(vec3(1.0 - float(mid)), 1.0);
     //fragColor = fragColor * 0.01 + vec4(vec3(ff), 1.0);
