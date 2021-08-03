@@ -7,6 +7,7 @@
 #include <buffers.h>
 #include <transform.h>
 #include <scroll_controller.h>
+#include <vector>
 
 typedef enum{
     DescriptionTop,
@@ -30,7 +31,6 @@ struct BufferView{
     LineBuffer *lineBuffer;
     VScroll sController;
     Geometry geometry;
-    
     /*
     * Rendering properties of the BufferView, defined by the renderer
     */
@@ -46,6 +46,13 @@ struct BufferView{
     int is_visible;
 
     int is_transitioning;
+};
+
+struct BufferViewFileLocation{
+    vec2ui textPosition;
+    vec2ui ghostPosition;
+    vec2ui range;
+    LineBuffer *lineBuffer;
 };
 
 Float InterpolateValueCubic(Float dt, Float remaining,
@@ -257,6 +264,26 @@ void BufferView_Dirty(BufferView *view);
 * Checks if a given bufferview is currently being rendered.
 */
 int BufferView_IsVisible(BufferView *view);
+
+/*
+* Register the position of the bufferview for a linebuffer.
+*/
+void BufferViewFileLocation_Register(BufferView *view);
+
+/*
+* Restore the position of a bufferview for a linebuffer.
+*/
+void BufferViewFileLocation_Restore(BufferView *view);
+
+/*
+* Removes a bufferview from the global tracked views.
+*/
+void BufferViewLocation_RemoveView(BufferView *view);
+
+/*
+* Removes a linebuffer from all tracked views positions.
+*/
+void BufferViewLocation_RemoveLineBuffer(LineBuffer *lineBuffer);
 
 void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

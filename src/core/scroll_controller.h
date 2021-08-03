@@ -60,4 +60,6 @@ void VScroll_CursorToPosition(VScroll *ss, uint lineNo, uint col, LineBuffer *li
 
 void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer);
 
+void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer);
+
 #endif //SCROLL_CONTROLLER_H

@@ -658,17 +658,20 @@ void AppCommandKillBuffer(){
         char *ptr = lineBuffer->filePath;
         uint pSize = lineBuffer->filePathSize;
         FileProvider_Remove(ptr, pSize);
+        BufferViewLocation_RemoveLineBuffer(lineBuffer);
         LineBuffer_Free(lineBuffer);
         AllocatorFree(lineBuffer);
     }
 }
 
 void AppCommandKillView(){
+    BufferView *bView = AppGetActiveBufferView();
     // we need to make sure the interface is not expanded otherwise
     // UI will get weird.
     ControlCommands_RestoreExpand();
 
     AppCommandKillBuffer();
+    BufferViewLocation_RemoveView(bView);
      // TODO: Check if it is safe to erase the view in the vnode here
     ViewNode *vnode = ViewTree_DestroyCurrent(1);
     AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);

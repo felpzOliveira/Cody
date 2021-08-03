@@ -62,6 +62,12 @@ void BufferView_CursorTo(BufferView *view, uint lineNo){
     }
 }
 
+void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
+    if(view->lineBuffer){
+        VScroll_FitCursorToRange(&view->sController, range, view->lineBuffer);
+    }
+}
+
 //TODO: Figure this out!
 void BufferView_Synchronize(BufferView *view){
     if(view->lineBuffer){
@@ -154,12 +160,14 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer){
 
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer){
     // We need to reset geometry because scroll actually holds visible range
+    BufferViewFileLocation_Register(view);
     Float lineHeight = view->sController.lineHeight;
     view->lineBuffer = lineBuffer;
     view->scroll.currX = 0;
     view->activeNestPoint = -1;
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
+    BufferViewFileLocation_Restore(view);
 }
 
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){
@@ -567,4 +575,110 @@ LineBuffer *BufferView_GetLineBuffer(BufferView *view){
 
 Buffer *BufferView_GetBufferAt(BufferView *view, uint lineNo){
     return LineBuffer_GetBufferAt(view->lineBuffer, lineNo);
+}
+
+//TODO: check if we can do faster than this
+//      i don't think there is a problem because most usage is with 2 views
+//      and we only depend on the hash map, but we can improve if it gets slow
+struct BufferViewLocation{
+    std::map<LineBuffer *, BufferViewFileLocation> locationMap;
+    BufferView *view;
+};
+
+#define MAX_BUFFERVIEWS 16
+BufferViewLocation globalLocations[MAX_BUFFERVIEWS];
+int globalTakenPositions = 0;
+
+inline
+BufferViewLocation *BufferViewLocation_GetEntry(BufferView *view, int *at=nullptr){
+    if(!view) return nullptr;
+    BufferViewLocation *loc = nullptr;
+    for(int i = 0; i < globalTakenPositions; i++){
+        if(globalLocations[i].view == view){
+            loc = &globalLocations[i];
+            if(at) *at = i;
+            break;
+        }
+    }
+
+    return loc;
+}
+
+void BufferViewLocation_RemoveView(BufferView *view){
+    BufferViewLocation *loc = nullptr;
+    int at = -1;
+    if(!view || globalTakenPositions < 1) return;
+    loc = BufferViewLocation_GetEntry(view, &at);
+
+    if(!loc || at < 0) return;
+
+    // TODO: this is one expensive shift, but hopefully it wont
+    //       be executed too much
+    for(int i = at+1; i < globalTakenPositions; i++){
+        BufferViewLocation *next = &globalLocations[i];
+        loc->view = next->view;
+        loc->locationMap = next->locationMap;
+        next->view = nullptr;
+        next->locationMap.clear();
+    }
+
+    globalTakenPositions -= 1;
+}
+
+void BufferViewLocation_RemoveLineBuffer(LineBuffer *lineBuffer){
+    if(!lineBuffer || globalTakenPositions < 1) return;
+    for(int i = 0; i < globalTakenPositions; i++){
+        BufferViewLocation *loc = &globalLocations[i];
+        if(loc->locationMap.find(lineBuffer) != loc->locationMap.end()){
+            loc->locationMap.erase(lineBuffer);
+            //printf("[DEBUG] Removed %s from map\n", lineBuffer->filePath);
+        }
+    }
+}
+
+void BufferViewFileLocation_Restore(BufferView *view){
+    if(!view) return;
+    if(!view->lineBuffer) return;
+
+    BufferViewFileLocation location;
+    LineBuffer *lineBuffer = view->lineBuffer;
+
+    BufferViewLocation *loc = BufferViewLocation_GetEntry(view);
+    if(!loc) return;
+
+    if(loc->locationMap.find(lineBuffer) != loc->locationMap.end()){
+        location = loc->locationMap[lineBuffer];
+        vec2ui p = location.textPosition;
+        BufferView_FitCursorToRange(view, location.range);
+        BufferView_CursorToPosition(view, p.x, p.y);
+        BufferView_GhostCursorFollow(view);
+    }
+}
+
+void BufferViewFileLocation_Register(BufferView *view){
+    LineBuffer *lineBuffer = nullptr;
+    DoubleCursor *cursor = nullptr;
+    BufferViewFileLocation location;
+
+    if(!view) return;
+    if(!view->lineBuffer) return;
+
+    lineBuffer = view->lineBuffer;
+
+    BufferViewLocation *loc = BufferViewLocation_GetEntry(view);
+    if(loc == nullptr){
+        if(globalTakenPositions < MAX_BUFFERVIEWS){
+            loc = &globalLocations[globalTakenPositions++];
+            loc->view = view;
+        }else{
+            return;
+        }
+    }
+
+    BufferView_GetCursor(view, &cursor);
+    location.textPosition  = cursor->textPosition;
+    location.ghostPosition = cursor->ghostPosition;
+    location.range = BufferView_GetViewRange(view);
+
+    loc->locationMap[lineBuffer] = location;
 }
