@@ -7,7 +7,6 @@
 #include <buffers.h>
 #include <transform.h>
 #include <scroll_controller.h>
-#include <vector>
 
 typedef enum{
     DescriptionTop,
