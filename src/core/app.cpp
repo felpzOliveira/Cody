@@ -14,6 +14,7 @@
 #include <view_tree.h>
 #include <control_cmds.h>
 #include <parallel.h>
+#include <timing.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -241,7 +242,8 @@ void AppCommandFreeTypingJumpToDirection(int direction){
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             int tid = BufferView_LocateNextCursorToken(bufferView, &token);
             if(tid >= 0){
-                cursor.y = Buffer_Utf8RawPositionToPosition(buffer, token->position + token->size);
+                cursor.y = Buffer_Utf8RawPositionToPosition(buffer,
+                                    token->position + token->size);
             }else{
                 cursor.y = buffer->count;
             }
@@ -268,8 +270,6 @@ void AppCommandFreeTypingArrows(int direction){
             
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
-            
-            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_UP:{ // Move Up
             cursor.x = cursor.x > 0 ? cursor.x - 1 : 0;
@@ -278,7 +278,6 @@ void AppCommandFreeTypingArrows(int direction){
             n = n < 0 ? 0 : buffer->tokens[n].position;
             n = Buffer_Utf8RawPositionToPosition(buffer, n);
             cursor.y = Clamp(cursor.y, (uint)n, buffer->count);
-            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_DOWN:{ // Move down
             cursor.x = Clamp(cursor.x+1, (uint)0, lineCount-1);
@@ -288,7 +287,6 @@ void AppCommandFreeTypingArrows(int direction){
             n = n < 0 ? 0 : buffer->tokens[n].position;
             n = Buffer_Utf8RawPositionToPosition(buffer, n);
             cursor.y = Clamp(cursor.y, (uint)n, buffer->count);
-            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         
         case DIRECTION_RIGHT:{ // Move right
@@ -301,11 +299,12 @@ void AppCommandFreeTypingArrows(int direction){
             
             buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
-            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         
         default: AssertA(0, "Invalid direction given");
     }
+
+    BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
 void RemountTokensBasedOn(BufferView *view, uint base, uint offset=0){
@@ -1383,7 +1382,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 bufferView->lineBuffer->is_dirty = 1;
 
                 if(state == View_AutoComplete){
-                    if(utf8Size == 1 && (*utf8Data == ' ')){
+                    if(utf8Size == 1 && AUTOCOMPLETE_TERMINATOR(*utf8Data)){
                         AutoComplete_Interrupt();
                     }else{
                         AppCommandAutoComplete();
@@ -1476,7 +1475,6 @@ void AppCommandInsertSymbol(){
 void AppCommandSwapToBuildBuffer(){
     View *view = AppGetActiveView();
     LockedLineBuffer *lockedBuffer = nullptr;
-    GetExecutorLockedLineBuffer(&lockedBuffer);
     GetExecutorLockedLineBuffer(&lockedBuffer);
     ViewNode *vnode = AppGetNextViewNode();
     BufferView *bView = View_GetBufferView(view);

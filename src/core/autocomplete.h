@@ -8,6 +8,9 @@
 #include <keyboard.h>
 #include <tries.h>
 
+#define AUTOCOMPLETE_TERMINATOR(x)\
+    (!(((x) >= 'A' && (x) <= 'F') || ((x) >= 'a' && (x) <= 'f')))
+
 /* Lets atttempt to implement auto-complete shall we? */
 
 struct AutoComplete{

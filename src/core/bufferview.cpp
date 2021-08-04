@@ -303,6 +303,12 @@ void BufferView_ToogleLineNumbers(BufferView *view){
     view->renderLineNbs = 1 - view->renderLineNbs;
 }
 
+void BufferView_SetAnimationCallback(BufferView *view, std::function<void()> fn){
+    if(view){
+        VScroll_SetAnimationFinishCallback(&view->sController, fn);
+    }
+}
+
 int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
                                 TokenId *cids, uint nIds, NestPoint *out, uint maxN,
                                 int *n)

@@ -7,6 +7,7 @@
 #include <buffers.h>
 #include <transform.h>
 #include <scroll_controller.h>
+#include <functional>
 
 typedef enum{
     DescriptionTop,
@@ -263,6 +264,8 @@ void BufferView_Dirty(BufferView *view);
 * Checks if a given bufferview is currently being rendered.
 */
 int BufferView_IsVisible(BufferView *view);
+
+void BufferView_SetAnimationCallback(BufferView *view, std::function<void()> fn);
 
 /*
 * Register the position of the bufferview for a linebuffer.

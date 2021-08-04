@@ -377,6 +377,14 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     }
 
     BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+    // because the parallel thread will reset the linebuffer we need
+    // to make sure the cursor is located in a valid range for rendering
+    // otherwise in case the build buffer does is updated too fast it can
+    // generate a SIGSEGV. This needs to run after the swap as we need
+    // to make sure the position cache map is updated with whatever
+    // is being rendered at the moment.
+    BufferView_CursorToPosition(bView, 0, 0);
+    BufferView_GhostCursorFollow(bView);
     // TODO: function LockedBufferStartRender() or something
     lockedBuffer->render_state = 0;
     ExecuteCommand(md);

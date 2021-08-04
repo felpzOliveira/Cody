@@ -32,6 +32,7 @@ struct VScroll{
     uint currentMaxRange;
     Float lineHeight;
     AnimationProps transitionAnim;
+    std::function<void()> onAnimationFinished;
 };
 
 void VScroll_Init(VScroll *ss);
@@ -61,5 +62,7 @@ void VScroll_CursorToPosition(VScroll *ss, uint lineNo, uint col, LineBuffer *li
 void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer);
 
 void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer);
+
+void VScroll_SetAnimationFinishCallback(VScroll *ss, std::function<void()> fn);
 
 #endif //SCROLL_CONTROLLER_H

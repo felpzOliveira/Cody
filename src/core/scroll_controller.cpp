@@ -1,6 +1,8 @@
 #include <scroll_controller.h>
 
 int Animation_Finished(AnimationProps *anim);
+void Animation_FinishCallback(){}
+
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
                             Float *velocity);
@@ -45,6 +47,7 @@ void VScroll_Init(VScroll *ss){
     ss->transitionAnim.duration = 0.0f;
     ss->transitionAnim.endLine = 0;
     ss->transitionAnim.velocity = 0;
+    ss->onAnimationFinished = Animation_FinishCallback;
 }
 
 uint VScroll_GetCursorSelection(VScroll *ss, vec2ui *start, vec2ui *end){
@@ -305,6 +308,9 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
     cursorAt->y = ss->cursor.textPosition.y;
     rRange->x = ss->visibleRect.x;
     rRange->y = ss->visibleRect.y;
+
+    ss->onAnimationFinished();
+    ss->onAnimationFinished = Animation_FinishCallback;
     
     anim->isAnimating = 0;
     *transform = Transform();
@@ -410,5 +416,12 @@ int VScroll_GetCursorTransition(VScroll *ss, Float dt, vec2ui *rRange,
     *transform = Transform();
     anim->isAnimating = 0;
     VScroll_CursorToPosition(ss, anim->endLine, anim->endCol, lineBuffer);
+
+    ss->onAnimationFinished();
+    ss->onAnimationFinished = Animation_FinishCallback;
     return 1;
+}
+
+void VScroll_SetAnimationFinishCallback(VScroll *ss, std::function<void()> fn){
+    ss->onAnimationFinished = fn;
 }

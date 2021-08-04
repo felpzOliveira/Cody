@@ -957,11 +957,31 @@ void OpenGLEntry(){
         }
 
         SwapBuffersX11(state->window);
+#if 0
+        PoolEventsX11();
+        double pTime = GetElapsedTime();
+        double fdt = pTime - lastTime;
+        // 120 fps
+        Float targetInterval = 1.0 / 120.0;
+
+        if(!IsZero(fdt) && fdt < targetInterval){
+            int dif = (targetInterval - fdt) * 1000.0;
+            std::this_thread::sleep_for(std::chrono::milliseconds(dif));
+        }
+
+        if(!IsZero(dt)){
+            printf("FPS %g\n", 1.0 / dt);
+        }else{
+            printf("FPS ---\n");
+        }
+
+#else
         if(animating){
             PoolEventsX11();
         }else{
             WaitForEventsX11();
         }
+#endif
     }
 
     //DEBUG_MSG("Finalizing OpenGL graphics\n");
