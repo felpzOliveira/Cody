@@ -72,6 +72,7 @@ struct LineBuffer{
     UndoRedo undoRedo;
     vec2i activeBuffer;
     LineBufferProps props;
+    int built;
 };
 
 /* For static initialization */

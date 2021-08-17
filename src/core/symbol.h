@@ -57,6 +57,12 @@ typedef enum{
     TOKEN_ID_FUNCTION_DECLARATION,
 }TokenId;
 
+inline int Symbol_IsTokenAutoCompletable(TokenId id){
+    return (id != TOKEN_ID_SPACE && id != TOKEN_ID_COMMENT && id != TOKEN_ID_NUMBER &&
+            !((int)id >= TOKEN_ID_BRACE_OPEN && (int)id <= TOKEN_ID_ASTERISK) &&
+            id != TOKEN_ID_MATH && id != TOKEN_ID_SCOPE);
+}
+
 inline int Symbol_IsTokenQueriable(TokenId id){
     if(!((int)id > TOKEN_ID_IGNORE && (int)id < TOKEN_ID_FUNCTION_DECLARATION)){
         return 0;

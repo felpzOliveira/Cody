@@ -182,8 +182,8 @@ void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
     if(buffer){
         for(uint i = 0; i < buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
-            if(token->identifier != TOKEN_ID_SPACE &&
-               token->identifier != TOKEN_ID_COMMENT)
+            if(Symbol_IsTokenAutoCompletable(token->identifier) &&
+               token->size > AutoCompleteMinInsertLen)
             {
                 char *p = &buffer->data[token->position];
                 AutoComplete_Remove(p, token->size);
@@ -698,7 +698,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     
     LineBuffer_InsertLine(lineBuffer, *p, size-1, 1);
     workContext->workTokenListHead = 0;
-    
+
     Lex_TokenizerPrepareForNewLine(tokenizer, lineNr-1);
 #if DEBUG_TOKENS != 0
     char *s = *p;
@@ -734,7 +734,9 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
             
-            if(token.identifier != TOKEN_ID_SPACE && token.identifier != TOKEN_ID_COMMENT){
+            if(Symbol_IsTokenAutoCompletable(token.identifier) &&
+               token.size > AutoCompleteMinInsertLen)
+            {
                 AutoComplete_PushString(h, token.size);
             }
 #if DEBUG_TOKENS != 0
@@ -825,8 +827,8 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
 
-            if(token.identifier != TOKEN_ID_SPACE && 
-               token.identifier != TOKEN_ID_COMMENT)
+            if(Symbol_IsTokenAutoCompletable(token.identifier) &&
+               token.size > AutoCompleteMinInsertLen)
             {
                 AutoComplete_PushString(&h[token.position], token.size);
             }
@@ -934,8 +936,8 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
             for(uint s = 0; s < buffer->tokenCount; s++){
                 Token *token = &buffer->tokens[s];
                 if(token){
-                    if(token->identifier != TOKEN_ID_SPACE &&
-                    token->identifier != TOKEN_ID_COMMENT)
+                    if(Symbol_IsTokenAutoCompletable(token->identifier) &&
+                       token->size > AutoCompleteMinInsertLen)
                     {
                         char *p = &buffer->data[token->position];
                         AutoComplete_Remove(p, token->size);
@@ -983,14 +985,16 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     
     Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
     
+    //printf("Starting to parse\n");
     //clock_t start = clock();
-    
+
     Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
                     0, &lineBufferTokenizer);
     
     //clock_t end = clock();
     //double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
-    //DEBUG_MSG("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
+    //printf("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
+
     activeLineBuffer = nullptr;
     current = 0;
     totalSize = 0;

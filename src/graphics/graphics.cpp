@@ -45,6 +45,20 @@ void OpenGLClearErrors(){
     while(glGetError()) ;
 }
 
+static void ResetGLCursor(OpenGLCursor *cursor){
+    cursor->pMin = vec2f(0,0);
+    cursor->pMax = vec2f(0,0);
+    cursor->valid = 0;
+    cursor->pGlyph = -1;
+    cursor->textPos = vec2f(0,0);
+    cursor->currentDif = 0;
+}
+
+void OpenGLResetCursors(OpenGLState *state){
+    ResetGLCursor(&state->glCursor);
+    ResetGLCursor(&state->glGhostCursor);
+}
+
 void OpenGLValidateErrors(const char *fn, int line, const char *file){
     int val = glGetError();
     if(val != GL_NO_ERROR){
@@ -928,6 +942,7 @@ void OpenGLEntry(){
             bView->is_transitioning = 0;
 
             if(BufferView_IsVisible(bView)){
+                OpenGLResetCursors(state);
                 for(uint s = 0; s < pipeline->stageCount; s++){
                     state->model = state->scale; // reset model
                     animating |= pipeline->stages[s].renderer(view, state,
@@ -961,8 +976,8 @@ void OpenGLEntry(){
         PoolEventsX11();
         double pTime = GetElapsedTime();
         double fdt = pTime - lastTime;
-        // 120 fps
-        Float targetInterval = 1.0 / 120.0;
+        // 240 fps
+        Float targetInterval = 1.0 / 240.0;
 
         if(!IsZero(fdt) && fdt < targetInterval){
             int dif = (targetInterval - fdt) * 1000.0;
@@ -970,9 +985,9 @@ void OpenGLEntry(){
         }
 
         if(!IsZero(dt)){
-            printf("FPS %g\n", 1.0 / dt);
+            //printf("FPS %g\n", 1.0 / dt);
         }else{
-            printf("FPS ---\n");
+            //printf("FPS ---\n");
         }
 
 #else

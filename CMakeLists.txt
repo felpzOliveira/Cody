@@ -12,7 +12,7 @@ elseif(CMAKE_BUILD_TYPE MATCHES Valgrind)
     set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -rdynamic")
 else()
     message(STATUS "Release build")
-    set(MH_FLAGS "-O2 -Wall -std=c++11")
+    set(MH_FLAGS "-Ofast -Wall -std=c++11")
 endif()
 
 set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)

@@ -831,7 +831,8 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
             }else if(id == QUERY_BAR_CMD_REVERSE_SEARCH && line > 0){
                 line--;
                 buffer = LineBuffer_GetBufferAt(lineBuffer, line);
-                start = buffer->taken-1;
+                if(buffer) start = buffer->taken-1;
+                else start = 0;
             }else{
                 done = 1;
             }

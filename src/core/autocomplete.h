@@ -11,6 +11,11 @@
 #define AUTOCOMPLETE_TERMINATOR(x)\
     (!(((x) >= 'A' && (x) <= 'F') || ((x) >= 'a' && (x) <= 'f')))
 
+// this should be verified outside alongside Symbol_IsTokenAutoCompletable
+// but it doesn't hurt to make sure. This heavily increases performance
+// as we use a naive Trie implementation.
+#define AutoCompleteMinInsertLen 3
+
 /* Lets atttempt to implement auto-complete shall we? */
 
 struct AutoComplete{

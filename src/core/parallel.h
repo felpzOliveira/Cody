@@ -4,6 +4,7 @@
 #include <geometry.h>
 #include <buffers.h>
 #include <mutex>
+#include <condition_variable>
 
 struct LockedLineBuffer{
     LineBuffer *lineBuffer;
@@ -18,6 +19,20 @@ void GetExecutorLockedLineBuffer(LockedLineBuffer **ptr);
 
 inline int GetConcurrency(){
     return Max(1, (int)std::thread::hardware_concurrency());
+}
+
+template<typename Function>
+void DispatchExecution(const Function &fn){
+    std::mutex mutex;
+    std::condition_variable cond;
+    int dispatch = 0;
+    std::unique_lock<std::mutex> guard(mutex);
+
+    std::thread(fn, &mutex, &cond, &dispatch).detach();
+
+    cond.wait(guard, [&]{ return dispatch == 1; });
+    mutex.unlock();
+    printf("Finished\n");
 }
 
 template<typename Function>

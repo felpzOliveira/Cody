@@ -4,7 +4,7 @@ TokenizerSupport noneSupport = {
     .comments = false,
     .strings = true,
     .numbers = true,
-    .lookups = true,
+    .lookups = false,
 };
 
 /* Empty token list */

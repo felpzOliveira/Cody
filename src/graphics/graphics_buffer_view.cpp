@@ -248,6 +248,19 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view,
     OpenGLFont *font = &state->font;
     OpenGLCursor *cursor = &state->glCursor;
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor->textPos.x);
+
+    if(!buffer){
+        // This is a bug
+        printf("Warning: Attempting to render cursor at position {%d %d} "
+               "but linebuffer has {%d}\n", cursor->textPos.x, cursor->textPos.y,
+                bufferView->lineBuffer->lineCount);
+        cursor->textPos.x = Max(0, bufferView->lineBuffer->lineCount-1);
+        buffer = BufferView_GetBufferAt(bufferView, cursor->textPos.x);
+        if(!buffer){
+            printf("Error: Bufferview is inconsistent, not locked?\n");
+            return;
+        }
+    }
     
     if(vstate == View_FreeTyping){
         vec4f col = Graphics_GetCursorColor(bufferView, defaultTheme);
@@ -525,6 +538,7 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                 
                 printf("Position %u  ==> Token %u, char \'%c\'\n", pos, token->position, v); 
                 printf("Data : %s, taken: %u\n", buffer->data, buffer->taken);
+                return 0;
                 AssertA(0, "Invalid character");
             }
 
@@ -690,7 +704,7 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         LockedLineBuffer *lockedBuffer = nullptr;
         GetExecutorLockedLineBuffer(&lockedBuffer);
         if(lockedBuffer->lineBuffer == bView->lineBuffer){
-            //lockedBuffer->mutex.lock();
+            lockedBuffer->mutex.lock();
             is_locked = 1;
         }
 
@@ -705,7 +719,7 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
                 r = 0;
             }
 
-            //lockedBuffer->mutex.unlock();
+            lockedBuffer->mutex.unlock();
         }
 
         return r;

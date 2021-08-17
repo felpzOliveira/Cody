@@ -781,10 +781,6 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     int matched = 0;
     uint length = 1;
 
-    if(!tokenizer->support.lookups){
-        return 0;
-    }
-
     token->identifier = TOKEN_ID_NONE;
     
     if(TerminatorChar(**p)){
@@ -803,8 +799,13 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     }
     
     consume:
+    
     // 2- check against lookup table
     token->size = length;
+    if(!tokenizer->support.lookups){
+        return length;
+    }
+
     int tableIndex = -1;
     for(int k = 0; k < lookup->nSize; k++){
         if((int)length == lookup->sizes[k].y){

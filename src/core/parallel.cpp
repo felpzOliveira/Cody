@@ -89,7 +89,7 @@ void ExecutorMainLoop(){
                 uint size = msg.size();
                 uint start = lineBuffer->lineCount-1;
 
-                std::lock_guard<std::mutex> lock(lockedBuffer.mutex);
+                lockedBuffer.mutex.lock();
                 uint n = LineBuffer_InsertRawText(lineBuffer, text, size);
                 // the fast gen is in-place and does not require a tokenizer
                 LineBuffer_FastTokenGen(lineBuffer, start, n);
@@ -98,6 +98,8 @@ void ExecutorMainLoop(){
                 }else{
                     lockedBuffer.render_state = 0;
                 }
+
+                lockedBuffer.mutex.unlock();
             });
         }else{
             printf("Got empty cmd\n");

@@ -67,7 +67,6 @@ int AutoComplete_Search(char *value, uint valuelen, SelectableList *list){
 
     LineBuffer_InitBlank(lineBuffer);
     auto push_wd = [&](char *buf, uint len, Trie *) -> void{
-        //printf(" > %s\n", buf);
         if(len != valuelen)
             LineBuffer_InsertLine(lineBuffer, buf, len, 0);
     };
@@ -86,22 +85,14 @@ int AutoComplete_Search(char *value, uint valuelen, SelectableList *list){
 }
 
 void AutoComplete_PushString(char *value, uint valuelen){
-#if 0
-    char s = value[valuelen];
-    value[valuelen] = 0;
-    printf(" Inserting > %s\n", value);
-    value[valuelen] = s;
-#endif
-    Trie_Insert(&autoComplete.root, value, valuelen);
+    if(valuelen > AutoCompleteMinInsertLen){
+        Trie_Insert(&autoComplete.root, value, valuelen);
+    }
 }
 
 void AutoComplete_Remove(char *value, uint valuelen){
-#if 0
-    char s = value[valuelen];
-    value[valuelen] = 0;
-    printf(" Removing > %s\n", value);
-    value[valuelen] = s;
-#endif
-    Trie_Remove(&autoComplete.root, value, valuelen);
+    if(valuelen > AutoCompleteMinInsertLen){
+        Trie_Remove(&autoComplete.root, value, valuelen);
+    }
 }
 
