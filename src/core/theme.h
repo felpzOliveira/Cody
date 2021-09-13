@@ -145,4 +145,5 @@ void GetThemeList(std::vector<ThemeDescription> **themes);
 void SwapDefaultTheme(char *name, uint len);
 int ThemeNeedsEffect(Theme *theme);
 int GetSelectorBorderWidth(Theme *theme);
+bool CurrentThemeIsLight();
 #endif //THEME_H

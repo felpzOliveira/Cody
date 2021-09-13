@@ -2,6 +2,7 @@
 #include <hash.h>
 #include <utilities.h>
 #include <string.h>
+#include <autocomplete.h>
 
 inline int _symbol_table_sym_node_matches(SymbolNode *node, char *label, 
                                           uint labelLen, TokenId id)
@@ -34,6 +35,9 @@ void SymbolTable_Initialize(SymbolTable *symTable, bool duplicate){
 int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
     uint insert_id = 0;
     SymbolNode *newNode = nullptr;
+
+    if(!(labelLen > AutoCompleteMinInsertLen)) return 1;
+
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
     
@@ -76,6 +80,8 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
 
 void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
     uint tableIndex;
+    if(!(labelLen > AutoCompleteMinInsertLen)) return;
+
     SymbolNode *node = SymbolTable_GetEntry(symTable, label, labelLen, id, &tableIndex);
     if(node){
         if(symTable->allow_duplication){

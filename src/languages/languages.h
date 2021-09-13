@@ -16,6 +16,8 @@ typedef struct{
     bool strings;
     bool numbers;
     bool lookups;
+    bool multilineComment;
+    char lineCommentChar;
 }TokenizerSupport;
 
 // C/C++
@@ -27,6 +29,11 @@ extern TokenizerSupport cppSupport;
 extern std::vector<std::vector<GToken>> glslReservedPreprocessor;
 extern std::vector<std::vector<GToken>> glslReservedTable;
 extern TokenizerSupport glslSupport;
+
+// LIT
+extern std::vector<std::vector<GToken>> litReservedPreprocessor;
+extern std::vector<std::vector<GToken>> litReservedTable;
+extern TokenizerSupport litSupport;
 
 // Empty
 extern std::vector<std::vector<GToken>> noneReservedPreprocessor;

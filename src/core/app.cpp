@@ -1134,7 +1134,7 @@ void AppCommandPaste(){
         
         UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
                                     cursor, vec2ui(endx, endy));
-        LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1));
+        LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1), 0);
         LineBuffer_SetCopySection(view->lineBuffer, section);
         
         RemountTokensBasedOn(view, startBuffer, n);

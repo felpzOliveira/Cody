@@ -27,3 +27,9 @@ extern unsigned char cppheader_png[];
 extern unsigned int cppheader_png_len;
 extern unsigned char font_png[];
 extern unsigned int font_png_len;
+
+
+extern unsigned char wave_dark_png[];
+extern unsigned int wave_dark_png_len;
+extern unsigned char wave_white_png[];
+extern unsigned int wave_white_png_len;

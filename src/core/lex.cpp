@@ -146,8 +146,9 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
     int filtered = 1;
     switch(token->identifier){
         /* templates */
-        case TOKEN_ID_LESS: proc->nestedLevel++; break;
-        case TOKEN_ID_MORE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
+        // TODO: We need to split tokens dividers here otherwise a { can be resolved by ) <
+        //case TOKEN_ID_LESS: proc->nestedLevel++; break;
+        //case TOKEN_ID_MORE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
         /* definition */
         case TOKEN_ID_BRACE_OPEN: proc->nestedLevel++; break;
         case TOKEN_ID_BRACE_CLOSE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
@@ -280,6 +281,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
             if(proc->nestedLevel == 0 && proc->currentState == 0){
                 token->identifier = TOKEN_ID_DATATYPE_USER_ENUM;
                 proc->currentState = 1;
+                PRINT_SAFE("ENUM > ", ((*p) - token->size), token->size);
             }else if(proc->nestedLevel == 0 && proc->currentState == 1){
                 /*
                 * This means we already got our token but there is another
@@ -294,6 +296,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
                 * We got one of the values inside the enum, this is a very soft test tho
                 */
                 char *h = (*p) - token->size;
+                PRINT_SAFE("ENUM REF > ", h, token->size);
                 token->identifier = TOKEN_ID_DATATYPE_USER_ENUM_VALUE;
                 if(SymbolTable_Insert(tokenizer->symbolTable, h,
                                       token->size, token->identifier) == 0)
@@ -684,7 +687,7 @@ LEX_PROCESSOR(Lex_String){
     
     while(level > 0 && n > rLen){
         (*p)++;
-        if(**p == '\\'){
+        if(**p == '\\' && !reverseSlash){
             reverseSlash = 1;
         }else if(**p == lastSep && !reverseSlash){
             //grab the out part
@@ -709,25 +712,45 @@ LEX_PROCESSOR(Lex_Comments){
     
     size_t rLen = 0;
     char prev = 0;
+    char lineChar = tokenizer->support.lineCommentChar;
+    int is_cpp_based = 0;
     *len = 0;
     *head = *p;
     if(!tokenizer->support.comments){
         return 0;
     }
 
+    if(lineChar == 0){
+        is_cpp_based = 1;
+    }else if(tokenizer->support.multilineComment){
+        printf("Error: Unimplemented generic multi-line comment\n");
+        exit(0);
+    }
+
     if(aggregate == 0){
-        if(n < 2) return 0;
-        if(**p == '/' && *((*p)+1) == '/'){
-            type = 1;
-        }else if(**p == '/' &&  *((*p)+1) == '*'){
-            type = 2;
-            aggregate = 1;
+        if(is_cpp_based){
+            if(n < 2) return 0;
+            if(**p == '/' && *((*p)+1) == '/'){
+                type = 1;
+            }else if(**p == '/' &&  *((*p)+1) == '*'){
+                type = 2;
+                aggregate = 1;
+            }else{
+                goto end;
+            }
+
+            (*p) += 2;
+            rLen += 2;
         }else{
-            goto end;
+            if(n < 1) return 0;
+            if(**p == lineChar){
+                type = 1;
+            }else{
+                goto end;
+            }
+            (*p) += 1;
+            rLen += 1;
         }
-        
-        (*p) += 2;
-        rLen += 2;
     }
     
     while(rLen < n){
@@ -750,7 +773,7 @@ LEX_PROCESSOR(Lex_Comments){
         }else{
             if(rLen+1 <= n){
                 char s = *(*(p)+1);
-                if(**p == '\\' && (s == 0 || s == '\n')){
+                if(**p == '\\' && (s == 0 || s == '\n') && is_cpp_based){
                     aggregate = 1;
                     (*p)++;
                     rLen++;

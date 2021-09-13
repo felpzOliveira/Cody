@@ -191,9 +191,20 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
     if(!str || !token || !symTable || !color) return -1;
     if(token->identifier == TOKEN_ID_SPACE) return -1;
     vec4i col = GetColor(theme, token->identifier);
-
-    if(token->identifier == TOKEN_ID_NONE){
+    /* handle explicit overriden values, i.e.: functions and none */
+    if(Symbol_IsTokenOverriden(token->identifier)){
         SymbolNode *node = SymbolTable_Search(symTable, str, token->size);
+        /* explicit search for user types for better rendering, better view */
+        SymbolNode *res = node;
+        while(res != nullptr){
+            res = SymbolTable_SymNodeNext(res);
+            if(res){
+                if(!(Symbol_IsTokenOverriden(res->id))){
+                    node = res;
+                    break;
+                }
+            }
+        }
         if(node){
             col = GetColor(theme, node->id);
         }
@@ -555,7 +566,7 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
 }
 
 static void OpenGLLoadIcons(OpenGLState *state){
-    Graphics_TextureInit(state, folder_png, folder_png_len, ".folder");
+    Graphics_TextureInit(state, folder_png, folder_png_len, ".folder", FILE_EXTENSION_FOLDER);
     Graphics_TextureInit(state, cmake_png, cmake_png_len, ".cmake", FILE_EXTENSION_CMAKE);
     Graphics_TextureInit(state, cpp_png, cpp_png_len, ".cpp", FILE_EXTENSION_CPP);
     Graphics_TextureInit(state, cppheader_png, cppheader_png_len, ".cppheader");
@@ -563,6 +574,12 @@ static void OpenGLLoadIcons(OpenGLState *state){
     Graphics_TextureInit(state, cuda_png, cuda_png_len, ".cu", FILE_EXTENSION_CUDA);
     Graphics_TextureInit(state, text_png, text_png_len, ".txt", FILE_EXTENSION_TEXT);
     Graphics_TextureInit(state, font_png, font_png_len, ".ttf", FILE_EXTENSION_FONT);
+    Graphics_TextureInit(state, wave_dark_png, wave_dark_png_len,
+                         ".lit_dark", FILE_EXTENSION_LIT_DARK);
+    Graphics_TextureInit(state, wave_white_png, wave_white_png_len,
+                         ".lit_white", FILE_EXTENSION_LIT_WHITE);
+    Graphics_TextureInit(state, wave_white_png, wave_white_png_len,
+                         ".lit", FILE_EXTENSION_LIT);
 }
 
 void OpenGLInitialize(OpenGLState *state){
@@ -770,7 +787,6 @@ static void _Graphics_InitTexture(OpenGLState *state, uint8 *data,
     state->textures[id].format = format;
     state->textureMap[key] = id;
     state->texBinds++;
-
 }
 
 static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
@@ -816,10 +832,48 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     }else if(strExt == ".ttf"){
         id = state->textureMap[".ttf"];
         *off = 10;
-    }else{
+    }else if(strExt == ".lit"){
+        if(CurrentThemeIsLight()){
+            id = state->textureMap[".lit_dark"];
+        }else{
+            id = state->textureMap[".lit_white"];
+        }
+    }else if(strExt == ".lit_dark"){
+        id = state->textureMap[".lit_dark"];
+    }else if(strExt == ".lit_white"){
+        id = state->textureMap[".lit_white"];
+    }
+    else{
         // TODO: some unknown extension
+        id = state->textureMap[".folder"];
     }
     return id;
+}
+
+FileExtension Graphics_TranslateFileExtension(FileExtension ext){
+    FileExtension f = ext;
+    if(ext == FILE_EXTENSION_LIT){
+        if(CurrentThemeIsLight()){
+            f = FILE_EXTENSION_LIT_DARK;
+        }else{
+            f = FILE_EXTENSION_LIT_WHITE;
+        }
+    }
+
+    return f;
+}
+
+std::string Graphics_TranslateFileExtension(std::string ext){
+    std::string f = ext;
+    if(ext == ".lit"){
+        if(CurrentThemeIsLight()){
+            f = ".lit_dark";
+        }else{
+            f = ".lit_white";
+        }
+    }
+
+    return f;
 }
 
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
@@ -831,6 +885,7 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
             char *ext = &e->path[p];
             std::string str(e->path);
             std::string strExt(ext);
+            strExt = Graphics_TranslateFileExtension(strExt);
             id = _Graphics_FetchTexture(state, strExt, off, str);
         }else{
             // NOTE: file wihtout extensions default to txt icons
@@ -844,6 +899,7 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
 
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){
     uint id = 0;
+    type = Graphics_TranslateFileExtension(type);
     if(state->fileMap.find(type) != state->fileMap.end()){
         std::string key = state->fileMap[type];
         id = _Graphics_FetchTexture(state, key, off);
@@ -870,6 +926,8 @@ void Graphics_TextureInit(OpenGLState *state, const char *path,
         if(type != FILE_EXTENSION_NONE){
             state->fileMap[type] = key;
         }
+    }else{
+        printf("Failed to load %s\n", path);
     }
 }
 
@@ -884,6 +942,8 @@ void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len,
         if(type != FILE_EXTENSION_NONE){
             state->fileMap[type] = key;
         }
+    }else{
+        printf("Failed to load %s\n", key);
     }
 }
 

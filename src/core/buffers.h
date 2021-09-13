@@ -39,9 +39,13 @@ typedef enum{
     FILE_EXTENSION_CPP,
     FILE_EXTENSION_GLSL,
     FILE_EXTENSION_CUDA,
+    FILE_EXTENSION_LIT,
+    FILE_EXTENSION_LIT_DARK, // ???
+    FILE_EXTENSION_LIT_WHITE, // ???
     FILE_EXTENSION_CMAKE,
     FILE_EXTENSION_TEXT,
     FILE_EXTENSION_FONT,
+    FILE_EXTENSION_FOLDER,
 }FileExtension;
 
 typedef struct{
@@ -319,7 +323,7 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer);
 * Sets the active buffer during edit. This allows for buffering and prevent
 * unecessary memory and stack usage for undo operations.
 */
-void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId);
+void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId, int safe=1);
 
 /*
 * Returns the id of the active buffer during edit.

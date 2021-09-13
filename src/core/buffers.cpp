@@ -40,6 +40,37 @@ inline void CopyToken(Token *dst, Token *src){
     dst->reserved = src->reserved;
 }
 
+void Buffer_RemoveExcessSpace(Buffer *buffer){
+    uint tid = 0;
+    Token *target = nullptr;
+    return;
+
+    if(!buffer) return;
+    if(!buffer->is_ours) return;
+    // avoid removing space when only 1 token is present
+    // mostly for preserving the indent region offset auto-generated
+    if(!(buffer->tokenCount > 1)) return;
+
+    for(int i = (int)buffer->tokenCount - 1; i >= 0; i--){
+        Token *token = &buffer->tokens[i];
+        if(token->identifier == TOKEN_ID_SPACE){
+            target = token;
+            tid = (uint)i;
+        }else{
+            break;
+        }
+    }
+
+    if(target){
+        for(uint i = target->position; i < buffer->size; i++){
+            buffer->data[i] = 0;
+        }
+        buffer->taken = target->position;
+        buffer->tokenCount = tid;
+        buffer->count = Buffer_GetUtf8Count(buffer);
+    }
+}
+
 void Buffer_CopyReferences(Buffer *dst, Buffer *src){
     if(dst != nullptr && src != nullptr){
         dst->data = src->data;
@@ -1324,7 +1355,12 @@ Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint 
     return b;
 }
 
-void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId){
+void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId, int safe){
+    uint i = lineBuffer->activeBuffer.x;
+    Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+    if(buffer && (int)i != bufId.x && safe){
+        Buffer_RemoveExcessSpace(buffer);
+    }
     lineBuffer->activeBuffer = bufId;
 }
 

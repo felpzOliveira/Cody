@@ -5,6 +5,8 @@ TokenizerSupport glslSupport = {
     .strings = true,
     .numbers = true,
     .lookups = true,
+    .multilineComment = true,
+    .lineCommentChar = 0,
 };
 
 /* glsl that can happen inside a code and are not preprocessor */

@@ -5,6 +5,8 @@ TokenizerSupport noneSupport = {
     .strings = true,
     .numbers = true,
     .lookups = false,
+    .multilineComment = false,
+    .lineCommentChar = '#',
 };
 
 /* Empty token list */

@@ -8,6 +8,8 @@ TokenizerSupport cppSupport = {
     .strings = true,
     .numbers = true,
     .lookups = true,
+    .multilineComment = true,
+    .lineCommentChar = 0,
 };
 
 /* C/C++ tokens that can happen inside a code and are not preprocessor */
@@ -148,10 +150,12 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__constant__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "thread_local", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__CUDA_ARCH__", .identifier = TOKEN_ID_RESERVED },
         { .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED } },
     {
@@ -313,10 +317,12 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__constant__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },
         { .value = "thread_local", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__CUDA_ARCH__", .identifier = TOKEN_ID_RESERVED },
         { .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
         { .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED } },
     {

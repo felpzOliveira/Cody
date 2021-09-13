@@ -4,11 +4,19 @@
 #include <stb_image.h>
 
 uint8 *ImageUtils_LoadPixels(const char *path, int *width, int *height, int *cn){
-    return stbi_load(path, width, height, cn, 0);
+    uint8 *img = stbi_load(path, width, height, cn, 0);
+    if(img == nullptr){
+        printf("Failed to load [%s] : %s\n", path, stbi_failure_reason());
+    }
+    return img;
 }
 
 uint8 *ImageUtils_LoadPixels(uint8 *data, uint len, int *width, int *height, int *cn){
-    return stbi_load_from_memory(data, len, width, height, cn, 0);
+    uint8 *img = stbi_load_from_memory(data, len, width, height, cn, 0);
+    if(img == nullptr){
+        printf("Failed to load data : %s\n", stbi_failure_reason());
+    }
+    return img;
 }
 
 // TODO: Implement if we ever need this

@@ -15,6 +15,7 @@ typedef struct FileProvider{
     Tokenizer cppTokenizer;
     Tokenizer glslTokenizer;
     Tokenizer emptyTokenizer;
+    Tokenizer litTokenizer;
 }FileProvider;
 
 // Static allocation of the file provider
@@ -24,13 +25,16 @@ void FileProvider_Initialize(){
     FileBufferList_Init(&fProvider.fileBuffer);
     SymbolTable_Initialize(&fProvider.symbolTable, true);
 
-    //TODO: Initialize all tokenizers, add as support for new languages are added
-    //      maybe we can see if we can initialize these as a file for them is requested?
-
     // Tokenizers all share the same Symbol Table as it is very expensive to have multiple
     fProvider.cppTokenizer   = TOKENIZER_INITIALIZER;
     fProvider.glslTokenizer  = TOKENIZER_INITIALIZER;
     fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
+    fProvider.litTokenizer   = TOKENIZER_INITIALIZER;
+
+    // NOTE: If this every becomes slow we have 2 options:
+    //        1- Use ParallelFor, I do believe we are able to initialize these
+    //           in parallel.
+    //        2- Initialize tokenizers only when their respective file is detected
 
     // C/C++
     Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
@@ -40,6 +44,11 @@ void FileProvider_Initialize(){
     Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
                        &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
                        &glslSupport);
+    // LIT
+    Lex_BuildTokenizer(&fProvider.litTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
+                       &litSupport);
+
     // Empty
     Lex_BuildTokenizer(&fProvider.emptyTokenizer, appGlobalConfig.tabSpacing,
                        &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
@@ -90,7 +99,13 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps
             props->type = 0;
             props->ext = FILE_EXTENSION_CUDA;
             return FileProvider_GetCppTokenizer();
-        }else if(strExt == ".txt"){
+        }else if(strExt == ".lit"){
+            props->type = 3;
+            props->ext = FILE_EXTENSION_LIT;
+            return FileProvider_GetLitTokenizer();
+        }
+
+        else if(strExt == ".txt"){
             props->type = 2;
             props->ext = FILE_EXTENSION_TEXT;
             return FileProvider_GetEmptyTokenizer();
@@ -114,6 +129,7 @@ Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
         case 0: return FileProvider_GetCppTokenizer();
         case 1: return FileProvider_GetGlslTokenizer();
         case 2: return FileProvider_GetEmptyTokenizer();
+        case 3: return FileProvider_GetLitTokenizer();
         default:{
             //TODO: Empty tokenizer
             return FileProvider_GetEmptyTokenizer();
@@ -237,4 +253,8 @@ Tokenizer *FileProvider_GetGlslTokenizer(){
 
 Tokenizer *FileProvider_GetEmptyTokenizer(){
     return &fProvider.emptyTokenizer;
+}
+
+Tokenizer *FileProvider_GetLitTokenizer(){
+    return &fProvider.litTokenizer;
 }

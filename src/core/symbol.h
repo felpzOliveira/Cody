@@ -77,6 +77,10 @@ inline int Symbol_IsTokenNest(TokenId id){
             id == TOKEN_ID_BRACE_OPEN || id == TOKEN_ID_BRACE_CLOSE);
 }
 
+inline int Symbol_IsTokenOverriden(TokenId id){
+    return (id == TOKEN_ID_NONE || id == TOKEN_ID_FUNCTION || id == TOKEN_ID_FUNCTION_DECLARATION);
+}
+
 inline int Symbol_AreTokensComplementary(TokenId id0, TokenId id1){
     return ((id0 == TOKEN_ID_PARENTHESE_OPEN && id1 == TOKEN_ID_PARENTHESE_CLOSE) ||
             (id0 == TOKEN_ID_PARENTHESE_CLOSE && id1 == TOKEN_ID_PARENTHESE_OPEN) ||

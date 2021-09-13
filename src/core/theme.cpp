@@ -13,7 +13,7 @@ Theme themeTerminal = {
     .backgroundLineNumbers = ColorFromHex(0xff2C001e),
     .lineNumberColor = ColorFromHex(0xfffce94f),
     .lineNumberHighlitedColor = ColorFromHex(0xfffce94f),
-    .cursorLineHighlight = ColorFromHex(0xff2C001e),
+    .cursorLineHighlight = ColorFromHex(0xff2e083a),
 
     .operatorColor   = ColorFromHex(0xfffce94f),
     .datatypeColor   = ColorFromHex(0xff87ffaf),
@@ -610,4 +610,8 @@ int ThemeNeedsEffect(Theme *theme){
     }
 
     return 0;
+}
+
+bool CurrentThemeIsLight(){
+    return defaultTheme == &themeGruvboxLight;
 }
