@@ -180,6 +180,7 @@ int SearchAllFilesCommandStart(View *view){
 
             uint sid = Buffer_Utf8RawPositionToPosition(buffer, start_loc);
             uint tid = Buffer_GetTokenAt(buffer, sid);
+            uint fid = Buffer_FindFirstNonEmptyToken(buffer);
             uint pickId = 0;
             for(pickId = tid; pickId < buffer->tokenCount; pickId++){
                 if(buffer->tokens[pickId].identifier != TOKEN_ID_SPACE){
@@ -193,18 +194,16 @@ int SearchAllFilesCommandStart(View *view){
             char ss = buffer->data[end_loc];
             buffer->data[end_loc] = 0;
 
-            if(start_loc == 0 && end_loc == f){ // whole line
-                len = snprintf(m, sizeof(m), "%s:%d: %s", pptr,
-                               res->results[i].line, &buffer->data[start_loc]);
-            }else if(start_loc == 0){ // don't fit the whole line but starts at 0
-                len = snprintf(m, sizeof(m), "%s:%d: %s...", pptr,
-                               res->results[i].line, &buffer->data[start_loc]);
-            }else if(start_loc > 0 && end_loc == f){ // don't start at 0
-                len = snprintf(m, sizeof(m), "%s:%d: ...%s", pptr,
-                               res->results[i].line, &buffer->data[start_loc]);
-            }else{ // don't start at 0 and don't fit
-                len = snprintf(m, sizeof(m), "%s:%d: ...%s...", pptr,
-                               res->results[i].line, &buffer->data[start_loc]);
+            if(start_loc == 0 || pickId == fid){
+                len = snprintf(m, sizeof(m), "%s:%d: ", pptr, res->results[i].line);
+            }else{
+                len = snprintf(m, sizeof(m), "%s:%d:... ", pptr, res->results[i].line);
+            }
+
+            if(end_loc == f){
+                len += snprintf(&m[len], sizeof(m)-len, "%s", &buffer->data[start_loc]);
+            }else{
+                len += snprintf(&m[len], sizeof(m)-len, "%s ...", &buffer->data[start_loc]);
             }
 
             //printf("Adding %s\n", m);
