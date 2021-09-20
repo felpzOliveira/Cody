@@ -14,7 +14,7 @@
 // this should be verified outside alongside Symbol_IsTokenAutoCompletable
 // but it doesn't hurt to make sure. This heavily increases performance
 // as we use a naive Trie implementation.
-#define AutoCompleteMinInsertLen 2
+#define AutoCompleteMinInsertLen 1
 
 /* Lets atttempt to implement auto-complete shall we? */
 

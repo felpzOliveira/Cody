@@ -137,6 +137,7 @@ int SearchAllFilesCommandStart(View *view){
     uint rootLen = root.size();
 
     linearResults.count = 0;
+    uint max_written_len = 60;
     for(int tid = 0; tid < MAX_THREADS; tid++){
         GlobalSearch *res = &results[tid];
         for(uint i = 0; i < res->count; i++){
@@ -167,11 +168,49 @@ int SearchAllFilesCommandStart(View *view){
 
             Buffer *buffer = LineBuffer_GetBufferAt(lBuffer, res->results[i].line);
             uint f = buffer->taken;
-            char ss = buffer->data[f];
-            buffer->data[f] = 0;
-            uint len = snprintf(m, sizeof(m), "%s:%d:%s", pptr,
-                                res->results[i].line, buffer->data);
-            buffer->data[f] = ss;
+            uint start_loc = res->results[i].col;
+            uint end_loc = 0;
+            uint len = 0;
+
+            if(start_loc > max_written_len * 0.4){
+                start_loc = start_loc - max_written_len * 0.4;
+            }else{
+                start_loc = 0;
+            }
+
+            uint sid = Buffer_Utf8RawPositionToPosition(buffer, start_loc);
+            uint tid = Buffer_GetTokenAt(buffer, sid);
+            uint pickId = 0;
+            for(pickId = tid; pickId < buffer->tokenCount; pickId++){
+                if(buffer->tokens[pickId].identifier != TOKEN_ID_SPACE){
+                    break;
+                }
+            }
+
+            start_loc = buffer->tokens[pickId].position;
+
+            end_loc = f - start_loc > max_written_len ? start_loc + max_written_len : f;
+            char ss = buffer->data[end_loc];
+            buffer->data[end_loc] = 0;
+
+            if(start_loc == 0 && end_loc == f){ // whole line
+                len = snprintf(m, sizeof(m), "%s:%d: %s", pptr,
+                               res->results[i].line, &buffer->data[start_loc]);
+            }else if(start_loc == 0){ // don't fit the whole line but starts at 0
+                len = snprintf(m, sizeof(m), "%s:%d: %s...", pptr,
+                               res->results[i].line, &buffer->data[start_loc]);
+            }else if(start_loc > 0 && end_loc == f){ // don't start at 0
+                len = snprintf(m, sizeof(m), "%s:%d: ...%s", pptr,
+                               res->results[i].line, &buffer->data[start_loc]);
+            }else{ // don't start at 0 and don't fit
+                len = snprintf(m, sizeof(m), "%s:%d: ...%s...", pptr,
+                               res->results[i].line, &buffer->data[start_loc]);
+            }
+
+            //printf("Adding %s\n", m);
+
+            buffer->data[end_loc] = ss;
+
             linearResults.res[linearResults.count++] = res->results[i];
 
             LineBuffer_InsertLine(lineBuffer, (char *)m, len, 0);

@@ -24,6 +24,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
     {
         { .value = "uv", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "sky", .identifier = TOKEN_ID_OPERATOR },
         { .value = "ray", .identifier = TOKEN_ID_OPERATOR },
         { .value = "set", .identifier = TOKEN_ID_OPERATOR },
         { .value = "eta", .identifier = TOKEN_ID_OPERATOR },
@@ -36,11 +37,11 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "name", .identifier = TOKEN_ID_OPERATOR },
         { .value = "View", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "image", .identifier = TOKEN_ID_OPERATOR },
         { .value = "width", .identifier = TOKEN_ID_OPERATOR },
         { .value = "light", .identifier = TOKEN_ID_OPERATOR },
         { .value = "pixel", .identifier = TOKEN_ID_OPERATOR },
         { .value = "depth", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "image", .identifier = TOKEN_ID_OPERATOR },
         { .value = "model", .identifier = TOKEN_ID_OPERATOR },
         { .value = "coeff", .identifier = TOKEN_ID_OPERATOR },
         { .value = "rough", .identifier = TOKEN_ID_OPERATOR },
@@ -48,6 +49,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "scale", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Shape", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "sundir", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "pixels", .identifier = TOKEN_ID_OPERATOR },
         { .value = "height", .identifier = TOKEN_ID_OPERATOR },
         { .value = "global", .identifier = TOKEN_ID_OPERATOR },
         { .value = "vertex", .identifier = TOKEN_ID_OPERATOR },
@@ -57,16 +60,20 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "center", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Filter", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "texture", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "Texture", .identifier = TOKEN_ID_DATATYPE },
         { .value = "samples", .identifier = TOKEN_ID_OPERATOR },
         { .value = "indices", .identifier = TOKEN_ID_OPERATOR },
         { .value = "normals", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Include", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "rayleigh", .identifier = TOKEN_ID_OPERATOR },
         { .value = "emission", .identifier = TOKEN_ID_OPERATOR },
         { .value = "geometry", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Material", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "intensity", .identifier = TOKEN_ID_OPERATOR },
         { .value = "normalize", .identifier = TOKEN_ID_OPERATOR },
         { .value = "transform", .identifier = TOKEN_ID_OPERATOR },
         { .value = "translate", .identifier = TOKEN_ID_OPERATOR }, },

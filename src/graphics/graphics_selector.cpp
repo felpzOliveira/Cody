@@ -24,6 +24,34 @@ typedef struct FrameStyle{
 //TODO > pratical way to handle many icons (load all of them or go caching?)
 ///////////////////////////////////////////////////////////////
 
+void RenderSelectableListItensBackground(OpenGLState *state, SelectableList *list,
+                                         Theme *theme, Float lWidth, FrameStyle *style)
+{
+    vec2ui range = SelectableList_GetViewRange(list);
+    Float y0 = 0;
+    for(uint i = range.x; i < range.y; i++){
+        Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
+
+        Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lWidth, y1),
+                          style->item_background_color);
+
+        if((int)i == list->active && style->with_line_border){
+            int w = GetSelectorBorderWidth(theme);
+            Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, w,
+                                    style->item_active_border_color);
+        }
+
+        if((int)i == list->active && style->with_line_highlight){
+            int w = 2; // TODO: should this be in theme?
+            Graphics_QuadPush(state, vec2ui(w, y0+w), vec2ui(lWidth-w, y1-w),
+                              style->item_active_background_color);
+        }
+
+        y0 += (1.0 + kViewSelectableListOffset) * style->yScaling *
+            state->font.fontMath.fontSizeAtRenderCall;
+    }
+}
+
 void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                                Theme *theme, Float lWidth, FrameStyle *style,
                                FileOpener *opener = nullptr)
@@ -53,8 +81,6 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         SelectableList_GetItem(list, i, &buffer);
         AssertA(buffer != nullptr, "Invalid buffer returned by View_SelectableListGetItem");
 
-        Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lWidth, y1),
-                          style->item_background_color);
         if(opener && style->with_load){
             x = Max(x, 2 * size);
         }
@@ -103,22 +129,9 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
             }
         }
 
-        if((int)i == list->active && style->with_line_border){
-            int w = GetSelectorBorderWidth(theme);
-            Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, w,
-                                    style->item_active_border_color);
-        }
-
-        if((int)i == list->active && style->with_line_highlight){
-            int w = 2; // TODO: should this be in theme?
-            Graphics_QuadPush(state, vec2ui(w, y0+w), vec2ui(lWidth-w, y1-w),
-                              style->item_active_background_color);
-        }
-
         y0 += (1.0 + kViewSelectableListOffset) * style->yScaling *
             state->font.fontMath.fontSizeAtRenderCall;
     }
-
 }
 
 int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
@@ -151,7 +164,7 @@ int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
         .yScaling = kAutoCompleteListScaling,
     };
 
-    RenderSelectableListItens(state, list, theme, lWidth, &style);
+    RenderSelectableListItensBackground(state, list, theme, lWidth, &style);
 
     Graphics_QuadPushBorder(state, 0, 0, lWidth, lHeight, 2,
                             ColorFromHexf(0x448589f6)); // theme?
@@ -162,6 +175,8 @@ int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
     Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
 
     Graphics_QuadFlush(state);
+
+    RenderSelectableListItens(state, list, theme, lWidth, &style);
 
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);
@@ -279,10 +294,12 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     Shader_UniformMatrix4(state->imageShader, "projection", &state->projection.m);
     Shader_UniformMatrix4(state->imageShader, "modelView", &state->scale.m);
 
-    RenderSelectableListItens(state, list, theme, lWidth, &style, opener);
+    RenderSelectableListItensBackground(state, list, theme, lWidth, &style);
 
     glUseProgram(font->cursorShader.id);
     Graphics_QuadFlush(state);
+
+    RenderSelectableListItens(state, list, theme, lWidth, &style, opener);
     
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);
