@@ -37,6 +37,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "name", .identifier = TOKEN_ID_OPERATOR },
         { .value = "View", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "sheen", .identifier = TOKEN_ID_OPERATOR },
         { .value = "image", .identifier = TOKEN_ID_OPERATOR },
         { .value = "width", .identifier = TOKEN_ID_OPERATOR },
         { .value = "light", .identifier = TOKEN_ID_OPERATOR },
@@ -68,21 +69,32 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "Include", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "specular", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "metallic", .identifier = TOKEN_ID_OPERATOR },
         { .value = "rayleigh", .identifier = TOKEN_ID_OPERATOR },
         { .value = "emission", .identifier = TOKEN_ID_OPERATOR },
         { .value = "geometry", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Material", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "sheenTint", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "clearcoat", .identifier = TOKEN_ID_OPERATOR },
         { .value = "intensity", .identifier = TOKEN_ID_OPERATOR },
         { .value = "normalize", .identifier = TOKEN_ID_OPERATOR },
         { .value = "transform", .identifier = TOKEN_ID_OPERATOR },
         { .value = "translate", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "subsurface", .identifier = TOKEN_ID_OPERATOR },
         { .value = "integrator", .identifier = TOKEN_ID_OPERATOR },
         { .value = "resolution", .identifier = TOKEN_ID_OPERATOR },
         { .value = "dispersion", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "anisotropic", .identifier = TOKEN_ID_OPERATOR },
         { .value = "reflectance", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "transmission", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "specularTint", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "clearcoatGloss", .identifier = TOKEN_ID_OPERATOR }, },
 };
 
 std::vector<std::vector<GToken>> litReservedPreprocessor = {

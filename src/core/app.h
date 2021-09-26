@@ -152,6 +152,12 @@ void AppAddStoredFile(std::string basePath);
 */
 int AppIsStoredFile(std::string path);
 
+/*
+* Inserts string 'p' with size 'size' in the current active view
+* with the modifier for paste.
+*/
+void AppPasteString(const char *p, uint size);
+
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();
 void AppCommandJumpRightArrow();

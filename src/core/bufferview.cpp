@@ -183,6 +183,12 @@ void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeigh
     }
 }
 
+void BufferView_SetViewRange(BufferView *view, vec2ui range){
+    if(view->lineBuffer){
+        VScroll_SetViewRange(&view->sController, range, view->lineBuffer);
+    }
+}
+
 vec2ui BufferView_GetViewRange(BufferView *view){
     return vec2ui(view->sController.visibleRect.x, 
                   Min(view->sController.visibleRect.y, view->lineBuffer->lineCount));
@@ -292,8 +298,7 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
     }
 
     if(AppIsStoredFile(path)){
-        char dagger[3] = {(char)0xCF, (char)0xAE, (char)0};
-        snprintf(endDesc, endSize, "%s", dagger);
+        snprintf(endDesc, endSize, "†");
     }
     
     return pct;
@@ -655,7 +660,7 @@ void BufferViewFileLocation_Restore(BufferView *view){
     if(loc->locationMap.find(lineBuffer) != loc->locationMap.end()){
         location = loc->locationMap[lineBuffer];
         vec2ui p = location.textPosition;
-        BufferView_FitCursorToRange(view, location.range);
+        BufferView_SetViewRange(view, location.range);
         BufferView_CursorToPosition(view, p.x, p.y);
         BufferView_GhostCursorFollow(view);
     }
@@ -685,6 +690,5 @@ void BufferViewFileLocation_Register(BufferView *view){
     location.textPosition  = cursor->textPosition;
     location.ghostPosition = cursor->ghostPosition;
     location.range = BufferView_GetViewRange(view);
-
     loc->locationMap[lineBuffer] = location;
 }

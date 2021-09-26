@@ -81,6 +81,12 @@ void VScroll_AdjustGhostIfNeeded(VScroll *ss, LineBuffer *lineBuffer){
     }
 }
 
+void VScroll_SetViewRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer){
+    int lineNoStart = Min(lineBuffer->lineCount-1, range.x);
+    int lineNoEnd   = Min(lineBuffer->lineCount, range.y);
+    ss->visibleRect = vec2ui(lineNoStart, lineNoEnd);
+    VScroll_FitCursorToRange(ss, ss->visibleRect, lineBuffer);
+}
 
 void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer){
     Buffer *buffer = nullptr;

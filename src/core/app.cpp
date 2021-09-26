@@ -1098,9 +1098,7 @@ void AppCommandCut(){
     }
 }
 
-void AppCommandPaste(){
-    uint size = 0;
-    const char *p = ClipboardGetStringX11(&size);
+void AppPasteString(const char *p, uint size){
     BufferView *view = AppGetActiveBufferView();
     Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
     SymbolTable *symTable = tokenizer->symbolTable;
@@ -1115,10 +1113,10 @@ void AppCommandPaste(){
         uint startBuffer = cursor.x;
 
         buffer = BufferView_GetBufferAt(view, cursor.x);
-        
+
         Buffer_EraseSymbols(buffer, symTable);
-        
-        uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size, 
+
+        uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size,
                                             cursor.x, cursor.y, &off);
 
         section = {
@@ -1131,26 +1129,32 @@ void AppCommandPaste(){
 
         uint endx = cursor.x + n;
         uint endy = off;
-        
+
         UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
                                     cursor, vec2ui(endx, endy));
         LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1), 0);
         LineBuffer_SetCopySection(view->lineBuffer, section);
-        
+
         RemountTokensBasedOn(view, startBuffer, n);
-        
+
         Buffer *b = LineBuffer_GetBufferAt(view->lineBuffer, endx);
-        
+
         if(b == nullptr){
             BUG();
             printf("Cursor line is nullptr\n");
         }
-        
+
         cursor.x = endx;
         cursor.y = Clamp(endy, (uint)0, b->count);
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
         view->lineBuffer->is_dirty = 1;
     }
+}
+
+void AppCommandPaste(){
+    uint size = 0;
+    const char *p = ClipboardGetStringX11(&size);
+    AppPasteString(p, size);
 }
 
 uint AppComputeLineIndentLevel(Buffer *buffer, uint p){

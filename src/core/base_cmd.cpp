@@ -10,6 +10,38 @@
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
+static std::map<std::string, std::string> mathSymbolMap;
+
+static void InitializeMathSymbolList(){
+    static bool is_math_symbol_inited = false;
+    if(!is_math_symbol_inited){
+        mathSymbolMap["pi"] = "π";    mathSymbolMap["Pi"] = "Π";
+        mathSymbolMap["theta"] = "θ"; mathSymbolMap["Theta"] = "Θ";
+        mathSymbolMap["mu"] = "μ";    mathSymbolMap["Mu"] = "M";
+        mathSymbolMap["zeta"] = "ζ";  mathSymbolMap["Zeta"] = "Z";
+        mathSymbolMap["eta"] = "η";   mathSymbolMap["Eta"] = "H";
+        mathSymbolMap["iota"] = "ι";  mathSymbolMap["Iota"] = "I";
+        mathSymbolMap["kappa"] = "κ"; mathSymbolMap["Kappa"] = "K";
+        mathSymbolMap["lambda"] = "λ";mathSymbolMap["Lambda"] = "Λ";
+        mathSymbolMap["nu"] = "ν";    mathSymbolMap["Nu"] = "N";
+        mathSymbolMap["xi"] = "ξ";    mathSymbolMap["Xi"] = "Ξ";
+        mathSymbolMap["rho"] = "ρ";   mathSymbolMap["Rho"] = "P";
+        mathSymbolMap["sigma"] = "σ"; mathSymbolMap["Sigma"] = "Σ";
+        mathSymbolMap["tau"] = "τ";   mathSymbolMap["Tau"] = "T";
+        mathSymbolMap["phi"] = "φ";   mathSymbolMap["Phi"] = "Φ";
+        mathSymbolMap["chi"] = "χ";   mathSymbolMap["Chi"] = "X";
+        mathSymbolMap["psi"] = "ψ";   mathSymbolMap["Psi"] = "Ψ";
+        mathSymbolMap["omega"] = "ω"; mathSymbolMap["Omega"] = "Ω";
+        mathSymbolMap["beta"] = "β";  mathSymbolMap["Beta"] = "B";
+        mathSymbolMap["alpha"] = "α"; mathSymbolMap["Alpha"] = "A";
+        mathSymbolMap["gamma"] = "γ"; mathSymbolMap["Gamma"] = "Γ";
+        mathSymbolMap["delta"] = "δ"; mathSymbolMap["Delta"] = "Δ";
+        mathSymbolMap["epsilon"] = "ε"; mathSymbolMap["Epsilon"] = "E";
+        mathSymbolMap["partial"] = "∂"; mathSymbolMap["int"] = "∫";
+        mathSymbolMap["inf"] = "∞";
+        is_math_symbol_inited = true;
+    }
+}
 
 /* Default helper functions */
 static void SelectableListFreeLineBuffer(View *view){
@@ -224,6 +256,26 @@ int SearchAllFilesCommandStart(View *view){
     return 0;
 }
 
+int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
+    int r = 0;
+    if(cmd[0] == '\\'){
+        r = 1;
+        int e = StringFirstNonEmpty(&cmd[1], size - 1);
+        if(e < 0) return r;
+        e += 1;
+
+        std::string symname(&cmd[e]);
+        InitializeMathSymbolList();
+
+        if(mathSymbolMap.find(symname) != mathSymbolMap.end()){
+            std::string value = mathSymbolMap[symname];
+            AppPasteString(value.c_str(), value.size());
+        }
+    }
+
+    return r;
+}
+
 int BaseCommand_SearchAllFiles(char *cmd, uint size){
     int r = 0;
     std::string search("search ");
@@ -255,7 +307,7 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size){
 
             GlobalSearch *threadResult = &results[tid];
             if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
-                printf("Too many results\n");
+                //printf("Too many results\n");
                 return;
             }
 
@@ -270,7 +322,7 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size){
                         if(at >= 0){
                             uint loc = threadResult->count;
                             if(loc >= MAX_SEARCH_ENTRIES-1){
-                                printf("Too many results\n");
+                                //printf("Too many results\n");
                                 return;
                             }
 
@@ -389,6 +441,8 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     if(BaseCommand_Interpret_AliasInsert(cmd, size, view)){
         return 0;
     }else if(BaseCommand_SetExecPath(cmd, size)){
+        return 0;
+    }else if(BaseCommand_InsertMappedSymbol(cmd, size)){
         return 0;
     }else{
         rv = BaseCommand_SearchAllFiles(cmd, size);

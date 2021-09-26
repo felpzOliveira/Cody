@@ -63,6 +63,8 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer);
 
 void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer);
 
+void VScroll_SetViewRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer);
+
 void VScroll_SetAnimationFinishCallback(VScroll *ss, std::function<void()> fn);
 
 #endif //SCROLL_CONTROLLER_H
