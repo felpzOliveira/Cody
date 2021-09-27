@@ -12,14 +12,56 @@ typedef struct FileProvider{
     file_hook openHooks[MAX_HOOKS];
     file_hook creationHooks[MAX_HOOKS];
     uint openHooksCount, createHooksCount;
-    Tokenizer cppTokenizer;
-    Tokenizer glslTokenizer;
-    Tokenizer emptyTokenizer;
-    Tokenizer litTokenizer;
+    Tokenizer cppTokenizer, cppDetachedTokenizer;
+    Tokenizer glslTokenizer, glslDetachedTokenizer;
+    Tokenizer emptyTokenizer, emptyDetachedTokenizer;
+    Tokenizer litTokenizer, litDetachedTokenizer;
 }FileProvider;
 
 // Static allocation of the file provider
 static FileProvider fProvider;
+
+static void InitTokenizers(){
+    // NOTE: If this every becomes slow we have 2 options:
+    //        1- Use ParallelFor, I do believe we are able to initialize these
+    //           in parallel.
+    //        2- Initialize tokenizers only when their respective file is detected
+
+    // C/C++
+    Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
+                       &cppSupport);
+
+    Lex_BuildTokenizer(&fProvider.cppDetachedTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
+                       &cppSupport);
+
+    // GLSL
+    Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
+                       &glslSupport);
+
+    Lex_BuildTokenizer(&fProvider.glslDetachedTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
+                       &glslSupport);
+    // LIT
+    Lex_BuildTokenizer(&fProvider.litTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
+                       &litSupport);
+
+    Lex_BuildTokenizer(&fProvider.litDetachedTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
+                       &litSupport);
+
+    // Empty
+    Lex_BuildTokenizer(&fProvider.emptyTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
+                       &noneSupport);
+
+    Lex_BuildTokenizer(&fProvider.emptyDetachedTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
+                       &noneSupport);
+}
 
 void FileProvider_Initialize(){
     FileBufferList_Init(&fProvider.fileBuffer);
@@ -31,28 +73,13 @@ void FileProvider_Initialize(){
     fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litTokenizer   = TOKENIZER_INITIALIZER;
 
-    // NOTE: If this every becomes slow we have 2 options:
-    //        1- Use ParallelFor, I do believe we are able to initialize these
-    //           in parallel.
-    //        2- Initialize tokenizers only when their respective file is detected
+    // Detached tokenizer for parallel parsing
+    fProvider.cppDetachedTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.glslDetachedTokenizer  = TOKENIZER_INITIALIZER;
+    fProvider.emptyDetachedTokenizer = TOKENIZER_INITIALIZER;
+    fProvider.litDetachedTokenizer   = TOKENIZER_INITIALIZER;
 
-    // C/C++
-    Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
-                       &cppSupport);
-    // GLSL
-    Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
-                       &glslSupport);
-    // LIT
-    Lex_BuildTokenizer(&fProvider.litTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
-                       &litSupport);
-
-    // Empty
-    Lex_BuildTokenizer(&fProvider.emptyTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
-                       &noneSupport);
+    InitTokenizers();
 
     fProvider.openHooksCount = 0;
     fProvider.createHooksCount = 0;
@@ -79,7 +106,9 @@ int FileProvider_FindByPath(LineBuffer **lBuffer, char *path, uint len, Tokenize
 }
 
 // TODO: Implement when other languages are supported
-Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps *props){
+Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len,
+                                       LineBufferProps *props, int detached)
+{
     int p = GetFilePathExtension(filename, len);
     if(p > 0){
         char *ext = &filename[p];
@@ -90,24 +119,29 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps
         {
             props->type = 0;
             props->ext = FILE_EXTENSION_CPP;
+            if(detached) return FileProvider_GetDetachedCppTokenizer();
             return FileProvider_GetCppTokenizer();
         }else if(strExt == ".glsl" || strExt == ".gl" || strExt == ".vs" || strExt == ".fs"){
             props->type = 1;
             props->ext = FILE_EXTENSION_GLSL;
+            if(detached) return FileProvider_GetDetachedGlslTokenizer();
             return FileProvider_GetGlslTokenizer();
         }else if(strExt == ".cu" || strExt == ".cuh"){
             props->type = 0;
             props->ext = FILE_EXTENSION_CUDA;
+            if(detached) return FileProvider_GetDetachedCppTokenizer();
             return FileProvider_GetCppTokenizer();
         }else if(strExt == ".lit"){
             props->type = 3;
             props->ext = FILE_EXTENSION_LIT;
+            if(detached) return FileProvider_GetDetachedLitTokenizer();
             return FileProvider_GetLitTokenizer();
         }
 
         else if(strExt == ".txt"){
             props->type = 2;
             props->ext = FILE_EXTENSION_TEXT;
+            if(detached) return FileProvider_GetDetachedEmptyTokenizer();
             return FileProvider_GetEmptyTokenizer();
         }
 
@@ -116,6 +150,7 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps
 
     props->type = 2;
     props->ext = FILE_EXTENSION_TEXT;
+    if(detached) return FileProvider_GetDetachedEmptyTokenizer();
     return FileProvider_GetEmptyTokenizer();
 }
 
@@ -166,7 +201,7 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
 }
 
 void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
-                       Tokenizer **lTokenizer)
+                       bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
     Tokenizer *tokenizer = nullptr;
@@ -179,26 +214,32 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     lBuffer = AllocatorGetN(LineBuffer, 1);
     *lBuffer = LINE_BUFFER_INITIALIZER;
 
-    tokenizer = FileProvider_GuessTokenizer(targetPath, len, &props);
+    tokenizer = FileProvider_GuessTokenizer(targetPath, len, &props, 1);
     Lex_TokenizerContextReset(tokenizer);
+
+    LineBuffer_SetStoragePath(lBuffer, targetPath, len);
+
+    FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
+    LineBuffer_SetType(lBuffer, props.type);
+    LineBuffer_SetExtension(lBuffer, props.ext);
+    LineBuffer_SetWrittable(lBuffer, true);
 
     if(fileSize == 0){
         AllocatorFree(content);
         LineBuffer_InitEmpty(lBuffer);
         content = nullptr;
     }else{
-        LineBuffer_Init(lBuffer, tokenizer, content, fileSize);
+        LineBuffer_Init(lBuffer, tokenizer, content, fileSize, mustFinish);
     }
 
-    LineBuffer_SetStoragePath(lBuffer, targetPath, len);
     if(content != nullptr){
-        AllocatorFree(content);
-    }
+        // NOTE: the memory taken from the file is released when the lexer
+        // has finished processing the contents of the file. Since now we
+        // are using the DisptachExecution method for loading files to handle
+        // large loads it is not safe to free this memory here.
 
-    FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
-    LineBuffer_SetType(lBuffer, props.type);
-    LineBuffer_SetExtension(lBuffer, props.ext);
-    LineBuffer_SetWrittable(lBuffer, true);
+        //AllocatorFree(content);
+    }
 
     // allow hooks execution
     for(uint i = 0; i < fProvider.openHooksCount; i++){
@@ -209,10 +250,6 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
 
     if(lineBuffer){
         *lineBuffer = lBuffer;
-    }
-
-    if(lTokenizer){
-        *lTokenizer = tokenizer;
     }
 }
 
@@ -257,4 +294,20 @@ Tokenizer *FileProvider_GetEmptyTokenizer(){
 
 Tokenizer *FileProvider_GetLitTokenizer(){
     return &fProvider.litTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedCppTokenizer(){
+    return &fProvider.cppDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedGlslTokenizer(){
+    return &fProvider.glslDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedEmptyTokenizer(){
+    return &fProvider.emptyDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedLitTokenizer(){
+    return &fProvider.litDetachedTokenizer;
 }

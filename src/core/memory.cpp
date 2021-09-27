@@ -60,7 +60,7 @@ void __gl_validate(const char *cmd, int line, const char *fileName){
     if(val != GL_NO_ERROR){
         std::string msg = translateGLError(val);
         std::cout << "(" << fileName << " : " << line << ") " << cmd << " => " << msg.c_str()
-            << "[" << val << "]" << std::endl;
+                   << "[" << val << "]" << std::endl;
         Assert(false);
         //exit(0);
     }
@@ -68,21 +68,19 @@ void __gl_validate(const char *cmd, int line, const char *fileName){
 
 void __gpu_gl_get_memory_usage(){
     int total_mem_kb = 0;
-    glGetIntegerv(GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX, 
-                  &total_mem_kb);
+    glGetIntegerv(GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX, &total_mem_kb);
 
     int cur_avail_mem_kb = 0;
-    glGetIntegerv(GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX, 
-                  &cur_avail_mem_kb);
+    glGetIntegerv(GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX, &cur_avail_mem_kb);
     total_mem_kb /= 1024;
-	cur_avail_mem_kb /= 1024;
+    cur_avail_mem_kb /= 1024;
     printf("[GPU] Current Available: %d / %d (MB)\n", cur_avail_mem_kb, total_mem_kb);
 }
 
 void __cpu_get_memory_usage(long unsigned int mem){
-	double g = (double)mem / 1024.;
-	g /= 1024.0;
-	printf("[CPU] Current size: %g (MB)\n", g);
+    double g = (double)mem / 1024.;
+    g /= 1024.0;
+    MEMORY_PRINT("[CPU] Current size: %g (MB)\n", g);
 }
 
 #endif

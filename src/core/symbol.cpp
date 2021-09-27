@@ -36,7 +36,7 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
     uint insert_id = 0;
     SymbolNode *newNode = nullptr;
 
-    if(!(labelLen > AutoCompleteMinInsertLen)) return 1;
+    if(!(labelLen > AutoCompleteMinInsertLen) || !symTable) return 1;
 
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
@@ -80,7 +80,7 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
 
 void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, TokenId id){
     uint tableIndex;
-    if(!(labelLen > AutoCompleteMinInsertLen)) return;
+    if(!(labelLen > AutoCompleteMinInsertLen) || !symTable) return;
 
     SymbolNode *node = SymbolTable_GetEntry(symTable, label, labelLen, id, &tableIndex);
     if(node){
@@ -114,6 +114,8 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
                                  TokenId id, uint *tableIndex)
 {
     SymbolNode *nodeRes = nullptr;
+    if(!symTable) return nullptr;
+
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
     SymbolNode *node = symTable->table[index];
@@ -138,6 +140,8 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
 
 SymbolNode *SymbolTable_Search(SymbolTable *symTable, char *label, uint labelLen){
     SymbolNode *nodeRes = nullptr;
+    if(!symTable) return nullptr;
+
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
     SymbolNode *node = symTable->table[index];
@@ -167,6 +171,7 @@ SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode){
 }
 
 void SymbolTable_DebugPrint(SymbolTable *symTable){
+    if(!symTable) return;
     uint n = symTable->tableSize;
     for(uint i = 0; i < n; i++){
         SymbolNode *node = symTable->table[i];

@@ -42,14 +42,13 @@ void StartWithFile(const char *path=nullptr){
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
-        Tokenizer *tokenizer = nullptr;
         uint length = strlen(path);
 
-        FileProvider_Load((char *)path, length, &lineBuffer, &tokenizer);
+        FileProvider_Load((char *)path, length, &lineBuffer, false);
         BufferView_SwapBuffer(bView, lineBuffer);
+    }else{
+        LoadStaticFilesOnStart();
     }
-
-    LoadStaticFilesOnStart();
 
     Graphics_Initialize();
 }
@@ -87,16 +86,5 @@ int main(int argc, char **argv){
         StartWithFile();
     }
 
-    //test_ternary_tree();
-    //exit(0);
-    
-    //test_tokenizer("/home/felipe/Downloads/sqlite-amalgamation-3340000/sqlite3.c");
-    //test_tokenizer();
-    //test_tokenizer("/home/felipe/Documents/Mayhem/src/core/lex.cpp");
-    //test_tokenizer("/home/felipe/Documents/Mayhem/src/core/lex.cpp");
-    //test_tokenizer("/home/felipe/Documents/Bubbles/src/boundaries/lnm.h");
-    //test_tokenizer("/home/felipe/Documents/Bubbles/src/bubbles.cpp");
-    //test_tokenizer("/home/felipe/Documents/Mayhem/test/simple.cpp");
-    //test_tokenizer("/home/felipe/Documents/Mayhem/test/empty.cpp");
     return 0;
 }

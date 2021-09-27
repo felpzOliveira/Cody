@@ -100,7 +100,6 @@ typedef enum{
 struct Token{
     int size;
     int position;
-    ContextID source;
     TokenId identifier;
     void *reserved;
 };
@@ -259,7 +258,7 @@ typedef LEX_PROC_CALLBACK(Lex_LineProcessorCallback);
 * The line when given has '\n' traded by 0, and size+1.
 */
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
-                     uint refLine=0, void *prv=nullptr);
+                     uint refLine=0, void *prv=nullptr, bool freeAfter=false);
 
 /*
 * Builds a tokenizer from default tables.

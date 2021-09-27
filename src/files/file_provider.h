@@ -50,12 +50,17 @@ Tokenizer *FileProvider_GetCppTokenizer();
 Tokenizer *FileProvider_GetGlslTokenizer();
 Tokenizer *FileProvider_GetEmptyTokenizer();
 Tokenizer *FileProvider_GetLitTokenizer();
+Tokenizer *FileProvider_GetDetachedCppTokenizer();
+Tokenizer *FileProvider_GetDetachedGlslTokenizer();
+Tokenizer *FileProvider_GetDetachedEmptyTokenizer();
+Tokenizer *FileProvider_GetDetachedLitTokenizer();
 
 /*
 * Asks the file provider to guess what is the tokenizer to use for a given file,
 * it also returns properties of a linebuffer that would hold this file.
 */
-Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len, LineBufferProps *props);
+Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len,
+                                       LineBufferProps *props, int detached=0);
 
 /*
 * Queries the file provider for the tokenizer that should be used with the given
@@ -75,10 +80,14 @@ int FileProvider_IsFileOpened(char *path, uint len);
 
 /*
 * Loads a file given its path. lineBuffer returns a new line buffer for the file
-* and lTokenizer returns the guessesd tokenizer.
+* The 'mustFinish' flag indicates if the load should not run asynchronously,
+* i.e.: at return the file must be completely loaded and all used resources must
+* be available. Settings 'mustFinish' to false allows for asynchronous load and
+* faster return, this allows for rendering the file wihout it being fully loaded,
+* usefull for large files but dangerous for loading files in sequence, use with care.
 */
 void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
-                       Tokenizer **lTokenizer=nullptr);
+                       bool mustFinish=true);
 
 /*
 * Creates a new file. lineBuffer returns a new line buffer allocated for the file

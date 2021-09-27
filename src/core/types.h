@@ -48,9 +48,11 @@ inline void __assert_check(bool v, const char *name, const char *filename,
 #if !defined(DEBUG_BUILD)
 #define Assert(x) 
 #define AssertA(x, msg)
+#define MEMORY_PRINT(...)
 #else
 #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
 #define AssertA(x, msg) AssertErr(x, msg)
+#define MEMORY_PRINT(...) printf(__VA_ARGS__)
 #endif
 
 #if defined(MEMORY_DEBUG)
@@ -154,7 +156,7 @@ inline void _debugger_trace(int sig){
 inline void *_get_memory(long size, const char *filename, uint line){
 #if defined(MEMORY_DEBUG)
     std::lock_guard<std::mutex> locker(debug_memory_mutex);
-    printf("CALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
+    MEMORY_PRINT("CALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
 #endif
 
     void *ptr = calloc(size, 1);
@@ -167,7 +169,7 @@ inline void *_get_memory(long size, const char *filename, uint line){
     entry.line = line;
     debug_memory_map[ptr] = entry;
     debug_memory_usage += size;
-    printf("OK - Inserted %p\n", ptr);
+    MEMORY_PRINT("OK - Inserted %p\n", ptr);
     __cpu_get_memory_usage(debug_memory_usage);
 #endif
 
@@ -183,9 +185,9 @@ inline void *_expand_memory(long size, long osize, void *p,
 #if defined(MEMORY_DEBUG)
     std::lock_guard<std::mutex> locker(debug_memory_mutex);
     if(p != nullptr){
-        printf("REALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
+        MEMORY_PRINT("REALLOC %lu (%s : %d)...", size, filename, line); fflush(stdout);
     }else{
-        printf("REALLOC %lu (%s : %d) of nullptr\n", size, filename, line);
+        MEMORY_PRINT("REALLOC %lu (%s : %d) of nullptr\n", size, filename, line);
         _debugger_trace(0);
     }
     
@@ -210,7 +212,7 @@ inline void *_expand_memory(long size, long osize, void *p,
     entry.line = line;
     debug_memory_map[ptr] = entry;
     debug_memory_usage += size;
-    printf("OK - Inserted %p\n", ptr);
+    MEMORY_PRINT("OK - Inserted %p\n", ptr);
     __cpu_get_memory_usage(debug_memory_usage);
 #endif
     
@@ -230,7 +232,7 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
     if(ptr){
         if(*ptr){
 #if defined(MEMORY_DEBUG)
-            printf("FREE %p (%s : %d)...", *ptr, filename, line); fflush(stdout);
+            MEMORY_PRINT("FREE %p (%s : %d)...", *ptr, filename, line); fflush(stdout);
             if(debug_memory_map.find(*ptr) != debug_memory_map.end()){
                 MemoryEntry e = debug_memory_map[*ptr];
 				debug_memory_usage -= e.size;
@@ -244,7 +246,7 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
             free(*ptr);
             
 #if defined(MEMORY_DEBUG)
-            printf("OK\n");
+            MEMORY_PRINT("OK\n");
 			__cpu_get_memory_usage(debug_memory_usage);
 #endif
             *ptr = nullptr;

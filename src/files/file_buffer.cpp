@@ -46,7 +46,7 @@ void FileBufferList_Insert(FileBufferList *list, LineBuffer *lBuffer){
     FileBuffer fBuffer = {
         .lineBuffer = lBuffer,
     };
-    
+
     List_Push<FileBuffer>(list->fList, &fBuffer);
 }
 

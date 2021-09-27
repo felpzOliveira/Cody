@@ -76,7 +76,6 @@ struct LineBuffer{
     UndoRedo undoRedo;
     vec2i activeBuffer;
     LineBufferProps props;
-    int built;
 };
 
 /* For static initialization */
@@ -217,7 +216,7 @@ void LineBuffer_InitEmpty(LineBuffer *lineBuffer);
 * 'filesize'.
 */
 void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
-                     char *fileContents, uint filesize);
+                     char *fileContents, uint filesize, bool synchronous=true);
 
 /*
 * Inserts a new line at the end of the LineBuffer. The line is specified by its contents

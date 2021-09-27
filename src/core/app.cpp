@@ -1451,6 +1451,7 @@ void AppCommandInsertSymbol(){
     vec2ui start, end;
     BufferView *bView = AppGetActiveBufferView();
     NullRet(bView->lineBuffer);
+
     if(BufferView_GetCursorSelectionRange(bView, &start, &end)){
         if(start.x == end.x){
             Buffer *buffer = BufferView_GetBufferAt(bView, start.x);
@@ -1563,9 +1564,8 @@ void AppCommandOpenFile(){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
-                FileProvider_Load(targetPath, l, &lBuffer, &tokenizer);
+                FileProvider_Load(targetPath, l, &lBuffer, false);
                 BufferView_SwapBuffer(bView, lBuffer);
-
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
                 if(f == 0 || lBuffer == nullptr){

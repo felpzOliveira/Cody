@@ -903,7 +903,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
-    token->source = LEX_CONTEXT_ID_EXEC_CODE;
     
     if(n == 1 && **p == '\\'){
         rv = TOKENIZER_OP_UNFINISHED;
@@ -959,7 +958,6 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
-    token->source = LEX_CONTEXT_ID_PREPROCESSOR;
     
     if(n == 1 && **p == '\\'){
         rv = TOKENIZER_OP_UNFINISHED;
@@ -1187,7 +1185,7 @@ static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
 }
 
 void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *processor,
-                     uint refLine, void *prv)
+                     uint refLine, void *prv, bool freeAfter)
 {
     uint processed = 0;
     char *p = text;
@@ -1220,6 +1218,10 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
     if(lineSize > 0){
         processor(&lineStart, lineSize+1, lineNr, 
                   processed-lineSize, textsize, prv);
+    }
+
+    if(freeAfter && text){
+        AllocatorFree(text);
     }
 }
 
@@ -1391,7 +1393,9 @@ int Lex_TokenizerHasPendingWork(Tokenizer *tokenizer){
 void Lex_TokenizerSetFetchCallback(Tokenizer *tokenizer,
                                    TokenizerFetchCallback *callback)
 {
-    tokenizer->fetcher = callback;
+    if(tokenizer){
+        tokenizer->fetcher = callback;
+    }
 }
 
 void Lex_TokenizerPrepareForNewLine(Tokenizer *tokenizer, uint lineNo){

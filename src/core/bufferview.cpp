@@ -275,6 +275,8 @@ int BufferView_GetCursorTransition(BufferView *view, Float dt, vec2ui *rRange,
 Float BufferView_GetDescription(BufferView *view, char *content, uint size,
                                 char *endDesc, uint endSize)
 {
+    LineBuffer *lineBuffer = BufferView_GetLineBuffer(view);
+    uint elen = 0;
     vec2ui pos = VScroll_GetCursorPosition(&view->sController);
     uint lineCount = view->lineBuffer->lineCount;
     Float pct = ((Float) pos.x) / ((Float) lineCount);
@@ -297,8 +299,18 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
         path = AppGetRootDirectory() + std::string("/") + path;
     }
 
+    if(lineBuffer){
+        if(!LineBuffer_IsWrittable(lineBuffer)){
+            elen = snprintf(endDesc, endSize, "○ ");
+        }else{
+            elen = snprintf(endDesc, endSize, "● ");
+        }
+    }
+
     if(AppIsStoredFile(path)){
-        snprintf(endDesc, endSize, "†");
+        snprintf(&endDesc[elen], endSize-elen, "■");
+    }else{
+        snprintf(&endDesc[elen], endSize-elen, "□");
     }
     
     return pct;

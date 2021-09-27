@@ -5,6 +5,7 @@
 #include <app.h>
 #include <string.h>
 #include <autocomplete.h>
+#include <parallel.h>
 
 #define MODULE_NAME "Buffer"
 
@@ -16,7 +17,6 @@ inline void DuplicateToken(Token *dst, Token *src){
     
     dst->size = src->size;
     dst->position = src->position;
-    dst->source = src->source;
     dst->identifier = src->identifier;
     if(dst->reserved){
         AllocatorFree(dst->reserved);
@@ -31,7 +31,6 @@ inline void DuplicateToken(Token *dst, Token *src){
 inline void CopyToken(Token *dst, Token *src){
     dst->size = src->size;
     dst->position = src->position;
-    dst->source = src->source;
     dst->identifier = src->identifier;
     if(dst->reserved){
         AllocatorFree(dst->reserved);
@@ -691,11 +690,12 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     
 }
 
-typedef struct{
+struct LineBufferTokenizer{
     Tokenizer *tokenizer;
     LineBuffer *lineBuffer;
     int lineBacktrack;
-}LineBufferTokenizer;
+    std::function<void(int)> func;
+};
 
 
 static LineBuffer *activeLineBuffer = nullptr;
@@ -739,6 +739,8 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
 #endif
     int iSize = size-1;
     current = at;
+    lineBufferTokenizer->func(lineNr);
+
     do{
         Token token;
         token.reserved = nullptr;
@@ -761,7 +763,6 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             workContext->workTokenList[head].size = token.size;
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
-            workContext->workTokenList[head].source = token.source;
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
             
@@ -854,7 +855,6 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
             workContext->workTokenList[head].size = token.size;
             workContext->workTokenList[head].position = token.position;
             workContext->workTokenList[head].identifier = token.identifier;
-            workContext->workTokenList[head].source = token.source;
             workContext->workTokenList[head].reserved = token.reserved;
             workContext->workTokenListHead++;
 
@@ -897,7 +897,6 @@ void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset){
                     tokens.push_back({
                         .size = (int)k - end,
                         .position = (int)k,
-                        .source = LEX_CONTEXT_ID_EXEC_CODE,
                         .identifier = TOKEN_ID_SPACE,
                         .reserved = nullptr,
                     });
@@ -913,7 +912,6 @@ void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset){
                     tokens.push_back({
                         .size = end - start,
                         .position = start,
-                        .source = LEX_CONTEXT_ID_EXEC_CODE,
                         .identifier = TOKEN_ID_NONE,
                         .reserved = nullptr,
                     });
@@ -927,7 +925,6 @@ void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset){
             tokens.push_back({
                 .size = end - start,
                 .position = start,
-                .source = LEX_CONTEXT_ID_EXEC_CODE,
                 .identifier = TOKEN_ID_NONE,
                 .reserved = nullptr,
             });
@@ -997,41 +994,81 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
 }
 
 void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
-                     char *fileContents, uint filesize)
+                     char *fileContents, uint filesize, bool synchronous)
 {
-    LineBufferTokenizer lineBufferTokenizer;
     AssertA(lineBuffer != nullptr && fileContents != nullptr && filesize > 0,
             "Invalid line buffer initialization");
-    
-    LineBuffer_InitBlank(lineBuffer);
-    
-    lineBufferTokenizer.tokenizer = tokenizer;
-    lineBufferTokenizer.lineBuffer = lineBuffer;
-    lineBufferTokenizer.lineBacktrack = 0;
-    
-    activeLineBuffer = lineBuffer;
-    current = 0;
-    totalSize = filesize;
-    content = fileContents;
-    
-    Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
-    
-    //printf("Starting to parse\n");
-    //clock_t start = clock();
 
-    Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
-                    0, &lineBufferTokenizer);
-    
-    //clock_t end = clock();
-    //double taken = (double)((end - start)) / (double)CLOCKS_PER_SEC;
-    //printf("Lines: %u, Took %g\n", lineBuffer->lineCount, taken);
+    if(synchronous){
+        LineBufferTokenizer lineBufferTokenizer;
+        LineBuffer_InitBlank(lineBuffer);
 
-    activeLineBuffer = nullptr;
-    current = 0;
-    totalSize = 0;
-    content = nullptr;
-    
-    Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
+        lineBufferTokenizer.tokenizer = tokenizer;
+        lineBufferTokenizer.lineBuffer = lineBuffer;
+        lineBufferTokenizer.lineBacktrack = 0;
+        lineBufferTokenizer.func = [&](int lineno) -> void{};
+
+        activeLineBuffer = lineBuffer;
+        current = 0;
+        totalSize = filesize;
+        content = fileContents;
+
+        Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
+
+        Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
+                        0, &lineBufferTokenizer, true);
+
+        activeLineBuffer = nullptr;
+        current = 0;
+        totalSize = 0;
+        content = nullptr;
+
+        Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
+    }else{ // Make the file tokenization run in a different thread
+        DispatchExecution([&](HostDispatcher *dispatcher){
+            // becarefull with pointers and variables as the parent
+            // context will dissolve once we dispatch the host.
+            const int kReleaseHostAt = 500;
+            LineBuffer *localLineBufferPtr = lineBuffer;
+            Tokenizer *localTokenizerPtr = tokenizer;
+
+            LineBufferTokenizer lineBufferTokenizer;
+            LineBuffer_InitBlank(localLineBufferPtr);
+            LineBuffer_SetWrittable(localLineBufferPtr, false);
+
+            lineBufferTokenizer.tokenizer = localTokenizerPtr;
+            lineBufferTokenizer.lineBuffer = localLineBufferPtr;
+            lineBufferTokenizer.lineBacktrack = 0;
+            lineBufferTokenizer.func = [&](int lineno) -> void{
+                if(lineno > kReleaseHostAt && !dispatcher->IsDispatched()){
+                    // we parsed enough, release the caller
+                    dispatcher->DispatchHost();
+                }
+            };
+
+            activeLineBuffer = localLineBufferPtr;
+            current = 0;
+            totalSize = filesize;
+            content = fileContents;
+
+            Lex_TokenizerSetFetchCallback(localTokenizerPtr,
+            LineBuffer_TokenizerFileFetcher);
+
+            Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
+                            0, &lineBufferTokenizer, true);
+
+            LineBuffer_SetWrittable(localLineBufferPtr, true);
+
+            activeLineBuffer = nullptr;
+            current = 0;
+            totalSize = 0;
+            content = nullptr;
+
+            Lex_TokenizerSetFetchCallback(localTokenizerPtr, nullptr);
+            // release the caller, just in case we haven't released it before
+            dispatcher->DispatchHost();
+        });
+    }
 }
 
 uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,

@@ -732,6 +732,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     Float ones[] = {1,1,1,1};
     char linen[32];
     BufferView *view = View_GetBufferView(vview);
+
     OpenGLFont *font = &state->font;
     Geometry geometry = view->geometry;
     

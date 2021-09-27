@@ -5,6 +5,9 @@
 #include <buffers.h>
 #include <mutex>
 #include <condition_variable>
+#include <functional>
+#include <typeindex>
+#include <map>
 
 struct LockedLineBuffer{
     LineBuffer *lineBuffer;
@@ -21,18 +24,60 @@ inline int GetConcurrency(){
     return Max(1, (int)std::thread::hardware_concurrency());
 }
 
-template<typename Function>
-void DispatchExecution(const Function &fn){
+class HostDispatcher{
+    public:
+    std::mutex *mutex;
+    std::condition_variable *cond;
+    int dispatchFlag;
+
+    HostDispatcher(){}
+
+    int IsDispatched(){ return dispatchFlag; }
+
+    void Init(std::mutex *m, std::condition_variable *c){
+        mutex = m;
+        cond = c;
+        dispatchFlag = 0;
+    }
+
+    void DispatchHost(){
+        std::lock_guard<std::mutex> guard(*mutex);
+        dispatchFlag = 1;
+        cond->notify_one();
+    }
+};
+
+template<typename T> class Dispatcher{
+    public:
     std::mutex mutex;
     std::condition_variable cond;
-    int dispatch = 0;
-    std::unique_lock<std::mutex> guard(mutex);
+    HostDispatcher hostDisp;
 
-    std::thread(fn, &mutex, &cond, &dispatch).detach();
+    Dispatcher() = default;
 
-    cond.wait(guard, [&]{ return dispatch == 1; });
-    mutex.unlock();
-    printf("Finished\n");
+    void DispatchFunction(const T &func){
+        hostDisp.Init(&mutex, &cond);
+
+        std::unique_lock<std::mutex> guard(mutex);
+        std::thread(func, &hostDisp).detach();
+        cond.wait(guard, [this]{ return hostDisp.dispatchFlag == 1; });
+    }
+};
+
+template<typename Function>
+void DispatchExecution(const Function &fn){
+    static std::map<std::type_index, void *> dispatcherMap;
+    std::type_index index = std::type_index(typeid(Function));
+    Dispatcher<Function> *dispatcher = nullptr;
+
+    if(dispatcherMap.find(index) == dispatcherMap.end()){
+        dispatcher = new Dispatcher<Function>();
+        dispatcherMap[index] = (void *)dispatcher;
+    }else{
+        dispatcher = (Dispatcher<Function> *)dispatcherMap[index];
+    }
+
+    dispatcher->DispatchFunction(fn);
 }
 
 template<typename Function>
