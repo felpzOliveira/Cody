@@ -95,6 +95,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "mutable", .identifier = TOKEN_ID_OPERATOR },
         { .value = "nullptr", .identifier = TOKEN_ID_OPERATOR },
@@ -205,6 +206,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "new", .identifier = TOKEN_ID_OPERATOR },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "elif", .identifier = TOKEN_ID_PREPROCESSOR },
         { .value = "FILE", .identifier = TOKEN_ID_DATATYPE },
         { .value = "dim3", .identifier = TOKEN_ID_DATATYPE },
         { .value = "this", .identifier = TOKEN_ID_OPERATOR },
@@ -259,6 +261,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
         { .value = "defined", .identifier = TOKEN_ID_OPERATOR },

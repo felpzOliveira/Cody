@@ -714,7 +714,6 @@ uint LineBuffer_TokenizerFileFetcher(char **p, uint fet){
     return 0;
 }
 
-
 #define DEBUG_TOKENS  0
 static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
                                      uint at, uint total, void *prv)
@@ -776,7 +775,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
             char f = s[token.position+token.size];
             s[token.position+token.size] = 0;
             printf("Token: %s { %s } [%d]\n", h,
-                   Lex_GetIdString(token.identifier), token.position);
+                   Symbol_GetIdString(token.identifier), token.position);
             s[token.position+token.size] = f;
 #endif
             iSize -= rc;

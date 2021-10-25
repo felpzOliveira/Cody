@@ -40,6 +40,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/external"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/crypto"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include")
 
 file(GLOB MH_CORE src/core/*.cpp
@@ -47,6 +48,7 @@ file(GLOB MH_CORE src/core/*.cpp
                   src/resources/*.cpp
                   ${CMAKE_BINARY_DIR}/*.cpp
                   src/languages/*.cpp
+                  src/crypto/*.cpp
                   src/graphics/*.cpp
                   src/external/glad/src/*.cpp)
 

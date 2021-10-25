@@ -105,6 +105,7 @@ inline void __gpu_check_binding(int bufferId, long int bindingSize,
 //TODO: Make allocator
 #define DefaultAllocatorSize 64
 #define AllocatorGet(size) _get_memory(size, __FILE__, __LINE__)
+#define AllocatorCalloc(n, size) _get_memory((size) * (n), __FILE__, __LINE__)
 #define AllocatorGetN(type, n) (type *)_get_memory(sizeof(type) * n, __FILE__, __LINE__)
 #define AllocatorGetDefault(type) (type *)_get_memory(DefaultAllocatorSize * sizeof(type), __FILE__, __LINE__)
 #define AllocatorExpand(type, ptr, n, o) (type*)_expand_memory(sizeof(type)*((n)), sizeof(type)*((o)), ptr, __FILE__, __LINE__)

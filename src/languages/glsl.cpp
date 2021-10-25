@@ -221,6 +221,7 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
         { .value = "int", .identifier = TOKEN_ID_DATATYPE },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "elif", .identifier = TOKEN_ID_PREPROCESSOR },
         { .value = "flat", .identifier = TOKEN_ID_OPERATOR },
         { .value = "lowp", .identifier = TOKEN_ID_OPERATOR },
         { .value = "char", .identifier = TOKEN_ID_DATATYPE },

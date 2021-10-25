@@ -76,6 +76,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "geometry", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Material", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "wireframe", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sheenTint", .identifier = TOKEN_ID_OPERATOR },
         { .value = "clearcoat", .identifier = TOKEN_ID_OPERATOR },
         { .value = "intensity", .identifier = TOKEN_ID_OPERATOR },

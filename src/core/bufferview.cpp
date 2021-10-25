@@ -308,9 +308,7 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
     }
 
     if(AppIsStoredFile(path)){
-        snprintf(&endDesc[elen], endSize-elen, "■");
-    }else{
-        snprintf(&endDesc[elen], endSize-elen, "□");
+        snprintf(&endDesc[elen], endSize-elen, "†");
     }
     
     return pct;
