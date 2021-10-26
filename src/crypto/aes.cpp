@@ -136,37 +136,20 @@ static bool AES_KeyExpansion(AesContext *ctx, uint8_t *key){
     //     the original key lies in the first bytes does not matter. It doesn't
     //     seem to have any relation between the key size and the expanded key
     //     Nb length. Iteration however begins at key size / 32.
-    if(Nk <= 6){
-        for(int i = Nk; i < it; i++){
-            AES_SET_WORD(tmp, exp, i-1);
-            AES_SET_WORD(ss, exp, i-Nk);
-            if(i % Nk == 0){
-                unsigned int rcon = i / Nk;
-                CryptoUtil_RotateBufferLeft(tmp, Nb);
-                AES_SubByte(tmp, 4);
-                tmp[0] ^= AES_Rcon[rcon];
-            }
-
-            AES_WORD_XOR(tmp, ss);
-            AES_SET_WORD(&exp[4 * i], tmp, 0);
+    for(int i = Nk; i < it; i++){
+        AES_SET_WORD(tmp, exp, i-1);
+        AES_SET_WORD(ss, exp, i-Nk);
+        if(i % Nk == 0){
+            unsigned int rcon = i / Nk;
+            CryptoUtil_RotateBufferLeft(tmp, Nb);
+            AES_SubByte(tmp, 4);
+            tmp[0] ^= AES_Rcon[rcon];
+        }else if(i % 4 == 0 && Nk > 6){
+            AES_SubByte(tmp, 4);
         }
 
-    }else{
-        for(int i = Nk; i < it; i++){
-            AES_SET_WORD(tmp, exp, i-1);
-            AES_SET_WORD(ss, exp, i-Nk);
-            if(i % Nk == 0){
-                unsigned int rcon = i / Nk;
-                CryptoUtil_RotateBufferLeft(tmp, Nb);
-                AES_SubByte(tmp, 4);
-                tmp[0] ^= AES_Rcon[rcon];
-            }else if(i % 4 == 0){
-                AES_SubByte(tmp, 4);
-            }
-
-            AES_WORD_XOR(tmp, ss);
-            AES_SET_WORD(&exp[4 * i], tmp, 0);
-        }
+        AES_WORD_XOR(tmp, ss);
+        AES_SET_WORD(&exp[4 * i], tmp, 0);
     }
 
     memset(tmp, 0, 4);
