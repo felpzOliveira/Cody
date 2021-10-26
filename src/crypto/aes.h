@@ -1,5 +1,8 @@
 /* date = October 25th 2021 22:15 */
 #pragma once
+#include <stddef.h>
+#include <vector>
+#include <stdint.h>
 
 /*
  * Disclaimer: All crypto code present in Cody is meant to be both
@@ -14,21 +17,45 @@
  *       we learn and maybe get things to a better place;
  *   2 - Applications should use what they need and not fantasize about
  *       things that are impossible in their scenarios.
- * This implies that my implementation is meant to provide protection on network
+ * This implies that my implementation is meant to provide protection over network
  * connections and not on local machines, If you feel like this code should
  * do more I suggest you implement crypto using either OpenSSL or MbedTLS.
  * I also don't make any promises that this will be decently fast, performance
- * is also irrelevant for Cody. I'll eventually tabulate things but only when
- * actually required.
+ * is also irrelevant for Cody as the crypto agent will be detached and the editor's
+ * performance won't be affect. I'll however eventually tabulate things but only when
+ * actually required. While I have written several protocols around OpenSSL and MbedTLS
+ * I have never written the crypto stuff at low level, this is a good oportunity
+ * to develop this skill.
  */
 
+#define AES_BLOCK_SIZE_IN_BYTES 16
+#define AES_TEST
+
 typedef enum{
-    AES128,
-    AES192,
-    AES256
+    AES128, AES192, AES256
 }AesKeyLength;
 
 /*
  * Generates a AES key with a given size, basically a random array.
  */
 bool AES_GenerateKey(void *buffer, AesKeyLength length);
+
+/*
+ * Encrypts a sequence of bytes using AES-CBC with a specific key. Passing
+ * an already filled iv vector makes this routine uses it for encryption, if
+ * the iv vector is empty than a new iv is generated and returned in it.
+ */
+bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength length,
+                     std::vector<uint8_t> &out, std::vector<uint8_t> &iv);
+
+/*
+ * Decrypts a sequence of bytes previously encrypted with AES-CBC.
+ */
+bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
+                     AesKeyLength length, std::vector<uint8_t> &out);
+
+/*
+ * Runs NIST test vectors on current implementation of AES-CBC.
+ * Code must be compiled with AES_TEST.
+ */
+void AES_RunVectorTests();

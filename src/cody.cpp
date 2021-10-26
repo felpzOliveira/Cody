@@ -137,6 +137,7 @@ int main(int argc, char **argv){
     uint8_t buf[32];
     AES_GenerateKey(buf, AES256);
 
+    AES_RunVectorTests();
     return 0;
 
     DebuggerRoutines();

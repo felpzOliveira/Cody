@@ -13,6 +13,15 @@ void CryptoUtil_RotateBufferLeft(unsigned char *buffer, size_t len){
     buffer[len-1] = e0;
 }
 
+void CryptoUtil_RotateBufferLeft(unsigned char **buffer, size_t len){
+    unsigned char e0 = *(buffer[0]);
+    for(size_t i = 0; i < len-1; i++){
+        *(buffer[i]) = *(buffer[i+1]);
+    }
+
+    *(buffer[len-1]) = e0;
+}
+
 void CryptoUtil_RotateBufferRight(unsigned char *buffer, size_t len){
     unsigned char e0 = buffer[len-1];
     for(size_t i = len-1; i > 0; i--){
@@ -20,6 +29,15 @@ void CryptoUtil_RotateBufferRight(unsigned char *buffer, size_t len){
     }
 
     buffer[0] = e0;
+}
+
+void CryptoUtil_RotateBufferRight(unsigned char **buffer, size_t len){
+    unsigned char e0 = *(buffer[len-1]);
+    for(size_t i = len-1; i > 0; i--){
+        *(buffer[i]) = *(buffer[i-1]);
+    }
+
+    *(buffer[0]) = e0;
 }
 
 void CryptoUtil_BufferToHex(unsigned char *buffer, size_t size, std::string &str){

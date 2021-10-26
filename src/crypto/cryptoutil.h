@@ -28,8 +28,10 @@ void CryptoUtil_BufferFromHex(std::vector<unsigned char> &out, char *data, size_
  * Rotates a buffer one position left.
  */
 void CryptoUtil_RotateBufferLeft(unsigned char *buffer, size_t len);
+void CryptoUtil_RotateBufferLeft(unsigned char **buffer, size_t len);
 
 /*
  * Rotates a buffer one position right.
  */
 void CryptoUtil_RotateBufferRight(unsigned char *buffer, size_t len);
+void CryptoUtil_RotateBufferRight(unsigned char **buffer, size_t len);
