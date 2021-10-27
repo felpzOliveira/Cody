@@ -11,6 +11,10 @@
 #define AES_MAX_STATE_SIZE 32
 #define AES_MAX_EXPANDED_KEY_SIZE_IN_BYTES ((AES_BLOCK_SIZE_IN_BYTES) * 15)
 
+#if AES_BLOCK_SIZE_IN_BYTES != 16
+    #error "Cody only supports AES with block size 16."
+#endif
+
 #define AES_WORD_XOR(b0, b1)\
 (b0)[0] = (b0)[0] ^ (b1)[0];\
 (b0)[1] = (b0)[1] ^ (b1)[1];\
@@ -176,6 +180,15 @@ static uint8_t AES_GaloisMult(uint8_t a, uint8_t b){
     return AES_E[s];
 }
 
+static void AES_ClearContext(AesContext *ctx){
+    ctx->keySize = 0;
+    ctx->blockSize = 0;
+    ctx->rounds = 0;
+    ctx->columns = 0;
+    memset(ctx->state, 0, AES_MAX_STATE_SIZE);
+    memset(ctx->expandedKey, 0, AES_MAX_EXPANDED_KEY_SIZE_IN_BYTES);
+}
+
 static void AES_InitializeContext(AesContext *ctx, AesKeyLength length){
     ctx->keySize = AES_KeySizeInBytes(length);
     ctx->blockSize = AES_BLOCK_SIZE_IN_BYTES;
@@ -273,7 +286,8 @@ static void AES_MixColumns(uint8_t *state, bool inverse=false){
         }
     }
 
-    memcpy(state, resp, 16);
+    memcpy(state, resp, AES_BLOCK_SIZE_IN_BYTES);
+    memset(resp, 0, AES_BLOCK_SIZE_IN_BYTES);
 #if defined(AES_DEBUG)
     std::string e1;
     CryptoUtil_BufferToHex(state, 16, e1);
@@ -331,6 +345,7 @@ static void AES_BlockEncrypt(uint8_t *block, uint8_t *output, AesContext *ctx){
 
     // Copy output block
     AES_CopyTransposed(output, ctx->state);
+    memset(RK, 0, AES_BLOCK_SIZE_IN_BYTES);
 }
 
 static void AES_BlockDecrypt(uint8_t *block, uint8_t *output, AesContext *ctx){
@@ -360,6 +375,7 @@ static void AES_BlockDecrypt(uint8_t *block, uint8_t *output, AesContext *ctx){
 
     // Copy output block
     AES_CopyTransposed(output, ctx->state);
+    memset(RK, 0, AES_BLOCK_SIZE_IN_BYTES);
 }
 
 bool AES_GenerateKey(void *buffer, AesKeyLength length){
@@ -412,24 +428,31 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
     }
 
     // check PKCS#7 padding
+    bool rv = false;
     uint8_t lastByte = dec[AES_BLOCK_SIZE_IN_BYTES-1];
     if(lastByte < 0x01 || lastByte > 0x10){
         printf("Invalid padding scheme ( %x )\n", lastByte);
         out.clear();
-        return false;
+        goto __ret;
     }
 
     for(size_t i = out.size()-1; i >= out.size()-lastByte; i--){
         if(out[i] != lastByte){
             printf("Invalid byte on padding\n");
             out.clear();
-            return false;
+            goto __ret;
         }
     }
 
     out.resize(out.size() - lastByte);
+    rv = true;
+__ret:
+    // clear stack
+    AES_ClearContext(&ctx);
+    memset(block, 0, AES_BLOCK_SIZE_IN_BYTES);
+    memset(dec, 0, AES_BLOCK_SIZE_IN_BYTES);
 
-    return true;
+    return rv;
 }
 
 bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength length,
@@ -457,9 +480,9 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
         for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++){
             iv[i] = giv[i];
         }
-
-        giv.clear();
     }
+
+    giv.clear();
 
     AES_KeyExpansion(&ctx, (uint8_t *)key);
 
@@ -521,6 +544,12 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
     for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++){
         giv.push_back(iv[i]);
     }
+
+    // clear stack
+    AES_ClearContext(&ctx);
+    memset(block, 0, AES_BLOCK_SIZE_IN_BYTES);
+    memset(iv, 0, AES_BLOCK_SIZE_IN_BYTES);
+    memset(enc, 0, AES_BLOCK_SIZE_IN_BYTES);
 
     return true;
 }
