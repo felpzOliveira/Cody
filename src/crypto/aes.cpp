@@ -4,7 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <cryptoutil.h>
-#include <iostream>
 
 #define AES_BLOCK_SIZE_WINDOW 4
 #define AES_BLOCK_SIZE_IN_BITS  (AES_BLOCK_SIZE_IN_BYTES << 3)
@@ -12,7 +11,7 @@
 #define AES_MAX_EXPANDED_KEY_SIZE_IN_BYTES ((AES_BLOCK_SIZE_IN_BYTES) * 15)
 
 #if AES_BLOCK_SIZE_IN_BYTES != 16
-    #error "Cody only supports AES with block size 16."
+    #error "Cody only supports AES with block size of 16 bytes."
 #endif
 
 #define AES_WORD_XOR(b0, b1)\
@@ -27,8 +26,8 @@
 (dst)[2] = (src)[4 * (offset) + 2];\
 (dst)[3] = (src)[4 * (offset) + 3];
 
-#define AES_GALOIS(a, b) AES_GaloisMult(a[0], b[0]) ^ AES_GaloisMult(a[1], b[1]) ^\
-                         AES_GaloisMult(a[2], b[2]) ^ AES_GaloisMult(a[3], b[3])
+#define AES_GALOIS(a, b) AES_GaloisMult((a)[0], (b)[0]) ^ AES_GaloisMult((a)[1], (b)[1]) ^\
+                         AES_GaloisMult((a)[2], (b)[2]) ^ AES_GaloisMult((a)[3], (b)[3])
 
 static uint8_t AES_SBox[256] = {
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7,
@@ -74,8 +73,9 @@ static uint8_t AES_InvSBox[256] = {
     0x55, 0x21, 0x0C, 0x7D
 };
 
-static uint8_t AES_Rcon[11] = { 0x8d, 0x01, 0x02, 0x04, 0x08, 0x10,
-                                0x20, 0x40, 0x80, 0x1B, 0x36 };
+static uint8_t AES_Rcon[11] = {
+    0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1B, 0x36
+};
 
 static uint8_t AES_L[256] = {
     0x00, 0x00, 0x19, 0x01, 0x32, 0x02, 0x1A, 0xC6, 0x4B, 0xC7, 0x1B, 0x68, 0x33, 0xEE,
@@ -131,6 +131,7 @@ typedef struct{
 }AesContext;
 
 static void AES_CopyTransposed(uint8_t *ptr, uint8_t *out){
+#if 0
     int c = 0;
     for(int i = 0; i < AES_BLOCK_SIZE_WINDOW; i++){
         for(int j = 0; j < AES_BLOCK_SIZE_WINDOW; j++){
@@ -138,6 +139,12 @@ static void AES_CopyTransposed(uint8_t *ptr, uint8_t *out){
             ptr[a] = out[c++];
         }
     }
+#else
+    ptr[0]  = out[0]; ptr[1]  = out[4]; ptr[2]  = out[8];  ptr[3]  = out[12];
+    ptr[4]  = out[1]; ptr[5]  = out[5]; ptr[6]  = out[9];  ptr[7]  = out[13];
+    ptr[8]  = out[2]; ptr[9]  = out[6]; ptr[10] = out[10]; ptr[11] = out[14];
+    ptr[12] = out[3]; ptr[13] = out[7]; ptr[14] = out[11]; ptr[15] = out[15];
+#endif
 }
 
 static unsigned int AES_KeySizeInBytes(AesKeyLength length){
@@ -370,7 +377,6 @@ static void AES_BlockDecrypt(uint8_t *block, uint8_t *output, AesContext *ctx){
         if(i != 0){
             AES_MixColumns(ctx->state, true);
         }
-
     }
 
     // Copy output block
@@ -562,41 +568,54 @@ typedef struct NistTestEntry{
     std::string cipher;
     std::string iv;
     AesKeyLength aes;
+    bool removePad;
 }NistTestEntry;
 
 std::vector<NistTestEntry> nistVectors = {
     {"6bc1bee22e409f96e93d7e117393172a", "2b7e151628aed2a6abf7158809cf4f3c",
-     "7649abac8119b246cee98e9b12e9197d", "000102030405060708090a0b0c0d0e0f", AES128},
+     "7649abac8119b246cee98e9b12e9197d", "000102030405060708090a0b0c0d0e0f",
+      AES128, true },
 
     {"ae2d8a571e03ac9c9eb76fac45af8e51", "2b7e151628aed2a6abf7158809cf4f3c",
-     "5086cb9b507219ee95db113a917678b2", "7649ABAC8119B246CEE98E9B12E9197D", AES128},
+     "5086cb9b507219ee95db113a917678b2", "7649ABAC8119B246CEE98E9B12E9197D",
+      AES128, true },
 
     {"30c81c46a35ce411e5fbc1191a0a52ef", "2b7e151628aed2a6abf7158809cf4f3c",
-     "73bed6b8e3c1743b7116e69e22229516", "5086CB9B507219EE95DB113A917678B2", AES128},
+     "73bed6b8e3c1743b7116e69e22229516", "5086CB9B507219EE95DB113A917678B2",
+      AES128, true },
 
     {"f69f2445df4f9b17ad2b417be66c3710", "2b7e151628aed2a6abf7158809cf4f3c",
-     "3ff1caa1681fac09120eca307586e1a7", "73BED6B8E3C1743B7116E69E22229516", AES128},
+     "3ff1caa1681fac09120eca307586e1a7", "73BED6B8E3C1743B7116E69E22229516",
+      AES128, true },
 
     {"6bc1bee22e409f96e93d7e117393172a", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
-     "4f021db243bc633d7178183a9fa071e8", "000102030405060708090A0B0C0D0E0F", AES192},
+     "4f021db243bc633d7178183a9fa071e8", "000102030405060708090A0B0C0D0E0F",
+      AES192, true },
 
     {"30c81c46a35ce411e5fbc1191a0a52ef", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
-     "571b242012fb7ae07fa9baac3df102e0", "B4D9ADA9AD7DEDF4E5E738763F69145A", AES192},
+     "571b242012fb7ae07fa9baac3df102e0", "B4D9ADA9AD7DEDF4E5E738763F69145A",
+      AES192, true },
 
     {"f69f2445df4f9b17ad2b417be66c3710", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
-     "08b0e27988598881d920a9e64f5615cd", "571B242012FB7AE07FA9BAAC3DF102E0", AES192},
+     "08b0e27988598881d920a9e64f5615cd", "571B242012FB7AE07FA9BAAC3DF102E0",
+      AES192, true },
 
     {"6bc1bee22e409f96e93d7e117393172a", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
-     "f58c4c04d6e5f1ba779eabfb5f7bfbd6", "000102030405060708090A0B0C0D0E0F", AES256},
+     "f58c4c04d6e5f1ba779eabfb5f7bfbd6", "000102030405060708090A0B0C0D0E0F",
+      AES256, true },
 
     {"30c81c46a35ce411e5fbc1191a0a52ef", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
-     "39f23369a9d9bacfa530e26304231461", "9CFC4E967EDB808D679F777BC6702C7D", AES256},
+     "39f23369a9d9bacfa530e26304231461", "9CFC4E967EDB808D679F777BC6702C7D",
+      AES256, true },
 
     {"f69f2445df4f9b17ad2b417be66c3710", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
-     "b2eb05e2c39be9fcda6c19078c6a9d1b", "39F23369A9D9BACFA530E26304231461", AES256},
+     "b2eb05e2c39be9fcda6c19078c6a9d1b", "39F23369A9D9BACFA530E26304231461",
+      AES256, true },
+
+    #include <aes_nist>
 };
 
-void AES_RunVectorTests(){
+void AES_RunTestVector(){
     int c = 1;
     for(NistTestEntry &e : nistVectors){
         std::vector<unsigned char> text, iv, key, cipher, dec, enc;
@@ -620,7 +639,10 @@ void AES_RunVectorTests(){
             printf(" > Encryption : %s\n", res.c_str());
             // Nist test vectors do not apply PKCS#7 padding
             // so we need to remove it
-            res = res.substr(0, res.size() / 2);
+            if(e.removePad){
+                res = res.substr(0, res.size() / 2);
+            }
+
             if(res != e.cipher){
                 printf(" ** ENCRYPTION FAILED\n");
                 exit(0);
@@ -647,7 +669,7 @@ void AES_RunVectorTests(){
 }
 
 #else
-void AES_RunVectorTests(){
-    printf("Cody is not compiled with NIST test vectors\n");
+void AES_RunTestVector(){
+    printf(" * Cody is not compiled with AES_TEST definition\n");
 }
 #endif

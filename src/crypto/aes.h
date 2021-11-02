@@ -24,11 +24,25 @@
  * is also irrelevant for Cody as the crypto agent will be detached and the editor's
  * performance won't be affect. I'll however eventually tabulate things but only when
  * actually required. While I have written several protocols around OpenSSL and MbedTLS
- * I have never written the crypto stuff at low level, this is a good oportunity
- * to develop this skill.
+ * I have never written the crypto stuff at low level, so expect the implementation to
+ * be the 'naive' one, however this is a good oportunity to learn implementation details
+ * of each algorithm.
+ */
+
+/*
+ * Note: The AES implementation here is the reference implementation, i.e.: it only
+ * uses tables for the galois field multiplication and does not merge ShiftRows,
+ * MixColumns, etc... into table components. Expect it to be slower than the optmized
+ * verison you would find in OpenSSL and MbedTLS.
  */
 
 #define AES_BLOCK_SIZE_IN_BYTES 16
+
+/*
+ * Enables the test routine for AES. Be aware that enabling this will attach
+ * around 1500 NIST test combinations for AES-CBC as a global variable, use only
+ * for debug/tests purposes.
+ */
 #define AES_TEST
 
 typedef enum{
@@ -58,4 +72,4 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
  * Runs NIST test vectors on current implementation of AES-CBC.
  * Code must be compiled with AES_TEST.
  */
-void AES_RunVectorTests();
+void AES_RunTestVector();

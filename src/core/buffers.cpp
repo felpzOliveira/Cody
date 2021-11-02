@@ -1050,8 +1050,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
             totalSize = filesize;
             content = fileContents;
 
-            Lex_TokenizerSetFetchCallback(localTokenizerPtr,
-            LineBuffer_TokenizerFileFetcher);
+            Lex_TokenizerSetFetchCallback(localTokenizerPtr, LineBuffer_TokenizerFileFetcher);
 
             Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
                             0, &lineBufferTokenizer, true);

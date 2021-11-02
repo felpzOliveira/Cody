@@ -95,6 +95,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "va_list", .identifier = TOKEN_ID_DATATYPE },
         { .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "mutable", .identifier = TOKEN_ID_OPERATOR },
@@ -261,6 +262,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "double", .identifier = TOKEN_ID_DATATYPE },
         { .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
     {
+        { .value = "va_list", .identifier = TOKEN_ID_DATATYPE },
         { .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_INCLUDE_SEL },
