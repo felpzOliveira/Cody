@@ -12,6 +12,7 @@
 #include <cryptoutil.h>
 #include <aes.h>
 #include <mp.h>
+#include <gitbase.h>
 
 void testMP(){
     MPI val32 = MPI::FromI64(32);
@@ -34,6 +35,7 @@ void testMP(){
 
     std::cout << ss << std::endl;
 #endif
+
     //exit(0);
 }
 
@@ -56,8 +58,8 @@ void LoadStaticFilesOnStart(){
 
                 int r = GuessFileEntry((char *)p.c_str(), p.size(), &entry, folder);
                 if(!(r < 0) && entry.type == DescriptorFile){
-                    FileProvider_Load((char *)p.c_str(), p.size());                    AppAddStoredFile(line);
-
+                    FileProvider_Load((char *)p.c_str(), p.size());
+                    AppAddStoredFile(line);
                 }
             }
         }
@@ -67,14 +69,14 @@ void LoadStaticFilesOnStart(){
 
 void StartWithFile(const char *path=nullptr){
     BufferView *bView = AppGetActiveBufferView();
-    BufferView_Initialize(bView, nullptr);
+    BufferView_Initialize(bView, nullptr, EmptyView);
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
         uint length = strlen(path);
 
         FileProvider_Load((char *)path, length, &lineBuffer, false);
-        BufferView_SwapBuffer(bView, lineBuffer);
+        BufferView_SwapBuffer(bView, lineBuffer, CodeView);
     }else{
         LoadStaticFilesOnStart();
     }
@@ -84,10 +86,12 @@ void StartWithFile(const char *path=nullptr){
 
 void CommandExecutorInit();
 int main(int argc, char **argv){
+#if 0
     testMP();
-    return 0;exit(0);
+    return 0;
     AES_RunTestVector();
     return 0;
+#endif
 
     DebuggerRoutines();
 

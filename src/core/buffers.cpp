@@ -523,6 +523,55 @@ void Buffer_Release(Buffer *buffer){
     buffer->stateContext.forwardTrack = 0;
 }
 
+void Buffer_FastTokenGen(Buffer *buffer){
+    std::vector<Token> tokens;
+    int start = -1;
+    int end = -1;
+    for(uint k = 0; k < buffer->taken; k++){
+        char p = buffer->data[k];
+        if(p != ' ' && p != '\r' && p != '\t' && p != '\n'){
+            if(end >= 0){
+                tokens.push_back({
+                    .size = (int)k - end,
+                    .position = (int)k,
+                    .identifier = TOKEN_ID_SPACE,
+                    .reserved = nullptr,
+                });
+                end = -1;
+            }
+
+            if(start < 0){
+                start = (int)k;
+            }
+        }else{
+            if(start >= 0){
+                end = (int)k;
+                tokens.push_back({
+                    .size = end - start,
+                    .position = start,
+                    .identifier = TOKEN_ID_NONE,
+                    .reserved = nullptr,
+                });
+                start = -1;
+            }
+        }
+    }
+
+    if(start >= 0){
+        end = (int)buffer->taken;
+        tokens.push_back({
+            .size = end - start,
+            .position = start,
+            .identifier = TOKEN_ID_NONE,
+            .reserved = nullptr,
+        });
+        start = -1;
+    }
+
+    Buffer_UpdateTokens(buffer, tokens.data(), tokens.size());
+    tokens.clear();
+}
+
 void Buffer_Free(Buffer *buffer){
     if(buffer){
 #if defined(MEMORY_DEBUG)
@@ -875,6 +924,108 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
         AssertA(base >= r, "Overflow during forwardtrack computation");
         Buffer *b = LineBuffer_GetBufferAt(lineBuffer, base - r);
         b->stateContext.forwardTrack = r+2;
+    }
+}
+
+std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any){
+    std::vector<vec2ui> *ptr = nullptr;
+    *any = false;
+    if(lineBuffer){
+        ptr = &lineBuffer->props.diffLines;
+        *any = ptr->size() > 0;
+    }
+
+    return ptr;
+}
+
+
+std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clear){
+    std::vector<GitDiffLine> *ptr = nullptr;
+    if(lineBuffer){
+        ptr = &lineBuffer->props.diffs;
+        if(clear){
+            ptr->clear();
+        }
+    }
+    return ptr;
+}
+
+uint LineBuffer_GetRealDiffLine(LineBuffer *lineBuffer, uint i,
+                                GitDiffLine *targetLine, bool *ok)
+{
+    uint where = 1;
+    *ok = false;
+    if(lineBuffer){
+        std::vector<GitDiffLine> *ptr = &lineBuffer->props.diffs;
+        if(ptr->size() > i){
+            uint id = 0;
+            uint additions = 0, removed = 0;
+            where = ptr->at(0).lineno;
+            GitDiffLine gLine;
+
+            while(id < i){
+                gLine = ptr->at(id);
+                if(gLine.lineno >= 0){
+                    where = gLine.lineno;
+                    if(gLine.ctype == GIT_LINE_REMOVED){
+                        where += additions;
+                        removed += 1;
+                    }else if(gLine.ctype == GIT_LINE_INSERTED){
+                        additions += 1;
+                        where += removed;
+                    }
+                }
+
+                id++;
+            }
+
+            *targetLine = gLine;
+            *ok = true;
+        }
+    }
+
+    return where-1;
+}
+
+void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer){
+    if(lineBuffer){
+        std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
+        for(int i = ptr->size()-1; i >= 0; i--){
+            vec2ui v = ptr->at(i);
+            if(v.y == GIT_LINE_REMOVED){
+                LineBuffer_RemoveLineAt(lineBuffer, v.x);
+            }
+        }
+    }
+}
+
+void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
+    if(lineBuffer){
+        std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
+        std::vector<GitDiffLine> *dif = &lineBuffer->props.diffs;
+        ptr->clear();
+
+        uint start = lineBuffer->lineCount, end = 0;
+        for(uint i = 0; i < dif->size(); i++){
+            GitDiffLine line;
+            bool ok = false;
+            uint n = LineBuffer_GetRealDiffLine(lineBuffer, i, &line, &ok);
+            if(ok){
+                if(line.ctype == GIT_LINE_REMOVED){
+                    LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
+                                            line.content.size(), 1);
+                    start = Min(start, n);
+                    end = Max(end, n);
+                }
+
+                ptr->push_back(vec2ui(n, (uint)line.ctype));
+            }else{
+                printf("[Error] Failed to compute diff line\n");
+                break;
+            }
+        }
+
+        range = vec2ui(start, end);
     }
 }
 
@@ -1276,6 +1427,10 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo){
     return nullptr;
 }
 
+char *LineBuffer_GetStoragePath(LineBuffer *lineBuffer){
+    return &lineBuffer->filePath[0];
+}
+
 void LineBuffer_SetStoragePath(LineBuffer *lineBuffer, char *path, uint size){
     if(path && size > 0){
         strncpy(lineBuffer->filePath, path, Min(size, sizeof(lineBuffer->filePath)));
@@ -1508,6 +1663,16 @@ void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt){
             }
         }
     }
+}
+
+LineBuffer *LineBuffer_AllocateInternal(){
+    LineBuffer *lineBuffer = AllocatorGetN(LineBuffer, 1);
+    LineBuffer_InitEmpty(lineBuffer);
+    LineBuffer_SetStoragePath(lineBuffer, nullptr, 0);
+    LineBuffer_SetWrittable(lineBuffer, false);
+    LineBuffer_SetType(lineBuffer, 2); // 2 = Empty tokenizer
+    LineBuffer_SetExtension(lineBuffer, FILE_EXTENSION_NONE);
+    return lineBuffer;
 }
 
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext){

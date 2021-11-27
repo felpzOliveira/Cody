@@ -51,7 +51,6 @@ inline int BufferView_IsPositionVisible(BufferView *view, vec2ui position){
     return (ss->visibleRect.x < position.x && ss->visibleRect.y > position.x) ? 1 : 0;
 }
 
-
 void BufferView_AdjustGhostCursorIfOut(BufferView *view){
     VScroll_AdjustGhostIfNeeded(&view->sController, view->lineBuffer);
 }
@@ -91,7 +90,8 @@ void BufferView_Synchronize(BufferView *view){
         // adjust ghost cursor if needed
         VScroll_AdjustGhostIfNeeded(ss, view->lineBuffer);
     }else{ // our buffer got killed
-        BufferView_SwapBuffer(view, nullptr);
+        // TODO: do we need this?
+        //BufferView_SwapBuffer(view, nullptr, EmptyView);
     }
 }
 
@@ -147,7 +147,7 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     return tokenID;
 }
 
-void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer){
+void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType type){
     AssertA(view != nullptr, "Invalid initialization");
     view->lineBuffer = lineBuffer;
     view->renderLineNbs = 1;
@@ -156,15 +156,17 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer){
     VScroll_Init(&view->sController);
     view->scroll.horizontal = Transform();
     view->is_visible = 1;
+    view->activeType = type;
 }
 
-void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer){
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type){
     // We need to reset geometry because scroll actually holds visible range
     BufferViewFileLocation_Register(view);
     Float lineHeight = view->sController.lineHeight;
     view->lineBuffer = lineBuffer;
     view->scroll.currX = 0;
     view->activeNestPoint = -1;
+    view->activeType = type;
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
     BufferViewFileLocation_Restore(view);
@@ -285,7 +287,7 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
 
     char *name = (char *)&view->lineBuffer->filePath[st];
     if(view->lineBuffer->filePathSize == 0){
-        name = (char *)"Build";
+        name = (char *)"Command";
     }
 
     if(view->lineBuffer->is_dirty == 0){
@@ -300,10 +302,13 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
     }
 
     if(lineBuffer){
+        // read-write state of the linebuffer
         if(!LineBuffer_IsWrittable(lineBuffer)){
             elen = snprintf(endDesc, endSize, "○ ");
+            //elen = snprintf(endDesc, endSize, "ʀ ");
         }else{
             elen = snprintf(endDesc, endSize, "● ");
+            //elen = snprintf(endDesc, endSize, "ʀԝ ");
         }
     }
 
@@ -560,6 +565,14 @@ int BufferView_IsVisible(BufferView *view){
 
 uint BufferView_GetCursorSelectionRange(BufferView *view, vec2ui *start, vec2ui *end){
     return VScroll_GetCursorSelection(&view->sController, start, end);
+}
+
+ViewType BufferView_GetViewType(BufferView *view){
+    return view->activeType;
+}
+
+void BufferView_SetViewType(BufferView *view, ViewType type){
+    view->activeType = type;
 }
 
 void BufferView_GetGeometry(BufferView *view, Geometry *geometry){

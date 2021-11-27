@@ -22,7 +22,7 @@ ViewNode *ViewTree_CreateNode(int is_leaf=1){
         View_SetActive(node->view, 0);
         if(viewTree.root){
             BufferView *bView = &node->view->bufferView;
-            BufferView_Initialize(bView, nullptr);
+            BufferView_Initialize(bView, nullptr, EmptyView);
         }
     }
 

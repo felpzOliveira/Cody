@@ -15,6 +15,8 @@
 #include <control_cmds.h>
 #include <parallel.h>
 #include <timing.h>
+#include <gitbase.h>
+#include <gitbuffer.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -107,12 +109,18 @@ void AppEarlyInitialize(){
     appGlobalConfig.configFolder = dir;
     appGlobalConfig.rootFolder = appContext.cwd;
     appGlobalConfig.configFile = dir + std::string("/.config");
+
+    Git_Initialize();
+    Git_OpenRootRepository();
+
+    GitBuffer_InitializeInternalBuffer();
 }
 
 int AppGetTabConfiguration(int *using_tab){
     if(using_tab){
         *using_tab = appGlobalConfig.useTabs;
     }
+
     return appGlobalConfig.tabSpacing;
 }
 
@@ -186,6 +194,17 @@ void AppUpdateViews(){
         BufferView_Synchronize(bView);
 
         ViewTree_Next(&iterator);
+    }
+}
+
+void AppRestoreCurrentBufferViewState(){
+    BufferView *view = AppGetActiveBufferView();
+    if(view){
+        ViewType type = BufferView_GetViewType(view);
+        // TODO: Add as needed
+        if(type == GitDiffView){
+            AppCommandGitDiffCurrent();
+        }
     }
 }
 
@@ -649,7 +668,7 @@ void AppCommandKillBuffer(){
             View *view = iterator.value->view;
             BufferView *bView = &view->bufferView;
             if(bView->lineBuffer == lineBuffer){
-                BufferView_SwapBuffer(bView, nullptr);
+                BufferView_SwapBuffer(bView, nullptr, EmptyView);
             }
             ViewTree_Next(&iterator);
         }
@@ -724,6 +743,8 @@ void AppCommandUndo(){
                 Buffer_EraseSymbols(buffer, symTable);
 
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
+                // give ownership of the buffer to the undo system
+                // this reduces memory allocations/frees
                 UndoSystemTakeBuffer(buffer);
                 
                 cursor.x = bChange->bufferInfo.x;
@@ -1447,6 +1468,67 @@ vec2ui AppActivateViewAt(int x, int y){
     return r;
 }
 
+void AppCommandGitStatus(){
+    AppRestoreCurrentBufferViewState();
+    BufferView *bView = AppGetActiveBufferView();
+    std::vector<std::string> data;
+    if(Git_FetchStatus(&data)){
+        LineBuffer *gitbuf = GitBuffer_GetLineBuffer();
+        GitBuffer_Clear();
+
+        for(std::string v : data){
+            GitBuffer_PushLine((char *)v.c_str(), v.size());
+        }
+
+        BufferView_SwapBuffer(bView, gitbuf, GitStatusView);
+    }
+}
+
+void AppCommandGitDiffCurrent(){
+    BufferView *bView = AppGetActiveBufferView();
+    bool allow_write = true;
+    NullRet(bView->lineBuffer);
+
+    // only compute diffs for actual editable linebuffers.
+    NullRet(BufferView_GetViewType(bView) == CodeView ||
+            BufferView_GetViewType(bView) == GitDiffView);
+
+    std::vector<GitDiffLine> *dif = LineBuffer_GetDiffPtr(bView->lineBuffer, 0);
+    if(dif){
+        vec2ui range;
+        if(dif->size() > 0){
+            std::vector<vec2ui> *ptr = &bView->lineBuffer->props.diffLines;
+            LineBuffer_EraseDiffContent(bView->lineBuffer);
+            range = vec2ui(ptr->at(0).x, ptr->at(ptr->size()-1).x);
+            dif->clear();
+            // removed the diff, make the state code again
+            BufferView_SetViewType(bView, CodeView);
+        }else{
+            dif->clear();
+            allow_write = false;
+            std::string path = AppGetRootDirectory();
+            std::string target = LineBuffer_GetStoragePath(bView->lineBuffer);
+            std::string gitName = target;
+            if(StringStartsWith((char *)target.c_str(), target.size(),
+                                (char *)path.c_str(), path.size()))
+            {
+                gitName = target.substr(path.size()+1);
+            }
+
+            if(!Git_ComputeCurrentDiff()) return;
+            if(!Git_FetchDiffFor((char *)gitName.c_str(), dif)) return;
+
+            LineBuffer_InsertDiffContent(bView->lineBuffer, range);
+            BufferView_SetViewType(bView, GitDiffView);
+        }
+
+        if(range.x <= range.y){
+            RemountTokensBasedOn(bView, range.x, range.y - range.x);
+            LineBuffer_SetWrittable(bView->lineBuffer, allow_write);
+        }
+    }
+}
+
 void AppCommandInsertSymbol(){
     vec2ui start, end;
     BufferView *bView = AppGetActiveBufferView();
@@ -1489,7 +1571,7 @@ void AppCommandSwapToBuildBuffer(){
         }
     }
 
-    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, BuildView);
 }
 
 void AppCommandQueryBarLeftArrow(){
@@ -1547,6 +1629,7 @@ void AppCommandSwitchTheme(){
 }
 
 void AppCommandSwitchBuffer(){
+    AppRestoreCurrentBufferViewState();
     View *view = AppGetActiveView();
     int r = SwitchBufferCommandStart(view);
     if(r >= 0)
@@ -1554,6 +1637,7 @@ void AppCommandSwitchBuffer(){
 }
 
 void AppCommandOpenFile(){
+    AppRestoreCurrentBufferViewState();
     View *view = AppGetActiveView();
     auto fileOpen = [](View *view, FileEntry *entry) -> void{
         char targetPath[PATH_MAX];
@@ -1565,14 +1649,14 @@ void AppCommandOpenFile(){
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
                 FileProvider_Load(targetPath, l, &lBuffer, false);
-                BufferView_SwapBuffer(bView, lBuffer);
+                BufferView_SwapBuffer(bView, lBuffer, CodeView);
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
                 if(f == 0 || lBuffer == nullptr){
                     printf("Did not find buffer %s\n", entry->path);
                 }else{
                     //printf("Swapped to %s\n", entry->path);
-                    BufferView_SwapBuffer(bView, lBuffer);
+                    BufferView_SwapBuffer(bView, lBuffer, CodeView);
                 }
             }
         }else{ // is file creation (or dir?)
@@ -1584,7 +1668,7 @@ void AppCommandOpenFile(){
             if(len > 0){
                 //printf("Creating file %s\n", content);
                 FileProvider_CreateFile(content, len, &lBuffer, &tokenizer);
-                BufferView_SwapBuffer(bView, lBuffer);
+                BufferView_SwapBuffer(bView, lBuffer, CodeView);
             }
         }
     };
@@ -1695,6 +1779,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearch, Key_LeftControl, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearchAndReplace, Key_LeftControl, Key_O);
+    RegisterRepeatableEvent(mapping, AppCommandGitDiffCurrent, Key_LeftAlt, Key_O);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftControl, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftAlt, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarRevSearch, Key_LeftControl, Key_R);

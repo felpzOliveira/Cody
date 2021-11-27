@@ -40,4 +40,9 @@ extern std::vector<std::vector<GToken>> noneReservedPreprocessor;
 extern std::vector<std::vector<GToken>> noneReservedTable;
 extern TokenizerSupport noneSupport;
 
+// Cmake
+extern std::vector<std::vector<GToken>> cmakeReservedTable;
+extern std::vector<std::vector<GToken>> cmakeReservedPreprocessor;
+extern TokenizerSupport cmakeSupport;
+
 #endif //LANGUAGES_H

@@ -131,12 +131,7 @@ void GetExecutorLockedLineBuffer(LockedLineBuffer **ptr){
 }
 
 void CommandExecutorInit(){
-    lockedBuffer.lineBuffer = AllocatorGetN(LineBuffer, 1);
+    lockedBuffer.lineBuffer = LineBuffer_AllocateInternal();
     lockedBuffer.render_state = -1;
-    LineBuffer_InitEmpty(lockedBuffer.lineBuffer);
-    LineBuffer_SetStoragePath(lockedBuffer.lineBuffer, nullptr, 0);
-    LineBuffer_SetWrittable(lockedBuffer.lineBuffer, false);
-    LineBuffer_SetType(lockedBuffer.lineBuffer, 2); // 2 = Empty tokenizer
-    LineBuffer_SetExtension(lockedBuffer.lineBuffer, FILE_EXTENSION_NONE);
     std::thread(ExecutorMainLoop).detach();
 }

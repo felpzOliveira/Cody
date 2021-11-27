@@ -131,7 +131,7 @@ uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch){
 
 void BaseCommand_JumpViewToBuffer(View *view, LineBuffer *lineBuffer, vec2i p){
     BufferView *bView = View_GetBufferView(view);
-    BufferView_SwapBuffer(bView, lineBuffer);
+    BufferView_SwapBuffer(bView, lineBuffer, CodeView); // is this always CodeView?
     BufferView_CursorToPosition(bView, p.x, p.y);
     BufferView_GhostCursorFollow(bView);
 }
@@ -270,6 +270,33 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
         if(mathSymbolMap.find(symname) != mathSymbolMap.end()){
             std::string value = mathSymbolMap[symname];
             AppPasteString(value.c_str(), value.size());
+        }
+    }
+
+    return r;
+}
+
+void BaseCommand_GitDiff(char *cmd, uint size){
+    uint len = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(arg == nullptr){
+        AppCommandGitDiffCurrent();
+    }
+}
+
+int BaseCommand_Git(char *cmd, uint size){
+    int r = 0;
+    const char *git = "git ";
+    const int gitlen = 4;
+    if(StringStartsWith(cmd, size, (char *)git, gitlen)){
+        r = 1;
+        uint len = 0;
+        char *gitCmd = StringNextWord(cmd, size, &len);
+        if(StringEqual(gitCmd, (char *)"diff", Min(len, 4))){
+            if(len != 4) return r; // check for ill construted string
+            BaseCommand_GitDiff(gitCmd, size-len);
+        }else if(StringEqual(gitCmd, (char *)"status", Min(len, 6))){
+            AppCommandGitStatus();
         }
     }
 
@@ -448,6 +475,9 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
         rv = BaseCommand_SearchAllFiles(cmd, size);
         if(rv != 0) return rv;
 
+        rv = BaseCommand_Git(cmd, size);
+        if(rv != 0) return rv;
+
         rv = -1;
     }
 
@@ -468,7 +498,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
         }
     }
 
-    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer);
+    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, BuildView);
     // because the parallel thread will reset the linebuffer we need
     // to make sure the cursor is located in a valid range for rendering
     // otherwise in case the build buffer does is updated too fast it can
@@ -770,7 +800,7 @@ int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
         return 0;
     }
     
-    BufferView_SwapBuffer(bView, lineBuffer);
+    BufferView_SwapBuffer(bView, lineBuffer, CodeView);
     SelectableListFreeLineBuffer(view);
     return 1;
 }

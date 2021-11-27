@@ -182,6 +182,8 @@ void AppCommandHomeLine();
 void AppCommandUndo();
 void AppCommandNewLine();
 void AppCommandInsertTab();
+void AppCommandGitDiffCurrent();
+void AppCommandGitStatus();
 void AppCommandRemovePreviousToken();
 void AppCommandQueryBarSearch();
 void AppCommandQueryBarRevSearch();

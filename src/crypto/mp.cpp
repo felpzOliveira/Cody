@@ -373,10 +373,11 @@ static bool MP_Add_s(MP_Int *mp0, MP_Int *mp1, MP_Int *c){
         // compute C[i] = A[i] + B[i] + Carry
         c->digits[i] = a->digits[i] + b->digits[i] + carry;
 
-        // grab the carry from C[i]
+        // the extra bits contains the carry, grab them from C[i]
         carry = c->digits[i] >> (MP_Digit)MP_DIGIT_BIT;
 
-        // remove the carry
+        // remove the carry, this assures the MP_Digit + MP_Digit is contained
+        // within the boundaries of a MP_Digit even if logically it could overflow
         c->digits[i] &= MP_MASK;
     }
 
@@ -905,32 +906,38 @@ bool MP_AddD(MP_Int *a, MP_Digit b, MP_Int *c){
     return true;
 }
 
+/* general purpose add operator c = mp0 + mp1 */
 bool MP_Add(MP_Int *mp0, MP_Int *mp1, MP_Int *c){
     MP_Int *a = mp0;
     MP_Int *b = mp1;
+    /* if both numbers have the same sign do c = |a| + |b| and keep the sign */
     if(a->sign == b->sign){
         c->sign = a->sign;
         return MP_Add_s(a, b, c);
     }
 
+    /* if |a| < |b| invert the pointers */
     if(MP_CmpMag(a, b) == MP_LT){
         a = mp1;
         b = mp0;
     }
 
+    /* this add is actually a sub with |c| = |a| - |b| */
     c->sign = a->sign;
     return MP_Sub_s(a, b, c);
 }
 
-
+/* general purpose sub operator c = mp0 - mp1 */
 bool MP_Sub(MP_Int *mp0, MP_Int *mp1, MP_Int *c){
     MP_Int *a = mp0;
     MP_Int *b = mp1;
+    /* if both numbers have diff signs than this is actually a sum */
     if(a->sign != b->sign){
         c->sign = a->sign;
         return MP_Add_s(a, b, c);
     }
 
+    /* if |a| < |b| invert the pointers and get sign */
     if(MP_CmpMag(a, b) == MP_LT){
         c->sign = (!MP_IsNeg(a) ? MP_NEG : MP_ZPOS);
         a = mp1;
@@ -939,6 +946,7 @@ bool MP_Sub(MP_Int *mp0, MP_Int *mp1, MP_Int *c){
         c->sign = a->sign;
     }
 
+    /* do an absolute sub |c| = |a| - |b| with |a| > |b| */
     return MP_Sub_s(a, b, c);
 }
 
@@ -1003,12 +1011,15 @@ bool MP_ReadRadix(MP_Int *a, const char *str, int radix){
         return false;
     }
 
-    /* if the leading digit is a
-     * minus set the sign to negative.
+    /*
+     * if the leading digit is a minus set the sign to negative.
+     * also check if it is positive just to be sure.
      */
     if(*str == '-'){
         ++str;
         sign = MP_NEG;
+    }else if(*str == '+'){
+        ++str;
     }
 
     /* set the integer to the default of zero */

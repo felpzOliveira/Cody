@@ -117,6 +117,13 @@ int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len);
 int StringFirstNonEmpty(char *s0, uint s0len);
 
 /*
+* Return an accessor to the begining of the next work in the string 's0'.
+* In case there is no other word it returns nullptr. Returns the size of
+* the word in the output 'size', in case a word is found.
+*/
+char *StringNextWord(char *s0, uint s0len, uint *size);
+
+/*
 * Find the first ocurrency of 'v' inside 's0'.
 */
 int StringFindFirstChar(char *s0, uint s0len, char v);

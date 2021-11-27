@@ -50,10 +50,12 @@ Tokenizer *FileProvider_GetCppTokenizer();
 Tokenizer *FileProvider_GetGlslTokenizer();
 Tokenizer *FileProvider_GetEmptyTokenizer();
 Tokenizer *FileProvider_GetLitTokenizer();
+Tokenizer *FileProvider_GetCmakeTokenizer();
 Tokenizer *FileProvider_GetDetachedCppTokenizer();
 Tokenizer *FileProvider_GetDetachedGlslTokenizer();
 Tokenizer *FileProvider_GetDetachedEmptyTokenizer();
 Tokenizer *FileProvider_GetDetachedLitTokenizer();
+Tokenizer *FileProvider_GetDetachedCmakeTokenizer();
 
 /*
 * Asks the file provider to guess what is the tokenizer to use for a given file,

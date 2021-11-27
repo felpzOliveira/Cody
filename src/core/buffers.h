@@ -6,6 +6,8 @@
 #include <lex.h>
 #include <undo.h>
 #include <symbol.h>
+#include <vector>
+#include <gitbase.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -60,6 +62,8 @@ struct LineBufferProps{
     FileExtension ext;
     CopySection cpSection;
     bool isWrittable;
+    std::vector<GitDiffLine> diffs;
+    std::vector<vec2ui> diffLines;
 };
 
 /*
@@ -197,6 +201,13 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
 void Buffer_CopyDeep(Buffer *dst, Buffer *src);
 
 /*
+* Generates tokens without tokenization. This simply splits the strings
+* and generates TOKEN_ID_NONE and TOKEN_ID_SPACE values to force a buffer
+* to be renderable without needing to perform tokenization and symbol table lookups.
+*/
+void Buffer_FastTokenGen(Buffer *buffer);
+
+/*
 * Releases a Buffer, giving its memory back.
 */
 void Buffer_Free(Buffer *buffer);
@@ -284,6 +295,37 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
 void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
 
 /*
+* Retrieves the pointer associated to the diff inside this linebuffer. Settings
+* clear = 1 makes the diff be clared before returning. This is intended to be used
+* with the git interface to avoid array copies.
+*/
+std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clear=1);
+
+/*
+* Retrieves the pointer associated to the diff range inside this linebuffer.
+*/
+std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any);
+
+/*
+* Erases the current diff lines from the linebuffer.
+*/
+void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer);
+
+/*
+* Computes the *exact* line where the diff at 'i' lies in the linebuffer.
+* In case diff 'i' does not exists it returns ok = false, otherwise ok = true.
+* targetLine returns the value of the diff at the position 'i'. The value returned
+* is the line index in the linebuffer within the range [0, lineCount-1].
+*/
+uint LineBuffer_GetRealDiffLine(LineBuffer *lineBuffer, uint i,
+                                GitDiffLine *targetLine, bool *ok);
+
+/*
+* Sets the diff content for the current linebuffer.
+*/
+void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range);
+
+/*
 * Generates the raw text from a range with the contents of this linebuffer.
 * Interior formatted tabs are removed from this string, this routine allocates
 * the pointer 'ptr'.
@@ -295,6 +337,11 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
 * Clears a linebuffer wihtout actually deleting data, it just marks as free.
 */
 void LineBuffer_SoftClear(LineBuffer *lineBuffer);
+
+/*
+* Gets the storage path for the contents of the LineBuffer given.
+*/
+char *LineBuffer_GetStoragePath(LineBuffer *lineBuffer);
 
 /*
 * Sets the storage path for the contents of the LineBuffer given.
@@ -363,6 +410,9 @@ void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt);
 * Releases memory taken by a LineBuffer.
 */
 void LineBuffer_Free(LineBuffer *lineBuffer);
+
+/* Helpers */
+LineBuffer *LineBuffer_AllocateInternal();
 
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer);

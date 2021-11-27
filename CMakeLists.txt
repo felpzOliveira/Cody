@@ -41,7 +41,9 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/external"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/crypto"
-                    "${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include")
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/git"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/external/libgit2/include")
 
 file(GLOB MH_CORE src/core/*.cpp
                   src/files/*.cpp
@@ -49,12 +51,16 @@ file(GLOB MH_CORE src/core/*.cpp
                   ${CMAKE_BINARY_DIR}/*.cpp
                   src/languages/*.cpp
                   src/crypto/*.cpp
+                  src/git/*.cpp
                   src/graphics/*.cpp
                   src/external/glad/src/*.cpp)
 
 file(GLOB MH_SHADERS shaders/*.glsl)
 
 file(GLOB MH_SRCS src/cody.cpp)
+
+set(MH_LIBGIT_LINK "${CMAKE_CURRENT_SOURCE_DIR}/external/libgit2/build")
+link_directories(${MH_LIBGIT_LINK})
 
 add_definitions(${MH_FLAGS})
 add_library(corelib OBJECT ${MH_CORE})
@@ -66,4 +72,4 @@ add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
                         ${CMAKE_BINARY_DIR}
                     DEPENDS ${MH_SHADERS})
 
-target_link_libraries(${CODY} dl;X11;pthread)
+target_link_libraries(${CODY} dl;X11;pthread;git2;z;pcre)

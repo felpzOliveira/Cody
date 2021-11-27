@@ -16,6 +16,7 @@ typedef struct FileProvider{
     Tokenizer glslTokenizer, glslDetachedTokenizer;
     Tokenizer emptyTokenizer, emptyDetachedTokenizer;
     Tokenizer litTokenizer, litDetachedTokenizer;
+    Tokenizer cmakeTokenizer, cmakeDetachedTokenizer;
 }FileProvider;
 
 // Static allocation of the file provider
@@ -61,6 +62,15 @@ static void InitTokenizers(){
     Lex_BuildTokenizer(&fProvider.emptyDetachedTokenizer, appGlobalConfig.tabSpacing,
                        &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
                        &noneSupport);
+
+    // Cmake
+    Lex_BuildTokenizer(&fProvider.cmakeTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&cmakeReservedPreprocessor, &cmakeReservedTable},
+                       &cmakeSupport);
+
+    Lex_BuildTokenizer(&fProvider.cmakeDetachedTokenizer, appGlobalConfig.tabSpacing,
+                       &fProvider.symbolTable, {&cmakeReservedPreprocessor, &cmakeReservedTable},
+                       &cmakeSupport);
 }
 
 void FileProvider_Initialize(){
@@ -72,12 +82,14 @@ void FileProvider_Initialize(){
     fProvider.glslTokenizer  = TOKENIZER_INITIALIZER;
     fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.cmakeTokenizer = TOKENIZER_INITIALIZER;
 
     // Detached tokenizer for parallel parsing
     fProvider.cppDetachedTokenizer   = TOKENIZER_INITIALIZER;
     fProvider.glslDetachedTokenizer  = TOKENIZER_INITIALIZER;
     fProvider.emptyDetachedTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litDetachedTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.cmakeDetachedTokenizer = TOKENIZER_INITIALIZER;
 
     InitTokenizers();
 
@@ -138,9 +150,17 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len,
             return FileProvider_GetLitTokenizer();
         }
 
-        else if(strExt == ".txt"){
-            props->type = 2;
+        else if(strExt == ".txt" || strExt == ".cmake"){
+            int n = GetRightmostSplitter(filename, len);
+            std::string val(&filename[n+1]);
             props->ext = FILE_EXTENSION_TEXT;
+            if(val == "CMakeLists.txt" || strExt == ".cmake"){
+                props->type = 4;
+                if(detached) return FileProvider_GetDetachedCmakeTokenizer();
+                return FileProvider_GetCmakeTokenizer();
+            }
+
+            props->type = 2;
             if(detached) return FileProvider_GetDetachedEmptyTokenizer();
             return FileProvider_GetEmptyTokenizer();
         }
@@ -165,6 +185,7 @@ Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
         case 1: return FileProvider_GetGlslTokenizer();
         case 2: return FileProvider_GetEmptyTokenizer();
         case 3: return FileProvider_GetLitTokenizer();
+        case 4: return FileProvider_GetCmakeTokenizer();
         default:{
             //TODO: Empty tokenizer
             return FileProvider_GetEmptyTokenizer();
@@ -296,6 +317,10 @@ Tokenizer *FileProvider_GetLitTokenizer(){
     return &fProvider.litTokenizer;
 }
 
+Tokenizer *FileProvider_GetCmakeTokenizer(){
+    return &fProvider.cmakeTokenizer;
+}
+
 Tokenizer *FileProvider_GetDetachedCppTokenizer(){
     return &fProvider.cppDetachedTokenizer;
 }
@@ -310,4 +335,8 @@ Tokenizer *FileProvider_GetDetachedEmptyTokenizer(){
 
 Tokenizer *FileProvider_GetDetachedLitTokenizer(){
     return &fProvider.litDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedCmakeTokenizer(){
+    return &fProvider.cmakeDetachedTokenizer;
 }

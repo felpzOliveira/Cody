@@ -37,6 +37,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "name", .identifier = TOKEN_ID_OPERATOR },
         { .value = "View", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "value", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sheen", .identifier = TOKEN_ID_OPERATOR },
         { .value = "image", .identifier = TOKEN_ID_OPERATOR },
         { .value = "width", .identifier = TOKEN_ID_OPERATOR },
@@ -50,6 +51,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "scale", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Shape", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "render", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "window", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sundir", .identifier = TOKEN_ID_OPERATOR },
         { .value = "pixels", .identifier = TOKEN_ID_OPERATOR },
         { .value = "height", .identifier = TOKEN_ID_OPERATOR },

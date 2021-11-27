@@ -14,6 +14,14 @@ typedef enum{
     DescriptionBottom
 }DescriptionLocation;
 
+typedef enum{
+    CodeView,
+    BuildView,
+    GitStatusView,
+    GitDiffView,
+    EmptyView,
+}ViewType;
+
 typedef struct{
     vec2ui position;
     TokenId id;
@@ -31,6 +39,7 @@ struct BufferView{
     LineBuffer *lineBuffer;
     VScroll sController;
     Geometry geometry;
+    ViewType activeType;
     /*
     * Rendering properties of the BufferView, defined by the renderer
     */
@@ -55,6 +64,17 @@ struct BufferViewFileLocation{
     LineBuffer *lineBuffer;
 };
 
+inline const char *ViewTypeString(ViewType type){
+    switch(type){
+        case CodeView : return "CodeView";
+        case BuildView : return "BuildView";
+        case GitDiffView : return "GitDiffView";
+        case GitStatusView: return "GitStatusView";
+        case EmptyView : return "EmptyView";
+        default: return "(none)";
+    }
+}
+
 Float InterpolateValueCubic(Float dt, Float remaining,
                             Float *initialValue, Float finalValue, 
                             Float *velocity);
@@ -64,16 +84,27 @@ Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
 
 
 /*
-* Initializes a bufferview to represent the contents of the given linebuffer. It also
-* receives the tokenizer responsible for tokenization of the linebuffer to be used
-* for updates.
+* Initializes a bufferview to represent the contents of the given linebuffer.
 */
-void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer);
+void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType type);
 
 /*
 * Makes a bufferview uses a linebuffer for file reference.
 */
-void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer);
+void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type);
+
+/*
+* Retrieves the view type of the given bufferview.
+*/
+ViewType BufferView_GetViewType(BufferView *view);
+
+/*
+* Sets the view type of the given bufferview. Usually you want to set this value during
+* initialization or buffer swap as it is bounded by the linebuffer. However some
+* operations i.e: git diff, work on the contents of the linebuffer and do not have
+* a dedicated linebuffer, so you can use this to guide the state of the linebuffer.
+*/
+void BufferView_SetViewType(BufferView *view, ViewType type);
 
 /*
 * Sets the geometry of a bufferview.

@@ -5,6 +5,8 @@
 #include <app.h>
 #include <file_provider.h>
 #include <parallel.h>
+#include <gitbase.h>
+#include <iostream>
 
 void _Graphics_RenderCursorElements(OpenGLState *state, BufferView *bufferView, 
                                     Transform *model, Transform *projection);
@@ -332,7 +334,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
         if(BufferView_CursorNestIsValid(view)){
             NestPoint *start = view->startNest;
             NestPoint *end   = view->endNest;
-            Float minY = -font->fontMath.fontSizeAtRenderCall;;
+            Float minY = -font->fontMath.fontSizeAtRenderCall;
             Float maxY = (view->sController.currentMaxRange + 1)* 
                 font->fontMath.fontSizeAtRenderCall;
             struct _Quad{
@@ -496,6 +498,56 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
         Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
         Graphics_LineFlush(state);
         
+    }
+}
+
+
+void Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float lineSpan,
+                                     Transform *projection, Transform *model, Theme *theme)
+{
+    BufferView *view = View_GetBufferView(vview);
+    if(view->isActive){
+        LineBuffer *lineBuffer=  BufferView_GetLineBuffer(view);
+        bool any = false;
+        if(lineBuffer){
+            OpenGLFont *font = &state->font;
+            vec2ui visibleLines = BufferView_GetViewRange(view);
+            std::vector<GitDiffLine> *dif = LineBuffer_GetDiffPtr(lineBuffer, 0);
+            std::vector<vec2ui> *ptr = LineBuffer_GetDiffRangePtr(lineBuffer, &any);
+            if(!any || !ptr || dif->size() < 1) return;
+
+            vec4f addedColor(0.1,0.4,0.1,0.5);
+            vec4f removeColor(0.5,0.1,0.1,0.5);
+
+            glUseProgram(font->cursorShader.id);
+            Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            for(vec2ui val : *ptr){
+                if(!(val.x >= visibleLines.x && val.x <= visibleLines.y)){
+                    continue;
+                }
+
+                Float y0 = ((Float)val.x - (Float)visibleLines.x) *
+                        font->fontMath.fontSizeAtRenderCall;
+                if(vview->descLocation == DescriptionTop){
+                    y0 += font->fontMath.fontSizeAtRenderCall;
+                }
+
+                Float y1 = y0 + font->fontMath.fontSizeAtRenderCall;
+                if(val.y == GIT_LINE_INSERTED){
+                    Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lineSpan, y1),
+                                      addedColor);
+                }else{
+                    Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lineSpan, y1),
+                                      removeColor);
+                }
+            }
+
+            Graphics_QuadFlush(state);
+
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+            Graphics_LineFlush(state);
+        }
     }
 }
 
@@ -667,13 +719,20 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     int is_tab = 0;
     int tabSpace = AppGetTabConfiguration(&is_tab);
     enddesc[0] = 0;
-    int k = 0;
+    std::string head, fmt;
+    int k = 0, kk = 0;
+
     if(is_tab){
         k = snprintf(enddesc, sizeof(enddesc), " TAB - %d", tabSpace);
     }else{
         k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d", tabSpace);
     }
-    
+
+    if(Git_GetReferenceHeadName(head)){
+        kk = snprintf(&enddesc[k], sizeof(enddesc) - k, " %s", head.c_str());
+        k += kk;
+    }
+
     Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph);
     Float rScale = font->fontMath.invReduceScale / scale;
     w = w * rScale;
@@ -681,9 +740,9 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
                         font->fontMath.invReduceScale * 0.5;
     x = 2.0 * half.x;
     if(n > 0){
-        x -= (1.5 * w + 1.5 * f);
+        x -= (1.5 * w + 1.2 * f);
     }else{
-        x -= 1.5 * f;
+        x -= 1.2 * f;
     }
 
     y = (a1.y + a0.y) * 0.5 - 0.25 * font->fontMath.fontSizeAtRenderCall;
@@ -803,6 +862,9 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     // render alignment and scoped quads first to not need to blend this thing
     Graphics_RenderScopeSections(state, vview, scaledWidth, &state->projection,
                                  &state->model, theme);
+
+    Graphics_RenderGitDiffHighlight(state, vview, scaledWidth, &state->projection,
+                                    &state->model, theme);
     
     if(!BufferView_IsAnimating(view)){
         Graphics_RenderTextBlock(state, view, baseHeight, &state->projection);

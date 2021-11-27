@@ -153,6 +153,39 @@ int StringFirstNonEmpty(char *s0, uint s0len){
     return -1;
 }
 
+char *StringNextWord(char *s0, uint s0len, uint *len){
+    bool space_found = false;
+    int remaining = (int)s0len;
+    while(remaining > 0){
+        char v = s0[s0len-remaining];
+        if(!space_found){
+            space_found = v == ' ';
+        }else{
+            if(v != ' '){
+                break;
+            }
+        }
+
+        remaining -= 1;
+    }
+
+    if(remaining > 0){
+        int rest = remaining;
+        *len = 0;
+        while(rest > 0){
+            char v = s0[s0len - remaining + *len];
+            if(v == ' ' || v == 0){
+                break;
+            }
+
+            (*len)++;
+            rest--;
+        }
+        return &s0[s0len-remaining];
+    }
+    return nullptr;
+}
+
 int StringStartsWith(char *s0, uint s0len, char *s1, uint s1len){
     if(s1len > s0len) return 0;
     for(uint i = 0; i < s1len; i++){
@@ -524,7 +557,7 @@ std::istream &GetNextLineFromStream(std::istream &is, std::string &str){
 
 int GetRightmostSplitter(const char *path, uint size){
     int addr = -1;
-    for(uint i = size-1; i >= 0; i--){
+    for(int i = size-1; i >= 0; i--){
         char *p = (char*)&path[i];
         if(*p == '\\' || *p == '/'){
             addr = i;

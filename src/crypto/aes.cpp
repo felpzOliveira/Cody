@@ -393,6 +393,16 @@ bool AES_GenerateKey(void *buffer, AesKeyLength length){
     return Crypto_SecureRNG(buffer, size);
 }
 
+/*
+ * CBC Decryption using AES as block cipher with PKCS#7 padding.
+ * Algorithm is straightforward the reverse of encryption:
+ *     - Decrypt the first block and set Si = iv;
+ *     - Xor the decrypted result with Si and make Si = encrypted block i+1;
+ *     - For all other blocks decrypt it and Xor with Si and make Si = encrypted block i+1;
+ *     - Once finished check the last byte p and check the last p bytes are p:
+ *         - In case they are the padding is correct and remove the last p bytes;
+ *         - In case it is not than the message has incorrect PKCS#7 padding.
+ */
 bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
                      AesKeyLength length, std::vector<uint8_t> &out)
 {
@@ -461,6 +471,15 @@ __ret:
     return rv;
 }
 
+/*
+ * CBC Encryption using AES as block cipher with PKCS#7 padding.
+ * Algorithm is straightforward:
+ *     - Xor the first block with the iv and encrypt it;
+ *     - For all other blocks xor the block with the previous result and encrypt it;
+ *     - Compute the padding byte as p = n - n % b;
+ *     - Introduce the padding byte into a new block or fill the last block with p;
+ *     - Encrypt the last block with padded byte.
+ */
 bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength length,
                      std::vector<uint8_t> &out, std::vector<uint8_t> &giv)
 {
@@ -481,7 +500,9 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
     padByte = AES_BLOCK_SIZE_IN_BYTES - len % AES_BLOCK_SIZE_IN_BYTES;
 
     if(giv.size() != AES_BLOCK_SIZE_IN_BYTES){
-        if(!Crypto_SecureRNG(iv, AES_BLOCK_SIZE_IN_BYTES)) return false;
+        if(!Crypto_SecureRNG(iv, AES_BLOCK_SIZE_IN_BYTES)){
+            return false;
+        }
     }else{
         for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++){
             iv[i] = giv[i];
@@ -529,7 +550,8 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
     }
 
     // if we finished because the message was multiple of the block size
-    // we need to do one more to insert the padding
+    // we need to do one more to insert the padding, in this case the entire
+    // block is a pad, i.e.: encrypt of 16 bytes of value 0x10.
     if(!is_last_block){
         for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++) block[i] = padByte;
 
@@ -575,43 +597,33 @@ std::vector<NistTestEntry> nistVectors = {
     {"6bc1bee22e409f96e93d7e117393172a", "2b7e151628aed2a6abf7158809cf4f3c",
      "7649abac8119b246cee98e9b12e9197d", "000102030405060708090a0b0c0d0e0f",
       AES128, true },
-
     {"ae2d8a571e03ac9c9eb76fac45af8e51", "2b7e151628aed2a6abf7158809cf4f3c",
      "5086cb9b507219ee95db113a917678b2", "7649ABAC8119B246CEE98E9B12E9197D",
       AES128, true },
-
     {"30c81c46a35ce411e5fbc1191a0a52ef", "2b7e151628aed2a6abf7158809cf4f3c",
      "73bed6b8e3c1743b7116e69e22229516", "5086CB9B507219EE95DB113A917678B2",
       AES128, true },
-
     {"f69f2445df4f9b17ad2b417be66c3710", "2b7e151628aed2a6abf7158809cf4f3c",
      "3ff1caa1681fac09120eca307586e1a7", "73BED6B8E3C1743B7116E69E22229516",
       AES128, true },
-
     {"6bc1bee22e409f96e93d7e117393172a", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
      "4f021db243bc633d7178183a9fa071e8", "000102030405060708090A0B0C0D0E0F",
       AES192, true },
-
     {"30c81c46a35ce411e5fbc1191a0a52ef", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
      "571b242012fb7ae07fa9baac3df102e0", "B4D9ADA9AD7DEDF4E5E738763F69145A",
       AES192, true },
-
     {"f69f2445df4f9b17ad2b417be66c3710", "8e73b0f7da0e6452c810f32b809079e562f8ead2522c6b7b",
      "08b0e27988598881d920a9e64f5615cd", "571B242012FB7AE07FA9BAAC3DF102E0",
       AES192, true },
-
     {"6bc1bee22e409f96e93d7e117393172a", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
      "f58c4c04d6e5f1ba779eabfb5f7bfbd6", "000102030405060708090A0B0C0D0E0F",
       AES256, true },
-
     {"30c81c46a35ce411e5fbc1191a0a52ef", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
      "39f23369a9d9bacfa530e26304231461", "9CFC4E967EDB808D679F777BC6702C7D",
       AES256, true },
-
     {"f69f2445df4f9b17ad2b417be66c3710", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
      "b2eb05e2c39be9fcda6c19078c6a9d1b", "39F23369A9D9BACFA530E26304231461",
       AES256, true },
-
     #include <aes_nist>
 };
 
@@ -640,6 +652,9 @@ void AES_RunTestVector(){
             // Nist test vectors do not apply PKCS#7 padding
             // so we need to remove it
             if(e.removePad){
+                // test vector data is usually one block
+                // so if we are to remove pad we simply need to erase
+                // the extra block that should be 0x10 encrypted
                 res = res.substr(0, res.size() / 2);
             }
 
