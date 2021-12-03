@@ -14,6 +14,14 @@ struct GitDiffLine{
     std::string content;
 };
 
+// Make the text strings global so we can easily detect which
+// operation is performed on a git status
+#define GIT_NEW_FILE_STR         " New:        "
+#define GIT_MODIFIED_FILE_STR    " Modified:   "
+#define GIT_DELETED_FILE_STR     " Deleted:    "
+#define GIT_RENAMED_FILE_STR     " Renamed:    "
+#define GIT_TYPECHANGE_FILE_STR  " Typechange: "
+
 /*
  * Initializes the git interface.
  */
@@ -28,6 +36,11 @@ void Git_Finalize();
  * Attempt to open the root directory of the application as a git repo.
  */
 bool Git_OpenRootRepository();
+
+/*
+ * Attempts to open the given path as a git repository.
+ */
+bool Git_OpenDirectory(char *path);
 
 /*
  * Get the head reference string.
@@ -57,3 +70,9 @@ bool Git_FetchDiffDeltas(std::vector<std::string> *_deltas);
 * file status (new file, modified, removed, ...).
 */
 bool Git_FetchStatus(std::vector<std::string> *_status);
+
+/*
+* Retrieves the graph representation of log. Similar to running:
+*     git log --graph
+*/
+bool Git_LogGraph();

@@ -223,7 +223,7 @@ inline void *_expand_memory(long size, long osize, void *p,
     
     if(ptr == NULL){
         printf("Failed to expand memory to size: %lx (%s:%u)\n", size, filename, line);
-    }else{
+    }else if(osize < size){
         unsigned char*start = (unsigned char *)ptr + osize;
         memset(start, 0x00, size - osize);
     }

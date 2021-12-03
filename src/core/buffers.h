@@ -138,7 +138,7 @@ uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int dec
 * to not perform tab expansion, i.e.: the string was already expanded, or 1 to perform
 * tab expansion. Returns the amount of bytes actually inserted after tab expansion.
 */
-uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, 
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
                               uint len, int decode_tab=0);
 
 /*
@@ -152,6 +152,20 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size);
 * that start < end. Range is given in UTF-8 positions.
 */
 void Buffer_RemoveRange(Buffer *buffer, uint start, uint end);
+
+/*
+* Logically erase the contents of the buffer, i.e.: erase the contents of the
+* buffer without freeing memory. Equivalent to:
+*        Buffer_RemoveRangeRaw(buffer,  0, buffer->taken);
+* but this also handles zeroing tokens.
+*/
+void Buffer_SoftClear(Buffer *buffer);
+
+/*
+* Removes the last token from a buffer. Erases both the token and the data
+* related to the token.
+*/
+void Buffer_RemoveLastToken(Buffer *buffer);
 
 /*
 * Removes a range of the given Buffer. Range is given in raw position inside the
@@ -297,12 +311,18 @@ void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
 /*
 * Retrieves the pointer associated to the diff inside this linebuffer. Settings
 * clear = 1 makes the diff be clared before returning. This is intended to be used
-* with the git interface to avoid array copies.
+* with the git interface to avoid array copies. This list should be used by the git
+* interface to register raw deltas. In order to clearly express changes in file
+* use LineBuffer_InsertDiffContent.
 */
 std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clear=1);
 
 /*
-* Retrieves the pointer associated to the diff range inside this linebuffer.
+* Retrieves the pointer associated to the diff range inside this linebuffer. The diff
+* range pointer is a list of pair of values that holds (line, type) of all diffs
+* currently active in the linebuffer. For example a new line might be registered as:
+* (32, GIT_LINE_INSERTED) and a removed one as (64, GIT_LINE_REMOVED). This list
+* can be used to render the linebuffer displaying diffs.
 */
 std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any);
 
@@ -312,16 +332,9 @@ std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *an
 void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer);
 
 /*
-* Computes the *exact* line where the diff at 'i' lies in the linebuffer.
-* In case diff 'i' does not exists it returns ok = false, otherwise ok = true.
-* targetLine returns the value of the diff at the position 'i'. The value returned
-* is the line index in the linebuffer within the range [0, lineCount-1].
-*/
-uint LineBuffer_GetRealDiffLine(LineBuffer *lineBuffer, uint i,
-                                GitDiffLine *targetLine, bool *ok);
-
-/*
-* Sets the diff content for the current linebuffer.
+* Updates the linebuffer to include its diff content. Returns in 'range' the
+* range of modified lines as (start, end). This routine processes the raw deltas
+* contained in the linebuffer and transforms it into displayable text that can be rendered.
 */
 void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range);
 
@@ -330,7 +343,7 @@ void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range);
 * Interior formatted tabs are removed from this string, this routine allocates
 * the pointer 'ptr'.
 */
-uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr, 
+uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
                                  vec2ui start, vec2ui end);
 
 /*

@@ -337,7 +337,7 @@ Theme theme4Coder = {
         ColorFromHex(0xFF070713),
         ColorFromHex(0xFF131307),
     },
-    
+
     //.userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeColor = ColorFromHex(0xCCffc110),//0xCCffdf10), //223, 16
     .userDatatypeEnum = ColorFromHex(0xCCffffe1),
@@ -443,7 +443,7 @@ inline static T ApplyAlpha(T color, Theme *theme){
         else s.w *= kAlphaReduceDefault;
         return s;
     }
-    
+
     return color;
 }
 
@@ -614,4 +614,8 @@ int ThemeNeedsEffect(Theme *theme){
 
 bool CurrentThemeIsLight(){
     return defaultTheme == &themeGruvboxLight;
+}
+
+void CurrentThemeSetDimm(int dim){
+    defaultTheme->alphaDimm = dim != 0 ? 1 : 0;
 }

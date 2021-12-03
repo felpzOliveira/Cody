@@ -14,7 +14,7 @@ inline void DuplicateToken(Token *dst, Token *src){
         printf("Null token given\n");
         return;
     }
-    
+
     dst->size = src->size;
     dst->position = src->position;
     dst->identifier = src->identifier;
@@ -22,7 +22,7 @@ inline void DuplicateToken(Token *dst, Token *src){
         AllocatorFree(dst->reserved);
         dst->reserved = nullptr;
     }
-    
+
     if(src->reserved){
         dst->reserved = StringDup((char *)src->reserved, src->size);
     }
@@ -37,6 +37,24 @@ inline void CopyToken(Token *dst, Token *src){
         dst->reserved = nullptr;
     }
     dst->reserved = src->reserved;
+}
+
+void Buffer_SoftClear(Buffer *buffer){
+    Buffer_RemoveRangeRaw(buffer,  0, buffer->taken);
+    for(uint i = 0; i < buffer->tokenCount; i++){
+        Token *token = &buffer->tokens[i];
+        if(token->reserved){
+            AllocatorFree(token->reserved);
+            token->reserved = nullptr;
+        }
+    }
+
+    if(buffer->tokens){
+        AllocatorFree(buffer->tokens);
+        buffer->tokens = nullptr;
+    }
+
+    buffer->tokenCount = 0;
 }
 
 void Buffer_RemoveExcessSpace(Buffer *buffer){
@@ -91,12 +109,12 @@ void Buffer_CopyDeep(Buffer *dst, Buffer *src){
             dst->data = (char *)AllocatorGet(len * sizeof(char));
             dst->size = len;
         }
-        
+
         if(src->taken > dst->size){
             dst->data = AllocatorExpand(char, dst->data, src->size, dst->size);
             dst->size = src->size;
         }
-        
+
         if(dst->tokens == nullptr && src->tokenCount > 0){
             dst->tokens = (Token *)AllocatorGet(src->tokenCount * sizeof(Token));
         }else if(dst->tokenCount < src->tokenCount){
@@ -296,8 +314,26 @@ uint Buffer_GetUtf8Count(Buffer *buffer){
     return StringComputeU8Count(buffer->data, buffer->taken);
 }
 
+void Buffer_RemoveLastToken(Buffer *buffer){
+    if(buffer){
+        if(buffer->tokenCount < 1) return;
+        Token *token = &buffer->tokens[buffer->tokenCount-1];
+        Buffer_RemoveRangeRaw(buffer, token->position, buffer->taken);
+        if(token->reserved) AllocatorFree(token->reserved);
+        if(buffer->tokenCount > 1){
+            buffer->tokens = AllocatorExpand(Token, buffer->tokens,
+                                       buffer->tokenCount-1, buffer->tokenCount);
+        }else{
+            AllocatorFree(buffer->tokens);
+            buffer->tokens = nullptr;
+        }
+        buffer->tokenCount -= 1;
+    }
+}
+
 void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size){
     if(buffer){
+        bool release = true;
         if(buffer->tokenCount < size){
             if(buffer->tokens){
                 buffer->tokens = AllocatorExpand(Token, buffer->tokens,
@@ -305,24 +341,39 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size){
                 for(uint i = buffer->tokenCount; i < size; i++){
                     buffer->tokens[i].reserved = nullptr;
                 }
-                
+
             }else{
                 buffer->tokens = AllocatorGetN(Token, size);
+                buffer->tokenCount = size;
+                release = false;
             }
         }
-        
-        for(uint i = 0; i < buffer->tokenCount; i++){
-            Token *token = &buffer->tokens[i];
-            if(token->reserved != nullptr) AllocatorFree(token->reserved);
-            token->reserved = nullptr;
+
+        if(release){
+            for(uint i = 0; i < buffer->tokenCount; i++){
+                Token *token = &buffer->tokens[i];
+                if(token->reserved != nullptr) AllocatorFree(token->reserved);
+                token->reserved = nullptr;
+            }
         }
-        
-        buffer->tokenCount = size;
-        for(uint i = 0; i < size; i++){
-            Token *dstToken = &buffer->tokens[i];
-            Token *srcToken = &tokens[i];
-            CopyToken(dstToken, srcToken);
-            srcToken->reserved = nullptr;
+
+        if(size == 0){
+            AllocatorFree(buffer->tokens);
+            buffer->tokens = nullptr;
+            buffer->tokenCount = 0;
+        }else{
+            if(size < buffer->tokenCount){
+                buffer->tokens = AllocatorExpand(Token, buffer->tokens,
+                                                 size, buffer->tokenCount);
+            }
+
+            buffer->tokenCount = size;
+            for(uint i = 0; i < size; i++){
+                Token *dstToken = &buffer->tokens[i];
+                Token *srcToken = &tokens[i];
+                CopyToken(dstToken, srcToken);
+                srcToken->reserved = nullptr;
+            }
         }
     }
 }
@@ -410,14 +461,14 @@ void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end){
             for(uint i = endLoc, j = 0; i < buffer->taken; i++, j++){
                 buffer->data[start+j] = buffer->data[i];
             }
-            
+
             buffer->taken -= rangeLen;
             buffer->count = Buffer_GetUtf8Count(buffer);
         }else{
             buffer->taken = 0;
             buffer->count = 0;
         }
-        
+
         buffer->data[buffer->taken] = 0;
     }
 }
@@ -634,7 +685,8 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
 void LineBuffer_SoftClear(LineBuffer *lineBuffer){
     for(uint i = 0; i < lineBuffer->lineCount; i++){
         Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-        Buffer_RemoveRangeRaw(buffer, 0, buffer->taken);
+        Buffer_SoftClear(buffer);
+        //Buffer_RemoveRangeRaw(buffer, 0, buffer->taken);
     }
     // need to give the empty line address
     lineBuffer->lineCount = 1;
@@ -950,43 +1002,6 @@ std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clea
     return ptr;
 }
 
-uint LineBuffer_GetRealDiffLine(LineBuffer *lineBuffer, uint i,
-                                GitDiffLine *targetLine, bool *ok)
-{
-    uint where = 1;
-    *ok = false;
-    if(lineBuffer){
-        std::vector<GitDiffLine> *ptr = &lineBuffer->props.diffs;
-        if(ptr->size() > i){
-            uint id = 0;
-            uint additions = 0, removed = 0;
-            where = ptr->at(0).lineno;
-            GitDiffLine gLine;
-
-            while(id < i){
-                gLine = ptr->at(id);
-                if(gLine.lineno >= 0){
-                    where = gLine.lineno;
-                    if(gLine.ctype == GIT_LINE_REMOVED){
-                        where += additions;
-                        removed += 1;
-                    }else if(gLine.ctype == GIT_LINE_INSERTED){
-                        additions += 1;
-                        where += removed;
-                    }
-                }
-
-                id++;
-            }
-
-            *targetLine = gLine;
-            *ok = true;
-        }
-    }
-
-    return where-1;
-}
-
 void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer){
     if(lineBuffer){
         std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
@@ -1004,25 +1019,49 @@ void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
         std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
         std::vector<GitDiffLine> *dif = &lineBuffer->props.diffs;
         ptr->clear();
+        /*
+        * Line computation: Whenever we look at a delta we need to keep
+        * in mind that for lines that were removed their number are relating
+        * to the old file, while for new lines they are referred to the new file.
+        * In the editor, new lines are always correct because the file is already
+        * completed. If we wish to merge both views in the same file we need to
+        * concatenate the removed lines in the correct position. Every time we
+        * insert a removed line, we push all the file down so even for the new lines
+        * they get position n += 1. For the following removed lines we need to consider
+        * the new lines that entered. If a removed line was at position k (old file)
+        * but before it were s new lines, than in the new file the position is actually
+        * k+s. These direct translates into the following loop where we accumulate
+        * the amount of removed lines to push the new lines down, and accumulate the
+        * new lines in order to push the removed lines based on the deltas that entered.
+        */
 
         uint start = lineBuffer->lineCount, end = 0;
+        uint adds = 0, rems = 0;
         for(uint i = 0; i < dif->size(); i++){
-            GitDiffLine line;
-            bool ok = false;
-            uint n = LineBuffer_GetRealDiffLine(lineBuffer, i, &line, &ok);
-            if(ok){
-                if(line.ctype == GIT_LINE_REMOVED){
-                    LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
-                                            line.content.size(), 1);
-                    start = Min(start, n);
-                    end = Max(end, n);
-                }
+            GitDiffLine line = dif->at(i);
+            uint n = line.lineno-1;
 
-                ptr->push_back(vec2ui(n, (uint)line.ctype));
+            //std::string p("+");
+            if(line.ctype == GIT_LINE_REMOVED){
+                n += rems;
+                LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
+                line.content.size(), 1);
+                adds += 1;
+                //p = "-";
+            }else if(line.ctype == GIT_LINE_INSERTED){
+                n += adds;
+                rems += 1;
             }else{
-                printf("[Error] Failed to compute diff line\n");
-                break;
+                AssertA(0, "Invalid delta type");
             }
+
+            //printf("[%d - %d] => %s %s\n", (int)n, (int)line.lineno-1,
+                    //p.c_str(), line.content.c_str());
+
+            start = Min(start, n);
+            end = Max(end, n);
+
+            ptr->push_back(vec2ui(n, (uint)line.ctype));
         }
 
         range = vec2ui(start, end);

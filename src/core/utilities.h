@@ -237,6 +237,17 @@ void Memcpy(void *dst, void *src, uint size);
 /* memset */
 void Memset(void *dst, unsigned char v, uint size);
 
+#if 0
+    #define MeasureTime(msg, ...) do{\
+        clock_t _beg_clk = clock();\
+        __VA_ARGS__\
+        clock_t _end_clk = clock();\
+        double _clk_interval = double(_end_clk - _beg_clk)/CLOCKS_PER_SEC;\
+        printf("[PERF] %s took %g ms\n", msg, _clk_interval * 1000.0);\
+    }while(0)
+#else
+    #define MeasureTime(msg, ...) __VA_ARGS__
+#endif
 /* Data structures - Structures create their own copy of the item so you can free yours*/
 
 /*
@@ -287,7 +298,7 @@ template<typename T> inline List<T> *List_Create(){
 template<typename T> inline
 T *List_Find(List<T> *list, std::function<int(T *)> call){
     if(!list) return nullptr;
-    
+
     ListNode<T> *ax = list->head;
     int found = 0;
     while(ax != nullptr && found == 0){
@@ -296,7 +307,7 @@ T *List_Find(List<T> *list, std::function<int(T *)> call){
             ax = ax->next;
         }
     }
-    
+
     return ax ? ax->item : nullptr;
 }
 
@@ -308,7 +319,7 @@ void List_Transverse(List<T> *list, std::function<int(T *)> transverse){
         if(transverse(ax->item) == 0){
             break;
         }
-        
+
         ax = ax->next;
     }
 }
@@ -324,25 +335,25 @@ void List_Erase(List<T> *list, std::function<int(T *)> finder){
                 list->head = ax->next;
                 if(ht) list->tail = list->head;
             }
-            
+
             if(ax == list->tail && !ht){
                 list->tail = ax->prev;
             }
-            
+
             if(ax->next != nullptr){
                 ax->next->prev = ax->prev;
             }
-            
+
             if(ax->prev != nullptr){
                 ax->prev->next = ax->next;
             }
-            
+
             AllocatorFree(ax->item);
             AllocatorFree(ax);
             list->size--;
             break;
         }
-        
+
         ax = ax->next;
     }
 }
@@ -354,7 +365,7 @@ template<typename T> inline void List_Push(List<T> *list, T *item){
     Memcpy(node->item, item, sizeof(T));
     node->prev = nullptr;
     node->next = nullptr;
-    
+
     if(list->size == 0){
         list->head = node;
         list->tail = node;
@@ -363,7 +374,7 @@ template<typename T> inline void List_Push(List<T> *list, T *item){
         node->prev = list->tail;
         list->tail = node;
     }
-    
+
     list->tail = node;
     list->size++;
 }
@@ -381,7 +392,7 @@ template<typename T> inline void List_Pop(List<T> *list){
             AllocatorFree(l->item);
             AllocatorFree(l);
         }
-        
+
         list->size--;
     }
 }
@@ -396,6 +407,137 @@ template<typename T> inline void List_Top(List<T> *list, T *item){
     if(item && list){
         item = list->head;
     }
+}
+
+/*
+* Priority queue. Implemented as a heap.
+* comparator function is of the form:
+*    int comp(Item *a, Item *b){
+*        return *a > *b;
+*    }
+* i.e.: should return true in case a is bigger than b.
+*/
+template<typename Item>
+struct PriorityQueueItem{
+    Item *data;
+};
+
+template<typename Item>
+struct PriorityQueue{
+    std::function<int(Item *, Item *)> comparator;
+    PriorityQueueItem<Item> *entries;
+    uint size;
+    uint length;
+    uint growsize;
+};
+
+template<typename Item> inline
+PriorityQueue<Item> *PriorityQueue_Create(std::function<int(Item*,Item*)> fn,uint gsize=5){
+    PriorityQueue<Item> *pq = (PriorityQueue<Item> *)
+                                AllocatorGet(sizeof(PriorityQueue<Item>));
+    AssertA(pq != nullptr, "Failed to get priority queue memory");
+    pq->growsize = Max(1, gsize);
+    pq->size = 0;
+    pq->length = pq->growsize;
+    pq->comparator = fn;
+
+    pq->entries = AllocatorGetN(PriorityQueueItem<Item>, pq->growsize);
+    AssertA(pq->entries != nullptr, "Failed to get priority queue entries memory");
+    return pq;
+}
+
+template<typename Item> inline
+void PriorityQueue_Heapify(PriorityQueue<Item> *pq, int i){
+    int largest = i;
+    uint left  = 2 * i + 1;
+    uint right = 2 * i + 2;
+    if(left < pq->size){
+        if(pq->comparator(pq->entries[left].data,
+                          pq->entries[largest].data))
+        {
+            largest = left;
+        }
+    }
+
+    if(right < pq->size){
+        if(pq->comparator(pq->entries[right].data,
+                          pq->entries[largest].data))
+        {
+            largest = right;
+        }
+    }
+
+    if(largest != i){
+        Item *idata = pq->entries[i].data;
+        pq->entries[i].data = pq->entries[largest].data;
+        pq->entries[largest].data = idata;
+        PriorityQueue_Heapify(pq, largest);
+    }
+}
+
+template<typename Item> inline
+int PriorityQueue_Push(PriorityQueue<Item> *pq, Item *item){
+    if(!pq || !item) return 0;
+
+    if(!(pq->size < pq->length)){
+        //expand array
+        pq->entries = AllocatorExpand(PriorityQueueItem<Item>, pq->entries,
+                                      pq->length + pq->growsize, pq->length);
+        pq->length += pq->growsize;
+    }
+
+    // push new entry into last position
+    pq->entries[pq->size].data = item;
+    pq->size += 1;
+    if(pq->size > 1){
+        // heapify the tree
+        for(int i = pq->size / 2 - 1; i >= 0; i--){
+            PriorityQueue_Heapify(pq, i);
+        }
+    }
+    return 1;
+}
+
+template<typename Item> inline
+void PriorityQueue_Pop(PriorityQueue<Item> *pq){
+    if(pq->size > 0){
+        Item *item = pq->entries[0].data;
+        pq->entries[0].data = pq->entries[pq->size-1].data;
+        pq->entries[pq->size-1].data = item;
+        pq->size -= 1;
+
+        if(pq->size > 1){
+            // heapify the tree
+            for(int i = pq->size / 2 - 1; i >= 0; i--){
+                PriorityQueue_Heapify(pq, i);
+            }
+        }
+    }
+}
+
+template<typename Item> inline
+uint PriorityQueue_Size(PriorityQueue<Item> *pq){
+    return pq->size;
+}
+
+template<typename Item> inline
+Item *PriorityQueue_Peek(PriorityQueue<Item> *pq){
+    if(pq->size == 0) return nullptr;
+    return pq->entries[0].data;
+}
+
+template<typename Item> inline
+void PriorityQueue_Clear(PriorityQueue<Item> *pq){
+    pq->size = 0;
+}
+
+template<typename Item> inline
+void PriorityQueue_Free(PriorityQueue<Item> *pq){
+    if(pq->entries){
+        AllocatorFree(pq->entries);
+        pq->size = 0;
+    }
+    AllocatorFree(pq);
 }
 
 /*

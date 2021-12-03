@@ -207,7 +207,6 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
 
     x = x0;
     y = baseHeight;
-    vec4i s(128);
     uint st0 = lines.x;
     uint ed0 = lines.y;
 
@@ -223,6 +222,7 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     for(uint i = st0; i < ed0; i++){
         if(OpenGLRenderLine(view, state, x, y, i)){
 #if 0
+            vec4i s(128);
             int pGlyph  = -1;
             const char *p = "..";
             uint plen = strlen(p);
@@ -501,11 +501,64 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
     }
 }
 
+void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *projection,
+                                    Transform *model, Theme *theme)
+{
+    BufferView *view = View_GetBufferView(vview);
+    if(view->isActive){
+        LineBuffer *lineBuffer=  BufferView_GetLineBuffer(view);
+        if(lineBuffer){
+            OpenGLFont *font = &state->font;
+            int previousGlyph = -1;
+            vec2ui visibleLines = BufferView_GetViewRange(view);
+            vec4f emptyColor(0.5, 0.5, 0.1, 0.5);
+            //vec4f extraColor(0.4, 0.1, 0.1, 0.5);
 
-void Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float lineSpan,
+            glUseProgram(font->cursorShader.id);
+            Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            for(uint i = visibleLines.x; i <= visibleLines.y; i++){
+                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+                if(!buffer) continue;
+
+                vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
+                vec2f x(2.0f, 2.0f);
+
+                if(Buffer_IsBlank(buffer) && buffer->tokenCount == 1){
+                    Token *token = &buffer->tokens[0];
+                    uint pos = 0;
+                    while((int)pos < token->size){
+                        x.y += fonsComputeStringAdvance(font->fsContext, " ", 1,
+                                                        &previousGlyph);
+                        pos++;
+                    }
+
+                    Graphics_QuadPush(state, vec2f(x.x, y.x), vec2f(x.y, y.y), emptyColor);
+                }else if(buffer->tokenCount > 1){
+                    int previousGlyph = -1;
+                    Token *token = &buffer->tokens[buffer->tokenCount-1];
+                    if(token->identifier == TOKEN_ID_SPACE){
+                        x.x += Graphics_GetTokenXPos(state, buffer,
+                                        buffer->tokenCount-1, previousGlyph);
+                        x.y = x.x + Graphics_GetTokenXSize(state, buffer,
+                                        buffer->tokenCount-1, previousGlyph);
+
+                        Graphics_QuadPush(state, vec2f(x.x, y.x),
+                                          vec2f(x.y, y.y), emptyColor);
+                    }
+                }
+            }
+
+            Graphics_QuadFlush(state);
+        }
+    }
+}
+
+bool Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float lineSpan,
                                      Transform *projection, Transform *model, Theme *theme)
 {
     BufferView *view = View_GetBufferView(vview);
+    bool rendered = false;
     if(view->isActive){
         LineBuffer *lineBuffer=  BufferView_GetLineBuffer(view);
         bool any = false;
@@ -514,7 +567,7 @@ void Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float line
             vec2ui visibleLines = BufferView_GetViewRange(view);
             std::vector<GitDiffLine> *dif = LineBuffer_GetDiffPtr(lineBuffer, 0);
             std::vector<vec2ui> *ptr = LineBuffer_GetDiffRangePtr(lineBuffer, &any);
-            if(!any || !ptr || dif->size() < 1) return;
+            if(!any || !ptr || dif->size() < 1) return rendered;
 
             vec4f addedColor(0.1,0.4,0.1,0.5);
             vec4f removeColor(0.5,0.1,0.1,0.5);
@@ -522,6 +575,7 @@ void Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float line
             glUseProgram(font->cursorShader.id);
             Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
             Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            rendered = true;
             for(vec2ui val : *ptr){
                 if(!(val.x >= visibleLines.x && val.x <= visibleLines.y)){
                     continue;
@@ -549,6 +603,8 @@ void Graphics_RenderGitDiffHighlight(OpenGLState *state, View *vview, Float line
             Graphics_LineFlush(state);
         }
     }
+
+    return rendered;
 }
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
@@ -863,9 +919,15 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     Graphics_RenderScopeSections(state, vview, scaledWidth, &state->projection,
                                  &state->model, theme);
 
-    Graphics_RenderGitDiffHighlight(state, vview, scaledWidth, &state->projection,
-                                    &state->model, theme);
-    
+    // only render line spacing if there is no git diff going on, otherwise
+    // it is might overwhelm our eyes
+    if(!Graphics_RenderGitDiffHighlight(state, vview, scaledWidth, &state->projection,
+                                        &state->model, theme))
+    {
+        Graphics_RenderSpacesHighlight(state, vview, &state->projection,
+                                       &state->model, theme);
+    }
+
     if(!BufferView_IsAnimating(view)){
         Graphics_RenderTextBlock(state, view, baseHeight, &state->projection);
         Graphics_RenderCursorElements(state, vview, &state->projection);

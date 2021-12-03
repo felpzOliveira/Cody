@@ -68,6 +68,11 @@ typedef struct QueryBarCmdSearchAndReplace{
 }QueryBarCmdSearchAndReplace;
 
 /*
+* Initializes the command map.
+*/
+void BaseCommand_InitializeCmdMap();
+
+/*
 * Performs one computation of the search operation based on the contents
 * of the QueryBar using a LineBuffer as a search environment using a cursor
 * as a starting point. Returns 1 in case a new match was found, 0 otherwise.

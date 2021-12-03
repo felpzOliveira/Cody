@@ -7,10 +7,17 @@
 #include <bufferview.h>
 #include <sstream>
 #include <map>
+#include <theme.h>
+
+#define CMD_DIMM_STR "dimm "
+#define CMD_KILLSPACES_STR "kill-space"
+#define CMD_SEARCH_STR "search "
+#define CMD_GIT_STR "git "
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
 static std::map<std::string, std::string> mathSymbolMap;
+static std::map<std::string, std::function<int(char *, uint, View *)>> cmdMap;
 
 static void InitializeMathSymbolList(){
     static bool is_math_symbol_inited = false;
@@ -284,104 +291,103 @@ void BaseCommand_GitDiff(char *cmd, uint size){
     }
 }
 
-int BaseCommand_Git(char *cmd, uint size){
-    int r = 0;
-    const char *git = "git ";
-    const int gitlen = 4;
-    if(StringStartsWith(cmd, size, (char *)git, gitlen)){
-        r = 1;
-        uint len = 0;
-        char *gitCmd = StringNextWord(cmd, size, &len);
-        if(StringEqual(gitCmd, (char *)"diff", Min(len, 4))){
-            if(len != 4) return r; // check for ill construted string
-            BaseCommand_GitDiff(gitCmd, size-len);
-        }else if(StringEqual(gitCmd, (char *)"status", Min(len, 6))){
-            AppCommandGitStatus();
+int BaseCommand_Git(char *cmd, uint size, View *){
+    int r = 1;
+    uint len = 0;
+    char *gitCmd = StringNextWord(cmd, size, &len);
+    if(StringEqual(gitCmd, (char *)"diff", Min(len, 4))){
+        if(len != 4) return r; // check for ill construted string
+        BaseCommand_GitDiff(gitCmd, size-len);
+    }else if(StringEqual(gitCmd, (char *)"status", Min(len, 6))){
+        AppCommandGitStatus();
+    }else if(StringEqual(gitCmd, (char *)"open", Min(len, 4))){
+        int e = StringFirstNonEmpty(&gitCmd[4], size - 4);
+        std::string val(&gitCmd[4+e]);
+        if(val.size() > 0){
+            char buf[PATH_MAX];
+            char *res = realpath(val.c_str(), buf);
+            (void) res;
+            AppCommandGitOpenRoot(buf);
         }
     }
-
     return r;
 }
 
-int BaseCommand_SearchAllFiles(char *cmd, uint size){
-    int r = 0;
-    std::string search("search ");
-    if(StringStartsWith(cmd, size, (char *)search.c_str(), search.size())){
-        r = 1;
-        int e = StringFirstNonEmpty(&cmd[search.size()], size - search.size());
-        if(e < 0) return r;
-        e += search.size();
+int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
+    int r = 1;
+    std::string search(CMD_SEARCH_STR);
+    int e = StringFirstNonEmpty(&cmd[search.size()], size - search.size());
+    if(e < 0) return r;
+    e += search.size();
 
-        std::string searchStr(&cmd[e]);
+    std::string searchStr(&cmd[e]);
 
-        FileBufferList *bufferList = FileProvider_GetBufferList();
-        FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
-        uint size = List_FetchAsArray(bufferList->fList, bufferArray,
-                                      MAX_QUERIABLE_BUFFERS, 0);
+    FileBufferList *bufferList = FileProvider_GetBufferList();
+    FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
+    size = List_FetchAsArray(bufferList->fList, bufferArray,
+                             MAX_QUERIABLE_BUFFERS, 0);
 
-        for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
+    for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
 
-        const char *strPtr = searchStr.c_str();
-        uint stringLen = searchStr.size();
+    const char *strPtr = searchStr.c_str();
+    uint stringLen = searchStr.size();
 
-        ParallelFor("String Seach", 0, size, [&](int i, int tid){
-            LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
+    ParallelFor("String Seach", 0, size, [&](int i, int tid){
+        LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
             //printf("[%d] ==> %s\n", tid, lineBuffer->filePath);
-            if(tid > MAX_THREADS-1){
-                printf("Ooops cannot query, too many threads\n");
-                return;
-            }
+        if(tid > MAX_THREADS-1){
+            printf("Ooops cannot query, too many threads\n");
+            return;
+        }
 
-            GlobalSearch *threadResult = &results[tid];
-            if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
+        GlobalSearch *threadResult = &results[tid];
+        if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
                 //printf("Too many results\n");
-                return;
-            }
+            return;
+        }
 
-            for(uint i = 0; i < lineBuffer->lineCount; i++){
-                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-                if(buffer->taken > 0){
-                    int at = 0;
-                    uint start = 0;
-                    do{
-                        at = StringSearch((char *)strPtr, &buffer->data[start],
-                                          stringLen, buffer->taken - start);
-                        if(at >= 0){
-                            uint loc = threadResult->count;
-                            if(loc >= MAX_SEARCH_ENTRIES-1){
+        for(uint i = 0; i < lineBuffer->lineCount; i++){
+            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+            if(buffer->taken > 0){
+                int at = 0;
+                uint start = 0;
+                do{
+                    at = StringSearch((char *)strPtr, &buffer->data[start],
+                    stringLen, buffer->taken - start);
+                    if(at >= 0){
+                        uint loc = threadResult->count;
+                        if(loc >= MAX_SEARCH_ENTRIES-1){
                                 //printf("Too many results\n");
-                                return;
-                            }
-
-                            threadResult->results[loc].line = i;
-                            threadResult->results[loc].col = at + start;
-                            threadResult->results[loc].lineBuffer = lineBuffer;
-                            start += at + stringLen;
-                            threadResult->count++;
+                            return;
                         }
-                    }while(at >= 0);
-                }
-            }
-        });
-#if 0
-        for(int tid = 0; tid < MAX_THREADS; tid++){
-            GlobalSearch *threadResult = &results[tid];
-            for(uint i = 0; i < threadResult->count; i++){
-                printf("[%s] = line (%d) col (%d)\n",
-                        threadResult->results[i].lineBuffer->filePath,
-                        threadResult->results[i].line,
-                        threadResult->results[i].col);
+
+                        threadResult->results[loc].line = i;
+                        threadResult->results[loc].col = at + start;
+                        threadResult->results[loc].lineBuffer = lineBuffer;
+                        start += at + stringLen;
+                        threadResult->count++;
+                    }
+                }while(at >= 0);
             }
         }
-#endif
-
-        View *view = AppGetActiveView();
-        if(SearchAllFilesCommandStart(view) >= 0){
-            AppSetBindingsForState(View_SelectableList);
-            r = 2;
+    });
+#if 0
+    for(int tid = 0; tid < MAX_THREADS; tid++){
+        GlobalSearch *threadResult = &results[tid];
+        for(uint i = 0; i < threadResult->count; i++){
+            printf("[%s] = line (%d) col (%d)\n",
+            threadResult->results[i].lineBuffer->filePath,
+            threadResult->results[i].line,
+            threadResult->results[i].col);
         }
     }
+#endif
 
+    View *view = AppGetActiveView();
+    if(SearchAllFilesCommandStart(view) >= 0){
+        AppSetBindingsForState(View_SelectableList);
+        r = 2;
+    }
     return r;
 }
 
@@ -461,6 +467,57 @@ std::string BaseCommand_Interpret_Alias(char *cmd, uint size){
     return strCmd;
 }
 
+int BaseCommand_SetDimm(char *cmd, uint size, View *){
+    int r = 1;
+    uint len = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringEqual(arg, (char *)"on", Min(len, 2))){
+        CurrentThemeSetDimm(1);
+    }else if(StringEqual(arg, (char *)"off", Min(len, 3))){
+        CurrentThemeSetDimm(0);
+    }
+    return r;
+}
+
+int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
+    int r = 1;
+    BufferView *bView = View_GetBufferView(view);
+    if(bView){
+        LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+        if(!lineBuffer) return r;
+
+        uint lineCount = BufferView_GetLineCount(bView);
+        bool any = false;
+
+        for(uint i = 0; i < lineCount; i++){
+            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+            if(!buffer) continue;
+            if(Buffer_IsBlank(buffer)){
+                Buffer_SoftClear(buffer);
+                any = true;
+            }else if(buffer->tokenCount > 1){
+                Token *lastToken = &buffer->tokens[buffer->tokenCount-1];
+                if(lastToken->identifier == TOKEN_ID_SPACE){
+                    Buffer_RemoveLastToken(buffer);
+                    any = true;
+                }
+            }
+        }
+
+        if(any){
+            lineBuffer->is_dirty = 1;
+        }
+    }
+    return r;
+}
+
+void BaseCommand_InitializeCmdMap(){
+    cmdMap[CMD_DIMM_STR] = BaseCommand_SetDimm;
+    cmdMap[CMD_KILLSPACES_STR] = BaseCommand_KillSpaces;
+    cmdMap[CMD_SEARCH_STR] = BaseCommand_SearchAllFiles;
+    cmdMap[CMD_GIT_STR] = BaseCommand_Git;
+}
+
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: map of commands? maybe set some function pointers to this
     // TODO: create a standard for this, a json or at least something like bubbles
@@ -472,13 +529,14 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     }else if(BaseCommand_InsertMappedSymbol(cmd, size)){
         return 0;
     }else{
-        rv = BaseCommand_SearchAllFiles(cmd, size);
-        if(rv != 0) return rv;
-
-        rv = BaseCommand_Git(cmd, size);
-        if(rv != 0) return rv;
-
-        rv = -1;
+        for(auto it = cmdMap.begin(); it != cmdMap.end(); it++){
+            std::string val = it->first;
+            char *ptr = (char *)val.c_str();
+            if(StringStartsWith(cmd, size, ptr, Min(size, val.size()))){
+                rv = it->second(cmd, size, view);
+                return rv;
+            }
+        }
     }
 
     std::string strCmd = BaseCommand_Interpret_Alias(cmd, size);
@@ -501,7 +559,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, BuildView);
     // because the parallel thread will reset the linebuffer we need
     // to make sure the cursor is located in a valid range for rendering
-    // otherwise in case the build buffer does is updated too fast it can
+    // otherwise in case the build buffer does updates too fast it can
     // generate a SIGSEGV. This needs to run after the swap as we need
     // to make sure the position cache map is updated with whatever
     // is being rendered at the moment.
@@ -528,7 +586,7 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
     if(ListFileEntries((char *)refPath.c_str(), entries, n, size) < 0){
         return -1;
     }
-    
+
     char path[PATH_MAX];
     FileEntry *arr = *entries;
     for(uint i = 0; i < *n; i++){
@@ -538,7 +596,7 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
             e->isLoaded = 1;
         }
     }
-    
+
     return 0;
 }
 
@@ -549,12 +607,12 @@ static void FileOpenUpdateList(View *view){
     // TODO: This is very ineficient, but it is working so...
     LineBuffer_Free(lb);
     LineBuffer_InitBlank(lb);
-    
+
     for(uint i = 0; i < opener->entryCount; i++){
         FileEntry *e = &opener->entries[i];
         LineBuffer_InsertLine(lb, e->path, e->pLen, 0);
     }
-    
+
     View_SelectableListSwapList(view, lb, 0);
 }
 
@@ -575,7 +633,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
             if(opener->basePath[opener->pathLen-1] == '/'){ // change dir
                 char tmp = 0;
                 uint n = GetSimplifiedPathName(opener->basePath, opener->pathLen-1);
-                
+
                 tmp = opener->basePath[n];
                 opener->basePath[n] = 0;
                 if(CHDIR(opener->basePath) < 0){
@@ -583,7 +641,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                     opener->basePath[n] = tmp;
                     return 0;
                 }
-                
+
                 if(ListFileEntriesAndCheckLoaded(opener->basePath, &opener->entries,
                                                  &opener->entryCount,
                                                  &opener->entrySize) < 0)
@@ -593,10 +651,10 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                     IGNORE(CHDIR(opener->basePath));
                     return 0;
                 }
-                
+
                 opener->pathLen = n;
                 p[n] = 0; // copy opener->basePath into context cwd
-                
+
                 QueryBar_SetEntry(queryBar, view, opener->basePath, n);
                 FileOpenUpdateList(view);
                 search = 0;
@@ -605,12 +663,12 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
             char *content = nullptr;
             uint contentLen = 0;
             QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
-            
+
             if(CHDIR(content) < 0){
                 printf("Failed to change to %s directory\n", content);
                 return -1;
             }
-            
+
             if(ListFileEntriesAndCheckLoaded(content, &opener->entries,
                                              &opener->entryCount, &opener->entrySize) < 0)
             {
@@ -618,16 +676,16 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                 IGNORE(CHDIR(opener->basePath));
                 return -1;
             }
-            
+
             opener->pathLen = len;
             Memset(p, 0x00, PATH_MAX);
             Memcpy(p, entry, len);
             Memcpy(opener->basePath, entry, len);
-            
+
             FileOpenUpdateList(view);
             search = 0;
         }
-        
+
         if(search){
             // text has changed, update the search
             char *content = nullptr;
@@ -642,7 +700,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
     }else{
         View_SelectableListFilterBy(view, nullptr, 0);
     }
-    
+
     return 1;
 }
 
@@ -674,16 +732,16 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
         queryBar->fileOpenCallback(view, entry);
         goto end;
     }
-    
+
     View_SelectableListGetItem(view, active, &buffer);
     if(!buffer){
         rv = -1;
         goto end;
     }
-    
+
     rindex = View_SelectableListGetRealIndex(view, active);
     entry = &opener->entries[rindex];
-    
+
     if(entry->type == DescriptorDirectory){
         char *p = AppGetContextDirectory();
         char *folder = opener->basePath;
@@ -695,7 +753,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
             printf("Failed to change to %s directory\n", opener->basePath);
             goto end;
         }
-        
+
         if(ListFileEntriesAndCheckLoaded(opener->basePath, &opener->entries,
                                          &opener->entryCount, &opener->entrySize) < 0)
         {
@@ -703,16 +761,16 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
             IGNORE(CHDIR(opener->basePath));
             goto end;
         }
-        
+
         Memset(p, 0x00, PATH_MAX);
         opener->basePath[opener->pathLen] = 0;
-        
+
         Memcpy(p, opener->basePath, opener->pathLen);
         QueryBar_SetEntry(queryBar, view, opener->basePath, opener->pathLen);
         FileOpenUpdateList(view);
         return 0;
     }
-    
+
     queryBar->fileOpenCallback(view, entry);
 end:
     SelectableListFreeLineBuffer(view);
@@ -728,7 +786,7 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 {
     AssertA(view != nullptr && basePath != nullptr && len > 0,
             "Invalid setup of file opener");
-    
+
     LineBuffer *lineBuffer = nullptr;
     char *pEntry = nullptr;
     const char *header = "Open File";
@@ -736,19 +794,19 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
     ushort length = Min(len, PATH_MAX-1);
     QueryBar *queryBar = View_GetQueryBar(view);
     FileOpener *opener = View_GetFileOpener(view);
-    
+
     Memcpy(opener->basePath, basePath, length);
     opener->basePath[length] = 0;
     opener->pathLen = length;
     opener->entryCount = 0;
-    
+
     if(ListFileEntriesAndCheckLoaded(basePath, &opener->entries,
                                      &opener->entryCount, &opener->entrySize) < 0)
     {
         printf("Failed to list files from %s\n", basePath);
         return -1;
     }
-    
+
     pEntry = AllocatorGetN(char, len+2);
     lineBuffer = AllocatorGetN(LineBuffer, 1);
     if(basePath[len-1] != '/'){
@@ -760,18 +818,18 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
         snprintf(pEntry, len+2, "%s", basePath);
         len -= 1;
     }
-    
+
     LineBuffer_InitBlank(lineBuffer);
-    
+
     for(uint i = 0; i < opener->entryCount; i++){
         FileEntry *e = &opener->entries[i];
         LineBuffer_InsertLine(lineBuffer, e->path, e->pLen, 0);
     }
-    
+
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            FileOpenCommandEntry, FileOpenCommandCancel,
                            FileOpenCommandCommit, nullptr);
-    
+
     QueryBar_SetEntry(queryBar, view, pEntry, len+1);
     queryBar->fileOpenCallback = onOpenFile;
     AllocatorFree(pEntry);
@@ -784,22 +842,22 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
     LineBuffer *lineBuffer = nullptr;
     Buffer *buffer = nullptr;
-    
+
     FileBufferList *fList = FileProvider_GetBufferList();
     BufferView *bView = View_GetBufferView(view);
-    
+
     uint active = View_SelectableListGetActiveIndex(view);
     View_SelectableListGetItem(view, active, &buffer);
     if(!buffer){
         return 0;
     }
-    
+
     if(FileBufferList_FindByName(fList, &lineBuffer, buffer->data,
                                  buffer->taken) == 0)
     {
         return 0;
     }
-    
+
     BufferView_SwapBuffer(bView, lineBuffer, CodeView);
     SelectableListFreeLineBuffer(view);
     return 1;
@@ -812,12 +870,12 @@ int SwitchBufferCommandStart(View *view){
     const char *header = "Switch Buffer";
     uint hlen = strlen(header);
     FileBufferList *fBuffers = FileProvider_GetBufferList();
-    
+
     lineBuffer = AllocatorGetN(LineBuffer, 1);
     LineBuffer_InitBlank(lineBuffer);
-    
+
     list = fBuffers->fList;
-    
+
     auto filler = [&](FileBuffer *buf) -> int{
         if(buf){
             if(buf->lineBuffer){
@@ -827,10 +885,10 @@ int SwitchBufferCommandStart(View *view){
                 LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n, 0);
             }
         }
-        
+
         return 1;
     };
-    
+
     List_Transverse<FileBuffer>(list, filler);
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
     filter.allowFreeType = 0;
@@ -855,12 +913,12 @@ int SwitchThemeCommandCommit(QueryBar *queryBar, View *view){
     SwapDefaultTheme(buffer->data, buffer->taken);
 
     SelectableListFreeLineBuffer(view);
-    return 1;    
+    return 1;
 }
 
 int SwitchThemeCommandStart(View *view){
     AssertA(view != nullptr, "Invalid view pointer");
-    std::vector<ThemeDescription> *themes = nullptr; 
+    std::vector<ThemeDescription> *themes = nullptr;
     LineBuffer *lineBuffer = nullptr;
     const char *header = "Switch Theme";
     uint hlen = strlen(header);
@@ -897,7 +955,7 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
             queryBar->cmd == QUERY_BAR_CMD_REVERSE_SEARCH ||
             queryBar->cmd == QUERY_BAR_CMD_SEARCH_AND_REPLACE,
             "QueryBar is in incorrect state");
-    
+
     char *str = toSearch;
     uint slen = toSearchLen;
     QueryBarCmdSearch *searchResult = &queryBar->searchCmd;
@@ -928,13 +986,13 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                 if(buffer->taken > 0){
                     int at = 0;
                     if(id == QUERY_BAR_CMD_SEARCH){
-                        at = StringSearch(str, &buffer->data[start], slen, 
+                        at = StringSearch(str, &buffer->data[start], slen,
                                           buffer->taken - start);
                         if(at >= 0) at += start;
                     }else{
                         at = ReverseStringSearch(str, buffer->data, slen, start);
                     }
-                    
+
                     if(at >= 0){ // found
                         searchResult->lineNo = line;
                         searchResult->position = at;
@@ -945,7 +1003,7 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                     }
                 }
             }
-            
+
             if(id == QUERY_BAR_CMD_SEARCH && line < lineBuffer->lineCount){
                 line++;
                 start = 0;
@@ -960,7 +1018,7 @@ int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
             }
         }while(done == 0);
     }
-    
+
     //printf("Invalid\n");
     //searchResult->valid = 0; // TODO: Why was this here?
     return 0;

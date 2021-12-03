@@ -207,6 +207,26 @@ void Graphics_SetFontSize(OpenGLState *state, Float fontSize,
 vec2ui Graphics_GetMouse(OpenGLState *state);
 
 /*
+* Computes the vertical position of a given line 'i' that is within the range 'visible'
+* inside 'view'. Return value is are the coordinates vec2f(start, end) of the line
+* with end = start + font->fontMath.fontSizeAtRenderCall.
+*/
+vec2f Graphics_GetLineYPos(OpenGLState *state, vec2ui visible, uint i, View *view);
+
+/*
+* Computes the horizontal position of the start of the token index 'upto' in the
+* given buffer.
+*/
+Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
+                            uint upto, int &previousGlyph);
+
+/*
+* Returns the size a token takes when rendering.
+*/
+Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
+                             int &previousGlyph);
+
+/*
 * Computes the color a token should have according to the current given theme
 * and text format. This function returns -1 in case the given token does not
 * need to be rendered or 0 in case it needs, in which case the color is given

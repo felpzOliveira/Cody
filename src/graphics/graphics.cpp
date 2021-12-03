@@ -88,7 +88,7 @@ void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float zNear = -range;
     Float zFar = range;
     *transform = Orthographic(0, width, height, 0, zNear, zFar);
-    
+
 }
 
 void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry){
@@ -97,7 +97,7 @@ void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry){
     uint w = geometry->upper.x - geometry->lower.x;
     uint h = geometry->upper.y - geometry->lower.y;
     OpenGLComputeProjection(vec2ui(x0, y0), vec2ui(x0+w,y0+h), &state->projection);
-    
+
     glViewport(x0, y0, w, h);
     glScissor(x0, y0, w, h);
     glEnable(GL_SCISSOR_TEST);
@@ -145,9 +145,9 @@ void ActivateViewportAndProjection(OpenGLState *state, View *vview, GLViewport t
             AssertErr(0, "Target rendering does not contains a valid viewport");
         }
     }
-    
+
     OpenGLComputeProjection(vec2ui(x0, y0), vec2ui(x0+w,y0+h), &state->projection);
-    
+
     glViewport(x0, y0, w, h);
     glScissor(x0, y0, w, h);
     glEnable(GL_SCISSOR_TEST);
@@ -173,12 +173,78 @@ Float GLToScreen(Float x, OpenGLState *state){
     return p.x;
 }
 
+Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
+                             int &previousGlyph)
+{
+    OpenGLFont *font = &state->font;
+    if(buffer->taken == 0 || buffer->tokenCount <= at) return 0;
+    Token *token = &buffer->tokens[at];
+    char *p = &buffer->data[token->position];
+    return fonsComputeStringAdvance(font->fsContext, p, token->size, &previousGlyph);
+}
+
+Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
+                            uint upto, int &previousGlyph)
+{
+    Float x = 0;
+    OpenGLFont *font = &state->font;
+    uint pos = 0;
+
+    if(buffer->taken == 0 || buffer->tokenCount <= upto) return x;
+
+    for(uint i = 0; i < upto; i++){
+        Token *token = &buffer->tokens[i];
+        while((int)pos < token->position){
+            char v = buffer->data[pos];
+            if(v == '\r' || v == '\n'){
+                pos++;
+                continue;
+            }
+
+            if(v == '\t' || v == ' '){
+                x += fonsComputeStringAdvance(font->fsContext, " ", 1, &previousGlyph);
+                pos ++;
+                continue;
+            }
+
+            if(v == 0){
+                return x;
+            }
+
+            BUG();
+            return x;
+        }
+
+        if(token->identifier == TOKEN_ID_SPACE){
+            // nothing
+        }else if(token->position < (int)buffer->taken){
+            char *p = &buffer->data[token->position];
+            char *e = &buffer->data[token->position + token->size];
+
+            pos += token->size;
+            x += fonsComputeStringAdvance(font->fsContext, p, e-p, &previousGlyph);
+        }
+    }
+
+    return x;
+}
+
+vec2f Graphics_GetLineYPos(OpenGLState *state, vec2ui visible, uint i, View *vview){
+    OpenGLFont *font = &state->font;
+    Float y0 = ((Float)i - (Float)visible.x) * font->fontMath.fontSizeAtRenderCall;
+    if(vview->descLocation == DescriptionTop){
+        y0 += font->fontMath.fontSizeAtRenderCall;
+    }
+
+    return vec2f(y0, y0 + font->fontMath.fontSizeAtRenderCall);
+}
+
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
     OpenGLFont *font = &state->font;
     FontMath *fMath = &font->fontMath;
     fMath->fontSizeAtRenderCall = reference;
     fMath->fontSizeAtDisplay = fontSize;
-    
+
     fMath->reduceScale = fMath->fontSizeAtDisplay / fMath->fontSizeAtRenderCall;
     fMath->invReduceScale = 1.0 / fMath->reduceScale;
     state->scale = Scale(fMath->reduceScale, fMath->reduceScale, 1);
@@ -315,10 +381,10 @@ void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
-    
+
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-    
+
     glUseProgram(font->shader.id);
     Shader_UniformMatrix4(font->shader, "projection", &projection->m);
     Shader_UniformMatrix4(font->shader, "modelView", &model->m);
@@ -366,10 +432,10 @@ static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
     buffer->colors = AllocatorGetN(Float, 4 * n);
     buffer->size = n;
     buffer->length = 0;
-    
+
     glGenVertexArrays(1, &buffer->vertexArray);
     glBindVertexArray(buffer->vertexArray);
-    
+
     glGenBuffers(1, &buffer->vertexBuffer);
     glGenBuffers(1, &buffer->colorBuffer);
 }
@@ -406,12 +472,12 @@ static void _OpenGLBufferPushVertex(OpenGLImageQuadBuffer *buffer, Float x, Floa
 static void _OpenGLBufferPushVertex(OpenGLBuffer *buffer, Float x, Float y, vec4f color){
     buffer->vertex[2 * buffer->length + 0] = x;
     buffer->vertex[2 * buffer->length + 1] = y;
-    
+
     buffer->colors[4 * buffer->length + 0] = color.x;
     buffer->colors[4 * buffer->length + 1] = color.y;
     buffer->colors[4 * buffer->length + 2] = color.z;
     buffer->colors[4 * buffer->length + 3] = color.w;
-    
+
     buffer->length ++;
 }
 
@@ -431,14 +497,14 @@ static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
     Float range = width * 2.0f;
     Float zNear = -range;
     Float zFar = range;
-    
+
     state->width = width;
     state->height = height;
     OpenGLFont *font = &state->font;
     state->projection = Orthographic(0.0f, width, height, 0.0f, zNear, zFar);
-    state->scale = Scale(font->fontMath.reduceScale, 
+    state->scale = Scale(font->fontMath.reduceScale,
                          font->fontMath.reduceScale, 1);
-    
+
     Geometry geometry;
     geometry.lower = vec2ui(0, 0);
     geometry.upper = vec2ui(width, height);
@@ -460,13 +526,13 @@ void WinOnMouseMotion(int x, int y){
     GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
 }
 
-void WindowOnScroll(int is_up){ 
+void WindowOnScroll(int is_up){
     int scrollRange = 5;
     int x = 0, y = 0;
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
     GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
-    
+
     View *view = AppGetViewAt(x, GlobalGLState.height - y);
     if(view){
         ViewState state = View_GetState(view);
@@ -483,7 +549,7 @@ void WindowOnScroll(int is_up){
 
 void WindowOnClick(int x, int y){
     vec2ui mouse = AppActivateViewAt(x, GlobalGLState.height - y);
-    
+
     //TODO: States
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
@@ -492,9 +558,9 @@ void WindowOnClick(int x, int y){
         uint dy = view->geometry.upper.y - view->geometry.lower.y;
         int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y, view->descLocation);
         if(lineNo < 0) return;
-        
+
         lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
-        
+
         uint colNo = 0;
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
         x = ScreenToGL(mouse.x, &GlobalGLState) - bufferView->lineOffset;
@@ -537,19 +603,19 @@ void OpenGLFontSetup(OpenGLState *state){
     uint cfragment = Shader_CompileSource(shader_cursor_f, SHADER_TYPE_FRAGMENT);
     uint ivertex   = Shader_CompileSource(shader_icon_v, SHADER_TYPE_VERTEX);
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
-    
+
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
 
     font->sdfSettings.sdfEnabled = 0;
     font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
-    
+
     //fontfileContents = GetFileContents(ttf, &filesize);
     fontfileContents = (char *)FONT_liberation_mono_ttf;
     filesize = FONT_liberation_mono_ttf_len;
-    
-    font->fontId = fonsAddFontSdfMem(font->fsContext, "Default", 
+
+    font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
                                      (uint8 *)fontfileContents, filesize, 0,
                                      font->sdfSettings);
     AssertA(font->fontId != FONS_INVALID, "Failed to create font");
@@ -589,22 +655,22 @@ void OpenGLInitialize(OpenGLState *state){
     OpenGLImageQuadBuffer *imageQuad = &state->glQuadImageBuffer;
     int width = state->width;
     int height = state->height;
-    
+
     InitializeX11();
     SetSamplesX11(16);
     SetOpenGLVersionX11(3, 3);
     state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
-    
+
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
     AssertErr(error == GL_NO_ERROR, "Failed to setup opengl context");
-    
+
     _OpenGLBufferInitialize(quad, 1024);
     _OpenGLBufferInitialize(imageQuad, 1024);
     _OpenGLBufferInitialize(lines, 1024);
     _OpenGLTextureInitialize(state);
     AppInitialize();
-    
+
     SwapIntervalX11(state->window, 0);
     RegisterInputs(state->window);
     OpenGLLoadIcons(state);
@@ -633,7 +699,7 @@ void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f colo
     _OpenGLBufferPushVertex(quad, x0, y0, color);
     _OpenGLBufferPushVertex(quad, x1, y1, color);
     _OpenGLBufferPushVertex(quad, x1, y0, color);
-    
+
     _OpenGLBufferPushVertex(quad, x0, y0, color);
     _OpenGLBufferPushVertex(quad, x0, y1, color);
     _OpenGLBufferPushVertex(quad, x1, y1, color);
@@ -687,22 +753,22 @@ void Graphics_QuadFlush(OpenGLState *state, int blend){
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
-        
+
         glBindVertexArray(quad->vertexArray);
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer);
         glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float),
                      quad->vertex, GL_DYNAMIC_DRAW);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
-        
+
         glEnableVertexAttribArray(1);
         glBindBuffer(GL_ARRAY_BUFFER, quad->colorBuffer);
         glBufferData(GL_ARRAY_BUFFER, quad->length * 4 * sizeof(Float),
                      quad->colors, GL_DYNAMIC_DRAW);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
-        
+
         glDrawArrays(GL_TRIANGLES, 0, quad->length);
-        
+
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(0);
         glBindVertexArray(0);
@@ -719,18 +785,18 @@ void Graphics_LineFlush(OpenGLState *state, int blend){
         glBindVertexArray(lines->vertexArray);
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, lines->vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, lines->length * 2 * sizeof(Float), lines->vertex, 
+        glBufferData(GL_ARRAY_BUFFER, lines->length * 2 * sizeof(Float), lines->vertex,
                      GL_DYNAMIC_DRAW);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL);
-        
+
         glEnableVertexAttribArray(1);
         glBindBuffer(GL_ARRAY_BUFFER, lines->colorBuffer);
-        glBufferData(GL_ARRAY_BUFFER, lines->length * 4 * sizeof(Float), lines->colors, 
+        glBufferData(GL_ARRAY_BUFFER, lines->length * 4 * sizeof(Float), lines->colors,
                      GL_DYNAMIC_DRAW);
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
-        
+
         glDrawArrays(GL_LINES, 0, lines->length);
-        
+
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(0);
         glBindVertexArray(0);
@@ -754,16 +820,16 @@ static void _Graphics_InitTexture(OpenGLState *state, uint8 *data,
 
     switch(channels){
         case 1:{
-            format = GL_RED; 
+            format = GL_RED;
         } break;
         case 2:{
-            format = GL_RG; 
+            format = GL_RG;
         } break;
         case 3:{
-            format = GL_RGB; 
+            format = GL_RGB;
         } break;
         case 4:{
-            format = GL_RGBA; 
+            format = GL_RGBA;
         } break;
 
         default:{
@@ -958,13 +1024,13 @@ void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
     OpenGLFont *font = &state->font;
-    
+
     _OpenGLStateInitialize(state);
     OpenGLInitialize(state);
     OpenGLFontSetup(state);
-    
+
     _OpenGLUpdateProjections(state, state->width, state->height);
-    
+
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
@@ -1045,9 +1111,9 @@ void OpenGLEntry(){
         }
 
         if(!IsZero(dt)){
-            //printf("FPS %g\n", 1.0 / dt);
+            printf("FPS %g\n", 1.0 / dt);
         }else{
-            //printf("FPS ---\n");
+            printf("FPS ---\n");
         }
 
 #else
@@ -1079,5 +1145,5 @@ void Graphics_Initialize(){
         GlobalGLState.running = 1;
         std::thread(OpenGLEntry).detach();
     }
-#endif    
+#endif
 }

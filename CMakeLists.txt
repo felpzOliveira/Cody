@@ -21,6 +21,11 @@ else()
     set(MH_FLAGS "-Ofast -Wall -std=c++11 -fshort-enums")
 endif()
 
+find_library(PCRE_LIB NAMES pcre libpcre)
+find_library(X11_LIB NAMES X11)
+find_library(Z_LIB NAMES z)
+find_library(PTHREAD_LIB NAMES pthread)
+
 set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
 execute_process(COMMAND ${CMAKE_CXX_COMPILER} -std=c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources)
 execute_process(COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR}
@@ -59,8 +64,7 @@ file(GLOB MH_SHADERS shaders/*.glsl)
 
 file(GLOB MH_SRCS src/cody.cpp)
 
-set(MH_LIBGIT_LINK "${CMAKE_CURRENT_SOURCE_DIR}/external/libgit2/build")
-link_directories(${MH_LIBGIT_LINK})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/external)
 
 add_definitions(${MH_FLAGS})
 add_library(corelib OBJECT ${MH_CORE})
@@ -72,4 +76,13 @@ add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
                         ${CMAKE_BINARY_DIR}
                     DEPENDS ${MH_SHADERS})
 
-target_link_libraries(${CODY} dl;X11;pthread;git2;z;pcre)
+set (CODY_LIBRARIES
+        dl
+        ${X11_LIB}
+        ${PTHREAD_LIB}
+        ${LIB_GIT2_LIBRARIES}
+        ${Z_LIB}
+        ${PCRE_LIB})
+
+target_link_directories(${CODY} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2)
+target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})

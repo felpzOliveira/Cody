@@ -14,6 +14,28 @@
 #include <mp.h>
 #include <gitbase.h>
 
+int int_compare(int *a, int *b){
+    return *a > *b;
+}
+
+void testQ(){
+    std::vector<int>data = {1, 4, -2, 5, 200, -59};
+    PriorityQueue<int> *pq = PriorityQueue_Create<int>(int_compare);
+    for(uint i = 0; i < data.size(); i++){
+        PriorityQueue_Push(pq, &data[i]);
+    }
+
+    while(PriorityQueue_Size(pq) > 0){
+        int *s = PriorityQueue_Peek(pq);
+        PriorityQueue_Pop(pq);
+        printf("%d\n", *s);
+    }
+
+    PriorityQueue_Free(pq);
+
+    exit(0);
+}
+
 void testMP(){
     MPI val32 = MPI::FromI64(32);
     MPI val64 = MPI::FromU64(922337203685477580);
@@ -84,9 +106,20 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
+bool test_GIT();
 void CommandExecutorInit();
 int main(int argc, char **argv){
+    //testQ();
 #if 0
+    Git_Initialize();
+
+    Git_OpenDirectory("/home/felipe/Documents/Cody");
+    test_GIT();
+    //Git_LogGraph();
+
+    Git_Finalize();
+    return 0;
+
     testMP();
     return 0;
     AES_RunTestVector();

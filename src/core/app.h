@@ -184,6 +184,7 @@ void AppCommandNewLine();
 void AppCommandInsertTab();
 void AppCommandGitDiffCurrent();
 void AppCommandGitStatus();
+void AppCommandGitOpenRoot(char *path);
 void AppCommandRemovePreviousToken();
 void AppCommandQueryBarSearch();
 void AppCommandQueryBarRevSearch();

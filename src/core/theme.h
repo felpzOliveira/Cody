@@ -132,7 +132,7 @@ typedef struct{
 
 extern Theme *defaultTheme;
 
-void SetAlpha(int acitve);
+void SetAlpha(int active);
 vec4i GetNestColor(Theme *theme, TokenId id, int level);
 vec4f GetNestColorf(Theme *theme, TokenId id, int level);
 vec4i GetColor(Theme *theme, TokenId id);
@@ -146,4 +146,5 @@ void SwapDefaultTheme(char *name, uint len);
 int ThemeNeedsEffect(Theme *theme);
 int GetSelectorBorderWidth(Theme *theme);
 bool CurrentThemeIsLight();
+void CurrentThemeSetDimm(int dim);
 #endif //THEME_H

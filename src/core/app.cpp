@@ -31,14 +31,14 @@ typedef struct{
     BindingMap *autoCompleteMapping;
     View *activeView;
     int activeId;
-    
+
     char cwd[PATH_MAX];
     Geometry currentGeometry;
     Float currentLineHeight;
 }App;
 
-static App appContext = { 
-    .freeTypeMapping = nullptr, 
+static App appContext = {
+    .freeTypeMapping = nullptr,
     .activeView = nullptr,
 };
 
@@ -114,6 +114,8 @@ void AppEarlyInitialize(){
     Git_OpenRootRepository();
 
     GitBuffer_InitializeInternalBuffer();
+
+    BaseCommand_InitializeCmdMap();
 }
 
 int AppGetTabConfiguration(int *using_tab){
@@ -180,7 +182,7 @@ void AppSetActiveView(View *view){
     appContext.activeView = view;
     View_SetActive(appContext.activeView, 1);
     ViewState state = View_GetState(appContext.activeView);
-    
+
     AppSetBindingsForState(state);
 }
 
@@ -223,7 +225,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
             }else{
                 cursor.y = 0;
             }
-            
+
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_UP:{ // Move Up
@@ -235,7 +237,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
                     if(Buffer_IsBlank(buffer)) picked = 1;
                     else line--;
                 }
-                
+
                 cursor.y = 0;
                 cursor.x = line;
                 BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
@@ -250,13 +252,13 @@ void AppCommandFreeTypingJumpToDirection(int direction){
                     if(Buffer_IsBlank(buffer)) picked = 1;
                     else line++;
                 }
-                
+
                 cursor.y = 0;
                 cursor.x = line;
                 BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
             }
         } break;
-        
+
         case DIRECTION_RIGHT:{ // Move right
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             int tid = BufferView_LocateNextCursorToken(bufferView, &token);
@@ -268,7 +270,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
             }
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
-        
+
         default: AssertA(0, "Invalid direction given");
     }
 }
@@ -286,7 +288,7 @@ void AppCommandFreeTypingArrows(int direction){
             }else{
                 cursor.y -= 1;
             }
-            
+
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
         } break;
@@ -300,14 +302,14 @@ void AppCommandFreeTypingArrows(int direction){
         } break;
         case DIRECTION_DOWN:{ // Move down
             cursor.x = Clamp(cursor.x+1, (uint)0, lineCount-1);
-            
+
             Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             int n = Buffer_FindFirstNonEmptyToken(buffer);
             n = n < 0 ? 0 : buffer->tokens[n].position;
             n = Buffer_Utf8RawPositionToPosition(buffer, n);
             cursor.y = Clamp(cursor.y, (uint)n, buffer->count);
         } break;
-        
+
         case DIRECTION_RIGHT:{ // Move right
             Buffer *buffer = LineBuffer_GetBufferAt(bufferView->lineBuffer, cursor.x);
             if(cursor.y >= buffer->count){ // move down
@@ -315,11 +317,11 @@ void AppCommandFreeTypingArrows(int direction){
             }else{
                 cursor.y += 1;
             }
-            
+
             buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
         } break;
-        
+
         default: AssertA(0, "Invalid direction given");
     }
 
@@ -337,7 +339,7 @@ void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view){
     BufferView *bView = View_GetBufferView(view);
     if(!bView->lineBuffer) return;
     QueryBar_GetSearchResult(bar, &result);
-    
+
     if(result->valid){
         Buffer *buf = BufferView_GetBufferAt(bView, result->lineNo);
         // TODO: This is being called even when it is not search operation!
@@ -356,7 +358,7 @@ void AppDefaultRemoveOne(){
     if(state == View_FreeTyping || state == View_AutoComplete){
         vec2ui cursor = BufferView_GetCursorPosition(bufferView);
         Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-        
+
         NullRet(buffer);
         NullRet(bufferView->lineBuffer);
         NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
@@ -373,11 +375,11 @@ void AppDefaultRemoveOne(){
             }
 
             Buffer_EraseSymbols(buffer, symTable);
-            
+
             Buffer_RemoveRange(buffer, cursor.y-1, cursor.y);
             RemountTokensBasedOn(bufferView, cursor.x);
             cursor.y -= 1;
-            
+
         }else if(cursor.x > 0){
             int offset = buffer->count;
             Buffer *pBuffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
@@ -388,12 +390,12 @@ void AppDefaultRemoveOne(){
             LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(cursor.x, OPERATION_REMOVE_LINE));
             buffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
             RemountTokensBasedOn(bufferView, cursor.x-1);
-            
+
             cursor.y = buffer->count - offset;
             cursor.x -= 1;
             UndoRedoUndoPushNewLine(&bufferView->lineBuffer->undoRedo, cursor);
         }
-        
+
         BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         BufferView_AdjustGhostCursorIfOut(bufferView);
         BufferView_Dirty(bufferView);
@@ -426,7 +428,7 @@ void AppCommandRemovePreviousToken(){
     SymbolTable *symTable = tokenizer->symbolTable;
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-    
+
     int tid = BufferView_LocatePreviousCursorToken(bufferView, &token);
     if(tid >= 0){
         vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
@@ -451,13 +453,13 @@ void AppCommandRemovePreviousToken(){
         LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, cursor.x-1);
         buffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
         RemountTokensBasedOn(bufferView, cursor.x-1);
-        
+
         cursor.y = buffer->count - offset;
         cursor.x -= 1;
         UndoRedoUndoPushNewLine(&bufferView->lineBuffer->undoRedo, cursor);
     }
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
-    
+
     BufferView_AdjustGhostCursorIfOut(bufferView);
     BufferView_Dirty(bufferView);
 }
@@ -478,7 +480,7 @@ void AppCommandInsertTab(){
         Memset(spaces, ' ', appGlobalConfig.tabSpacing);
         offset = appGlobalConfig.tabSpacing;
     }
-    
+
     vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
     if(id.x != (int)cursor.x || id.y != OPERATION_INSERT_CHAR){
         // user started to edit a different buffer
@@ -486,10 +488,10 @@ void AppCommandInsertTab(){
         LineBuffer_SetActiveBuffer(bufferView->lineBuffer,
                                    vec2i((int)cursor.x, OPERATION_INSERT_CHAR));
     }
-    
+
     Buffer_InsertStringAt(buffer, cursor.y, spaces, appGlobalConfig.tabSpacing);
     RemountTokensBasedOn(bufferView, cursor.x);
-    
+
     cursor.y += offset;
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
     BufferView_Dirty(bufferView);
@@ -512,12 +514,12 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
             LineBuffer_RemoveLineAt(bufferView->lineBuffer, start.x+1);
             rmov++;
         }
-        
+
         // remove end now
         buffer = BufferView_GetBufferAt(bufferView, end.x - rmov);
         Buffer_EraseSymbols(buffer, symTable);
         Buffer_RemoveRange(buffer, 0, end.y);
-        
+
         // merge start and end
         LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, start.x);
         BufferView_Dirty(bufferView);
@@ -556,35 +558,35 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
         dataptr = &buffer->data[p];
         toNextLine = buffer->taken - p;
     }
-    
+
     if(len + toNextLine > 0){
         lineHelper = AllocatorGetN(char, (len + toNextLine) * sizeof(char));
     }
-    
+
     if(len > 0){
         char indentChar = ' ';
         if(appGlobalConfig.useTabs) indentChar = '\t';
         Memset(lineHelper, indentChar, sizeof(char) * len);
     }
-    
+
     if(toNextLine > 0){
         Memcpy(&lineHelper[len], dataptr, toNextLine * sizeof(char));
     }
-    
+
     LineBuffer_InsertLineAt(lineBuffer, at.x+1, lineHelper, len+toNextLine, 0);
     if(toNextLine > 0){
         buffer = BufferView_GetBufferAt(bufferView, at.x);
         Buffer_RemoveRange(buffer, at.y, buffer->count);
     }
-    
+
     RemountTokensBasedOn(bufferView, at.x, 2);
     buffer = BufferView_GetBufferAt(bufferView, at.x);
-    
+
     AllocatorFree(lineHelper);
-    
+
     // get the buffer again in case it was end of a file
     bufferp1 = BufferView_GetBufferAt(bufferView, at.x+1);
-    
+
     Buffer_Claim(buffer);
     Buffer_Claim(bufferp1);
     at.x += 1;
@@ -599,13 +601,13 @@ void AppCommandNewLine(){
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-    
+
     NullRet(buffer);
-    
+
     UndoRedoUndoPushMerge(&bufferView->lineBuffer->undoRedo, buffer, cursor);
-    
+
     cursor = AppCommandNewLine(bufferView, cursor);
-    
+
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
     BufferView_AdjustGhostCursorIfOut(bufferView);
     LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(cursor.x-1, OPERATION_INSERT_LINE));
@@ -614,7 +616,7 @@ void AppCommandNewLine(){
 
 //TODO
 void AppCommandRedo(){
-    
+
 }
 
 void AppCommandKillEndOfLine(){
@@ -672,7 +674,7 @@ void AppCommandKillBuffer(){
             }
             ViewTree_Next(&iterator);
         }
-        
+
         char *ptr = lineBuffer->filePath;
         uint pSize = lineBuffer->filePathSize;
         FileProvider_Remove(ptr, pSize);
@@ -715,20 +717,20 @@ void AppCommandUndo(){
                 RemountTokensBasedOn(bufferView, cursor.x);
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
             } break;
-            
+
             /* These cases rely on replacing the original line with a saved one */
             case CHANGE_MERGE:
             case CHANGE_REMOVE:
             case CHANGE_INSERT:{
                 Buffer *b = bChange->buffer;
                 TokenizerStateContext *context = &b->stateContext;
-                
+
                 uint fTrack = context->forwardTrack;
                 uint bTrack = context->backTrack;
-                
+
                 Buffer *buffer = LineBuffer_ReplaceBufferAt(bufferView->lineBuffer, b,
                                                             bChange->bufferInfo.x);
-                
+
                 if(bChange->change == CHANGE_MERGE){
                     /* In case of a merge we need to also remove the following line */
                     Buffer *bp1 = BufferView_GetBufferAt(bufferView, bChange->bufferInfo.x+1);
@@ -736,7 +738,7 @@ void AppCommandUndo(){
                     LineBuffer_RemoveLineAt(bufferView->lineBuffer,
                                             bChange->bufferInfo.x+1);
                 }
-                
+
                 context = &buffer->stateContext;
                 fTrack = Max(fTrack, context->forwardTrack);
                 bTrack = Max(bTrack, context->backTrack);
@@ -746,7 +748,7 @@ void AppCommandUndo(){
                 // give ownership of the buffer to the undo system
                 // this reduces memory allocations/frees
                 UndoSystemTakeBuffer(buffer);
-                
+
                 cursor.x = bChange->bufferInfo.x;
                 cursor.y = bChange->bufferInfo.y;
                 uint base = cursor.x > bTrack ? cursor.x - bTrack : 0;
@@ -754,20 +756,20 @@ void AppCommandUndo(){
                 // restore the active buffer and let stack grow again
                 LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i((int)cursor.x,-1));
             } break;
-            
+
             case CHANGE_BLOCK_REMOVE:{
                 vec2ui start = bChange->bufferInfo;
                 vec2ui end   = bChange->bufferInfoEnd;
                 cursor = start;
-                
+
                 //printf("Removing range [%u %u] x [%u %u]\n",
                 //       start.x, start.y, end.x, end.y); 
-                
+
                 AppCommandRemoveTextBlock(bufferView, start, end);
-                
+
                 RemountTokensBasedOn(bufferView, cursor.x, 1);
                 UndoRedoPopUndo(&lineBuffer->undoRedo);
-                
+
             } break;
             case CHANGE_BLOCK_INSERT:{
                 vec2ui start = bChange->bufferInfo;
@@ -776,9 +778,9 @@ void AppCommandUndo(){
                 if(text && size > 0){
                     uint off = 0;
                     uint startBuffer = start.x;
-                    uint n = LineBuffer_InsertRawTextAt(bufferView->lineBuffer, text, size, 
+                    uint n = LineBuffer_InsertRawTextAt(bufferView->lineBuffer, text, size,
                                                         start.x, start.y, &off);
-                    
+
                     uint endx = start.x + n;
                     uint endy = off;
                     LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(endx, -1));
@@ -791,7 +793,7 @@ void AppCommandUndo(){
             } break;
             default:{ printf("Unknow undo command\n"); }
         }
-        
+
         BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         BufferView_AdjustGhostCursorIfOut(bufferView);
     }
@@ -924,7 +926,7 @@ void AppCommandQueryBarSearch(){
         QueryBar *bar = View_GetQueryBar(view);
         QueryBar_Activate(bar, QUERY_BAR_CMD_SEARCH, view);
         View_ReturnToState(view, View_QueryBar);
-        
+
         KeyboardSetActiveMapping(appContext.queryBarMapping);
     }
 }
@@ -937,7 +939,7 @@ void AppCommandQueryBarGotoLine(){
         QueryBar *bar = View_GetQueryBar(view);
         QueryBar_Activate(bar, QUERY_BAR_CMD_JUMP_TO_LINE, view);
         View_ReturnToState(view, View_QueryBar);
-        
+
         KeyboardSetActiveMapping(appContext.queryBarMapping);
     }
 }
@@ -950,7 +952,7 @@ void AppCommandQueryBarRevSearch(){
         QueryBar *bar = View_GetQueryBar(view);
         QueryBar_Activate(bar, QUERY_BAR_CMD_REVERSE_SEARCH, view);
         View_ReturnToState(view, View_QueryBar);
-        
+
         KeyboardSetActiveMapping(appContext.queryBarMapping);
     }
 }
@@ -1066,7 +1068,7 @@ void AppCommandCopy(){
     char *ptr = nullptr;
     BufferView *view = AppGetActiveBufferView();
     NullRet(view->lineBuffer);
-    
+
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         uint size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
@@ -1079,7 +1081,7 @@ void AppCommandJumpNesting(){
     BufferView *view = AppGetActiveBufferView();
     NullRet(view->lineBuffer);
     BufferView_GetCursor(view, &cursor);
-    
+
     if(BufferView_CursorNestIsValid(view)){
         //TODO: Create toogle
         if(view->activeNestPoint == -1){
@@ -1087,7 +1089,7 @@ void AppCommandJumpNesting(){
         }else{
             view->activeNestPoint = 1 - view->activeNestPoint;
         }
-        
+
         vec2ui p = view->activeNestPoint == 0 ? cursor->nestStart : cursor->nestEnd;
         Buffer *buffer = BufferView_GetBufferAt(view, p.x);
         uint pos = Buffer_Utf8RawPositionToPosition(buffer, buffer->tokens[p.y].position);
@@ -1100,7 +1102,7 @@ void AppCommandCut(){
     uint size = 0;
     char *ptr = nullptr;
     BufferView *view = AppGetActiveBufferView();
-    
+
     NullRet(view->lineBuffer);
     NullRet(LineBuffer_IsWrittable(view->lineBuffer));
 
@@ -1108,10 +1110,10 @@ void AppCommandCut(){
         size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
         //printf("Cut %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
-        
+
         UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
         AppCommandRemoveTextBlock(view, start, end);
-        
+
         RemountTokensBasedOn(view, start.x, 1);
         BufferView_CursorToPosition(view, start.x, start.y);
         BufferView_AdjustGhostCursorIfOut(view);
@@ -1204,7 +1206,7 @@ uint AppComputeLineLastIndentLevel(Buffer *buffer){
             l++;
         }
     }
-    
+
     return l;
 }
 
@@ -1217,11 +1219,11 @@ uint AppComputeLineIndentLevel(Buffer *buffer){
             if(token->identifier == TOKEN_ID_BRACE_CLOSE){
                 l = l > 0 ? l - 1 : 0;
             }
-            
+
             break;
         }
     }
-    
+
     return l;
 }
 
@@ -1233,14 +1235,14 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
     if(appGlobalConfig.useTabs){
         indentChar = '\t';
     }
-    
+
     // Grab the maximum line size in this range
     uint maxSize = 0;
     for(uint i = start.x; i < end.x; i++){
         Buffer *buffer = BufferView_GetBufferAt(view, i);
         maxSize = Max(buffer->taken, maxSize);
     }
-    
+
     lineHelper = AllocatorGetN(char, maxSize);
     for(uint i = start.x; i < end.x; i++){
         Buffer *buffer = BufferView_GetBufferAt(view, i);
@@ -1268,58 +1270,58 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
                 break;
             }
         }
-        
+
         // 2- Add the indentation sequence the amount of times required
         uint len = indentLevel * tabSize;
         uint llen = buffer->taken - targetP;
-        
+
         // Skip lines made entirely of spaces
         if(!foundNonSpace){
             llen = 0;
             len = 0;
         }
-        
+
         // if this line is a preprocessor align to edge of file
         if(indentStyle == 1){
             len = 0;
         }
-        
+
         // don't attempt to configure user comment format
         if(indentStyle == 2){
             // however if we don't allow indentation until first
             // token we would keep the tab/space as was defined
             len = targetP;
         }
-        
+
         if(len+llen > maxSize){
             uint osize = maxSize;
             maxSize = len + llen;
             lineHelper = AllocatorExpand(char, lineHelper, maxSize, osize);
         }
-        
+
         // insert spacing only when there is actually a token
         if(len > 0 && foundNonSpace)
             Memset(lineHelper, indentChar, len * sizeof(char));
         // insert rest of the line
         if(llen > 0)
             Memcpy(&lineHelper[len], &buffer->data[targetP], llen * sizeof(char));
-        
+
         //TODO: Maybe we can batch all lines as a CHANGE_BLOCK_INSERT for simpler undo,
         // this undo is currently broken and I'm not sure why.
         // Save undo - redo stuff as simple inserts
         //UndoRedoUndoPushInsert(&view->lineBuffer->undoRedo, buffer, vec2ui(i, 0));
-        
+
         // Re-insert the line in raw mode to avoid processing
         Buffer_RemoveRange(buffer, 0, buffer->count);
         if(len + llen > 0)
             Buffer_InsertRawStringAt(buffer, 0, lineHelper, len+llen, 0);
         changes = 1;
     }
-    
+
     if(changes){ // unfortunatelly we need to retokenize to adjust tokens offsets
         RemountTokensBasedOn(view, start.x, end.x - start.x);
     }
-    
+
     AllocatorFree(lineHelper);
 }
 
@@ -1364,15 +1366,15 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 
                 vec2ui cursor = BufferView_GetCursorPosition(bufferView);
                 Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-                
+
                 NullRet(buffer);
-                
+
                 vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
                 if(id.x != (int)cursor.x || id.y != OPERATION_INSERT_CHAR){
                     // user started to edit a different buffer
                     UndoRedoUndoPushRemove(&bufferView->lineBuffer->undoRedo,
                                            buffer, cursor);
-                    
+
                     LineBuffer_SetActiveBuffer(bufferView->lineBuffer,
                                                vec2i((int)cursor.x, OPERATION_INSERT_CHAR));
                 }
@@ -1382,7 +1384,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 
                 uint startX = cursor.x;
                 uint offset = 0;
-                
+
                 Buffer_EraseSymbols(buffer, symTable);
                 Buffer_InsertStringAt(buffer, cursor.y, utf8Data, utf8Size);
 
@@ -1400,7 +1402,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
 
                 Buffer_Claim(buffer);
                 RemountTokensBasedOn(bufferView, startX, offset);
-                
+
                 cursor.y += StringComputeU8Count(utf8Data, utf8Size);
 
                 BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
@@ -1441,7 +1443,7 @@ View *AppGetViewAt(int x, int y){
 
         ViewTree_Next(&iterator);
     }
-    
+
     return rView;
 }
 
@@ -1464,8 +1466,12 @@ vec2ui AppActivateViewAt(int x, int y){
 
         ViewTree_Next(&iterator);
     }
-    
+
     return r;
+}
+
+void AppCommandGitOpenRoot(char *path){
+    Git_OpenDirectory(path);
 }
 
 void AppCommandGitStatus(){
@@ -1504,6 +1510,7 @@ void AppCommandGitDiffCurrent(){
             // removed the diff, make the state code again
             BufferView_SetViewType(bView, CodeView);
         }else{
+            bool difStatus = false;
             dif->clear();
             allow_write = false;
             std::string path = AppGetRootDirectory();
@@ -1515,16 +1522,32 @@ void AppCommandGitDiffCurrent(){
                 gitName = target.substr(path.size()+1);
             }
 
-            if(!Git_ComputeCurrentDiff()) return;
-            if(!Git_FetchDiffFor((char *)gitName.c_str(), dif)) return;
+            MeasureTime("GitFetchFor", {
+                difStatus = Git_FetchDiffFor((char *)gitName.c_str(), dif);
+            });
+            if(!difStatus) return;
 
-            LineBuffer_InsertDiffContent(bView->lineBuffer, range);
+            MeasureTime("DiffInsertion", {
+                LineBuffer_InsertDiffContent(bView->lineBuffer, range);
+            });
+
             BufferView_SetViewType(bView, GitDiffView);
         }
 
         if(range.x <= range.y){
             RemountTokensBasedOn(bView, range.x, range.y - range.x);
             LineBuffer_SetWrittable(bView->lineBuffer, allow_write);
+        }
+    }
+}
+
+void AppCommandEnterKey(){
+    BufferView *bufferView = AppGetActiveBufferView();
+    ViewType type = BufferView_GetViewType(bufferView);
+    switch(type){
+        case CodeView: AppCommandNewLine(); break;
+        default: {
+            printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
         }
     }
 }
@@ -1672,8 +1695,8 @@ void AppCommandOpenFile(){
             }
         }
     };
-    
-    int r = FileOpenerCommandStart(view, appContext.cwd, 
+
+    int r = FileOpenerCommandStart(view, appContext.cwd,
                                    strlen(appContext.cwd), fileOpen);
     if(r >= 0){
         AppSetBindingsForState(View_SelectableList);
@@ -1684,7 +1707,7 @@ void AppInitialize(){
     KeyboardInitMappings();
     AppInitializeFreeTypingBindings();
     AppInitializeQueryBarBindings();
-    
+
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
 }
 
@@ -1694,17 +1717,17 @@ void AppInitializeQueryBarBindings(){
     RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandQueryBarNext, Key_Down);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarPrevious, Key_Up);
-    
+
     //RegisterRepeatableEvent(mapping, AppCommandQueryBarRightArrow, Key_Right);
     //RegisterRepeatableEvent(mapping, AppCommandQueryBarLeftArrow, Key_Left);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_RightAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarCommit, Key_Enter);
-    
+
     appContext.queryBarMapping = mapping;
 }
 
@@ -1725,7 +1748,7 @@ void AppMemoryDebugCmp(){
 void AppInitializeFreeTypingBindings(){
     BindingMap *mapping = nullptr;
     mapping = KeyboardCreateMapping();
-    
+
     RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
@@ -1741,35 +1764,35 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandDownArrow, Key_Down);
 
     RegisterRepeatableEvent(mapping, AppCommandSwitchTheme, Key_LeftControl, Key_T);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandOpenFile, Key_LeftAlt, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpDownArrow, Key_Down, Key_LeftControl);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftAlt);
     RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftAlt);
     RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftAlt);
     RegisterRepeatableEvent(mapping, AppCommandJumpDownArrow, Key_Down, Key_LeftAlt);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandRemovePreviousToken,
                             Key_Backspace, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandRemovePreviousToken,
                             Key_Backspace, Key_LeftAlt);
-    
-    RegisterRepeatableEvent(mapping, AppCommandNewLine, Key_Enter);
-    
+
+    RegisterRepeatableEvent(mapping, AppCommandEnterKey, Key_Enter);
+
     RegisterRepeatableEvent(mapping, AppCommandHomeLine, Key_Home);
     RegisterRepeatableEvent(mapping, AppCommandEndLine, Key_End);
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_RightAlt, Key_W);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandSetGhostCursor, Key_Space,
                             Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandSetGhostCursor, Key_Space,
                             Key_RightControl);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandAutoComplete, Key_LeftControl, Key_N);
     RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftAlt, Key_N);
     RegisterRepeatableEvent(mapping, AppCommandKillBuffer, Key_LeftControl, Key_K);
@@ -1793,13 +1816,13 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_C);
     RegisterRepeatableEvent(mapping, AppCommandCopy, Key_LeftControl, Key_Q);
     RegisterRepeatableEvent(mapping, AppCommandSwapToBuildBuffer, Key_LeftControl, Key_M);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
 
     //TODO: re-do (AppCommandRedo)
     RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand, Key_LeftControl, Key_Semicolon);
-    
+
     RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
@@ -1809,7 +1832,7 @@ void AppInitializeFreeTypingBindings(){
     // Let the control commands bind its things
     ControlCommands_Initialize();
     ControlCommands_BindTrigger(mapping);
-    
+
     appContext.freeTypeMapping = mapping;
 }
 
