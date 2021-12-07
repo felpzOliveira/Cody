@@ -267,7 +267,7 @@ int Graphics_RenderQueryBar(View *view, OpenGLState *state,
                             Theme *theme, Float dt);
 
 /*
-* Renders a SelectableList active in a view.
+* Renders a View's SelectableList.
 */
 int Graphics_RenderListSelector(View *view, OpenGLState *state,
                                 Theme *theme, Float dt);
@@ -318,6 +318,11 @@ void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
 * Triggers a render call for all batched texts pushed.
 */
 void Graphics_FlushText(OpenGLState *state);
+
+/*
+* TODO
+*/
+vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view);
 
 /*
 * Bind all image units.

@@ -3,10 +3,10 @@
 #include <iostream>
 #include <app.h>
 #include <types.h>
-#include <map>
-#include <sstream>
-#include <set>
 #include <time.h>
+#include <utilities.h>
+#include <stack>
+#include <gitgraph.h>
 
 #define MODULE_NAME "GIT"
 
@@ -59,6 +59,7 @@ template<typename Fn> static bool Git_TransverseRelevantReferences(const Fn &fn)
     int rv = 0, err = 0;
     git_reference_iterator *it = nullptr;
     git_reference *ref = nullptr;
+    bool keep = true;
 
     rv = git_reference_iterator_new(&it, gitState.repo);
     if(rv != 0){
@@ -66,7 +67,7 @@ template<typename Fn> static bool Git_TransverseRelevantReferences(const Fn &fn)
         return false;
     }
 
-    while((err = git_reference_next(&ref, it)) == 0){
+    while((err = git_reference_next(&ref, it)) == 0 && keep){
         GitReferenceType type = GIT_REF_NONE;
         const char *ptr = git_reference_name(ref);
         uint len = strlen(ptr);
@@ -85,7 +86,7 @@ template<typename Fn> static bool Git_TransverseRelevantReferences(const Fn &fn)
         }
 
         if(type != GIT_REF_NONE){
-            if(!fn(ref, type)) break;
+            keep = fn(ref, type);
         }
 
         git_reference_free(ref);
@@ -273,21 +274,6 @@ bool Git_FetchDiffDeltas(std::vector<std::string> *_deltas){
     return rv == 0;
 }
 
-bool test_GIT(){
-    git_diff *diff = nullptr;
-    git_diff_options diffopts = GIT_DIFF_OPTIONS_INIT;
-
-    const char *strs[] = {"src/cody.cpp", NULL};
-    diffopts.pathspec.strings = (char **)&strs[0];
-    diffopts.pathspec.count = 1;
-
-    int rv = git_diff_index_to_workdir(&diff, gitState.repo, NULL, &diffopts);
-    if(rv != 0){
-        DEBUG_MSG("Failed to get diff\n");
-    }
-    return false;
-}
-
 bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *_hunks){
     if(!gitState.repo) return false;
     int rv = -1;
@@ -352,82 +338,178 @@ bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *_hunks){
     return rv == 0;
 }
 
-bool Git_LogGraph(){
-    if(!gitState.repo) return false;
-    int rv = 0;
-#if 0
-    auto itt = [&](git_reference *ref, GitReferenceType type) -> bool{
-        git_oid oid;
-        rv = git_reference_name_to_id(&oid, gitState.repo, git_reference_name(ref));
-        if(rv == 0 && (type == GIT_REF_BRANCH_LOCAL || type == GIT_REF_BRANCH_REMOTE)){
-            git_commit *commit = nullptr;
-
-            git_commit_lookup(&commit, gitState.repo, &oid);
-            git_time_t time = git_commit_time(commit);
-
-            git_comp_entry entry;
-            entry.time = time;
-            git_oid_cpy(&entry.oid, &oid);
-            set.insert(entry);
-
-            git_commit_free(commit);
-        }
-        //printf("%s : %s\n", GitReferenceString(type), git_reference_shorthand(ref));
-        return true;
-    };
-
-    Git_TransverseRelevantReferences(itt);
-    std::set<git_comp_entry, comparator>::iterator it;
-    for(it = set.begin(); it != set.end(); it++){
-        git_comp_entry entry = *it;
-        std::string buf(git_oid_tostr_s(&entry.oid), 9);
-        struct tm t;
-        time_t tv = (time_t) entry.time;
-        localtime_r(&tv, &t);
-        printf("%s ( %d/%d/%d : %d:%d:%d )\n", buf.c_str(),
-                t.tm_mday, t.tm_mon+1, t.tm_year+1900, t.tm_hour, t.tm_min, t.tm_sec);
-    }
-
-    return true;
-
-#else
-    git_revwalk *walker = nullptr;
+struct commit_info{
+    git_time_t time;
     git_oid oid;
-    git_commit *commit = nullptr;
+    std::string branch;
+    git_commit *commit;
+    GitReferenceType type;
+};
 
-    rv = git_revwalk_new(&walker, gitState.repo);
-    if(rv != 0){
-        DEBUG_MSG("Failed to allocate revwalker\n");
-        return false;
+int commit_info_comp(commit_info *a, commit_info *b){
+    return a->time > b->time;
+}
+
+typedef PriorityQueue<commit_info> CommitInfoPriorityQueue;
+
+static CommitInfoPriorityQueue *Git_GetStartingCommits(){
+    CommitInfoPriorityQueue *pq = nullptr;
+    if(gitState.repo){
+        pq = PriorityQueue_Create<commit_info>(commit_info_comp);
+        auto iterator = [&](git_reference *ref, GitReferenceType type) -> bool{
+            if(type == GIT_REF_BRANCH_LOCAL || type == GIT_REF_BRANCH_REMOTE){
+                commit_info *info = new commit_info;
+                const char *branchName = nullptr;
+                git_branch_name(&branchName, ref);
+
+                git_reference_name_to_id(&info->oid, gitState.repo, git_reference_name(ref));
+                git_commit_lookup(&info->commit, gitState.repo, &info->oid);
+                info->type = type;
+                info->branch = branchName;
+                info->time = git_commit_time(info->commit);
+                PriorityQueue_Push(pq, info);
+            }
+            return true;
+        };
+
+        Git_TransverseRelevantReferences(iterator);
     }
+    return pq;
+}
 
-    //git_revwalk_sorting(walker, GIT_SORT_REVERSE);
-
-    git_revwalk_push_head(walker);
-
-    while(!git_revwalk_next(&oid, walker)){
-        rv = git_commit_lookup(&commit, gitState.repo, &oid);
-        if(rv != 0){
-            DEBUG_MSG("Failed to perform commit lookup\n");
+std::string shrink_message(std::string msg){
+    int i = -1;
+    for(uint j = 0; j < msg.size(); j++){
+        if(msg[j] == '\n' && j > 0){
+            i = j;
             break;
         }
-
-        std::string buf(git_oid_tostr_s(&oid), 7);
-        std::string msg(git_commit_message(commit));
-        uint pcount = git_commit_parentcount(commit);
-
-
-        RemoveUnwantedLineTerminators(msg);
-
-        printf("[ %u ] %s %s\n", pcount, buf.c_str(), msg.c_str());
-
-        git_commit_free(commit);
-        break;
     }
 
-    git_revwalk_free(walker);
+    return msg.substr(0, i);
+}
+
+static std::map<std::string, bool> expMap;
+static int counter = 0;
+void Git_PrintTree(git_commit *commit, int id){
+    struct commit_v{
+        git_commit *cmt;
+        int it;
+    };
+
+    std::stack<commit_v> stack;
+    stack.push({.cmt = commit, .it = id});
+    while(stack.size() > 0){
+        commit_v v = stack.top();
+        stack.pop();
+
+        git_commit *cmt = v.cmt;
+
+        const git_oid *oid = git_commit_id(cmt);
+        std::string buf(git_oid_tostr_s(oid), 9);
+
+        if(expMap.find(buf) != expMap.end()){
+            // nothing
+        }else{
+            std::string msg = shrink_message(git_commit_message(cmt));
+            uint count = git_commit_parentcount(cmt);
+            printf("[%d/%d] %s - %s\n", v.it, (int)count, buf.c_str(), msg.c_str());
+
+            for(int i = count-1; i >= 0; i--){
+                git_commit *p = nullptr;
+                git_commit_parent(&p, cmt, i);
+                stack.push({.cmt = p, .it = v.it+1});
+            }
+
+            expMap[buf] = true;
+            counter++;
+        }
+
+        git_commit_free(cmt);
+    }
+}
+
+void Git_PrintTree3(git_commit *commit, int id){
+    const git_oid *oid = git_commit_id(commit);
+    if(oid){
+        const char *ps = git_oid_tostr_s(oid);
+        std::string buf(ps, 9);
+        std::string msg = shrink_message(git_commit_message(commit));
+
+        if(expMap.find(buf) != expMap.end()) return;
+
+        expMap[buf] = true;
+        uint count = git_commit_parentcount(commit);
+        printf("[%d/%d] %s - %s\n", id, (int)count, buf.c_str(), msg.c_str());
+        counter++;
+
+        for(uint i = 0; i < count; i++){
+            git_commit *p = nullptr;
+            git_commit_parent(&p, commit, i);
+
+            Git_PrintTree3(p, id+1);
+            git_commit_free(p);
+        }
+    }
+}
+
+void Git_PrintTree2(commit_info *info){
+    git_commit *commit = info->commit;
+    printf("================ %s\n", info->branch.c_str());
+    while(commit != nullptr){
+        git_commit *parent = nullptr;
+        const git_oid *oid = git_commit_id(commit);
+        std::string buf(git_oid_tostr_s(oid), 9);
+        std::string msg = shrink_message(git_commit_message(commit));
+        uint count = git_commit_parentcount(commit);
+        if(count == 1){
+            printf("* %s - %s\n", buf.c_str(), msg.c_str());
+            git_commit_parent(&parent, commit, 0);
+        }else if(count == 0){
+            printf("* %s - %s\n", buf.c_str(), msg.c_str());
+        }else{
+            printf("* [%u] %s - %s\n", count, buf.c_str(), msg.c_str());
+            git_commit_parent(&parent, commit, 0);
+        }
+        counter++;
+
+        git_commit_free(commit);
+        commit = parent;
+    }
+    printf("=================================================\n");
+}
+
+bool Git_LogGraph(){
+    CommitInfoPriorityQueue *pq = Git_GetStartingCommits();
+    if(!pq) return false;
+    if(PriorityQueue_Size(pq) > 0){
+        commit_info *info = PriorityQueue_Peek(pq);
+        PriorityQueue_Pop(pq);
+
+        //Git_PrintTree2(info);
+        //Git_PrintTree3(info->commit, 0);
+        //Git_PrintTree(info->commit, 0);
+        //printf("Counter = %d\n", (int)counter);
+        GitGraph *graph = GitGraph_Build(info->commit);
+        GitGraph_Free(graph);
+    }
+#if 0
+    while(PriorityQueue_Size(pq) > 0){
+        commit_info *info = PriorityQueue_Peek(pq);
+        PriorityQueue_Pop(pq);
+
+        std::string buf(git_oid_tostr_s(&info->oid), 9);
+        struct tm t;
+        localtime_r(&info->time, &t);
+        printf("%s %s ( %d/%d/%d : %d:%d:%d )\n", buf.c_str(), info->branch.c_str(),
+                t.tm_mday, t.tm_mon+1, t.tm_year+1900, t.tm_hour, t.tm_min, t.tm_sec);
+
+        git_commit_free(info->commit);
+        delete info;
+    }
 #endif
-    return rv == 0;
+    PriorityQueue_Free(pq);
+    return true;
 }
 
 bool Git_ComputeCurrentDiff(){

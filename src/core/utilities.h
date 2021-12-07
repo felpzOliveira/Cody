@@ -232,6 +232,13 @@ int StringToCodepoint(char *u, int size, int *off);
 */
 int ExtensionStringContains(const char *string, const char *extensions);
 
+template<typename Fn>
+inline double MeasureInterval(const Fn &fn){
+    clock_t start = clock();
+    fn();
+    return double(clock() - start)/CLOCKS_PER_SEC;
+}
+
 /* memcpy */
 void Memcpy(void *dst, void *src, uint size);
 /* memset */
@@ -241,8 +248,7 @@ void Memset(void *dst, unsigned char v, uint size);
     #define MeasureTime(msg, ...) do{\
         clock_t _beg_clk = clock();\
         __VA_ARGS__\
-        clock_t _end_clk = clock();\
-        double _clk_interval = double(_end_clk - _beg_clk)/CLOCKS_PER_SEC;\
+        double _clk_interval = double(clock() - _beg_clk)/CLOCKS_PER_SEC;\
         printf("[PERF] %s took %g ms\n", msg, _clk_interval * 1000.0);\
     }while(0)
 #else

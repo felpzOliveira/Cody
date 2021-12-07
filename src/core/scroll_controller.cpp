@@ -4,7 +4,7 @@ int Animation_Finished(AnimationProps *anim);
 void Animation_FinishCallback(){}
 
 Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue, 
+                            Float *initialValue, Float finalValue,
                             Float *velocity);
 
 Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
@@ -53,7 +53,7 @@ void VScroll_Init(VScroll *ss){
 uint VScroll_GetCursorSelection(VScroll *ss, vec2ui *start, vec2ui *end){
     vec2ui s = ss->cursor.textPosition;
     vec2ui e = ss->cursor.ghostPosition;
-    
+
     if(s.x > e.x){ // ghost cursor is behind
         s = ss->cursor.ghostPosition;
         e = ss->cursor.textPosition;
@@ -66,7 +66,7 @@ uint VScroll_GetCursorSelection(VScroll *ss, vec2ui *start, vec2ui *end){
             e = ss->cursor.textPosition;
         }
     }
-    
+
     *start = s;
     *end = e;
     return 1;
@@ -104,14 +104,14 @@ void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer)
             if(range < (int)ss->currentMaxRange) lineNo++;
         }
     }
-    
+
     buffer = LineBuffer_GetBufferAt(lineBuffer, lineNo);
-    
+
     ss->cursor.textPosition.x = lineNo;
     if(buffer->tokenCount > 0){
         uint lastP = buffer->tokens[buffer->tokenCount-1].position;
         uint lastX = lastP + buffer->tokens[buffer->tokenCount-1].size;
-        
+
         if((int)ss->cursor.textPosition.y < buffer->tokens[0].position){
             ss->cursor.textPosition.y = buffer->tokens[0].position;
         }else if(ss->cursor.textPosition.y > lastX){
@@ -120,7 +120,7 @@ void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer)
     }else{
         ss->cursor.textPosition.y = 0;
     }
-    
+
     VScroll_UpdateRelativeDistance(ss, lineNo, lineBuffer->lineCount);
     ss->cursor.is_dirty = 1;
 }
@@ -133,10 +133,10 @@ void VScroll_CursorToPosition(VScroll *ss, uint lineNo, uint col, LineBuffer *li
             col = Clamp(col, (uint)0, buffer->count);
         else
             col = 0;
-        
+
         VScroll_CursorTo(ss, (uint)lineNo, lineBuffer);
         ss->cursor.textPosition.y = col;
-        
+
         VScroll_UpdateRelativeDistance(ss, lineNo, lineBuffer->lineCount);
     }
 }
@@ -206,13 +206,13 @@ void VScroll_CursorTo2(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
 #endif
         }
     }
-    
+
     ss->visibleRect = visibleRect;
     if(lineNo < lineBuffer->lineCount){
         ss->cursor.textPosition.x = lineNo;
         VScroll_UpdateRelativeDistance(ss, lineNo, lineBuffer->lineCount);
     }
-    
+
     ss->cursor.is_dirty = 1;
 }
 
@@ -227,7 +227,7 @@ void VScroll_StartScrollViewTransition(VScroll *ss, int lineDiffs,
         }else{ // going down
             expectedEnd = Min(lineBuffer->lineCount - 1, expectedEnd);
         }
-        
+
         ss->transitionAnim.isAnimating = 1;
         ss->transitionAnim.transition = TransitionScroll;
         ss->transitionAnim.passedTime = 0;
@@ -244,7 +244,7 @@ void VScroll_StartScrollViewTransition(VScroll *ss, int lineDiffs,
         }else{ // going down
             expectedEnd = Min(lineBuffer->lineCount - 1, expectedEnd);
         }
-        
+
         int is_down = expectedEnd > (int)ss->transitionAnim.endLine;
         ss->transitionAnim.endLine = expectedEnd;
         ss->transitionAnim.is_down = is_down;
@@ -258,7 +258,7 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
     AnimationProps *anim = &ss->transitionAnim;
     vec2ui oldP = ss->cursor.textPosition;
     uint range = ss->currentMaxRange;
-    
+
     AssertA(anim->transition == TransitionScroll, "Incorrect transition query");
     ss->cursor.is_dirty = 1;
     anim->passedTime += Max(0, dt);
@@ -276,14 +276,14 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
         ss->visibleRect.x = Max(0, Floor(lak));
         ss->visibleRect.y = Min(ss->visibleRect.x + range,
                                 lineBuffer->lineCount);
-        
+
         rRange->x = ss->visibleRect.x;
         rRange->y = ss->visibleRect.y;
-        
+
         if(!VScroll_IsCursorVisible(ss, *rRange)){
             VScroll_FitCursorToRange(ss, ss->visibleRect, lineBuffer);
         }
-        
+
         Float dif = Absf(lak - rRange->x);
         if(anim->is_down){
             if(ss->cursor.textPosition.x < oldP.x){
@@ -298,13 +298,13 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
             }
             *transform = Translate(0, -dif, 0);
         }
-        
+
         cursorAt->x = ss->cursor.textPosition.x;
         cursorAt->y = ss->cursor.textPosition.y;
-        
+
         if(ss->visibleRect.x == anim->endLine) goto __set_end_transition;
     }
-    
+
     return 0;
     __set_end_transition:
     ss->visibleRect.x = anim->endLine;
@@ -317,7 +317,7 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
 
     ss->onAnimationFinished();
     ss->onAnimationFinished = Animation_FinishCallback;
-    
+
     anim->isAnimating = 0;
     *transform = Transform();
     return 1;
@@ -379,12 +379,12 @@ int VScroll_GetCursorTransition(VScroll *ss, Float dt, vec2ui *rRange,
             if(buffer->tokenCount > 0) initialp = buffer->tokens[0].position;
             cursorAt->y = Clamp(ss->cursor.textPosition.y, initialp, buffer->count-1);
         }
-        
+
         if(anim->is_down){
             if(!(cursorAt->x < rect.y - gap)){
                 rRange->y = Min(cursorAt->x + gap + 1, lineBuffer->lineCount-1);
                 int minV = (int)rRange->y - (int)range;
-                
+
                 rRange->x = (uint)Max(0, minV);
                 *transform = Translate(0, Fract(lak), 0);
             }else{
@@ -392,7 +392,7 @@ int VScroll_GetCursorTransition(VScroll *ss, Float dt, vec2ui *rRange,
                 rRange->y = rect.y;
                 *transform = Transform();
             }
-            
+
             if(cursorAt->x >= anim->endLine){ // incorrect interpolation, end transition
                 goto __set_end_transition;
             }
@@ -406,13 +406,13 @@ int VScroll_GetCursorTransition(VScroll *ss, Float dt, vec2ui *rRange,
                 rRange->y = rect.y;
                 *transform = Transform();
             }
-            
+
             if(cursorAt->x <= anim->endLine){ // incorrect interpolation, end transition
                 goto __set_end_transition;
             }
         }
     }
-    
+
     return 0;
     __set_end_transition:
     rRange->x = ss->visibleRect.x;

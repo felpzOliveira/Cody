@@ -158,6 +158,20 @@ int AppIsStoredFile(std::string path);
 */
 void AppPasteString(const char *p, uint size);
 
+/*
+* Handles a scroll to a new position. x and y hold the new mouse coordinates
+* in windows coordinates, state is the **global** opengl state for rendering requirements,
+* height is the current height of the window and is_up tells which direction
+* the scroll is going.
+*/
+void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state);
+
+/*
+* Handles the mouse click event. Receives the mouse coordinates in x and y in window
+* coordinates, the **global** opengl state fore rendering.
+*/
+void AppHandleMouseClick(int x, int y, OpenGLState *state);
+
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();
 void AppCommandJumpRightArrow();

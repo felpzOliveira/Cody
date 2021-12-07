@@ -47,6 +47,8 @@ AppConfig appGlobalConfig;
 void AppInitializeFreeTypingBindings();
 void AppInitializeQueryBarBindings();
 void AppCommandAutoComplete();
+void AppCommandFreeTypingArrows(int direction);
+void AppCommandQueryBarCommit();
 
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     Float w = (Float)(geometry.upper.x - geometry.lower.x);
@@ -207,6 +209,86 @@ void AppRestoreCurrentBufferViewState(){
         if(type == GitDiffView){
             AppCommandGitDiffCurrent();
         }
+    }
+}
+
+void AppHandleMouseClick(int x, int y, OpenGLState *state){
+    vec2ui mouse = AppActivateViewAt(x, state->height - y);
+    View *view = AppGetActiveView();
+    NullRet(view);
+    ViewState vstate = View_GetState(view);
+    BufferView *bufferView = View_GetBufferView(view);
+    uint dy = view->geometry.upper.y - view->geometry.lower.y;
+    switch(vstate){
+        case View_FreeTyping:{
+            int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y,
+                                                    view->descLocation);
+            if(lineNo < 0) return;
+
+            lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
+
+            uint colNo = 0;
+            Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
+            x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
+            if(x > 0){
+                // TODO: It seems when we have a tab on a line and we click to select
+                // a character it seems we are jumping exactly tabSpacing - 1 ahead
+                colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x);
+                BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
+                BufferView_GhostCursorFollow(bufferView);
+            }
+        } break;
+        case View_SelectableList:{
+            SelectableList *list = &view->selectableList;
+            y = dy - mouse.y;
+            y = ScreenToGL(y, state);
+            if(view->descLocation == DescriptionTop){
+                y -= state->font.fontMath.fontSizeAtRenderCall;
+            }
+            vec2i item = Graphics_ComputeSelectableListItem(state, y, view);
+            SelectableList_SetItem(list, item.y);
+
+            AppCommandQueryBarCommit();
+        } break;
+        default:{
+            // nothing
+        }
+    }
+}
+
+void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
+    View *view = AppGetViewAt(x, state->height - y);
+    if(view){
+        ViewState vstate = View_GetState(view);
+        switch(vstate){
+            case View_FreeTyping:{
+                int scrollRange = 5;
+                BufferView *bView = View_GetBufferView(view);
+                NullRet(bView);
+                NullRet(bView->lineBuffer);
+                BufferView_StartScrollViewTransition(bView, is_up ? -scrollRange : scrollRange,
+                                                     kTransitionScrollInterval);
+            } break;
+            case View_SelectableList:{
+                //printf("View_SelectableList\n");
+                if(is_up){
+                    AppCommandQueryBarPrevious();
+                }else{
+                    AppCommandQueryBarNext();
+                }
+            } break;
+            case View_QueryBar:{
+                //printf("View_QueryBar\n");
+            } break;
+            case View_StatesCount:{
+                //printf("View_StatesCount\n");
+            } break;
+            default:{
+                // nothing
+            }
+        }
+
+        Timing_Update();
     }
 }
 
@@ -1117,7 +1199,7 @@ void AppCommandCut(){
         RemountTokensBasedOn(view, start.x, 1);
         BufferView_CursorToPosition(view, start.x, start.y);
         BufferView_AdjustGhostCursorIfOut(view);
-        view->lineBuffer->is_dirty = 1;
+        BufferView_Dirty(view);
     }
 }
 
@@ -1170,7 +1252,7 @@ void AppPasteString(const char *p, uint size){
         cursor.x = endx;
         cursor.y = Clamp(endy, (uint)0, b->count);
         BufferView_CursorToPosition(view, cursor.x, cursor.y);
-        view->lineBuffer->is_dirty = 1;
+        BufferView_Dirty(view);
     }
 }
 
@@ -1332,7 +1414,7 @@ void AppCommandIndent(){
     NullRet(LineBuffer_IsWrittable(view->lineBuffer));
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         AppCommandIndentRegion(view, start, end);
-        view->lineBuffer->is_dirty = 1;
+        BufferView_Dirty(view);
     }
 }
 
@@ -1406,7 +1488,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 cursor.y += StringComputeU8Count(utf8Data, utf8Size);
 
                 BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
-                bufferView->lineBuffer->is_dirty = 1;
+                BufferView_Dirty(bufferView);
 
                 if(state == View_AutoComplete){
                     if(utf8Size == 1 && AUTOCOMPLETE_TERMINATOR(*utf8Data)){

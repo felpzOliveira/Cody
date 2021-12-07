@@ -224,7 +224,7 @@ int Graphics_RenderAutoComplete(View *view, OpenGLState *state, Theme *theme, Fl
     Float gw = kAutoCompleteListScaling * fw * font->fontMath.reduceScale;
     AssertA(w > gw, "View is too small!");
 
-    OpenGLCursor *glCursor = &state->glCursor;    
+    OpenGLCursor *glCursor = &state->glCursor;
     Float x = glCursor->pMin.x * font->fontMath.reduceScale;
     if(x + gw > w){
         x = w - gw;
@@ -246,22 +246,52 @@ int Graphics_RenderAutoComplete(View *view, OpenGLState *state, Theme *theme, Fl
     return Graphics_RenderHoverableList(view, state, theme, &geo, list);
 }
 
+vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view){
+    Geometry geometry;
+    OpenGLFont *font = &state->font;
+    if(!view) return vec2f(0);
+
+    BufferView *bView = View_GetBufferView(view);
+    if(!bView) return vec2f(0);
+
+    SelectableList *list = &view->selectableList;
+
+    BufferView_GetGeometry(bView, &geometry);
+    vec2ui range = SelectableList_GetViewRange(list);
+    Float y0 = 0;
+    int it = 0;
+    Float yScaling = kViewSelectableListScaling;
+    vec2i res(-1);
+    for(uint i = range.x; i < range.y; i++){
+        Float y1 = y0 + yScaling * font->fontMath.fontSizeAtRenderCall;
+        if(y >= y0 && y <= y1 && res.x < 0){
+            res = vec2i(it, i);
+        }
+
+        y0 += (1.0 + kViewSelectableListOffset) * yScaling *
+            font->fontMath.fontSizeAtRenderCall;
+        it += 1;
+    }
+
+    return res;
+}
+
 int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Float dt){
     OpenGLFont *font = &state->font;
     FileOpener *opener = View_GetFileOpener(view);
-    
+
     Geometry geometry = view->geometry;
     SelectableList *list = &view->selectableList;
-    
+
     Float lWidth = (geometry.upper.x - geometry.lower.x) * font->fontMath.invReduceScale;
     vec4f backgroundColor = GetUIColorf(theme, UIBackground);
-    
+
     Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z, backgroundColor.w };
-    
+
     ActivateViewportAndProjection(state, view, ViewportFrame);
     glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, kOnes);
-    
+
     vec4f col = GetUIColorf(theme, UISelectableListBackground);
     vec4i tcol = GetColor(theme, TOKEN_ID_NONE);
     vec4i tcolSel = GetUIColor(theme, UISelectorLoadedColor);
@@ -278,12 +308,12 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
         .item_active_foreground_color = tcol,
         .yScaling = kViewSelectableListScaling,
     };
-    
+
     uint currFontSize = state->font.fontMath.fontSizeAtDisplay;
-    
-    
+
+
     //printf("Range: %u - %u\n", range.x, range.y);
-    
+
     //Graphics_SetFontSize(state, currFontSize + 2);
 
     glUseProgram(font->cursorShader.id);
@@ -300,7 +330,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     Graphics_QuadFlush(state);
 
     RenderSelectableListItens(state, list, theme, lWidth, &style, opener);
-    
+
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);
 

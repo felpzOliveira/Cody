@@ -174,7 +174,7 @@ void Buffer_RemoveLastToken(Buffer *buffer);
 void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end);
 
 /*
-* Checks whether a buffer is visually empty.
+* Checks if a buffer is visually empty when rendering.
 */
 int Buffer_IsBlank(Buffer *buffer);
 
@@ -279,7 +279,7 @@ void LineBuffer_MergeConsecutiveLines(LineBuffer *lineBuffer, uint base);
 /*
 * Updates the token list present in the 'lineNr' to be 'tokens'.
 */
-void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNr, 
+void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNr,
                                Token *tokens, uint size);
 /*
 * Removes a line at a position 'at' of the LineBuffer.
@@ -298,7 +298,7 @@ Buffer *LineBuffer_GetBufferAt(LineBuffer *lineBuffer, uint lineNo);
 * Optionally can also pass a offset to allow for extension on the computed
 * termination range, usefull for when adding new lines.
 */
-void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenizer, 
+void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenizer,
                                      uint base, uint offset);
 
 /*

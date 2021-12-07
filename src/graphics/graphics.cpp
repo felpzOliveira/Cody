@@ -524,55 +524,19 @@ void WindowOnSizeChange(int width, int height){
 void WinOnMouseMotion(int x, int y){
     //printf("Mouse to %d %d\n", x, y);
     GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
+    //AppHandleMouseMotion();
 }
 
 void WindowOnScroll(int is_up){
-    int scrollRange = 5;
     int x = 0, y = 0;
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
     GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
-
-    View *view = AppGetViewAt(x, GlobalGLState.height - y);
-    if(view){
-        ViewState state = View_GetState(view);
-        if(state == View_FreeTyping){
-            BufferView *bView = View_GetBufferView(view);
-            NullRet(bView);
-            NullRet(bView->lineBuffer);
-            BufferView_StartScrollViewTransition(bView, is_up ? -scrollRange : scrollRange,
-                                                 kTransitionScrollInterval);
-            Timing_Update();
-        }
-    }
+    AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
 }
 
 void WindowOnClick(int x, int y){
-    vec2ui mouse = AppActivateViewAt(x, GlobalGLState.height - y);
-
-    //TODO: States
-    View *view = AppGetActiveView();
-    ViewState state = View_GetState(view);
-    if(state == View_FreeTyping){
-        BufferView *bufferView = View_GetBufferView(view);
-        uint dy = view->geometry.upper.y - view->geometry.lower.y;
-        int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y, view->descLocation);
-        if(lineNo < 0) return;
-
-        lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
-
-        uint colNo = 0;
-        Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
-        x = ScreenToGL(mouse.x, &GlobalGLState) - bufferView->lineOffset;
-        if(x > 0){
-            // TODO: It seems when we have a tab on a line and we click to select
-            // a character it seems we are jumping exactly tabSpacing - 1 ahead
-            colNo = fonsComputeStringOffsetCount(GlobalGLState.font.fsContext,
-                                                 buffer->data, x);
-            BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
-            BufferView_GhostCursorFollow(bufferView);
-        }
-    }
+    AppHandleMouseClick(x, y, &GlobalGLState);
 }
 
 void WinOnFocusChange(){

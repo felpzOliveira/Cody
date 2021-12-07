@@ -106,16 +106,18 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
-bool test_GIT();
 void CommandExecutorInit();
 int main(int argc, char **argv){
     //testQ();
 #if 0
     Git_Initialize();
 
-    Git_OpenDirectory("/home/felipe/Documents/Cody");
-    test_GIT();
-    //Git_LogGraph();
+    Git_OpenDirectory("/home/felipe/Documents/Lit");
+    double interval = MeasureInterval([&](){
+        Git_LogGraph();
+    });
+
+    printf("Graph generation took: %g ms\n", interval * 1000.0);
 
     Git_Finalize();
     return 0;

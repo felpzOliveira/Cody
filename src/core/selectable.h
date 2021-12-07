@@ -15,8 +15,14 @@ struct SelectableList{
     int active;
 };
 
+/*
+* Initializes a new selectable list.
+*/
 void SelectableList_Init(SelectableList *list);
 
+/*
+* Sets the linebuffer to use for printing the list contents.
+*/
 void SelectableList_Set(SelectableList *list, LineBuffer *sourceBuffer);
 
 void SelectableList_SetView(SelectableList *list, uint range, uint displayable);
@@ -28,6 +34,8 @@ void SelectableList_SetLineBuffer(SelectableList *list, LineBuffer *sourceBuffer
 LineBuffer *SelectableList_GetLineBuffer(SelectableList *list);
 
 vec2ui SelectableList_GetViewRange(SelectableList *list);
+
+void SelectableList_SetItem(SelectableList *list, uint item);
 
 void SelectableList_NextItem(SelectableList *list);
 

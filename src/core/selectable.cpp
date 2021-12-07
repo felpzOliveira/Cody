@@ -97,6 +97,13 @@ void SelectableList_Filter(SelectableList *list, char *key, uint keylen){
     if(list->used == 0) list->active = -1;
 }
 
+void SelectableList_SetItem(SelectableList *list, uint item){
+    if(list->used > 0 && item < list->used){
+        list->active = item;
+        SelectableListUpdateRange(list);
+    }
+}
+
 void SelectableList_NextItem(SelectableList *list){
     if(list->used > 0){
         if(list->active < (int)list->used-1){

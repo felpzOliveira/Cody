@@ -296,6 +296,9 @@ void BufferView_Dirty(BufferView *view);
 */
 int BufferView_IsVisible(BufferView *view);
 
+/*
+* Sets a callback to be triggered whenever scroll animation finishes.
+*/
 void BufferView_SetAnimationCallback(BufferView *view, std::function<void()> fn);
 
 /*

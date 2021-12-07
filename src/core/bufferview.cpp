@@ -4,34 +4,34 @@
 #include <symbol.h>
 
 Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue, 
+                            Float *initialValue, Float finalValue,
                             Float *velocity)
 {
     if(dt > remaining){
         *initialValue = finalValue;
         return finalValue;
     }
-    
+
     Float t  = dt / remaining;
     Float u  = (1.0f - t);
     Float c0 = 1.0f * u * u * u;
     Float c1 = 3.0f * u * u * t;
     Float c2 = 3.0f * u * t * t;
     Float c3 = 1.0f * t * t * t;
-    
+
     Float dc0 = -3.0f * u * u;
     Float dc1 = -6.0f * u * t + 3.0f * u * u;
     Float dc2 =  6.0f * u * t - 3.0f * t * t;
     Float dc3 =  3.0f * t * t;
-    
+
     Float b0 = *initialValue;
     Float b1 = *initialValue + (remaining / 3.0f) * (*velocity);
     Float b2 = finalValue;
     Float b3 = finalValue;
-    
+
     *initialValue = c0 * b0 + c1 * b1 + c2 * b2 + c3 * b3;
     *velocity = (dc0 * b0 + dc1 * b1 + dc2 * b2 + dc3 * b3) * (1.0f / remaining);
-    
+
     return *initialValue;
 }
 
@@ -128,14 +128,14 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer,
                                             view->sController.cursor.textPosition.x);
     int tokenID = -1;
-    uint pos = Buffer_Utf8PositionToRawPosition(buffer, 
+    uint pos = Buffer_Utf8PositionToRawPosition(buffer,
                                                 view->sController.cursor.textPosition.y);
     if(pos > 0){
         for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
             Token *token = &buffer->tokens[i];
-            if((token->position < (int)pos && 
+            if((token->position < (int)pos &&
                (token->identifier != TOKEN_ID_SPACE &&
-                token->identifier != TOKEN_ID_MATH)) || 
+                token->identifier != TOKEN_ID_MATH)) ||
                (i == 0 && token->identifier == TOKEN_ID_SPACE))
             {
                 *targetToken = token;
@@ -192,7 +192,7 @@ void BufferView_SetViewRange(BufferView *view, vec2ui range){
 }
 
 vec2ui BufferView_GetViewRange(BufferView *view){
-    return vec2ui(view->sController.visibleRect.x, 
+    return vec2ui(view->sController.visibleRect.x,
                   Min(view->sController.visibleRect.y, view->lineBuffer->lineCount));
 }
 
@@ -202,7 +202,7 @@ int BufferView_ComputeTextLine(BufferView *view, Float screenY, DescriptionLocat
         if(desc == DescriptionTop){
             screenY -= view->sController.lineHeight;
         }
-        
+
         Float fline = lStart + floor(screenY / view->sController.lineHeight);
         if((uint)fline < view->lineBuffer->lineCount){
             return (int)fline;
@@ -250,11 +250,11 @@ int BufferView_GetNumbersShowTransition(BufferView *view, Float dt){
     }else{
         view->renderLineNbs = 0;
     }
-    
+
     if(view->renderLineNbs == 0){ // done
         anim->isAnimating = 0;
     }
-    
+
     return view->renderLineNbs == 0 ? 1 : 0;
 }
 
@@ -315,7 +315,7 @@ Float BufferView_GetDescription(BufferView *view, char *content, uint size,
     if(AppIsStoredFile(path)){
         snprintf(&endDesc[elen], endSize-elen, "†");
     }
-    
+
     return pct;
 }
 
@@ -335,7 +335,7 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
 {
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
-    
+
     uint k = 0;
     uint bid = start.x;
     uint startAt = Buffer_GetTokenAt(buffer, start.y);
@@ -345,7 +345,7 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
     for(uint i = 0; i < nIds; i++){
         n[i] = 0;
     }
-    
+
     do{
         int r = (int)buffer->tokenCount;
         for(int i = (int)startAt; i < r; i++){
@@ -367,15 +367,15 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
                     }
                 }
             }
-            
+
             is_first = 0;
         }
-        
+
         bid += 1;
         if(bid < view->lineBuffer->lineCount){
             buffer = BufferView_GetBufferAt(view, bid);
             startAt = 0;
-            
+
             TokenizerStateContext *ctx = &buffer->stateContext;
             if(ctx->indentLevel == 0){
                 zeroContext++;
@@ -386,9 +386,9 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
         }else{
             done = 1;
         }
-        
+
     }while(done == 0);
-    
+
     return k;
 }
 
@@ -398,18 +398,18 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
 {
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
-    
+
     uint k = 0;
     int is_first = 1;
     uint bid = start.x;
     uint startAt = Buffer_GetTokenAt(buffer, start.y);
     int done = 0;
     uint zeroContext = 0;
-    
+
     for(uint i = 0; i < nIds; i++){
         n[i] = 0;
     }
-    
+
     do{
         for(int i = (int)startAt; i >= 0; i--){
             Token *token = &buffer->tokens[i];
@@ -430,10 +430,10 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
                     }
                 }
             }
-            
+
             is_first = 0;
         }
-        
+
         if(bid > 0){
             bid = bid > 0 ? bid - 1 : 0;
             buffer = BufferView_GetBufferAt(view, bid);
@@ -449,7 +449,7 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
             done = 1;
         }
     }while(done == 0);
-    
+
     return k;
 }
 
@@ -462,15 +462,15 @@ void BufferView_UpdateCursorNesting(BufferView *view){
     if(ss->cursor.is_dirty){
         ss->cursor.is_dirty = 0;
         ss->cursor.nestValid = 0;
-        
+
         int is_first = 1;
         vec2ui s = VScroll_GetCursorPosition(ss);
-        
+
         TokenId ids[]  = { TOKEN_ID_BRACE_OPEN, TOKEN_ID_PARENTHESE_OPEN };
         TokenId cids[] = { TOKEN_ID_BRACE_CLOSE, TOKEN_ID_PARENTHESE_CLOSE };
         int n[] = {0, 0};
         int nc[] = {0, 0};
-        view->startNestCount = BufferView_FindNestsBackwards(view, s, ids, cids, 2, 
+        view->startNestCount = BufferView_FindNestsBackwards(view, s, ids, cids, 2,
                                                              view->startNest, 64, n);
         view->endNestCount = BufferView_FindNestsForward(view, s, ids, cids, 2,
                                                          view->endNest, 64, n);
@@ -484,11 +484,11 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                     view->endNest[k].comp = i;
                     view->startNest[i].valid = 1;
                     view->endNest[i].valid = 1;
-                    
+
                     // accumulate token information so we can output depth
                     int id = idst == TOKEN_ID_BRACE_OPEN ? 0 : 1;
                     nc[id]++;
-                    
+
                     eid = k + 1;
                     if(is_first){ // the first one is the closest to the cursor
                         ss->cursor.nestStart = vec2ui(view->startNest[i].position.x,
@@ -502,7 +502,7 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                 }
             }
         }
-        
+
         // set nest depth, have to do later because numbers are actually reversed
         // and we can't pre-compute.
         for(int i = 0; i < view->startNestCount; i++){
@@ -526,7 +526,7 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                 }
             }
         }
-        
+
         k = view->endNestCount;
         printf("============================\n");
         if(k > 0){
@@ -534,12 +534,12 @@ void BufferView_UpdateCursorNesting(BufferView *view){
                 NestPoint v = view->endNest[i];
                 if(v.valid){
                     printf("Found %s at : %d %d, depth: %d ( %d )\n",
-                           Symbol_GetIdString(v.id), v.position.x, v.position.y, 
+                           Symbol_GetIdString(v.id), v.position.x, v.position.y,
                            v.depth, v.comp);
                 }
             }
         }
-        
+
         printf("Single: [%u %u] [%u %u]\n", view->cursor.nestStart.x,
                view->cursor.nestStart.y, view->cursor.nestEnd.x,
                view->cursor.nestEnd.y);

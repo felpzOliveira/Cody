@@ -10,7 +10,7 @@
 #include <theme.h>
 
 #define CMD_DIMM_STR "dimm "
-#define CMD_KILLSPACES_STR "kill-space"
+#define CMD_KILLSPACES_STR "kill-spaces"
 #define CMD_SEARCH_STR "search "
 #define CMD_GIT_STR "git "
 
@@ -505,7 +505,7 @@ int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
         }
 
         if(any){
-            lineBuffer->is_dirty = 1;
+            BufferView_Dirty(bView);
         }
     }
     return r;
