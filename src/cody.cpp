@@ -107,9 +107,25 @@ void StartWithFile(const char *path=nullptr){
 }
 
 void CommandExecutorInit();
+#include <secure_hash.h>
 int main(int argc, char **argv){
     //testQ();
-#if 0
+#if 1
+    uint8_t data[1024 + 35];
+    memset(data, 'a', sizeof(data));
+
+    FILE *fp = fopen("tmp.bin", "wb");
+    if(fp){
+        fwrite(data, 1, sizeof(data), fp);
+        fclose(fp);
+    }
+    uint8_t hash[20];
+    SHA1(data, sizeof(data), hash);
+    std::string h;
+    CryptoUtil_BufferToHex(hash, 20, h);
+    printf("Hash: %s\n", h.c_str());
+
+    return 0;
     Git_Initialize();
 
     Git_OpenDirectory("/home/felipe/Documents/Lit");

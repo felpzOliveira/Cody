@@ -4,6 +4,23 @@
 #include <string>
 #include <vector>
 
+#define CRYPTO_BYTE_0( x ) ( (uint8_t) (   ( x )         & 0xff ) )
+#define CRYPTO_BYTE_1( x ) ( (uint8_t) ( ( ( x ) >> 8  ) & 0xff ) )
+#define CRYPTO_BYTE_2( x ) ( (uint8_t) ( ( ( x ) >> 16 ) & 0xff ) )
+#define CRYPTO_BYTE_3( x ) ( (uint8_t) ( ( ( x ) >> 24 ) & 0xff ) )
+#define CRYPTO_BYTE_4( x ) ( (uint8_t) ( ( ( x ) >> 32 ) & 0xff ) )
+#define CRYPTO_BYTE_5( x ) ( (uint8_t) ( ( ( x ) >> 40 ) & 0xff ) )
+#define CRYPTO_BYTE_6( x ) ( (uint8_t) ( ( ( x ) >> 48 ) & 0xff ) )
+#define CRYPTO_BYTE_7( x ) ( (uint8_t) ( ( ( x ) >> 56 ) & 0xff ) )
+
+#define CRYPTO_PUT_UINT32_BE( n, data, offset )                \
+{                                                               \
+    ( data )[( offset )    ] = CRYPTO_BYTE_3( n );             \
+    ( data )[( offset ) + 1] = CRYPTO_BYTE_2( n );             \
+    ( data )[( offset ) + 2] = CRYPTO_BYTE_1( n );             \
+    ( data )[( offset ) + 3] = CRYPTO_BYTE_0( n );             \
+}
+
 /*
  * Encode a buffer to a base64 string.
  */

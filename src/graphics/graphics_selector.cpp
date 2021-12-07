@@ -264,8 +264,9 @@ vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view)
     vec2i res(-1);
     for(uint i = range.x; i < range.y; i++){
         Float y1 = y0 + yScaling * font->fontMath.fontSizeAtRenderCall;
-        if(y >= y0 && y <= y1 && res.x < 0){
+        if(y >= y0 && y <= y1){
             res = vec2i(it, i);
+            break;
         }
 
         y0 += (1.0 + kViewSelectableListOffset) * yScaling *

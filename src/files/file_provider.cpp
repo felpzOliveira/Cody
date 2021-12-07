@@ -23,10 +23,11 @@ typedef struct FileProvider{
 static FileProvider fProvider;
 
 static void InitTokenizers(){
-    // NOTE: If this every becomes slow we have 2 options:
+    // NOTE: If this ever becomes slow we have 2 options:
     //        1- Use ParallelFor, I do believe we are able to initialize these
     //           in parallel.
-    //        2- Initialize tokenizers only when their respective file is detected
+    //        2- Initialize tokenizers only when their respective file is detected,
+    //           this might be tricky, but might be the standard other editors do.
 
     // C/C++
     Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,

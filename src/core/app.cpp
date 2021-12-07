@@ -246,9 +246,10 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
                 y -= state->font.fontMath.fontSizeAtRenderCall;
             }
             vec2i item = Graphics_ComputeSelectableListItem(state, y, view);
-            SelectableList_SetItem(list, item.y);
-
-            AppCommandQueryBarCommit();
+            if(item.y >= 0){
+                SelectableList_SetItem(list, item.y);
+                AppCommandQueryBarCommit();
+            }
         } break;
         default:{
             // nothing
@@ -262,11 +263,11 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
         ViewState vstate = View_GetState(view);
         switch(vstate){
             case View_FreeTyping:{
-                int scrollRange = 5;
+                int scrollRange = is_up ? -5 : 5;
                 BufferView *bView = View_GetBufferView(view);
                 NullRet(bView);
                 NullRet(bView->lineBuffer);
-                BufferView_StartScrollViewTransition(bView, is_up ? -scrollRange : scrollRange,
+                BufferView_StartScrollViewTransition(bView, scrollRange,
                                                      kTransitionScrollInterval);
             } break;
             case View_SelectableList:{
@@ -279,9 +280,6 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
             } break;
             case View_QueryBar:{
                 //printf("View_QueryBar\n");
-            } break;
-            case View_StatesCount:{
-                //printf("View_StatesCount\n");
             } break;
             default:{
                 // nothing

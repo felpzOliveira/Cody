@@ -99,7 +99,10 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
                              Tokenizer **lTokenizer);
 
 /*
-* Register a file open hook.
+* Register a file open hook. You are not allowed to read the file on this hook.
+* File opening **might** be performed in a dispatch execution meaning that its
+* content might not be available when your hook is called because it is being
+* processed in a different thread.
 */
 void RegisterFileOpenHook(file_hook hook);
 
