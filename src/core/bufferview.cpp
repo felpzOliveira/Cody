@@ -172,6 +172,15 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     BufferViewFileLocation_Restore(view);
 }
 
+uint BufferView_GetMaximumLineView(BufferView *view){
+    uint n = 0;
+    if(view){
+        n = view->sController.currentMaxRange;
+    }
+
+    return n;
+}
+
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){
     Float height = geometry.upper.y - geometry.lower.y;
     view->geometry = geometry;

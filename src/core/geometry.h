@@ -92,8 +92,8 @@ inline int Log2Int(uint64_t n){
 
 template <typename T, typename U, typename V> 
 inline T Clamp(T val, U low, V high){
-    if(val < low) return low;
-    if(val > high) return high;
+    if(val < (T)low) return low;
+    if(val > (T)high) return high;
     return val;
 }
 

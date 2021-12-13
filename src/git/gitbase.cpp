@@ -562,6 +562,18 @@ bool Git_ComputeCurrentDiff(){
     return true;
 }
 
+std::string Git_GetRepositoryRoot(){
+    if(!gitState.repo) return std::string();
+    const char *gitp = git_repository_path(gitState.repo);
+    std::string str(gitp);
+
+    int id = GetRightmostSplitter(gitp, str.size()-1);
+    if(id > 0){
+        str = str.substr(0, id);
+    }
+    return str;
+}
+
 void Git_Initialize(){
     git_libgit2_init();
     DEBUG_MSG("Initialized\n");

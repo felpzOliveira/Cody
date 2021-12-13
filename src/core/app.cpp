@@ -694,6 +694,46 @@ void AppCommandNewLine(){
     BufferView_Dirty(bufferView);
 }
 
+void AppCommandGitStatusChangeBuffer(){
+    BufferView *bView = AppGetActiveBufferView();
+    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+    LineBuffer *lBuffer = nullptr;
+    NullRet(lineBuffer);
+
+    vec2ui cursor = BufferView_GetCursorPosition(bView);
+    Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, cursor.x);
+    NullRet(buffer);
+
+    if(buffer->taken < GIT_LABEL_SIZE) return;
+    std::string root = Git_GetRepositoryRoot();
+    if(root.size() == 0) return;
+
+    char *ptr = &buffer->data[GIT_LABEL_SIZE];
+    root += "/"; root += std::string(ptr);
+
+    FileBufferList *fList = FileProvider_GetBufferList();
+    if(FileBufferList_FindByPath(fList, &lBuffer,
+                        (char *)root.c_str(), root.size()))
+    {
+        if(lBuffer){
+            BufferView_SwapBuffer(bView, lBuffer, CodeView);
+            AppCommandGitDiffCurrent();
+        }
+    }else{
+        // is the file closed?
+        char folder[PATH_MAX];
+        FileEntry entry;
+        int r = GuessFileEntry((char *)root.c_str(), root.size(), &entry, folder);
+        if(!(r < 0) && entry.type == DescriptorFile){
+            FileProvider_Load((char *)root.c_str(), root.size(), &lBuffer, false);
+            if(lBuffer){
+                BufferView_SwapBuffer(bView, lBuffer, CodeView);
+                AppCommandGitDiffCurrent();
+            }
+        }
+    }
+}
+
 //TODO
 void AppCommandRedo(){
 
@@ -1581,6 +1621,7 @@ void AppCommandGitDiffCurrent(){
 
     std::vector<GitDiffLine> *dif = LineBuffer_GetDiffPtr(bView->lineBuffer, 0);
     if(dif){
+        int is_dif_start = 0;
         vec2ui range;
         if(dif->size() > 0){
             std::vector<vec2ui> *ptr = &bView->lineBuffer->props.diffLines;
@@ -1591,6 +1632,7 @@ void AppCommandGitDiffCurrent(){
             BufferView_SetViewType(bView, CodeView);
         }else{
             bool difStatus = false;
+            is_dif_start = 1;
             dif->clear();
             allow_write = false;
             std::string path = AppGetRootDirectory();
@@ -1617,6 +1659,29 @@ void AppCommandGitDiffCurrent(){
         if(range.x <= range.y){
             RemountTokensBasedOn(bView, range.x, range.y - range.x);
             LineBuffer_SetWrittable(bView->lineBuffer, allow_write);
+            if(is_dif_start){
+                bool any = false;
+                std::vector<vec2ui> *ptr = nullptr;
+
+                ptr = LineBuffer_GetDiffRangePtr(bView->lineBuffer, &any);
+                if(any && ptr->size() > 0){
+                    uint s = BufferView_GetMaximumLineView(bView);
+                    vec2ui val = ptr->at(0);
+                    int in = val.x + s;
+                    s = Clamp(in - 2, 0, BufferView_GetLineCount(bView)-1);
+                    // TODO: This is very ineficient as we have to do scroll
+                    //       range adjustment twice. It would be best if we
+                    //       could set them all together with a call such as:
+                    //            BufferView_SetViewDisplay(...)
+                    //       and configure cursor + viewing rectangle in one call.
+                    //       But I'm not sure how much worse it is, for now looks ok.
+
+                    // trigger range change, to 'drag' the viewing rectangle
+                    BufferView_CursorToPosition(bView, s, 0);
+                    // restore view, set actual cursor location
+                    BufferView_CursorToPosition(bView, val.x, 0);
+                }
+            }
         }
     }
 }
@@ -1626,6 +1691,7 @@ void AppCommandEnterKey(){
     ViewType type = BufferView_GetViewType(bufferView);
     switch(type){
         case CodeView: AppCommandNewLine(); break;
+        case GitStatusView: AppCommandGitStatusChangeBuffer(); break;
         default: {
             printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
         }

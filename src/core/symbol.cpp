@@ -168,8 +168,11 @@ SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode, char *label, uint len){
         node = symNode->next;
         if(label && len > 0){
             while(node != nullptr){
-                uint n = node->labelLen;
-                if(StringEqual(label, node->label, Min(len, n))) break;
+                if(node->labelLen == len){
+                    if(StringEqual(label, node->label, len)){
+                        break;
+                    }
+                }
                 node = node->next;
             }
         }

@@ -24,10 +24,10 @@ static int FileBufferList_FindEntry(FileBufferList *list, FileBuffer **fBuffer,
                 }
             }
         }
-        
+
         return rv;
     };
-    
+
     tmp = List_Find<FileBuffer>(list->fList, locate);
     if(tmp){
         *fBuffer = tmp;
@@ -62,10 +62,10 @@ void FileBufferList_Remove(FileBufferList *list, char *name, uint nameLen){
                 }
             }
         }
-        
+
         return rv;
     };
-    
+
     List_Erase<FileBuffer>(list->fList, finder);
 }
 
@@ -81,7 +81,7 @@ int FileBufferList_FindByName(FileBufferList *list, LineBuffer **lineBuffer,
         if(lineBuffer) *lineBuffer = fBuffer->lineBuffer;
         found = 1;
     }
-    
+
     return found;
 }
 
@@ -96,6 +96,6 @@ int FileBufferList_FindByPath(FileBufferList *list, LineBuffer **lineBuffer,
         if(lineBuffer) *lineBuffer = fBuffer->lineBuffer;
         found = 1;
     }
-    
+
     return found;
 }

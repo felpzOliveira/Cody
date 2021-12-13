@@ -16,6 +16,7 @@ struct GitDiffLine{
 
 // Make the text strings global so we can easily detect which
 // operation is performed on a git status
+#define GIT_LABEL_SIZE           14
 #define GIT_NEW_FILE_STR         " New:        "
 #define GIT_MODIFIED_FILE_STR    " Modified:   "
 #define GIT_DELETED_FILE_STR     " Deleted:    "
@@ -36,6 +37,14 @@ void Git_Finalize();
  * Attempt to open the root directory of the application as a git repo.
  */
 bool Git_OpenRootRepository();
+
+/*
+* Returns the root directory of the opened repository. This should always
+* match the app root directory, but it is possible a combination of 'git open'
+* made this change so explicitly allow app to get the git root. In case no root
+* was opened this routine returns an empty string.
+*/
+std::string Git_GetRepositoryRoot();
 
 /*
  * Attempts to open the given path as a git repository.

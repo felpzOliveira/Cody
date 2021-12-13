@@ -99,6 +99,12 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType ty
 ViewType BufferView_GetViewType(BufferView *view);
 
 /*
+* Retrieves the maximum line count given bufferview can display simultaneously,
+* i.e.: the size of one page.
+*/
+uint BufferView_GetMaximumLineView(BufferView *view);
+
+/*
 * Sets the view type of the given bufferview. Usually you want to set this value during
 * initialization or buffer swap as it is bounded by the linebuffer. However some
 * operations i.e: git diff, work on the contents of the linebuffer and do not have
