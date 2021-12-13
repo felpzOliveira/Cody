@@ -89,9 +89,27 @@ void LoadStaticFilesOnStart(){
     }
 }
 
-void StartWithFile(const char *path=nullptr){
+void InitializeEmptyView(BufferView **view=nullptr){
     BufferView *bView = AppGetActiveBufferView();
     BufferView_Initialize(bView, nullptr, EmptyView);
+    if(view) *view = bView;
+}
+
+void StartWithNewFile(const char *path=nullptr){
+    BufferView *view = nullptr;
+    InitializeEmptyView(&view);
+    if(path){
+        LineBuffer *lineBuffer = nullptr;
+        FileProvider_CreateFile((char *)path, strlen(path), &lineBuffer, nullptr);
+        BufferView_SwapBuffer(view, lineBuffer, CodeView);
+    }
+
+    Graphics_Initialize();
+}
+
+void StartWithFile(const char *path=nullptr){
+    BufferView *bView = nullptr;
+    InitializeEmptyView(&bView);
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
@@ -108,23 +126,31 @@ void StartWithFile(const char *path=nullptr){
 
 void CommandExecutorInit();
 #include <secure_hash.h>
+void SHA3_Print(SHA3Ctx &ctx);
 int main(int argc, char **argv){
     //testQ();
-#if 1
+#if 0
+    SHA_RunTestVector();
+    return 0;
     uint8_t data[1024 + 35];
     memset(data, 'a', sizeof(data));
-
     FILE *fp = fopen("tmp.bin", "wb");
     if(fp){
         fwrite(data, 1, sizeof(data), fp);
         fclose(fp);
     }
-    uint8_t hash[20];
+#if 0
+    const uint32_t hlen = 20;
+    uint8_t hash[hlen];
     SHA1(data, sizeof(data), hash);
+#else
+    const uint32_t hlen = 64;
+    uint8_t hash[hlen];
+    SHA3_512(data, 0, hash);
+#endif
     std::string h;
-    CryptoUtil_BufferToHex(hash, 20, h);
+    CryptoUtil_BufferToHex(hash, hlen, h);
     printf("Hash: %s\n", h.c_str());
-
     return 0;
     Git_Initialize();
 
@@ -156,9 +182,10 @@ int main(int argc, char **argv){
         int r = GuessFileEntry(p, len, &entry, folder);
 
         if(r == -1){
-            printf("Unknown argument\n");
+            printf("Unknown argument, attempting to open as file\n");
             AppEarlyInitialize();
-            StartWithFile();
+            //StartWithFile();
+            StartWithNewFile(p);
             return 0;
         }
 

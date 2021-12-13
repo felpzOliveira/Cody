@@ -218,8 +218,8 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
         }
     }
 
-    *lineBuffer = lBuffer;
-    *lTokenizer = tokenizer;
+    if(lineBuffer) *lineBuffer = lBuffer;
+    if(lTokenizer) *lTokenizer = tokenizer;
 }
 
 void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,

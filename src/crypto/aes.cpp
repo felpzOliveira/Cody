@@ -624,7 +624,7 @@ std::vector<NistTestEntry> nistVectors = {
     {"f69f2445df4f9b17ad2b417be66c3710", "603deb1015ca71be2b73aef0857d77811f352c073b6108d72d9810a30914dff4",
      "b2eb05e2c39be9fcda6c19078c6a9d1b", "39F23369A9D9BACFA530E26304231461",
       AES256, true },
-    #include <aes_nist>
+    #include <test_vectors/aes_nist>
 };
 
 void AES_RunTestVector(){
