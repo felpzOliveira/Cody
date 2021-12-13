@@ -103,6 +103,12 @@ template<typename Fn> static bool Git_TransverseRelevantReferences(const Fn &fn)
 }
 /**********************************************************************/
 
+static std::string Git_GetCommitHash(git_commit *cmt, uint n=9){
+    const git_oid *oid = git_commit_id(cmt);
+    std::string buf(git_oid_tostr_s(oid), n);
+    return buf;
+}
+
 static bool Git_TryOpenRepo(git_repository **repo, git_reference **head, std::string root){
     int rv = 0;
 
@@ -343,6 +349,7 @@ struct commit_info{
     git_oid oid;
     std::string branch;
     git_commit *commit;
+    int btype; // 0 - local only, 1 - remote only, 2 - both
     GitReferenceType type;
 };
 
@@ -352,22 +359,45 @@ int commit_info_comp(commit_info *a, commit_info *b){
 
 typedef PriorityQueue<commit_info> CommitInfoPriorityQueue;
 
-static CommitInfoPriorityQueue *Git_GetStartingCommits(){
+static CommitInfoPriorityQueue *Git_GetStartingCommits(bool local_only=false){
     CommitInfoPriorityQueue *pq = nullptr;
     if(gitState.repo){
+        std::vector<commit_info *> list;
         pq = PriorityQueue_Create<commit_info>(commit_info_comp);
         auto iterator = [&](git_reference *ref, GitReferenceType type) -> bool{
-            if(type == GIT_REF_BRANCH_LOCAL || type == GIT_REF_BRANCH_REMOTE){
-                commit_info *info = new commit_info;
+            if(type == GIT_REF_BRANCH_LOCAL ||
+               (!local_only && type == GIT_REF_BRANCH_REMOTE))
+            {
                 const char *branchName = nullptr;
                 git_branch_name(&branchName, ref);
 
+                // TODO: figure out how to add HEAD into viweing
+                std::string name(branchName);
+                if(name == "origin/HEAD" || name == "HEAD") return true;
+
+                commit_info *info = new commit_info;
+
+                bool insert = true;
                 git_reference_name_to_id(&info->oid, gitState.repo, git_reference_name(ref));
                 git_commit_lookup(&info->commit, gitState.repo, &info->oid);
-                info->type = type;
-                info->branch = branchName;
-                info->time = git_commit_time(info->commit);
-                PriorityQueue_Push(pq, info);
+
+                std::string h1 = Git_GetCommitHash(info->commit);
+                for(commit_info *e : list){
+                    std::string h0 = Git_GetCommitHash(e->commit);
+                    insert = h0 != h1;
+                    if(!insert) break;
+                }
+
+                if(insert){
+                    info->type = type;
+                    info->branch = branchName;
+                    info->time = git_commit_time(info->commit);
+                    PriorityQueue_Push(pq, info);
+                    list.push_back(info);
+                }else{
+                    git_commit_free(info->commit);
+                    delete info;
+                }
             }
             return true;
         };
@@ -483,6 +513,7 @@ bool Git_LogGraph(){
     CommitInfoPriorityQueue *pq = Git_GetStartingCommits();
     if(!pq) return false;
     if(PriorityQueue_Size(pq) > 0){
+        printf("Size %d\n", PriorityQueue_Size(pq));
         commit_info *info = PriorityQueue_Peek(pq);
         PriorityQueue_Pop(pq);
 
@@ -490,8 +521,8 @@ bool Git_LogGraph(){
         //Git_PrintTree3(info->commit, 0);
         //Git_PrintTree(info->commit, 0);
         //printf("Counter = %d\n", (int)counter);
-        GitGraph *graph = GitGraph_Build(info->commit);
-        GitGraph_Free(graph);
+        //GitGraph *graph = GitGraph_Build(info->commit);
+        //GitGraph_Free(graph);
     }
 #if 0
     while(PriorityQueue_Size(pq) > 0){

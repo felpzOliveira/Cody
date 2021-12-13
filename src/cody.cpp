@@ -1,40 +1,13 @@
 #include <iostream>
 #include <graphics.h>
 #include <utilities.h>
-#include <string.h>
-#include <unistd.h>
+#include <parallel.h>
 #include <app.h>
 #include <file_provider.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <bignum.h>
-#include <rng.h>
 #include <cryptoutil.h>
-#include <aes.h>
 #include <mp.h>
 #include <gitbase.h>
-
-int int_compare(int *a, int *b){
-    return *a > *b;
-}
-
-void testQ(){
-    std::vector<int>data = {1, 4, -2, 5, 200, -59};
-    PriorityQueue<int> *pq = PriorityQueue_Create<int>(int_compare);
-    for(uint i = 0; i < data.size(); i++){
-        PriorityQueue_Push(pq, &data[i]);
-    }
-
-    while(PriorityQueue_Size(pq) > 0){
-        int *s = PriorityQueue_Peek(pq);
-        PriorityQueue_Pop(pq);
-        printf("%d\n", *s);
-    }
-
-    PriorityQueue_Free(pq);
-
-    exit(0);
-}
 
 void testMP(){
     MPI val32 = MPI::FromI64(32);
@@ -124,34 +97,8 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
-void CommandExecutorInit();
-#include <secure_hash.h>
-void SHA3_Print(SHA3Ctx &ctx);
 int main(int argc, char **argv){
-    //testQ();
 #if 0
-    SHA_RunTestVector();
-    return 0;
-    uint8_t data[1024 + 35];
-    memset(data, 'a', sizeof(data));
-    FILE *fp = fopen("tmp.bin", "wb");
-    if(fp){
-        fwrite(data, 1, sizeof(data), fp);
-        fclose(fp);
-    }
-#if 0
-    const uint32_t hlen = 20;
-    uint8_t hash[hlen];
-    SHA1(data, sizeof(data), hash);
-#else
-    const uint32_t hlen = 64;
-    uint8_t hash[hlen];
-    SHA3_512(data, 0, hash);
-#endif
-    std::string h;
-    CryptoUtil_BufferToHex(hash, hlen, h);
-    printf("Hash: %s\n", h.c_str());
-    return 0;
     Git_Initialize();
 
     Git_OpenDirectory("/home/felipe/Documents/Lit");
@@ -165,8 +112,6 @@ int main(int argc, char **argv){
     return 0;
 
     testMP();
-    return 0;
-    AES_RunTestVector();
     return 0;
 #endif
 

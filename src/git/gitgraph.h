@@ -9,7 +9,7 @@ typedef struct GitGraphNode{
     std::vector<std::string> refs;
     std::vector<GitGraphNode *> childs;
     std::vector<GitGraphNode *> parents;
-    bool explored;
+    bool explored, is_merge_child;
     int i, j;
 }GitGraphNode;
 

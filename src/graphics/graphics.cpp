@@ -263,7 +263,7 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
         /* explicit search for user types for better rendering, better view */
         SymbolNode *res = node;
         while(res != nullptr){
-            res = SymbolTable_SymNodeNext(res);
+            res = SymbolTable_SymNodeNext(res, str, token->size);
             if(res){
                 if(!(Symbol_IsTokenOverriden(res->id))){
                     node = res;

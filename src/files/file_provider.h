@@ -93,7 +93,8 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullp
 
 /*
 * Creates a new file. lineBuffer returns a new line buffer allocated for the file
-* and lTokenizer returns the guessed tokenizer.
+* and lTokenizer returns the guessed tokenizer. Both can be null if a reference
+* to the creation is not required.
 */
 void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer,
                              Tokenizer **lTokenizer);

@@ -187,9 +187,13 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
 
 /*
 * Gets the next symbol in the symbol table given a specific already hashed symbol.
-* Returns nullptr in case no one is available.
+* Returns nullptr in case no one is available. Note that because we expect collisions
+* it is not garanteed that the next node in the list has the exact same value for label.
+* Passing a valid label and n > 0 makes the search looks for a specific entry and not
+* the literal 'next' node. Passing label as null or n = 0 makes this routine returns
+* the next node.
 */
-SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode);
+SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode, char *label, uint len);
 
 /*
 * Debug routines.

@@ -55,6 +55,7 @@ uint GitGraph_DFSBuild(GitGraph *graph, const Fn &fn){
 
     stack.push({.cmt = gnode->commit, .it = 0});
     gnode->explored = false;
+    gnode->is_merge_child = false;
     cmtMap[GitGraph_GetCommitHash(gnode->commit)] = gnode;
 
     while(stack.size() > 0){
@@ -91,6 +92,7 @@ uint GitGraph_DFSBuild(GitGraph *graph, const Fn &fn){
                     if(!gparent->commit){
                         git_commit_dup(&gparent->commit, parent);
                         gparent->explored = false;
+                        gparent->is_merge_child = i > 0;
                         std::string buf2 = GitGraph_GetCommitHash(parent);
                         cmtMap[buf2] = gparent;
                         graph->nodes.push_back(gparent);
@@ -152,7 +154,11 @@ void GitGraph_Print(GitGraphNode *graph){
         for(GitGraphNode *g : depends){
             std::string buf, msg;
             get_str(g->commit, buf, msg);
-            printf("(%s - %s) ", buf.c_str(), msg.c_str());
+            if(g->is_merge_child){
+                printf("[%d](%s - %s)* ", g->i, buf.c_str(), msg.c_str());
+            }else{
+                printf("[%d](%s - %s) ", g->i, buf.c_str(), msg.c_str());
+            }
             for(GitGraphNode *b : g->parents){
                 next.push_back(b);
             }
@@ -171,10 +177,10 @@ GitGraph *GitGraph_Build(git_commit *commit){
     ggraph->graph = gnode;
 
     uint n = GitGraph_DFSBuild(ggraph, [&](git_commit *cmt) -> void{
-        const git_oid *oid = git_commit_id(cmt);
-        std::string buf(git_oid_tostr_s(oid), 9);
-        std::string msg = shrink_commit_message(git_commit_message(cmt));
-        printf("%s - %s\n", buf.c_str(), msg.c_str());
+        //const git_oid *oid = git_commit_id(cmt);
+        //std::string buf(git_oid_tostr_s(oid), 9);
+        //std::string msg = shrink_commit_message(git_commit_message(cmt));
+        //printf("%s - %s\n", buf.c_str(), msg.c_str());
     });
 
     printf("Graph with %d nodes\n", (int)n);

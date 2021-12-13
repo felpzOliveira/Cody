@@ -4,7 +4,7 @@
 #include <string.h>
 #include <autocomplete.h>
 
-inline int _symbol_table_sym_node_matches(SymbolNode *node, char *label, 
+inline int _symbol_table_sym_node_matches(SymbolNode *node, char *label,
                                           uint labelLen, TokenId id)
 {
     if(node == nullptr) return 0;
@@ -40,10 +40,10 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
 
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
-    
+
     SymbolNode *node = symTable->table[index];
     SymbolNode *prev = nullptr;
-    
+
     while(node != nullptr){
         if(_symbol_table_sym_node_matches(node, label, labelLen, id)){
             if(symTable->allow_duplication){
@@ -52,12 +52,12 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
             }
             return 0;
         }
-        
+
         prev = node;
         node = node->next;
         insert_id++;
     }
-    
+
     // create a new entry
     newNode = AllocatorGetN(SymbolNode, 1);
     newNode->label = StringDup(label, labelLen);
@@ -66,14 +66,14 @@ int SymbolTable_Insert(SymbolTable *symTable, char *label, uint labelLen, TokenI
     newNode->next = nullptr;
     newNode->prev = nullptr;
     newNode->duplications = 0;
-    
+
     if(insert_id > 0){
         prev->next = newNode;
         newNode->prev = prev;
     }else{
         symTable->table[index] = newNode;
     }
-    
+
     //printf("Inserted %s - %s\n", newNode->label, Symbol_GetIdString(newNode->id));
     return 1;
 }
@@ -90,7 +90,7 @@ void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, Token
                 return;
             }
         }
-        
+
         SymbolNode *prev = node->prev;
         if(prev == nullptr){ // head
             symTable->table[tableIndex] = node->next;
@@ -101,9 +101,9 @@ void SymbolTable_Remove(SymbolTable *symTable, char *label, uint labelLen, Token
             if(node->next)
                 node->next->prev = prev;
         }
-        
+
         //printf("Removed %s - %s\n", node->label, Symbol_GetIdString(node->id));
-        
+
         node->next = nullptr;
         AllocatorFree(node->label);
         AllocatorFree(node);
@@ -119,9 +119,9 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
     SymbolNode *node = symTable->table[index];
-    
+
     *tableIndex = index;
-    
+
     while(node != nullptr){
         if(node->label){
             if(node->labelLen == labelLen && node->id == id){
@@ -131,10 +131,10 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
                 }
             }
         }
-        
+
         node = node->next;
     }
-    
+
     return nodeRes;
 }
 
@@ -145,7 +145,7 @@ SymbolNode *SymbolTable_Search(SymbolTable *symTable, char *label, uint labelLen
     uint hash = _symbol_table_hash(symTable, label, labelLen);
     uint index = hash % symTable->tableSize;
     SymbolNode *node = symTable->table[index];
-    
+
     while(node != nullptr){
         if(node->label){
             if(node->labelLen == labelLen){
@@ -155,17 +155,24 @@ SymbolNode *SymbolTable_Search(SymbolTable *symTable, char *label, uint labelLen
                 }
             }
         }
-        
+
         node = node->next;
     }
-    
+
     return nodeRes;
 }
 
-SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode){
+SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode, char *label, uint len){
     SymbolNode *node = nullptr;
     if(symNode){
         node = symNode->next;
+        if(label && len > 0){
+            while(node != nullptr){
+                uint n = node->labelLen;
+                if(StringEqual(label, node->label, Min(len, n))) break;
+                node = node->next;
+            }
+        }
     }
     return node;
 }
@@ -180,10 +187,10 @@ void SymbolTable_DebugPrint(SymbolTable *symTable){
                 printf("[%u] ", i);
                 while(node != nullptr){
                     printf("%s (%s)", node->label, Symbol_GetIdString(node->id));
-                    
+
                     node = node->next;
                 }
-                
+
                 printf("\n");
             }
         }
