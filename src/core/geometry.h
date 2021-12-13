@@ -90,7 +90,7 @@ inline int Log2Int(uint64_t n){
 #undef S
 }
 
-template <typename T, typename U, typename V> 
+template <typename T, typename U, typename V>
 inline T Clamp(T val, U low, V high){
     if(val < (T)low) return low;
     if(val > (T)high) return high;
@@ -100,7 +100,7 @@ inline T Clamp(T val, U low, V high){
 template<typename T> class vec2{
     public:
     T x, y;
-    
+
     vec2(){ x = y = (T)0; }
     vec2(T a){ x = y = a; }
     vec2(T a, T b): x(a), y(b){
@@ -110,96 +110,96 @@ template<typename T> class vec2{
     template<typename Q> vec2(vec2<Q> other): x(other.x), y(other.y){
         Assert(!HasNaN());
     }
-    
+
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
     }
-    
+
     bool HasNaN() const{
         return IsNaN(x) || IsNaN(y);
     }
-    
+
     int Dimensions() const{ return 2; }
-    
+
     T operator[](int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
-    
+
     T &operator[](int i){
         Assert(i >= 0 && i < 2);
         if(i == 0) return x;
         return y;
     }
-    
+
     vec2<T> operator/(T f) const{
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         return vec2<T>(x * inv, y * inv);
     }
-    
+
     vec2<T> &operator/(T f){
         Assert(!IsZero(f));
         Float inv = (Float)1 / f;
         x *= inv; y *= inv;
         return *this;
     }
-    
+
     vec2<T> operator-(){
         return vec2<T>(-x, -y);
     }
-    
+
     vec2<T> operator-() const{
         return vec2<T>(-x, -y);
     }
-    
+
     vec2<T> operator-(const vec2<T> &v) const{
         return vec2(x - v.x, y - v.y);
     }
-    
+
     vec2<T> operator-(const vec2<T> &v){
         return vec2(x - v.x, y - v.y);
     }
-    
+
     vec2<T> operator+(const vec2<T> &v) const{
         return vec2<T>(x + v.x, y + v.y);
     }
-    
+
     vec2<T> &operator-=(const vec2<T> &v){
         x -= v.x; y -= v.y;
         return *this;
     }
-    
+
     vec2<T> operator+=(const vec2<T> &v){
         x += v.x; y += v.y;
         return *this;
     }
-    
+
     vec2<T> operator*(T s) const{
         return vec2<T>(x * s, y * s);
     }
-    
+
     vec2<T> &operator*=(T s){
         x *= s; y *= s;
         return *this;
     }
-    
+
     vec2<T> operator*(const vec2<T> &v) const{
         return vec2<T>(x * v.x, y * v.y);
     }
-    
+
     vec2<T> &operator*=(const vec2<T> &v){
         x *= v.x; y *= v.y;
         return *this;
     }
-    
+
     vec2<T> Rotate(Float radians) const{
         Float si = std::sin(radians);
         Float co = std::cos(radians);
         return vec2<T>(x * co - y * si, x * si + y * co);
     }
-    
+
     Float LengthSquared() const{ return x * x + y * y; }
     Float Length() const{ return sqrt(LengthSquared()); }
     void PrintSelf() const{
@@ -219,35 +219,35 @@ template<typename T> class vec3{
     template<typename Q> vec3(vec3<Q> other): x(other.x), y(other.y), z(other.z){
         Assert(!HasNaN());
     }
-    
+
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z);
     }
-    
+
     bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
-    
+
     int Dimensions() const{ return 3; }
-    
+
     T operator[](int i) const{
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
-    
+
     T &operator[](int i){
         Assert(i >= 0 && i < 3);
         if(i == 0) return x;
         if(i == 1) return y;
         return z;
     }
-    
+
     vec3<T> operator/(T f) const{
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
@@ -256,18 +256,18 @@ template<typename T> class vec3{
         Float inv = (Float)1 / f;
         return vec3<T>(x * inv, y * inv, z * inv);
     }
-    
+
     vec3<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
-        
+
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv;
         return *this;
     }
-    
+
     vec3<T> operator/(const vec3<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -275,7 +275,7 @@ template<typename T> class vec3{
         Float invz = (Float)1 / v.z;
         return vec3<T>(x * invx, y * invy, z * invz);
     }
-    
+
     vec3<T> &operator/(const vec3<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -284,51 +284,51 @@ template<typename T> class vec3{
         x = x * invx; y = y * invy; z = z * invz;
         return *this;
     }
-    
+
     vec3<T> operator-(){
         return vec3<T>(-x, -y, -z);
     }
-    
+
     vec3<T> operator-() const{
         return vec3<T>(-x, -y, -z);
     }
-    
+
     vec3<T> operator-(const vec3<T> &v) const{
         return vec3(x - v.x, y - v.y, z - v.z);
     }
-    
+
     vec3<T> &operator-=(const vec3<T> &v){
         x -= v.x; y -= v.y; z -= v.z;
         return *this;
     }
-    
+
     vec3<T> operator+(const vec3<T> &v) const{
         return vec3<T>(x + v.x, y + v.y, z + v.z);
     }
-    
+
     vec3<T> operator+=(const vec3<T> &v){
         x += v.x; y += v.y; z += v.z;
         return *this;
     }
-    
+
     vec3<T> operator*(const vec3<T> &v) const{
         return vec3<T>(x * v.x, y * v.y, z * v.z);
     }
-    
+
     vec3<T> &operator*=(const vec3<T> &v){
         x *= v.x; y *= v.y; z *= v.z;
         return *this;
     }
-    
+
     vec3<T> operator*(T s) const{
         return vec3<T>(x * s, y * s, z * s);
     }
-    
+
     vec3<T> &operator*=(T s){
         x *= s; y *= s; z *= s;
         return *this;
     }
-    
+
     unsigned int ToUnsigned() const{
         unsigned int r = x;
         unsigned int g = y;
@@ -336,7 +336,7 @@ template<typename T> class vec3{
         unsigned int a = 255;
         return (r) | (g << 8) | (b << 16) | (a << 24);
     }
-    
+
     Float LengthSquared() const{ return x * x + y * y + z * z; }
     Float Length() const{ return sqrt(LengthSquared()); }
     void PrintSelf() const{
@@ -352,19 +352,19 @@ template<typename T> class vec4{
     vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
         Assert(!HasNaN());
     }
-    
+
     bool HasNaN(){
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
-    
+
     bool HasNaN() const{
         return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
     }
-    
+
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z) && IsZero(w);
     }
-    
+
     T operator[](int i) const{
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
@@ -372,7 +372,7 @@ template<typename T> class vec4{
         if(i == 2) return z;
         return w;
     }
-    
+
     T &operator[](int i){
         Assert(i >= 0 && i < 4);
         if(i == 0) return x;
@@ -380,7 +380,7 @@ template<typename T> class vec4{
         if(i == 2) return z;
         return w;
     }
-    
+
     vec4<T> operator/(T f) const{
         Assert(!IsZero(f));
         if(IsZero(f)){
@@ -389,18 +389,18 @@ template<typename T> class vec4{
         Float inv = (Float)1 / f;
         return vec4<T>(x * inv, y * inv, z * inv, w * inv);
     }
-    
+
     vec4<T> &operator/(T f){
         Assert(!IsZero(f));
         if(IsZero(f)){
             printf("Warning: Propagating error ( division by 0 with value: %g )\n", f);
         }
-        
+
         Float inv = (Float)1 / f;
         x *= inv; y *= inv; z *= inv; w *= inv;
         return *this;
     }
-    
+
     vec4<T> operator/(const vec4<T> &v) const{
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -409,7 +409,7 @@ template<typename T> class vec4{
         Float invw = (Float)1 / v.w;
         return vec4<T>(x * invx, y * invy, z * invz, w * invw);
     }
-    
+
     vec4<T> &operator/(const vec4<T> &v){
         Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
@@ -419,51 +419,51 @@ template<typename T> class vec4{
         x = x * invx; y = y * invy; z = z * invz; w *= invw;
         return *this;
     }
-    
+
     vec4<T> operator-(){
         return vec4<T>(-x, -y, -z, -w);
     }
-    
+
     vec4<T> operator-() const{
         return vec4<T>(-x, -y, -z, -w);
     }
-    
+
     vec4<T> operator-(const vec4<T> &v) const{
         return vec4(x - v.x, y - v.y, z - v.z, w - v.w);
     }
-    
+
     vec4<T> &operator-=(const vec4<T> &v){
         x -= v.x; y -= v.y; z -= v.z; w -= v.w;
         return *this;
     }
-    
+
     vec4<T> operator+(const vec4<T> &v) const{
         return vec4<T>(x + v.x, y + v.y, z + v.z, w + v.w);
     }
-    
+
     vec4<T> operator+=(const vec4<T> &v){
         x += v.x; y += v.y; z += v.z; w += v.w;
         return *this;
     }
-    
+
     vec4<T> operator*(const vec4<T> &v) const{
         return vec4<T>(x * v.x, y * v.y, z * v.z, w * v.w);
     }
-    
+
     vec4<T> &operator*=(const vec4<T> &v){
         x *= v.x; y *= v.y; z *= v.z; w *= v.w;
         return *this;
     }
-    
+
     vec4<T> operator*(T s) const{
         return vec4<T>(x * s, y * s, z * s, w * s);
     }
-    
+
     vec4<T> &operator*=(T s){
         x *= s; y *= s; z *= s; w *= s;
         return *this;
     }
-    
+
     unsigned int ToUnsigned() const{
         unsigned int r = x;
         unsigned int g = y;
@@ -471,7 +471,7 @@ template<typename T> class vec4{
         unsigned int a = w;
         return (r) | (g << 8) | (b << 16) | (a << 24);
     }
-    
+
     Float LengthSquared() const{ return x * x + y * y + z * z + w * w; }
     Float Length() const{ return sqrt(LengthSquared()); }
     void PrintSelf() const{
@@ -480,12 +480,12 @@ template<typename T> class vec4{
 };
 
 template<typename T>
-inline bool HasZero(const vec2<T> &v){ 
+inline bool HasZero(const vec2<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)));
 }
 
 template<typename T>
-inline bool HasZero(const vec3<T> &v){ 
+inline bool HasZero(const vec3<T> &v){
     return (IsZero(v.x) || (IsZero(v.y)) || (IsZero(v.z)));
 }
 
@@ -527,17 +527,17 @@ template<typename T> inline vec2<T> Abs(const vec2<T> &v){
     return vec2<T>(Absf(v.x), Absf(v.y));
 }
 
-template <typename T, typename U> inline 
+template <typename T, typename U> inline
 vec2<T> operator*(U s, const vec2<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline 
+template <typename T, typename U> inline
 vec3<T> operator*(U s, const vec3<T> &v){
     return v * s;
 }
 
-template <typename T, typename U> inline 
+template <typename T, typename U> inline
 vec4<T> operator*(U s, const vec4<T> &v){
     return v * s;
 }
@@ -678,13 +678,13 @@ template<typename T> inline vec3<T> Permute(const vec3<T> &v, int x, int y, int 
     return vec3<T>(v[x], v[y], v[z]);
 }
 
-template<typename T> inline 
+template<typename T> inline
 vec3<T> Flip(const vec3<T> &p){ return vec3<T>(p.z, p.y, p.x); }
 
-template<typename T> inline 
+template<typename T> inline
 vec2<T> Flip(const vec2<T> &p){ return vec2<T>(p.y, p.x); }
 
-template<typename T> inline void 
+template<typename T> inline void
 CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
     if(Absf(v1.x) > Absf(v1.y)){
         Float f = sqrt(v1.x * v1.x + v1.z * v1.z);
@@ -695,7 +695,7 @@ CoordinateSystem(const vec3<T> &v1, vec3<T> *v2, vec3<T> *v3){
         AssertA(!IsZero(f), "Zero y component coordinate system generation");
         *v2 = vec3<T>(0, v1.z, -v1.y) / f;
     }
-    
+
     *v3 = Cross(v1, *v2);
 }
 
@@ -708,7 +708,7 @@ vec3<T> Sqrt(const vec3<T> &v){
     return vec3<T>(std::sqrt(v.x), std::sqrt(v.y), std::sqrt(v.z));
 }
 
-template<typename T> inline 
+template<typename T> inline
 vec3<T> Pow(const vec3<T> &v, Float val){
     return vec3<T>(std::pow(v.x, val), std::pow(v.y, val), std::pow(v.z, val));
 }
@@ -779,70 +779,70 @@ template <typename T>
 class Bounds2 {
     public:
     vec2<T> pMin, pMax;
-    
+
     Bounds2(){
         T minNum = FLT_MIN;
         T maxNum = FLT_MAX;
         pMin = vec2<T>(maxNum, maxNum);
         pMax = vec2<T>(minNum, minNum);
     }
-    
+
     explicit Bounds2(const vec2<T> &p) : pMin(p), pMax(p) {}
     Bounds2(const vec2<T> &p1, const vec2<T> &p2)
         : pMin(Min(p1.x, p2.x), Min(p1.y, p2.y)), pMax(Max(p1.x, p2.x), Max(p1.y, p2.y)) {}
-    
+
     const vec2<T> &operator[](int i) const;
     vec2<T> &operator[](int i);
     bool operator==(const Bounds2<T> &b) const{
         return b.pMin == pMin && b.pMax == pMax;
     }
-    
+
     bool operator!=(const Bounds2<T> &b) const{
         return b.pMin != pMin || b.pMax != pMax;
     }
-    
+
     vec2<T> Corner(int corner) const{
         Assert(corner >= 0 && corner < 4);
         return vec2<T>((*this)[(corner & 1)].x,
                        (*this)[(corner & 2) ? 1 : 0].y);
     }
-    
+
     void Expand(Float d){
         pMin -= vec2<T>(Absf(d));
         pMax += vec2<T>(Absf(d));
     }
-    
+
     void Reduce(Float d){
         pMin += vec2<T>(Absf(d));
         pMax -= vec2<T>(Absf(d));
     }
-    
+
     T LengthAt(int i, int axis) const{
         Assert(axis == 0 || axis == 1);
         return (i == 0) ? pMin[axis] : pMax[axis];
     }
-    
+
     vec2<T> Diagonal() const { return pMax - pMin; }
     T SurfaceArea() const{
         vec2<T> d = Diagonal();
         return (d.x * d.y);
     }
-    
+
     T Volume() const{
         printf("Warning: Called for volume on 2D surface\n");
         return 0;
     }
-    
+
     vec2<T> Center() const{
         return (pMin + pMax) * 0.5;
     }
-    
+
     T ExtentOn(int i) const{
         Assert(i >= 0 && i < 2);
         if(i == 0) return Absf(pMax.x - pMin.x);
         return Absf(pMax.y - pMin.y);
     }
-    
+
     int MaximumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
@@ -850,7 +850,7 @@ class Bounds2 {
         else
             return 1;
     }
-    
+
     int MinimumExtent() const{
         vec2<T> d = Diagonal();
         if (d.x > d.y)
@@ -858,33 +858,33 @@ class Bounds2 {
         else
             return 0;
     }
-    
+
     vec2<T> Offset(const vec2<T> &p) const{
         vec2<T> o = p - pMin;
         if (pMax.x > pMin.x) o.x /= pMax.x - pMin.x;
         if (pMax.y > pMin.y) o.y /= pMax.y - pMin.y;
         return o;
     }
-    
+
     void BoundingSphere(vec2<T> *center, Float *radius) const{
         *center = (pMin + pMax) / 2;
         *radius = Inside(*center, *this) ? Distance(*center, pMax) : 0;
     }
-    
+
     vec2<T> MinDistance(const vec2<T> &p) const{
         Float x0 = Absf(pMin.x - p.x), x1 = Absf(pMax.x - p.x);
         Float y0 = Absf(pMin.y - p.y), y1 = Absf(pMax.y - p.y);
         return vec2<T>(Min(x0, x1), Min(y0, y1));
     }
-    
+
     template <typename U> explicit operator Bounds2<U>() const{
         return Bounds2<U>((vec2<U>)pMin, (vec2<U>)pMax);
     }
-    
+
     vec2<T> Clamped(const vec2<T> &point) const{
         return Clamp(point, pMin, pMax);
     }
-    
+
     void PrintSelf() const{
         printf("pMin = {x : %g, y : %g} pMax = {x : %g, y : %g}\n",
                pMin.x, pMin.y, pMax.x, pMax.y);
@@ -894,7 +894,7 @@ class Bounds2 {
 typedef Bounds2<Float> Bounds2f;
 typedef Bounds2<int> Bounds2i;
 
-template <typename T> inline 
+template <typename T> inline
 vec2<T> &Bounds2<T>::operator[](int i){
     Assert(i == 0 || i == 1);
     return (i == 0) ? pMin : pMax;
@@ -916,7 +916,7 @@ Bounds2<T> Union(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline 
+template <typename T> inline
 Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     Bounds2<T> ret;
     ret.pMin = Max(b1.pMin, b2.pMin);
@@ -924,7 +924,7 @@ Bounds2<T> Intersect(const Bounds2<T> &b1, const Bounds2<T> &b2){
     return ret;
 }
 
-template <typename T> inline 
+template <typename T> inline
 bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
     bool x = (b1.pMax.x >= b2.pMin.x) && (b1.pMin.x <= b2.pMax.x);
     bool y = (b1.pMax.y >= b2.pMin.y) && (b1.pMin.y <= b2.pMax.y);
@@ -933,23 +933,23 @@ bool Overlaps(const Bounds2<T> &b1, const Bounds2<T> &b2){
 
 template <typename T> inline
 bool Inside(const vec2<T> &p, const Bounds2<T> &b){
-    bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x && 
+    bool rv = (p.x >= b.pMin.x && p.x <= b.pMax.x &&
                p.y >= b.pMin.y && p.y <= b.pMax.y);
     if(!rv){
         vec2<T> oE = b.MinDistance(p);
         rv = IsUnsafeZero(oE.x) || IsUnsafeZero(oE.y);
     }
-    
+
     return rv;
 }
 
 template <typename T> inline
 bool InsideExclusive(const vec2<T> &p, const Bounds2<T> &b){
-    return (p.x >= b.pMin.x && p.x < b.pMax.x && 
+    return (p.x >= b.pMin.x && p.x < b.pMax.x &&
             p.y >= b.pMin.y && p.y < b.pMax.y);
 }
 
-template <typename T, typename U> inline 
+template <typename T, typename U> inline
 Bounds2<T> Expand(const Bounds2<T> &b, U delta){
     return Bounds2<T>(b.pMin - vec2<T>(delta, delta),
                       b.pMax + vec2<T>(delta, delta));
@@ -961,14 +961,14 @@ class Geometry{
     vec2ui upper; // upper position in pixels inside a viewport
     vec2f extensionX; // fraction of the window being used in the X-axis
     vec2f extensionY; // fraction of the window being used in the Y-axis
-    
+
     Geometry(){
         lower = vec2ui(0, 0);
         upper = vec2ui(0, 0);
         extensionX = vec2f(0, 0);
         extensionY = vec2f(0, 0);
     }
-    
+
     void PrintSelf(){
         printf("Lower %u %u, Upper: %u %u\n", lower.x, lower.y, upper.x, upper.y);
     }
