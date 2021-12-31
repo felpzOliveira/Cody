@@ -115,7 +115,6 @@ bool DbgApp_HandleStopPoint(DbgSyncPackage *pkg){
     //     but first restore if we did this before
     DbgApp_RestoreViewStates();
 
-    //dbgSync.dbgLB = nullptr;
     // try the file provider first
     int r = FileProvider_FindByPath(&dbgLB, (char *)sp->file.c_str(),
                                     sp->file.size(), nullptr);
@@ -152,7 +151,7 @@ bool DbgApp_HandleStopPoint(DbgSyncPackage *pkg){
                 if(!vlb) return 0;
 
                 if(vlb == dbgSync.dbgLB){
-                    adjust_cursor_fn(bv, 0, false, true);
+                    adjust_cursor_fn(bv, 0, state, true);
                 }
                 return 0;
             });
@@ -351,7 +350,7 @@ void DbgApp_Exit(){
 
 void DbgApp_QueryBar(){
     AppCommandQueryBarInteractiveCommand();
-    // we have to set the keyboard just in case we cancell the query bar
+    // we have to set the keyboard just in case we cancel the query bar
     AppSetDelayedCall(DbgApp_SetKeyboard);
 }
 

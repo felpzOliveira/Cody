@@ -97,10 +97,7 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
-#include <dbg.h>
 int main(int argc, char **argv){
-    //dbg_entry();
-    //return 0;
 #if 0
     Git_Initialize();
 

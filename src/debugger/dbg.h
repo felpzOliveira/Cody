@@ -125,4 +125,3 @@ bool Dbg_IsRunning();
 */
 void Dbg_SendPackage(DbgPackage package);
 
-void dbg_entry();
