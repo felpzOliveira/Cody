@@ -26,6 +26,7 @@ typedef struct SHA1Ctx{
     uint8_t buf[64];
 }SHA1Ctx;
 
+// SHA-3 Context
 typedef struct SHA3Ctx{
     uint8_t A[200]; // state is 5x5xω, but ω=b/25 and max b=1600, so state is 200=1600/8
     uint32_t len;

@@ -2,6 +2,9 @@
 #include <view.h>
 #include <view_tree.h>
 #include <control_cmds.h>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 
 int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
                                       Theme *theme, Float dt, ControlProps *props)
@@ -83,9 +86,13 @@ int Graphics_RenderControlCommands(View *view, OpenGLState *state,
     ControlProps *props = nullptr;
     View_GetControlRenderOpts(view, &props);
     int animating = 0;
+    auto t = std::time(nullptr);
+    auto tm = *std::localtime(&t);
 
     switch(props->opts){
         case Control_Opts_Indices:{
+            std::cout << "[DEBUG] Rendering ctrl ( " << std::put_time(&tm, "%d-%m-%Y %H-%M-%S")
+               << " )" <<  std::endl;
             animating = Graphics_RenderControlCmdsIndices(view, state, theme, dt, props);
         } break;
 

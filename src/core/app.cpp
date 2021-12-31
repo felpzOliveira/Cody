@@ -17,6 +17,7 @@
 #include <timing.h>
 #include <gitbase.h>
 #include <gitbuffer.h>
+#include <dbgapp.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -24,6 +25,8 @@
 #define DIRECTION_RIGHT 3
 
 #define MAX_VIEWS 16
+
+#define CODEVIEW_OR_RET(bview) if(BufferView_GetViewType(bview) != CodeView) return
 
 typedef struct{
     BindingMap *freeTypeMapping;
@@ -35,6 +38,8 @@ typedef struct{
     char cwd[PATH_MAX];
     Geometry currentGeometry;
     Float currentLineHeight;
+    bool hasDelayedCall;
+    std::function<void(void)> delayedCall;
 }App;
 
 static App appContext = {
@@ -82,6 +87,11 @@ Geometry AppGetScreenGeometry(Float *lineHeight){
     return appContext.currentGeometry;
 }
 
+void AppSetDelayedCall(std::function<void(void)> fn){
+    appContext.delayedCall = fn;
+    appContext.hasDelayedCall = true;
+}
+
 void AppEarlyInitialize(){
     View *view = nullptr;
 
@@ -101,6 +111,7 @@ void AppEarlyInitialize(){
 
     view->geometry.lower = vec2ui();
     appContext.activeView = view;
+    appContext.hasDelayedCall = false;
 
     View_SetActive(appContext.activeView, 1);
 
@@ -117,7 +128,7 @@ void AppEarlyInitialize(){
 
     GitBuffer_InitializeInternalBuffer();
 
-    BaseCommand_InitializeCmdMap();
+    BaseCommand_InitializeCommandMap();
 }
 
 int AppGetTabConfiguration(int *using_tab){
@@ -164,7 +175,7 @@ BufferView *AppGetActiveBufferView(){
     return &appContext.activeView->bufferView;
 }
 
-void AppSetBindingsForState(ViewState state){
+void AppSetBindingsForState(ViewState state, ViewType type){
     switch(state){
         case View_SelectableList:
         case View_QueryBar: KeyboardSetActiveMapping(appContext.queryBarMapping); break;
@@ -174,18 +185,30 @@ void AppSetBindingsForState(ViewState state){
             AssertErr(0, "Not implemented binding");
         }
     }
+
+    if(type == DbgView){
+        DbgApp_TakeKeyboard();
+    }
+
+    if(appContext.hasDelayedCall){
+        appContext.delayedCall();
+        appContext.hasDelayedCall = false;
+    }
 }
 
-void AppSetActiveView(View *view){
+void AppSetActiveView(View *view, bool force_binding){
     AssertA(view != nullptr, "Invalid view");
     if(appContext.activeView){
         View_SetActive(appContext.activeView, 0);
     }
     appContext.activeView = view;
     View_SetActive(appContext.activeView, 1);
-    ViewState state = View_GetState(appContext.activeView);
-
-    AppSetBindingsForState(state);
+    if(force_binding){
+        BufferView *bView = View_GetBufferView(appContext.activeView);
+        ViewState state = View_GetState(appContext.activeView);
+        ViewType type = BufferView_GetViewType(bView);
+        AppSetBindingsForState(state, type);
+    }
 }
 
 void AppUpdateViews(){
@@ -201,6 +224,24 @@ void AppUpdateViews(){
     }
 }
 
+View *AppSearchView(LineBuffer *lineBuffer){
+    View *foundView = nullptr;
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        View *view = iterator.value->view;
+        LineBuffer *lb = BufferView_GetLineBuffer(&view->bufferView);
+        if(lb == lineBuffer){
+            foundView = view;
+            break;
+        }
+
+        ViewTree_Next(&iterator);
+    }
+
+    return foundView;
+}
+
 void AppRestoreCurrentBufferViewState(){
     BufferView *view = AppGetActiveBufferView();
     if(view){
@@ -212,13 +253,48 @@ void AppRestoreCurrentBufferViewState(){
     }
 }
 
-void AppHandleMouseClick(int x, int y, OpenGLState *state){
-    vec2ui mouse = AppActivateViewAt(x, state->height - y);
+void AppHandleMouseMotion(int x, int y, OpenGLState *state){
+#if 0
+    vec2ui mouse(x, state->height - y);
     View *view = AppGetActiveView();
+    if(Geometry_IsPointInside(&view->geometry, mouse)){
+        vec2ui relative = mouse - view->geometry.lower;
+        BufferView *bufferView = View_GetBufferView(view);
+        uint dy = view->geometry.upper.y - view->geometry.lower.y;
+        int lineNo = BufferView_ComputeTextLine(bufferView, dy - relative.y,
+                                                view->descLocation);
+
+        if(lineNo < 0) return;
+
+        lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
+        Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
+        int x = ScreenToGL(relative.x, state) - bufferView->lineOffset;
+        if(x < 0) return;
+
+        uint colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x);
+        colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
+
+        uint p = Buffer_Utf8RawPositionToPosition(buffer, colNo);
+        uint tid = Buffer_GetTokenAt(buffer, p);
+        if(tid < buffer->tokenCount){
+            Token *token = &buffer->tokens[tid];
+            std::string tvalue(&buffer->data[token->position], token->size);
+            printf("Value = %s\n", tvalue.c_str());
+        }
+    }
+#endif
+}
+
+void AppHandleMouseClick(int x, int y, OpenGLState *state){
+    View *view = AppGetActiveView();
+    BufferView *bufferView = View_GetBufferView(view);
+    vec2ui mouse = AppActivateViewAt(x, state->height - y);
+    view = AppGetActiveView();
     NullRet(view);
     ViewState vstate = View_GetState(view);
-    BufferView *bufferView = View_GetBufferView(view);
+    bufferView = View_GetBufferView(view);
     uint dy = view->geometry.upper.y - view->geometry.lower.y;
+
     switch(vstate){
         case View_FreeTyping:{
             int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y,
@@ -231,9 +307,11 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
             Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
             x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
             if(x > 0){
-                // TODO: It seems when we have a tab on a line and we click to select
-                // a character it seems we are jumping exactly tabSpacing - 1 ahead
-                colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x);
+                colNo = fonsComputeStringOffsetCount(state->font.fsContext,
+                                                     buffer->data, x);
+
+                colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
+
                 BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
                 BufferView_GhostCursorFollow(bufferView);
             }
@@ -261,10 +339,11 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
     View *view = AppGetViewAt(x, state->height - y);
     if(view){
         ViewState vstate = View_GetState(view);
+        BufferView *bView = View_GetBufferView(view);
+
         switch(vstate){
             case View_FreeTyping:{
                 int scrollRange = is_up ? -5 : 5;
-                BufferView *bView = View_GetBufferView(view);
                 NullRet(bView);
                 NullRet(bView->lineBuffer);
                 BufferView_StartScrollViewTransition(bView, scrollRange,
@@ -292,6 +371,7 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
 
 void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
+    //CODEVIEW_OR_RET(bufferView);
     if(!bufferView->lineBuffer) return;
 
     Token *token = nullptr;
@@ -357,10 +437,12 @@ void AppCommandFreeTypingJumpToDirection(int direction){
 
 void AppCommandFreeTypingArrows(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
+    //CODEVIEW_OR_RET(bufferView);
     if(!bufferView->lineBuffer) return;
 
     uint lineCount = BufferView_GetLineCount(bufferView);
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
+    int tabdir = -1;
     switch(direction){
         case DIRECTION_LEFT:{ // Move left
             if(cursor.y == 0){ // move up
@@ -400,11 +482,14 @@ void AppCommandFreeTypingArrows(int direction){
 
             buffer = BufferView_GetBufferAt(bufferView, cursor.x);
             cursor.y = Clamp(cursor.y, (uint)0, buffer->count);
+            tabdir = 1;
         } break;
 
         default: AssertA(0, "Invalid direction given");
     }
 
+    Buffer *nbuffer = BufferView_GetBufferAt(bufferView, cursor.x);
+    cursor.y = Buffer_PositionTabCompensation(nbuffer, cursor.y, tabdir);
     BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
 }
 
@@ -456,9 +541,13 @@ void AppDefaultRemoveOne(){
 
             Buffer_EraseSymbols(buffer, symTable);
 
-            Buffer_RemoveRange(buffer, cursor.y-1, cursor.y);
+            // need to compute the position with regards to tab otherwise we won't
+            // be able to correctly erase tabs
+            uint y = Buffer_PositionTabCompensation(buffer, cursor.y - 1, -1);
+
+            Buffer_RemoveRange(buffer, y, cursor.y);
             RemountTokensBasedOn(bufferView, cursor.x);
-            cursor.y -= 1;
+            cursor.y = y;
 
         }else if(cursor.x > 0){
             int offset = buffer->count;
@@ -805,18 +894,22 @@ void AppCommandKillBuffer(){
 }
 
 void AppCommandKillView(){
-    BufferView *bView = AppGetActiveBufferView();
-    // we need to make sure the interface is not expanded otherwise
-    // UI will get weird.
-    ControlCommands_RestoreExpand();
+    uint count = ViewTree_GetCount();
+    // only kill view if there is at least 2
+    if(count > 1){
+        BufferView *bView = AppGetActiveBufferView();
+        // we need to make sure the interface is not expanded otherwise
+        // UI will get weird.
+        ControlCommands_RestoreExpand();
 
-    AppCommandKillBuffer();
-    BufferViewLocation_RemoveView(bView);
-     // TODO: Check if it is safe to erase the view in the vnode here
-    ViewNode *vnode = ViewTree_DestroyCurrent(1);
-    AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);
-    appContext.activeView = vnode->view;
-    AppSetActiveView(appContext.activeView);
+        AppCommandKillBuffer();
+        BufferViewLocation_RemoveView(bView);
+         // TODO: Check if it is safe to erase the view in the vnode here
+        ViewNode *vnode = ViewTree_DestroyCurrent(1);
+        AppSetViewingGeometry(appContext.currentGeometry, appContext.currentLineHeight);
+        appContext.activeView = vnode->view;
+        AppSetActiveView(appContext.activeView);
+    }
 }
 
 void AppCommandUndo(){
@@ -1242,55 +1335,67 @@ void AppCommandCut(){
 }
 
 void AppPasteString(const char *p, uint size){
-    BufferView *view = AppGetActiveBufferView();
-    Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
-    SymbolTable *symTable = tokenizer->symbolTable;
-    NullRet(view->lineBuffer);
-    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+    View *vview = AppGetActiveView();
+    ViewState state = View_GetState(vview);
+    if(state == View_FreeTyping || state == View_AutoComplete){
+        BufferView *view = AppGetActiveBufferView();
+        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
+        SymbolTable *symTable = tokenizer->symbolTable;
+        NullRet(view->lineBuffer);
+        NullRet(LineBuffer_IsWrittable(view->lineBuffer));
 
-    if(size > 0 && p){
-        CopySection section;
-        Buffer *buffer = nullptr;
-        uint off = 0;
-        vec2ui cursor = BufferView_GetCursorPosition(view);
-        uint startBuffer = cursor.x;
+        if(size > 0 && p){
+            CopySection section;
+            Buffer *buffer = nullptr;
+            uint off = 0;
+            vec2ui cursor = BufferView_GetCursorPosition(view);
+            uint startBuffer = cursor.x;
 
-        buffer = BufferView_GetBufferAt(view, cursor.x);
+            buffer = BufferView_GetBufferAt(view, cursor.x);
 
-        Buffer_EraseSymbols(buffer, symTable);
+            Buffer_EraseSymbols(buffer, symTable);
 
-        uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size,
-                                            cursor.x, cursor.y, &off);
+            uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size,
+            cursor.x, cursor.y, &off);
 
-        section = {
-            .start = cursor,
-            .end = vec2ui(cursor.x + n, off),
-            .currTime = 0,
-            .interval = kTransitionCopyFadeIn,
-            .active = 1,
-        };
+            section = {
+                .start = cursor,
+                .end = vec2ui(cursor.x + n, off),
+                .currTime = 0,
+                .interval = kTransitionCopyFadeIn,
+                .active = 1,
+            };
 
-        uint endx = cursor.x + n;
-        uint endy = off;
+            uint endx = cursor.x + n;
+            uint endy = off;
 
-        UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
-                                    cursor, vec2ui(endx, endy));
-        LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1), 0);
-        LineBuffer_SetCopySection(view->lineBuffer, section);
+            UndoRedoUndoPushRemoveBlock(&view->lineBuffer->undoRedo,
+            cursor, vec2ui(endx, endy));
+            LineBuffer_SetActiveBuffer(view->lineBuffer, vec2i(endx, -1), 0);
+            LineBuffer_SetCopySection(view->lineBuffer, section);
 
-        RemountTokensBasedOn(view, startBuffer, n);
+            RemountTokensBasedOn(view, startBuffer, n);
 
-        Buffer *b = LineBuffer_GetBufferAt(view->lineBuffer, endx);
+            Buffer *b = LineBuffer_GetBufferAt(view->lineBuffer, endx);
 
-        if(b == nullptr){
-            BUG();
-            printf("Cursor line is nullptr\n");
+            if(b == nullptr){
+                BUG();
+                printf("Cursor line is nullptr\n");
+            }
+
+            cursor.x = endx;
+            cursor.y = Clamp(endy, (uint)0, b->count);
+            BufferView_CursorToPosition(view, cursor.x, cursor.y);
+            BufferView_Dirty(view);
         }
-
-        cursor.x = endx;
-        cursor.y = Clamp(endy, (uint)0, b->count);
-        BufferView_CursorToPosition(view, cursor.x, cursor.y);
-        BufferView_Dirty(view);
+    }else if(View_IsQueryBarActive(vview)){
+        QueryBar *bar = View_GetQueryBar(vview);
+        int r = QueryBar_AddEntry(bar, vview, (char *)p, size);
+        if(r == 1){
+            AppQueryBarSearchJumpToResult(bar, vview);
+        }else if(r == -2){
+            AppDefaultReturn();
+        }
     }
 }
 
@@ -1482,7 +1587,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
                 Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
-		        SymbolTable *symTable = tokenizer->symbolTable;
+                SymbolTable *symTable = tokenizer->symbolTable;
 
                 vec2ui cursor = BufferView_GetCursorPosition(bufferView);
                 Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -1567,7 +1672,28 @@ View *AppGetViewAt(int x, int y){
     return rView;
 }
 
-vec2ui AppActivateViewAt(int x, int y){
+vec2ui AppComputeViewMouseCoordinates(int x, int y){
+    vec2ui r(x, y);
+    View *view = nullptr;
+    ViewTreeIterator iterator;
+
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        view = iterator.value->view;
+        if(Geometry_IsPointInside(&view->geometry, r)){
+            // Activate the view and re-map position
+            ViewTree_SetActive(iterator.value);
+            r = r - view->geometry.lower;
+            break;
+        }
+
+        ViewTree_Next(&iterator);
+    }
+
+    return r;
+}
+
+vec2ui AppActivateViewAt(int x, int y, bool force_binding){
     // Check which view is the mouse on and activate it
     vec2ui r(x, y);
     View *view = nullptr;
@@ -1579,7 +1705,9 @@ vec2ui AppActivateViewAt(int x, int y){
         if(Geometry_IsPointInside(&view->geometry, r)){
             // Activate the view and re-map position
             ViewTree_SetActive(iterator.value);
-            AppSetActiveView(view);
+
+            // we can do better than this, fix it
+            AppSetActiveView(view, force_binding);
             r = r - view->geometry.lower;
             break;
         }
@@ -1611,6 +1739,10 @@ void AppCommandGitStatus(){
 }
 
 void AppCommandGitDiffCurrent(){
+    //DbgApp_StartDebugger("/home/felipe/Documents/entry", nullptr);
+    //DbgPackage package("entry.cpp", 2);
+    //Dbg_SendPackage(package);
+    //return;
     BufferView *bView = AppGetActiveBufferView();
     bool allow_write = true;
     NullRet(bView->lineBuffer);
@@ -1619,7 +1751,7 @@ void AppCommandGitDiffCurrent(){
     NullRet(BufferView_GetViewType(bView) == CodeView ||
             BufferView_GetViewType(bView) == GitDiffView);
 
-    std::vector<GitDiffLine> *dif = LineBuffer_GetDiffPtr(bView->lineBuffer, 0);
+    std::vector<LineHighlightInfo> *dif = LineBuffer_GetLineHighlightPtr(bView->lineBuffer, 0);
     if(dif){
         int is_dif_start = 0;
         vec2ui range;
@@ -1873,6 +2005,7 @@ void AppInitializeQueryBarBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_RightAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarCommit, Key_Enter);
+    RegisterRepeatableEvent(mapping, AppCommandPaste, Key_LeftControl, Key_V);
 
     appContext.queryBarMapping = mapping;
 }
@@ -1967,7 +2100,8 @@ void AppInitializeFreeTypingBindings(){
 
     //TODO: re-do (AppCommandRedo)
     RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
-    RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand, Key_LeftControl, Key_Semicolon);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand,
+                            Key_LeftControl, Key_Semicolon);
 
     RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
@@ -1978,6 +2112,8 @@ void AppInitializeFreeTypingBindings(){
     // Let the control commands bind its things
     ControlCommands_Initialize();
     ControlCommands_BindTrigger(mapping);
+
+    DbgApp_Initialize();
 
     appContext.freeTypeMapping = mapping;
 }

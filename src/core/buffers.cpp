@@ -191,6 +191,28 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
     return buffer->tokenCount;
 }
 
+uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
+    if(!(rawp <= buffer->taken)){
+        BUG();
+        Buffer_DebugStdoutData(buffer);
+        printf("Queried for tab compensation at %u\n", rawp);
+        return 0;
+    }
+
+    direction = direction < 0 ? -1 : 1;
+    while(buffer->data[rawp] == '\t'){
+        if(direction < 0){
+            if(rawp == 0) break;
+        }else{
+            if(rawp == buffer->taken-1) break;
+        }
+
+        rawp += direction;
+    }
+
+    return rawp;
+}
+
 //TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     if(!(rawp <= buffer->taken)){
@@ -286,6 +308,11 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
 
             r++;
             c += of;
+        }
+
+        if(r != u8p){
+            printf("oops\n");
+            Buffer_Utf8PositionToRawPosition(buffer, u8p, len);
         }
 
         AssertA(r == u8p, "StringToCodepoint failed to decode UTF-8");
@@ -991,8 +1018,8 @@ std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *an
 }
 
 
-std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clear){
-    std::vector<GitDiffLine> *ptr = nullptr;
+std::vector<LineHighlightInfo> *LineBuffer_GetLineHighlightPtr(LineBuffer *lineBuffer, int clear){
+    std::vector<LineHighlightInfo> *ptr = nullptr;
     if(lineBuffer){
         ptr = &lineBuffer->props.diffs;
         if(clear){
@@ -1017,7 +1044,7 @@ void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer){
 void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
     if(lineBuffer){
         std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
-        std::vector<GitDiffLine> *dif = &lineBuffer->props.diffs;
+        std::vector<LineHighlightInfo> *dif = &lineBuffer->props.diffs;
         ptr->clear();
         /*
         * Line computation: Whenever we look at a delta we need to keep
@@ -1038,7 +1065,7 @@ void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
         uint start = lineBuffer->lineCount, end = 0;
         uint adds = 0, rems = 0;
         for(uint i = 0; i < dif->size(); i++){
-            GitDiffLine line = dif->at(i);
+            LineHighlightInfo line = dif->at(i);
             uint n = line.lineno-1;
 
             //std::string p("+");

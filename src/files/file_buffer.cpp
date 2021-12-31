@@ -50,6 +50,19 @@ void FileBufferList_Insert(FileBufferList *list, LineBuffer *lBuffer){
     List_Push<FileBuffer>(list->fList, &fBuffer);
 }
 
+void FileBufferList_Remove(FileBufferList *list, LineBuffer *lineBuffer){
+    auto finder = [&](FileBuffer *buf) -> int{
+        int rv = 0;
+        if(buf){
+            rv = buf->lineBuffer == lineBuffer ? 1 : 0;
+        }
+
+        return rv;
+    };
+
+    List_Erase<FileBuffer>(list->fList, finder);
+}
+
 void FileBufferList_Remove(FileBufferList *list, char *name, uint nameLen){
     auto finder = [&](FileBuffer *buf) -> int{
         int rv = 0;

@@ -157,6 +157,7 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->scroll.horizontal = Transform();
     view->is_visible = 1;
     view->activeType = type;
+    view->highlightLine = {};
 }
 
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type){
@@ -167,6 +168,7 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->scroll.currX = 0;
     view->activeNestPoint = -1;
     view->activeType = type;
+    view->highlightLine = {};
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
     BufferViewFileLocation_Restore(view);
@@ -179,6 +181,26 @@ uint BufferView_GetMaximumLineView(BufferView *view){
     }
 
     return n;
+}
+
+std::optional<LineHints> BufferView_GetLineHighlight(BufferView *view){
+    AssertA(view != nullptr, "Invalid bufferview");
+    return view->highlightLine;
+}
+
+void BufferView_ClearHighlightLine(BufferView *view){
+    AssertA(view != nullptr, "Invalid bufferview");
+    view->highlightLine = {};
+}
+
+void BufferView_SetHighlightLine(BufferView *view, LineHints hint){
+    AssertA(view != nullptr, "Invalid bufferview");
+    if(view->lineBuffer != nullptr){
+        hint.line = Min(hint.line, view->lineBuffer->lineCount-1);
+        view->highlightLine = std::optional<LineHints>(hint);
+    }else{
+        view->highlightLine = {};
+    }
 }
 
 void BufferView_SetGeometry(BufferView *view, Geometry geometry, Float lineHeight){
@@ -336,6 +358,50 @@ void BufferView_SetAnimationCallback(BufferView *view, std::function<void()> fn)
     if(view){
         VScroll_SetAnimationFinishCallback(&view->sController, fn);
     }
+}
+
+bool BufferView_FindFirstForward(BufferView *view, TokenId id, TokenId cid,
+                                 vec2ui start, vec2ui &end)
+{
+    Buffer *buffer = BufferView_GetBufferAt(view, start.x);
+    if(!buffer) return false;
+    bool found = false;
+    int done = 0;
+    int depth = 0;
+    uint bid = start.x;
+    uint startAt = Buffer_GetTokenAt(buffer, bid);
+
+    do{
+        int r = (int)buffer->tokenCount;
+        for(int i = (int)startAt; i < r; i++){
+            Token *token = &buffer->tokens[i];
+            if(token){
+                if(token->identifier == id){
+                    if(depth == 0){
+                        end.x = start.x;
+                        end.y = i;
+                        found = true;
+                        done = 1;
+                        break;
+                    }else{
+                        depth--;
+                    }
+                }else if(token->identifier == cid){
+                    depth++;
+                }
+            }
+        }
+
+        bid += 1;
+        if(bid < view->lineBuffer->lineCount){
+            buffer = BufferView_GetBufferAt(view, bid);
+            startAt = 0;
+        }else{
+            done = 1;
+        }
+    }while(done == 0);
+
+    return found;
 }
 
 int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,

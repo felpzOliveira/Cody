@@ -23,3 +23,10 @@ void ControlCommands_YieldKeyboard();
 * Restore the interface if it was in a expanded state.
 */
 void ControlCommands_RestoreExpand();
+
+/*
+* Performs expansion/restoration of the view interface without relying
+* on the control command being active.
+*/
+void ControlCommands_SwapExpand();
+

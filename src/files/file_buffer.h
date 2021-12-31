@@ -45,6 +45,11 @@ int FileBufferList_FindByName(FileBufferList *list, LineBuffer **lineBuffer,
 */
 void FileBufferList_Remove(FileBufferList *list, char *name, uint nameLen);
 
+/*
+* Remove an entry of the list given its corresponding linebuffer.
+*/
+void FileBufferList_Remove(FileBufferList *list, LineBuffer *lineBuffer);
+
 /* Debug stuff */
 void FileBufferList_DebugList(FileBufferList *list);
 

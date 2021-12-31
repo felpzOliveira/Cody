@@ -46,6 +46,14 @@ void ViewTree_ExpandRestore();
 ViewNode *ViewTree_GetCurrent();
 
 /*
+* Get the number of active views at this moment. Note: this does not
+* care about expanded views, it returns the number of displayable views.
+* This routine simply transverses the tree view and returns the amount
+* of leafs found. This number is the number of swappables views.
+*/
+uint ViewTree_GetCount();
+
+/*
 * Updates the active tree node to be vnode. You should get the node vnode from
 * a query either using the Begin/Next routines or the ForAll routine.
 */

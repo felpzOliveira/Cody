@@ -14,6 +14,8 @@ typedef struct ControlCmds{
 
 static ControlCmds controlCmds;
 
+void ControlCmdsRestoreCurrent();
+
 void ControlCmdsTrigger(){
     controlCmds.lastMapping = KeyboardGetActiveMapping();
     KeyboardSetActiveMapping(controlCmds.mapping);
@@ -49,6 +51,7 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size){
             }
 
             if(iterator.value->view && (uint)id == index && !swapped){
+                ControlCmdsRestoreCurrent();
                 AppSetActiveView(iterator.value->view);
                 swapped = true;
             }
@@ -90,20 +93,34 @@ void ControlCmdsClear(){
     ControlCommands_YieldKeyboard();
 }
 
-void ControlCmdsExpandCurrent(){
+void ControlCmdsRestoreCurrent(){
+    if(controlCmds.is_expanded){
+        ViewTree_ExpandRestore();
+    }
+}
+
+static void ControlCmdsHandleExpandRestore(int yield=1){
+    uint count = ViewTree_GetCount();
+    if(count <= 1) return;
+
     if(controlCmds.is_expanded){
         ViewTree_ExpandRestore();
     }else{
         ViewTree_ExpandCurrent();
     }
-    ControlCommands_YieldKeyboard();
+
+    if(yield){
+        ControlCommands_YieldKeyboard();
+    }
     controlCmds.is_expanded = 1 - controlCmds.is_expanded;
 }
 
-void ControlCmdsSpaceView(){
+void ControlCmdsExpandCurrent(){
+    ControlCmdsHandleExpandRestore(1);
+}
 
-    ControlCommands_YieldKeyboard();
-    Timing_Update();
+void ControlCommands_SwapExpand(){
+    ControlCmdsHandleExpandRestore(0);
 }
 
 void ControlCmdsRenderIndices(){
@@ -139,7 +156,7 @@ void ControlCommands_Initialize(){
     RegisterRepeatableEvent(mapping, ControlCommands_YieldKeyboard, Key_Escape);
     RegisterRepeatableEvent(mapping, ControlCmdsRenderIndices, Key_Q);
     RegisterRepeatableEvent(mapping, ControlCmdsExpandCurrent, Key_Z);
-    RegisterRepeatableEvent(mapping, ControlCmdsSpaceView, Key_Space);
+    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Space);
     RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Left);
     RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Right);
     RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Down);

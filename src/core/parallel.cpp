@@ -1,46 +1,10 @@
 #include <parallel.h>
-#include <mutex>
-#include <condition_variable>
-#include <queue>
 #include <stdio.h>
 #include <stdlib.h>
 #include <symbol.h>
 #include <file_provider.h>
 
 #define CMD_EXIT "__internal_exit__"
-
-template<typename T> class ConcurrentQueue{
-    public:
-
-    std::mutex mutex;
-    std::condition_variable cv;
-    std::queue<T> itemQ;
-    const unsigned int maxItems = 10;
-
-    ConcurrentQueue() = default;
-    T pop(){
-        std::unique_lock<std::mutex> locker(mutex);
-        while(itemQ.empty()){
-            cv.wait(locker);
-        }
-        T val = itemQ.front();
-        itemQ.pop();
-        locker.unlock();
-
-        cv.notify_one();
-        return val;
-    }
-
-    void push(T item){
-        std::unique_lock<std::mutex> locker(mutex);
-        while(itemQ.size() >= maxItems){
-            cv.wait(locker);
-        }
-        itemQ.push(item);
-        locker.unlock();
-        cv.notify_one();
-    }
-};
 
 ConcurrentQueue<std::string> commandQ;
 LockedLineBuffer lockedBuffer;

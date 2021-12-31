@@ -101,7 +101,7 @@ static int QueryBar_AcceptInput(QueryBar *queryBar, char *input, uint len){
     if(filter->digitOnly){
         return StringIsDigits(input, len);
     }
-    
+
     return 1;
 }
 
@@ -161,14 +161,14 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
             AssertErr(0, "Command not implemented");
         }
     }
-    
+
     if(!QueryBar_AreCommandsContinuous(queryBar, cmd)){
         Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count);
         lastp = 0;
     }else{
         Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->writePosU8);
     }
-    
+
     queryBar->writePos = Buffer_InsertStringAt(&queryBar->buffer, 0, title, len, 0);
     queryBar->writePosU8 = Buffer_Utf8RawPositionToPosition(&queryBar->buffer,
                                                             queryBar->writePos);
@@ -203,7 +203,7 @@ static int  QueryBar_DynamicUpdate(QueryBar *queryBar, View *view){
         } break;
         default:{}
     }
-    
+
     return r;
 }
 
@@ -277,13 +277,13 @@ void QueryBar_Activate(QueryBar *queryBar, QueryBarCommand cmd, View *view){
     QueryBar_StartCommand(queryBar, cmd);
 }
 
-void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen, 
+void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
                              OnQueryBarEntry entry, OnQueryBarCancel cancel,
                              OnQueryBarCommit commit, QueryBarInputFilter *filter)
 {
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
     QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_CUSTOM, title, titlelen);
-    
+
     queryBar->entryCallback  = entry;
     queryBar->cancelCallback = cancel;
     queryBar->commitCallback = commit;
@@ -293,7 +293,7 @@ void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len){
     AssertA(queryBar != nullptr && ptr != nullptr && len != nullptr,
             "Invalid QueryBar pointer");
-    
+
     *ptr = &queryBar->buffer.data[queryBar->writePos];
     *len = queryBar->buffer.taken - queryBar->writePos;
 }
@@ -322,17 +322,17 @@ void QueryBar_SetEntry(QueryBar *queryBar, View *view, char *str, uint len){
 int QueryBar_AddEntry(QueryBar *queryBar, View *view, char *str, uint len){
     AssertA(queryBar != nullptr && str != nullptr && len > 0,
             "Invalid QueryBar pointer");
-    
+
     if(QueryBar_AcceptInput(queryBar, str, len)){
         uint p = queryBar->cursor.textPosition.y;
         uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p);
         rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, 0);
-        
+
         queryBar->cursor.textPosition.y =
             Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);
         return QueryBar_DynamicUpdate(queryBar, view);
     }
-    
+
     return 0;
 }
 
@@ -345,7 +345,7 @@ int QueryBar_RemoveOne(QueryBar *queryBar, View *view){
         queryBar->cursor.textPosition.y = pos;
         return QueryBar_DynamicUpdate(queryBar, view);
     }
-    
+
     return 0;
 }
 
@@ -376,13 +376,13 @@ int QueryBar_NextItem(QueryBar *queryBar, View *view){
             cursor.textPosition = vec2ui(queryBar->searchCmd.lineNo,
                                          queryBar->searchCmd.position+
                                          queryBar->searchCmd.length);
-            
+
             QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_SEARCH);
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor);
         } break;
         default:{}
     }
-    
+
     return r;
 }
 
@@ -395,7 +395,7 @@ int QueryBar_PreviousItem(QueryBar *queryBar, View *view){
             DoubleCursor cursor;
             cursor.textPosition = vec2ui(queryBar->searchCmd.lineNo,
                                          queryBar->searchCmd.position);
-            
+
             QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_REVERSE_SEARCH);
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor);
         } break;
@@ -413,13 +413,13 @@ int QueryBar_PreviousItem(QueryBar *queryBar, View *view){
             }else{
                 return 0;
             }
-            
+
             cursor.textPosition = vec2ui(line, p);
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor);
         } break;
         default:{}
     }
-    
+
     return r;
 }
 
@@ -480,7 +480,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
             default:{}
         }
     }
-    
+
     if(r != 0){
         QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
         queryBar->cmd = QUERY_BAR_CMD_NONE;
@@ -497,6 +497,6 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
         replace->toReplaceLen = 0;
         replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
     }
-    
+
     return r;
 }

@@ -52,9 +52,10 @@ BufferView *AppGetActiveBufferView();
 int AppGetTabConfiguration(int *using_tab);
 
 /*
-* Triggers the view at (x,y) to be active.
+* Triggers the view at (x,y) to be active. Variable force_binding
+* is the same from 'AppSetActiveView'.
 */
-vec2ui AppActivateViewAt(int x, int y);
+vec2ui AppActivateViewAt(int x, int y, bool force_binding=true);
 
 /*
 * Gets the view located at (x,y).
@@ -72,14 +73,29 @@ void AppSetViewingGeometry(Geometry geometry, Float lineHeight);
 View *AppGetActiveView();
 
 /*
-* Sets a specific view to be active.
+* Search for the view that holds an accessor to the given linebuffer.
+* Considerations:
+*    1 - If no view is currently displaying the linebuffer than this routine
+*        returns nullptr;
+*    2 - If more than one view is currently displaying the linebuffer than
+*        the first one found in the view tree is returned;
+*    3 - Comparation is performed by pointer and not by file path, the linebuffer
+*        must be the exact one being searched. This allows for non-file searches.
 */
-void AppSetActiveView(View *view);
+View *AppSearchView(LineBuffer *lineBuffer);
+
+/*
+* Sets a specific view to be active. The force_binding variable can be used
+* to define if the state should make sure the mappings are correct for it. This
+* usually is true, unless you are calling this from an event and needs to persist
+* the state for the event, i.e.: dbg.
+*/
+void AppSetActiveView(View *view, bool force_binding=true);
 
 /*
 * Forces the current view to swap to the binding for the given state.
 */
-void AppSetBindingsForState(ViewState state);
+void AppSetBindingsForState(ViewState state, ViewType type=NoneView);
 
 /*
 * Gets cwd from app context.
@@ -172,6 +188,21 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state);
 */
 void AppHandleMouseClick(int x, int y, OpenGLState *state);
 
+/*
+* Handles the mouse motion event. Receives the current mouse coordinates after motion,
+* this coordinates are in **global** values.
+*/
+void AppHandleMouseMotion(int x, int y, OpenGLState *state);
+
+/*
+* Sets a call to be performed after a sequence of view restoration is made.
+* Whenever we exit some states, i.e.: QueryBar, we restore the view and keyboard
+* mapping, if the transformation is intended to continue after the restoration step
+* than you can use this function to be called again once the state is restored and
+* make your final changes.
+*/
+void AppSetDelayedCall(std::function<void(void)> fn);
+
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();
 void AppCommandJumpRightArrow();
@@ -183,8 +214,14 @@ void AppCommandUpArrow();
 void AppCommandDownArrow();
 void AppCommandIndent();
 void AppCommandPaste();
+void AppCommandSplitHorizontal();
+void AppCommandSplitVertical();
+void AppCommandKillView();
+void AppCommandKillBuffer();
 void AppCommandCut();
 void AppCommandJumpNesting();
+void AppCommandSwitchTheme();
+void AppCommandSwitchBuffer();
 void AppCommandCopy();
 void AppCommandSaveBufferView();
 void AppCommandLineQuicklyDisplay();
@@ -206,6 +243,8 @@ void AppCommandQueryBarGotoLine();
 void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end);
 void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end);
 void AppCommandQueryBarSearchAndReplace();
+void AppCommandQueryBarInteractiveCommand();
+void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view);
 
 /* Base commands for the query bar */
 void AppCommandQueryBarNext();

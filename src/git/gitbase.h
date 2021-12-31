@@ -3,14 +3,15 @@
 #include <string>
 #include <vector>
 
+// these don't really belong in here...
 typedef enum{
     GIT_LINE_REMOVED = 0,
     GIT_LINE_INSERTED,
-}GitLineTypes;
+}LineTypes;
 
-struct GitDiffLine{
+struct LineHighlightInfo{
     int lineno;
-    GitLineTypes ctype;
+    LineTypes ctype;
     std::string content;
 };
 
@@ -66,7 +67,7 @@ bool Git_ComputeCurrentDiff();
  * Given a target (file) of the working tree, get all hunks from the previously
  * computed diff.
  */
-bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *hunks);
+bool Git_FetchDiffFor(const char *target, std::vector<LineHighlightInfo> *hunks);
 
 /*
  * Compute all deltas (files) of the working tree and return in an array.

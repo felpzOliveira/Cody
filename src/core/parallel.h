@@ -4,15 +4,117 @@
 #include <geometry.h>
 #include <buffers.h>
 #include <mutex>
+#include <queue>
 #include <condition_variable>
 #include <functional>
 #include <typeindex>
 #include <map>
+#include <optional>
+#include <chrono>
+#include <iostream>
 
 struct LockedLineBuffer{
     LineBuffer *lineBuffer;
     std::mutex mutex;
     int render_state;
+};
+
+/*
+* Blocking Queue with timeout. Calling pop() blocks for 'max_timeout_ms'
+* if an item is detected than it is returned otherwise an empty std::optional<T>
+* is returned instead.
+*/
+template<typename T> class ConcurrentTimedQueue{
+    public:
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::queue<T> itemQ;
+    uint max_timeout_ms;
+
+    ConcurrentTimedQueue(uint ms=10) : max_timeout_ms(ms){}
+
+    std::optional<T> pop(){
+        std::unique_lock<std::mutex> locker(mutex);
+        auto max_ms = std::chrono::milliseconds(max_timeout_ms);
+        bool done = false;
+        auto start = std::chrono::system_clock::now();
+        while(itemQ.empty() && !done){
+            cv.wait_until(locker, start + max_ms, [&]{ return !itemQ.empty(); });
+            auto end = std::chrono::system_clock::now();
+            auto elapsed =
+                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+
+            done = elapsed >= max_timeout_ms;
+        }
+
+        if(itemQ.empty()){
+            return {};
+        }
+
+        T val = itemQ.front();
+        itemQ.pop();
+        return std::optional<T>(val);
+    }
+
+    uint size(){
+        std::unique_lock<std::mutex> locker(mutex);
+        return itemQ.size();
+    }
+
+    void push(T item){
+        std::unique_lock<std::mutex> locker(mutex);
+        itemQ.push(item);
+        locker.unlock();
+        cv.notify_all();
+    }
+
+    void clear(){
+        std::unique_lock<std::mutex> locker(mutex);
+        std::queue<T> empty;
+        std::swap(itemQ, empty);
+    }
+};
+
+/*
+* Blocking Queue. Calling pop() blocks untill a item is available.
+*/
+template<typename T> class ConcurrentQueue{
+    public:
+
+    std::mutex mutex;
+    std::condition_variable cv;
+    std::queue<T> itemQ;
+
+    ConcurrentQueue() = default;
+    T pop(){
+        std::unique_lock<std::mutex> locker(mutex);
+        while(itemQ.empty()){
+            cv.wait(locker);
+        }
+        T val = itemQ.front();
+        itemQ.pop();
+        locker.unlock();
+
+        return val;
+    }
+
+    void push(T item){
+        std::unique_lock<std::mutex> locker(mutex);
+        itemQ.push(item);
+        locker.unlock();
+        cv.notify_all();
+    }
+
+    int size(){
+        std::unique_lock<std::mutex> locker(mutex);
+        return itemQ.size();
+    }
+
+    void clear(){
+        std::unique_lock<std::mutex> locker(mutex);
+        std::queue<T> empty;
+        std::swap(itemQ, empty);
+    }
 };
 
 int ExecuteCommand(std::string cmd);

@@ -8,6 +8,11 @@
 #include <transform.h>
 #include <scroll_controller.h>
 #include <functional>
+#include <optional>
+
+#define LHINT_STATE_VALID      1
+#define LHINT_STATE_UNKNOW     2
+#define LHINT_STATE_INTERRUPT  3
 
 typedef enum{
     DescriptionTop,
@@ -19,7 +24,9 @@ typedef enum{
     BuildView,
     GitStatusView,
     GitDiffView,
+    DbgView,
     EmptyView,
+    NoneView,
 }ViewType;
 
 typedef struct{
@@ -34,6 +41,11 @@ typedef struct{
     Float currX;
     Transform horizontal;
 }Scroll;
+
+struct LineHints{
+    uint line;
+    int state; // this might not be the best name
+};
 
 struct BufferView{
     LineBuffer *lineBuffer;
@@ -54,6 +66,9 @@ struct BufferView{
     int endNestCount;
     int is_visible;
 
+    // test this
+    std::optional<LineHints> highlightLine;
+
     int is_transitioning;
 };
 
@@ -70,13 +85,14 @@ inline const char *ViewTypeString(ViewType type){
         case BuildView : return "BuildView";
         case GitDiffView : return "GitDiffView";
         case GitStatusView: return "GitStatusView";
+        case DbgView: return "DbgView";
         case EmptyView : return "EmptyView";
         default: return "(none)";
     }
 }
 
 Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue, 
+                            Float *initialValue, Float finalValue,
                             Float *velocity);
 
 Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
@@ -303,9 +319,32 @@ void BufferView_Dirty(BufferView *view);
 int BufferView_IsVisible(BufferView *view);
 
 /*
+* Gets the highlight line value, note that this is optinal.
+*/
+std::optional<LineHints> BufferView_GetLineHighlight(BufferView *view);
+
+/*
+* Sets the highlight line value.
+*/
+void BufferView_SetHighlightLine(BufferView *view, LineHints hint);
+
+/*
+* Clear the highlight line value.
+*/
+void BufferView_ClearHighlightLine(BufferView *view);
+
+/*
 * Sets a callback to be triggered whenever scroll animation finishes.
 */
 void BufferView_SetAnimationCallback(BufferView *view, std::function<void()> fn);
+
+/*
+* Find the position of a target token given by 'id' that have a counterpart 'cid',
+* starting from position 'start'. Returns true in case it is found false otherwise,
+* 'end' holds the (line, tid) where token is located.
+*/
+bool BufferView_FindFirstForward(BufferView *view, TokenId id, TokenId cid,
+                                 vec2ui start, vec2ui &end);
 
 /*
 * Register the position of the bufferview for a linebuffer.
@@ -327,5 +366,4 @@ void BufferViewLocation_RemoveView(BufferView *view);
 */
 void BufferViewLocation_RemoveLineBuffer(LineBuffer *lineBuffer);
 
-void BufferView_Test(BufferView *view);
 #endif //BUFFERVIEW_H

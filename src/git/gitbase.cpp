@@ -280,7 +280,7 @@ bool Git_FetchDiffDeltas(std::vector<std::string> *_deltas){
     return rv == 0;
 }
 
-bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *_hunks){
+bool Git_FetchDiffFor(const char *target, std::vector<LineHighlightInfo> *_hunks){
     if(!gitState.repo) return false;
     int rv = -1;
     git_diff *diff = nullptr;
@@ -290,7 +290,7 @@ bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *_hunks){
     diffopts.pathspec.count = 1;
 
     struct diff_data{
-        std::vector<GitDiffLine> *hks;
+        std::vector<LineHighlightInfo> *hks;
         std::string tgt;
     };
 
@@ -304,8 +304,8 @@ bool Git_FetchDiffFor(const char *target, std::vector<GitDiffLine> *_hunks){
 
         std::string hpath(delta->new_file.path);
         if(hpath == dt->tgt){
-            GitDiffLine hunk;
-            std::vector<GitDiffLine> *hunks = dt->hks;
+            LineHighlightInfo hunk;
+            std::vector<LineHighlightInfo> *hunks = dt->hks;
 
             hunk.content = std::string(line->content, line->content_len-1);
             if(line->origin == GIT_DIFF_LINE_DELETION){ // this line was removed

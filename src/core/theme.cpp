@@ -60,6 +60,9 @@ Theme themeTerminal = {
     .dynamicCursor = true,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
+    .isLight = false,
 };
 
 Theme themeGruvboxLight = {
@@ -121,6 +124,9 @@ Theme themeGruvboxLight = {
     .dynamicCursor = false,
     .borderWidth = 6,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xff000000),
+    .dbgLinehighlightColor = ColorFromHex(0xFFfbdbb2),
+    .isLight = true,
 };
 
 Theme themeDracula = {
@@ -175,6 +181,9 @@ Theme themeDracula = {
     .dynamicCursor = false,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF44476a),
+    .isLight = false,
 };
 
 Theme themeYavid = {
@@ -214,7 +223,8 @@ Theme themeYavid = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0xFF202020),
+        ColorFromHex(0xFF16191C),
+        //ColorFromHex(0xFF202020),
     },
     .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
@@ -229,6 +239,9 @@ Theme themeYavid = {
     .dynamicCursor = false,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF272739),
+    .isLight = false,
 };
 
 Theme themeRadical = {
@@ -237,9 +250,9 @@ Theme themeRadical = {
     .hoverableItemBackgroundColor = ColorFromHex(0xFF241630),
     .selectorBackground = ColorFromHex(0xFF131220),
     .searchBackgroundColor = ColorFromHex(0xFF342640),
-    
+
     .selectableListBackground = ColorFromHex(0x082f317c),
-    
+
     .searchWordColor = ColorFromHex(0xCCce0b95),
     .backgroundLineNumbers = ColorFromHex(0xFF141323),
     .lineNumberColor = ColorFromHex(0xFF767585),
@@ -248,7 +261,7 @@ Theme themeRadical = {
     //.operatorColor   = ColorFromHex(0xCCfc78ad),
     //.operatorColor = ColorFromHex(0xCCfaaf05),
     .operatorColor = ColorFromHex(0xCCc7ff00),
-    
+
     .datatypeColor   = ColorFromHex(0xCCf67397),
     .commentColor    = ColorFromHex(0x48cff0e9),
     .stringColor     = ColorFromHex(0xCCbaf7fc),
@@ -276,7 +289,7 @@ Theme themeRadical = {
     .backTextColors = {
         ColorFromHex(0xFF190A25),
     },
-    
+
     .userDatatypeColor = ColorFromHex(0xCCf67397),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),
     .scopeLineColor = ColorFromHex(0xAAd5348f),
@@ -290,6 +303,9 @@ Theme themeRadical = {
     .dynamicCursor = false,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF241640),
+    .isLight = false,
 };
 
 Theme theme4Coder = {
@@ -305,7 +321,7 @@ Theme theme4Coder = {
     .lineNumberHighlitedColor = ColorFromHex(0xFF7a7c7d),
     .cursorLineHighlight = ColorFromHex(0xFF232330),
     .operatorColor   = ColorFromHex(0xCCffc110),
-    
+
     .datatypeColor   = ColorFromHex(0xCCffc110),
     .commentColor    = ColorFromHex(0xCCa3a3a3),
     .stringColor     = ColorFromHex(0xCC8bb92d),
@@ -353,6 +369,9 @@ Theme theme4Coder = {
     .dynamicCursor = false,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .isLight = false,
 };
 
 Theme themeNoah = {
@@ -410,6 +429,9 @@ Theme themeNoah = {
     .dynamicCursor = false,
     .borderWidth = 3,
     .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xff252848),
+    .isLight = false,
 };
 
 Theme *defaultTheme = &themeRadical;
@@ -479,10 +501,10 @@ vec4i GetNestColor(Theme *theme, TokenId id, int level){
         }else{
             level = 0;
         }
-        
+
         return ApplyAlpha(theme->backTextColors[level], theme);
     }
-    
+
     AssertErr(0, "Invalid theme query for nesting color");
     return vec4i(255, 255, 0, 255);
 }
@@ -505,14 +527,14 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_NONE, tokensColor);
         COLOR_RET(TOKEN_ID_PREPROCESSOR, preprocessorColor);
         COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINE, preprocessorColor);
-        
+
         COLOR_RET(TOKEN_ID_DATATYPE_STRUCT_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_TYPEDEF_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_CLASS_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_ENUM_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_MORE, mathColor);
         COLOR_RET(TOKEN_ID_LESS, mathColor);
-        
+
         COLOR_RET(TOKEN_ID_COMMA, tokensColor);
         COLOR_RET(TOKEN_ID_SEMICOLON, tokensColor);
         COLOR_RET(TOKEN_ID_BRACE_OPEN, reservedColor);
@@ -521,15 +543,15 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_PARENTHESE_CLOSE, reservedColor);
         COLOR_RET(TOKEN_ID_BRACKET_OPEN, reservedColor);
         COLOR_RET(TOKEN_ID_BRACKET_CLOSE, reservedColor);
-        
+
         COLOR_RET(TOKEN_ID_DATATYPE_USER_STRUCT, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_DATATYPE, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM_VALUE, userDatatypeEnum);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM, preprocessorDefineColor);
-        
-        
+
+
         COLOR_RET(TOKEN_ID_PREPROCESSOR_DEFINITION, userDefineColor);
         default:{
             printf("Token id is %s (%d)\n", Symbol_GetIdString(id), (int)id);
@@ -537,7 +559,7 @@ vec4i GetColor(Theme *theme, TokenId id){
             return vec4i(255);
         }
     }
-    
+
 #undef COLOR_RET
     return ApplyAlpha(c, theme);
 }
@@ -566,6 +588,8 @@ vec4i GetUIColor(Theme *theme, UIElement id){
         COLOR_RET(UIHoverableListItem, hoverableItemForegroundColor);
         COLOR_RET(UIHoverableListItemBackground, hoverableItemBackgroundColor);
         COLOR_RET(UIPasteColor, pasteColor);
+        COLOR_RET(UIDbgArrowColor, dbgArrowColor);
+        COLOR_RET(UIDbgLineHighlightColor, dbgLinehighlightColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);
@@ -613,7 +637,7 @@ int ThemeNeedsEffect(Theme *theme){
 }
 
 bool CurrentThemeIsLight(){
-    return defaultTheme == &themeGruvboxLight;
+    return defaultTheme->isLight;
 }
 
 void CurrentThemeSetDimm(int dim){

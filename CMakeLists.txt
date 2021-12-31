@@ -6,19 +6,19 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Debug build")
-    set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic -fshort-enums")
+    set(MH_FLAGS "-g3 -O0 -Wall -std=c++17 -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Valgrind)
     message(STATUS "Valgrind build")
-    set(MH_FLAGS "-g3 -O0 -Wall -std=c++11 -rdynamic -fshort-enums")
+    set(MH_FLAGS "-g3 -O0 -Wall -std=c++17 -rdynamic -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Profiling)
     message(STATUS "Profiling build")
-    set(MH_FLAGS "-g -pg -Wall -std=c++11 -fshort-enums")
+    set(MH_FLAGS "-g -pg -Wall -std=c++17 -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Memory)
     message(STATUS "Memory check build")
-    set(MH_FLAGS "-Ofast -Wall -std=c++11 -DMEMORY_DEBUG -fshort-enums")
+    set(MH_FLAGS "-Ofast -Wall -std=c++17 -DMEMORY_DEBUG -fshort-enums")
 else()
     message(STATUS "Release build")
-    set(MH_FLAGS "-Ofast -Wall -std=c++11 -fshort-enums")
+    set(MH_FLAGS "-Ofast -Wall -std=c++17 -fshort-enums")
 endif()
 
 find_library(PCRE_LIB NAMES pcre libpcre)
@@ -41,9 +41,11 @@ endif()
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/core"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/files"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/debugger"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/languages"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/graphics"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/external"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/external/migdb"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/crypto"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/git"
@@ -53,6 +55,8 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
 file(GLOB MH_CORE src/core/*.cpp
                   src/files/*.cpp
                   src/resources/*.cpp
+                  src/debugger/*.cpp
+                  src/external/migdb/*.cpp
                   ${CMAKE_BINARY_DIR}/*.cpp
                   src/languages/*.cpp
                   src/crypto/*.cpp
@@ -84,5 +88,7 @@ set (CODY_LIBRARIES
         ${Z_LIB}
         ${PCRE_LIB})
 
-target_link_directories(${CODY} PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2)
+target_link_directories(${CODY} PRIVATE
+                        ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2
+                        ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
 target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})

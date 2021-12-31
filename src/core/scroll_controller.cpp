@@ -125,7 +125,6 @@ void VScroll_FitCursorToRange(VScroll *ss, vec2ui range, LineBuffer *lineBuffer)
     ss->cursor.is_dirty = 1;
 }
 
-
 void VScroll_CursorToPosition(VScroll *ss, uint lineNo, uint col, LineBuffer *lineBuffer){
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, (uint)lineNo);
     if(buffer){
@@ -306,7 +305,7 @@ int VScroll_GetScrollViewTransition(VScroll *ss, Float dt, vec2ui *rRange,
     }
 
     return 0;
-    __set_end_transition:
+__set_end_transition:
     ss->visibleRect.x = anim->endLine;
     ss->visibleRect.y = Min(ss->visibleRect.x + range, lineBuffer->lineCount);
     VScroll_FitCursorToRange(ss, ss->visibleRect, lineBuffer);

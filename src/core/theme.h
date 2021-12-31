@@ -6,6 +6,14 @@
 #include <lex.h>
 #include <vector>
 
+/*
+* The theme structure holds *all* colors used for rendering Cody UI.
+* Whenever a component is going to be painted it queries the theme API
+* for what is the current theme being used and inspect the component
+* relevant colors. Cody provides a few embedded themes that are
+* specified in theme.cpp.
+*/
+
 typedef enum{
     UIBackground,
     UISelectorBackground,
@@ -28,6 +36,8 @@ typedef enum{
     UIHoverableListItem,
     UIHoverableListItemBackground,
     UIPasteColor,
+    UIDbgArrowColor,
+    UIDbgLineHighlightColor,
 }UIElement;
 
 typedef struct{
@@ -39,7 +49,7 @@ typedef struct{
     // color used to paint active word background on hoverable components
     // currently the AutoComplete uses it to specify background of active item
     vec4i hoverableItemBackgroundColor;
-    // color used to paint query bar background and default background
+    // color used to paint query bar background and default background (no file opened)
     vec4i selectorBackground;
     // color used for the background that is painted for a word when searching
     vec4i searchBackgroundColor;
@@ -113,7 +123,7 @@ typedef struct{
     short backTextCount;
     // the size of the border of the files, if file border is enabled
     Float lineBorderWidth;
-    // flag indicating if this theme wants the inactve views to be alpha dimmed
+    // flag indicating if this theme wants the inactive views to be alpha dimmed
     short alphaDimm;
     // flag indicating if this themes cursor is based on the token position or not
     bool dynamicCursor;
@@ -123,6 +133,14 @@ typedef struct{
     // color used to fade in characters when paste is used, alpha value is overwritten
     // during interpolation
     vec4i pasteColor;
+    // color used to paint the debugger arrow
+    vec4i dbgArrowColor;
+    // color used for the debugger line highlighting
+    vec4i dbgLinehighlightColor;
+    // flag indicating if this theme is visually bright, i.e.: light
+    // this helps better select what icons are to be used and make decisions
+    // on components that have different colors on dark/light modes
+    bool isLight;
 }Theme;
 
 typedef struct{

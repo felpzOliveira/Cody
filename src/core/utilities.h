@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <functional>
 #include <sys/stat.h>
+#include <vector>
 
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
@@ -124,6 +125,11 @@ int StringFirstNonEmpty(char *s0, uint s0len);
 char *StringNextWord(char *s0, uint s0len, uint *size);
 
 /*
+* Split a string into a list of string, splits based on space.
+*/
+void StringSplit(std::string s0, std::vector<std::string> &splitted);
+
+/*
 * Find the first ocurrency of 'v' inside 's0'.
 */
 int StringFindFirstChar(char *s0, uint s0len, char v);
@@ -156,6 +162,17 @@ int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size);
 * path in 'folder' which should be of length PATH_MAX.
 */
 int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder);
+
+/*
+* Quickly check if a file exists.
+*/
+int FileExists(char *path);
+
+/*
+* Concatenate the path + folder into a string if the path does not look like
+* a full path. If it does return the original path.
+*/
+std::string ExpandFilePath(char *path, uint size, char *folder);
 
 /*
 * Gets the current working directory, 'dir' should be of size 'len' = PATH_MAX.

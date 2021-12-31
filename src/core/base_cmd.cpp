@@ -2,17 +2,29 @@
 #include <utilities.h>
 #include <string.h>
 #include <app.h>
+#include <control_cmds.h>
 #include <file_provider.h>
 #include <parallel.h>
 #include <bufferview.h>
 #include <sstream>
 #include <map>
 #include <theme.h>
+#include <dbgapp.h>
 
 #define CMD_DIMM_STR "dimm "
 #define CMD_KILLSPACES_STR "kill-spaces"
 #define CMD_SEARCH_STR "search "
 #define CMD_GIT_STR "git "
+#define CMD_HSPLIT_STR "hsplit"
+#define CMD_VSPLIT_STR "vsplit"
+#define CMD_EXPAND_STR "expand"
+#define CMD_KILLVIEW_STR "kill-view"
+#define CMD_KILLBUFFER_STR "kill-buffer"
+#define CMD_DBG_START_STR "dbg start "
+#define CMD_DBG_BREAK_STR "dbg break "
+#define CMD_DBG_EXIT_STR "dbg exit"
+#define CMD_DBG_RUN_STR "dbg run"
+#define CMD_DBG_FINISH_STR "dbg finish"
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
@@ -334,7 +346,7 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
 
     ParallelFor("String Seach", 0, size, [&](int i, int tid){
         LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
-            //printf("[%d] ==> %s\n", tid, lineBuffer->filePath);
+        //printf("[%d] ==> %s\n", tid, lineBuffer->filePath);
         if(tid > MAX_THREADS-1){
             printf("Ooops cannot query, too many threads\n");
             return;
@@ -342,7 +354,7 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
 
         GlobalSearch *threadResult = &results[tid];
         if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
-                //printf("Too many results\n");
+            //printf("Too many results\n");
             return;
         }
 
@@ -353,11 +365,11 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
                 uint start = 0;
                 do{
                     at = StringSearch((char *)strPtr, &buffer->data[start],
-                    stringLen, buffer->taken - start);
+                                      stringLen, buffer->taken - start);
                     if(at >= 0){
                         uint loc = threadResult->count;
                         if(loc >= MAX_SEARCH_ENTRIES-1){
-                                //printf("Too many results\n");
+                            //printf("Too many results\n");
                             return;
                         }
 
@@ -479,6 +491,67 @@ int BaseCommand_SetDimm(char *cmd, uint size, View *){
     return r;
 }
 
+int BaseCommand_DbgStart(char *cmd, uint size, View *view){
+    int r = 1;
+    char pmax[PATH_MAX];
+    memset(pmax, 0, PATH_MAX);
+    std::vector<std::string> splits;
+    StringSplit(std::string(cmd), splits);
+    if(splits.size() < 3){
+        printf("Invalid arguments\n");
+        return r;
+    }
+
+    std::string arg0 = splits[2];
+    std::string arg1;
+    for(uint i = 3; i < splits.size(); i++){
+        arg1 += splits[i];
+        if(i < splits.size()-1) arg1 += " ";
+    }
+    printf("Running %s %s\n", arg0.c_str(), arg1.c_str());
+    char *p = realpath(arg0.c_str(), pmax);
+    if(!p){
+        printf("Could not translate path [ %s ]\n", arg0.c_str());
+        return r;
+    }
+
+    DbgApp_StartDebugger(pmax, arg1.c_str());
+
+    return r;
+}
+
+int BaseCommand_DbgBreak(char *cmd, uint size, View *view){
+    int r = 1;
+    std::vector<std::string> splits;
+    StringSplit(std::string(cmd), splits);
+    if(splits.size() != 4){
+        printf("Invalid arguments\n");
+        return r;
+    }
+
+    const char *p0 = splits[2].c_str();
+    const char *p1 = splits[3].c_str();
+    uint val = StringToUnsigned((char *)p1, splits[3].size());
+    DbgApp_Break((char *)p0, val);
+
+    return r;
+}
+
+int BaseCommand_DbgFinish(char *cmd, uint size, View *view){
+    DbgApp_Finish();
+    return 1;
+}
+
+int BaseCommand_DbgExit(char *cmd, uint size, View *view){
+    DbgApp_Exit();
+    return 1;
+}
+
+int BaseCommand_DbgRun(char *cmd, uint size, View *view){
+    DbgApp_Run();
+    return 1;
+}
+
 int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
     int r = 1;
     BufferView *bView = View_GetBufferView(view);
@@ -511,11 +584,47 @@ int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
     return r;
 }
 
-void BaseCommand_InitializeCmdMap(){
+/* These are most duplicated from app.cpp so we get a list of strings attached to a cmd */
+int BaseCommand_Vsplit(char *, uint, View *){
+    AppCommandSplitVertical();
+    return 1;
+}
+
+int BaseCommand_Hsplit(char *, uint, View *){
+    AppCommandSplitHorizontal();
+    return 1;
+}
+
+int BaseCommand_ExpandRestore(char *, uint, View *){
+    ControlCommands_SwapExpand();
+    return 1;
+}
+
+int BaseCommand_KillView(char *, uint, View *){
+    AppCommandKillView();
+    return 1;
+}
+
+int BaseCommand_KillBuffer(char *, uint, View *){
+    AppCommandKillBuffer();
+    return 1;
+}
+
+void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = BaseCommand_SetDimm;
     cmdMap[CMD_KILLSPACES_STR] = BaseCommand_KillSpaces;
     cmdMap[CMD_SEARCH_STR] = BaseCommand_SearchAllFiles;
     cmdMap[CMD_GIT_STR] = BaseCommand_Git;
+    cmdMap[CMD_HSPLIT_STR] = BaseCommand_Hsplit;
+    cmdMap[CMD_VSPLIT_STR] = BaseCommand_Vsplit;
+    cmdMap[CMD_EXPAND_STR] = BaseCommand_ExpandRestore;
+    cmdMap[CMD_KILLVIEW_STR] = BaseCommand_KillView;
+    cmdMap[CMD_KILLBUFFER_STR] = BaseCommand_KillBuffer;
+    cmdMap[CMD_DBG_START_STR] = BaseCommand_DbgStart;
+    cmdMap[CMD_DBG_BREAK_STR] = BaseCommand_DbgBreak;
+    cmdMap[CMD_DBG_EXIT_STR] = BaseCommand_DbgExit;
+    cmdMap[CMD_DBG_RUN_STR] = BaseCommand_DbgRun;
+    cmdMap[CMD_DBG_FINISH_STR] = BaseCommand_DbgFinish;
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

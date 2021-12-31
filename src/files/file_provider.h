@@ -30,6 +30,7 @@ FileBufferList *FileProvider_GetBufferList();
 * Asks the file provider to remove a file
 */
 void FileProvider_Remove(char *path, uint len);
+void FileProvider_Remove(LineBuffer *lineBuffer);
 
 /*
 * Finds the linebuffer (if any) that holds a file given by its path, it also returns

@@ -12,10 +12,15 @@
 #include <x11_display.h>
 #include <map>
 #include <file_provider.h>
+#include <functional>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
 #define MAX_TEXTURES_PER_BATCH 16
+
+// look if you are trying to bind something that requires higher frequency
+// than 1/1024, I'm sorry, you should review your event.
+#define MIN_EVENT_SAMPLING_INTERVAL 0.000976562
 
 // Our OpenGL rendering renders everything in very high resolution and
 // than reduce scaling to get simple AA. This could potentially be slow
@@ -104,6 +109,11 @@ struct OpenGLTexture{
     int format;
 };
 
+struct EventHandler{
+    std::function<bool(void)> fn;
+    double interval;
+};
+
 struct OpenGLState{
     WindowX11 *window;
     OpenGLFont font;
@@ -121,6 +131,8 @@ struct OpenGLState{
     Transform projection;
     Transform scale;
     Transform model;
+    std::vector<EventHandler> eventHandlers;
+    double eventInterval;
     // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
     std::map<FileExtension, std::string> fileMap;
@@ -328,6 +340,25 @@ vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view)
 * Bind all image units.
 */
 void Graphics_BindImages(OpenGLState *state);
+
+/*
+* Add an event handling function into the rendering thread. This can be used by
+* routines that want to do live update and require UI to not pause for events.
+* The ival value tells what is the interval of sampling it should use and eH tells what
+* function to call during the pooling procedure in order to handle the events. The
+* handler should use the boolean return to tell if the routine needs to be sampled again,
+* i.e.: returning false makes the routine be removed from the event handling routine list.
+* Maximum sampling frequency is given by MIN_EVENT_SAMPLING_INTERVAL. Note that the
+* interval given might not be respected. If any other event requires a higher sampling
+* rate, than the routine will be sampled at higher frequency, this avoids races where
+* it would not be possible to combine different events under different frequencies.
+* Because all events run together, if an event take too long to return the routine
+* might not be called in 'ival' seconds, it is however garanteed to be executed by an
+* triggered timer under 'ival' seconds. Events are called *after* the rendering is done
+* so the routine might consider all previous actions to UI have already been updated
+* into the current framebuffer.
+*/
+void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH);
 
 /*
 * Converts a screen coordinates to a rendering coordinate.

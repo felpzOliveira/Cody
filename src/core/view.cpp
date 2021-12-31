@@ -62,9 +62,9 @@ void View_Free(View *view){
     if(view->selectableList.selectableSize > 0){
         AllocatorFree(view->selectableList.selectable);
     }
-    
+
     QueryBar_Free(&view->queryBar);
-    
+
     view->selectableList = SELECTABLE_LIST_INITIALIZER;
 }
 
@@ -110,7 +110,7 @@ void View_EarlyInitialize(View *view){
     QueryBar_Initialize(&view->queryBar);
 
     View_SetControlOpts(view, Control_Opts_None);
-    
+
     view->renderList[View_FreeTyping] = {
         .stages = {
             Graphics_RenderView,
@@ -118,7 +118,7 @@ void View_EarlyInitialize(View *view){
         },
         .stageCount = 2,
     };
-    
+
     view->renderList[View_QueryBar] = {
         .stages = {
             Graphics_RenderView,
@@ -127,7 +127,7 @@ void View_EarlyInitialize(View *view){
         },
         .stageCount = 3,
     };
-    
+
     view->renderList[View_SelectableList] = {
         .stages = {
             Graphics_RenderListSelector,
@@ -157,7 +157,7 @@ void View_SetGeometry(View *view, Geometry geometry, uint lineHeight){
     Float listLines = height / pHeight;
     uint count = (uint)Floor(listLines);
     uint displayable = (uint)Floor(height / realHeight) - 1;
-    
+
     view->geometry = geometry;
 
     SelectableList_SetView(&view->selectableList, count, displayable);
@@ -171,7 +171,7 @@ void View_SetGeometry(View *view, Geometry geometry, uint lineHeight){
     }else{
         AssertErr(0, "Unknown description");
     }
-    
+
     barGeo.extensionX = geometry.extensionX;
     barGeo.extensionY = geometry.extensionY;
     BufferView_SetGeometry(&view->bufferView, geometry, lineHeight);
@@ -218,7 +218,7 @@ int View_PreviousItem(View *view){
         int minv = filter->allowFreeType ? -1 : 0;
         SelectableList_PreviousItem(list, minv);
     }
-    
+
     return 0;
 }
 
@@ -229,7 +229,7 @@ int View_NextItem(View *view){
         SelectableList *list = &view->selectableList;
         SelectableList_NextItem(list);
     }
-    
+
     return 0;
 }
 
@@ -238,10 +238,10 @@ int View_CommitToState(View *view, ViewState state){
     if(View_IsQueryBarActive(view)){
         c = QueryBar_Reset(&view->queryBar, view, 1);
     }
-    
+
     if(c != 0)
         view->state = state;
-    
+
     return c;
 }
 
@@ -253,7 +253,7 @@ void View_SelectableListDebug(View *view){
     SelectableList *list = &view->selectableList;
     printf("List len = %u, Buffer len = %u, Active = %u\n",
            list->selectableSize, list->listBuffer->lineCount, list->active);
-    
+
     for(uint i = 0; i < list->used; i++){
         Buffer *b = LineBuffer_GetBufferAt(list->listBuffer, list->selectable[i]);
         printf("State (%u) = %u (%s)\n", i, list->selectable[i], b->data);

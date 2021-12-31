@@ -132,21 +132,32 @@ void ViewTree_Begin(ViewTreeIterator *iterator){
     if(viewTree.root){
         iterator->stack = std::stack<ViewNode *>(); // clear stack
         iterator->stack.push(viewTree.root);
-        return ViewTree_IteratorNext(iterator);
+        ViewTree_IteratorNext(iterator);
+    }else{
+        iterator->value = nullptr;
     }
-    iterator->value = nullptr;
 }
 
 void ViewTree_Next(ViewTreeIterator *iterator){
     if(viewTree.root){
-        return ViewTree_IteratorNext(iterator);
+        ViewTree_IteratorNext(iterator);
+    }else{
+        iterator->value = nullptr;
     }
-
-    iterator->value = nullptr;
 }
 
 void ViewTree_SetActive(ViewNode *vnode){
     viewTree.activeNode = vnode;
+}
+
+uint ViewTree_GetCount(){
+    uint count = 0;
+    ViewTree_ForAllViews([&](ViewNode *node) -> int{
+        if(node->is_leaf) count += 1;
+        return 0;
+    });
+
+    return count;
 }
 
 void ViewTree_ForAllViews(std::function<int(ViewNode *)> fn){

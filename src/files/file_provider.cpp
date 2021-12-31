@@ -108,13 +108,19 @@ FileBufferList *FileProvider_GetBufferList(){
     return &fProvider.fileBuffer;
 }
 
+void FileProvider_Remove(LineBuffer *lineBuffer){
+    FileBufferList_Remove(&fProvider.fileBuffer, lineBuffer);
+}
+
 void FileProvider_Remove(char *ptr, uint pSize){
     FileBufferList_Remove(&fProvider.fileBuffer, ptr, pSize);
 }
 
 int FileProvider_FindByPath(LineBuffer **lBuffer, char *path, uint len, Tokenizer **tokenizer){
     LineBufferProps props;
-    *tokenizer = FileProvider_GuessTokenizer(path, len, &props);
+    if(tokenizer){
+        *tokenizer = FileProvider_GuessTokenizer(path, len, &props);
+    }
     return FileBufferList_FindByPath(&fProvider.fileBuffer, lBuffer, path, len);
 }
 

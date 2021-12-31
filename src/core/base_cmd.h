@@ -70,7 +70,7 @@ typedef struct QueryBarCmdSearchAndReplace{
 /*
 * Initializes the command map.
 */
-void BaseCommand_InitializeCmdMap();
+void BaseCommand_InitializeCommandMap();
 
 /*
 * Performs one computation of the search operation based on the contents

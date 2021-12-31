@@ -16,6 +16,7 @@
 #include <image_util.h>
 #include <file_provider.h>
 #include <parallel.h>
+#include <dbgapp.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -484,6 +485,7 @@ static void _OpenGLBufferPushVertex(OpenGLBuffer *buffer, Float x, Float y, vec4
 static void _OpenGLStateInitialize(OpenGLState *state){
     int targetWidth = 1600;
     int targetHeight = 900;
+    state->eventInterval = MIN_EVENT_SAMPLING_INTERVAL;
     state->font.fsContext = nullptr;
     state->font.fontId = -1;
     state->window = nullptr;
@@ -524,7 +526,7 @@ void WindowOnSizeChange(int width, int height){
 void WinOnMouseMotion(int x, int y){
     //printf("Mouse to %d %d\n", x, y);
     GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
-    //AppHandleMouseMotion();
+    AppHandleMouseMotion(x, y, &GlobalGLState);
 }
 
 void WindowOnScroll(int is_up){
@@ -977,13 +979,73 @@ void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len,
     }
 }
 
+void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH){
+    double stateInterval = Max(MIN_EVENT_SAMPLING_INTERVAL, ival);
+    if(stateInterval < GlobalGLState.eventInterval){
+        GlobalGLState.eventInterval = stateInterval;
+    }
+
+    GlobalGLState.eventHandlers.push_back({.fn = eH, .interval = stateInterval});
+}
+
+void UpdateEventsAndHandleRequests(int animating){
+    // if the UI is animating than just pool with uncapped fps
+    if(animating){
+        PoolEventsX11();
+    }else{
+        OpenGLState *state = &GlobalGLState;
+        // check if we are handling custom events outside
+        // the UI that require live update, for these we
+        // can pool but they will overconsume our CPU
+        // so cap at specific interval as they don't really need high fps
+        // but without it we would need to integrate x11 pooling
+        // with concurrent events, yikes...
+        if(state->eventHandlers.size() > 0){
+            bool any_rems = false;
+            // pool the UI first
+            PoolEventsX11();
+            // pool the events and update next event interval in case anyone bails out
+            std::vector<EventHandler>::iterator it;
+            double expected_ival = Infinity;
+            for(it = state->eventHandlers.begin(); it != state->eventHandlers.end(); ){
+                EventHandler handler = *it;
+                if(!handler.fn()){
+                    it = state->eventHandlers.erase(it);
+                    any_rems = true;
+                }else{
+                    it++;
+                    expected_ival = Min(expected_ival, handler.interval);
+                }
+            }
+
+            // sleep untill the next event
+            double pTime = GetElapsedTime();
+            double fdt = pTime - lastTime;
+
+            if(!IsZero(fdt) && fdt < state->eventInterval){
+                int dif = (state->eventInterval - fdt) * 1000.0;
+                std::this_thread::sleep_for(std::chrono::milliseconds(dif));
+            }
+
+            // in case someone exited we need to update the iterval
+            // for the next one
+            if(any_rems && state->eventHandlers.size() > 0){
+                state->eventInterval = expected_ival;
+            }
+        }else{
+            // if we are not handling custom events than simply wait for the
+            // next UI event. This is fine because Cody is UI-driven
+            WaitForEventsX11();
+        }
+    }
+}
+
 /*
 * TODO: It is interesting to attempt to render 1 +2pages and allow
 *       for a translation matrix. It might allow us to better represent
 *       transitions and the viewing interface? Also it allows us to by-pass
 *       the 'translate at end of file' issue we have right now.
 */
-
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
@@ -1062,31 +1124,17 @@ void OpenGLEntry(){
         }
 
         SwapBuffersX11(state->window);
-#if 0
-        PoolEventsX11();
-        double pTime = GetElapsedTime();
-        double fdt = pTime - lastTime;
-        // 240 fps
-        Float targetInterval = 1.0 / 240.0;
 
-        if(!IsZero(fdt) && fdt < targetInterval){
-            int dif = (targetInterval - fdt) * 1000.0;
-            std::this_thread::sleep_for(std::chrono::milliseconds(dif));
-        }
+        UpdateEventsAndHandleRequests(animating);
+    }
 
-        if(!IsZero(dt)){
-            printf("FPS %g\n", 1.0 / dt);
-        }else{
-            printf("FPS ---\n");
-        }
-
-#else
-        if(animating){
-            PoolEventsX11();
-        }else{
-            WaitForEventsX11();
-        }
-#endif
+    if(Dbg_IsRunning()){
+        DbgApp_Exit();
+        // sleep to make sure the debugger has enough time
+        // to send the message, response might take longer
+        // because it depends on its state, however it should
+        // not be our problem anymore as we are not going to answer it
+        sleep(1);
     }
 
     //DEBUG_MSG("Finalizing OpenGL graphics\n");
@@ -1107,6 +1155,7 @@ void Graphics_Initialize(){
 #if 0
     if(GlobalGLState.running == 0){
         GlobalGLState.running = 1;
+        GlobalGLState.eventInterval = 0.008333; // 1/120
         std::thread(OpenGLEntry).detach();
     }
 #endif

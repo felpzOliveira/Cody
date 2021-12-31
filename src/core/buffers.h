@@ -62,7 +62,7 @@ struct LineBufferProps{
     FileExtension ext;
     CopySection cpSection;
     bool isWrittable;
-    std::vector<GitDiffLine> diffs;
+    std::vector<LineHighlightInfo> diffs;
     std::vector<vec2ui> diffLines;
 };
 
@@ -210,6 +210,14 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len=nullptr
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
 
 /*
+* Adjust the position to **make sure** it does not lie inside a tab expansion.
+* The direction variable can be passed to tell to which side of a tab it should
+* clamp in case it does indeed lie inside a tab expansion, it has value -1 for
+* clamping t othe left and +1 for clamping to the right.
+*/
+uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction);
+
+/*
 * Copy the contents of 'src' into 'dst' duplicating the 'src' buffer.
 */
 void Buffer_CopyDeep(Buffer *dst, Buffer *src);
@@ -309,20 +317,20 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
 void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
 
 /*
-* Retrieves the pointer associated to the diff inside this linebuffer. Settings
-* clear = 1 makes the diff be clared before returning. This is intended to be used
-* with the git interface to avoid array copies. This list should be used by the git
-* interface to register raw deltas. In order to clearly express changes in file
-* use LineBuffer_InsertDiffContent.
+* Retrieves the pointer associated to the line highlight inside this linebuffer. Settings
+* clear = 1 makes the ptr be clared before returning. This is intended to be used
+* with the git/dbg interface to avoid array copies. This list should be used by the git
+* interface to register raw deltas and dbg to trigger view on stop points. In order to
+* clearly express changes in file use LineBuffer_InsertDiffContent.
 */
-std::vector<GitDiffLine> *LineBuffer_GetDiffPtr(LineBuffer *lineBuffer, int clear=1);
+std::vector<LineHighlightInfo> *LineBuffer_GetLineHighlightPtr(LineBuffer *lineBuffer, int clear=1);
 
 /*
-* Retrieves the pointer associated to the diff range inside this linebuffer. The diff
-* range pointer is a list of pair of values that holds (line, type) of all diffs
+* Retrieves the pointer associated to the line highlight range inside this linebuffer.
+* The diff range pointer is a list of pair of values that holds (line, type) of all highlights
 * currently active in the linebuffer. For example a new line might be registered as:
 * (32, GIT_LINE_INSERTED) and a removed one as (64, GIT_LINE_REMOVED). This list
-* can be used to render the linebuffer displaying diffs.
+* can be used to render the linebuffer displaying git diffs or highlight lines for some reason.
 */
 std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any);
 
