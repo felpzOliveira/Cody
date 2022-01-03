@@ -1,6 +1,7 @@
 #include <query_bar.h>
 #include <view.h>
 #include <bufferview.h>
+#include <app.h>
 
 static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
                                   char *name=nullptr, uint titleLen=0);
@@ -138,6 +139,7 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
             len = snprintf(title, sizeof(title), "Goto Line: ");
             queryBar->filter.digitOnly = 1;
         } break;
+        case QUERY_BAR_CMD_INTERACTIVE:
         case QUERY_BAR_CMD_CUSTOM:{
             if(title && titleLen > 0){
                 len = snprintf(title, sizeof(title), "%s: ", name);
@@ -196,6 +198,7 @@ static int  QueryBar_DynamicUpdate(QueryBar *queryBar, View *view){
                 }
             }
         } break;
+        case QUERY_BAR_CMD_INTERACTIVE:
         case QUERY_BAR_CMD_CUSTOM:{
             if(queryBar->entryCallback){
                 r = queryBar->entryCallback(queryBar, view);
@@ -230,6 +233,7 @@ void QueryBar_Initialize(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
     QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
     queryBar->buffer = BUFFER_INITIALIZER;
+    queryBar->qHistoryAt = -1;
     queryBar->isActive = 0;
     queryBar->writePos = 0;
     queryBar->writePosU8 = 0;
@@ -275,6 +279,20 @@ void QueryBar_Activate(QueryBar *queryBar, QueryBarCommand cmd, View *view){
     BufferView *bView = View_GetBufferView(view);
     queryBar->cursorBackup = BufferView_GetCursorPosition(bView);
     QueryBar_StartCommand(queryBar, cmd);
+}
+
+void QueryBar_ActiveCustomFull(QueryBar *queryBar, char *title, uint titlelen,
+                               OnQueryBarEntry entry, OnQueryBarCancel cancel,
+                               OnQueryBarCommit commit, QueryBarInputFilter *filter,
+                               QueryBarCommand cmd)
+{
+    AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    QueryBar_StartCommand(queryBar, cmd, title, titlelen);
+
+    queryBar->entryCallback  = entry;
+    queryBar->cancelCallback = cancel;
+    queryBar->commitCallback = commit;
+    if(filter) queryBar->filter = *filter;
 }
 
 void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
@@ -380,6 +398,22 @@ int QueryBar_NextItem(QueryBar *queryBar, View *view){
             QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_SEARCH);
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor);
         } break;
+        case QUERY_BAR_CMD_INTERACTIVE:{
+            QueryBarHistory *qHistory = AppGetQueryBarHistory();
+            if(queryBar->qHistoryAt > 0){
+                uint where = queryBar->qHistoryAt-1;
+                QueryBarHistoryItem *item = CircularStack_At(qHistory->history, where);
+                if(item){
+                    char *data = (char *)item->value.c_str();
+                    uint len = item->value.size();
+                    QueryBar_SetEntry(queryBar, view, data, len);
+                    queryBar->qHistoryAt = where;
+                }
+            }else if(queryBar->qHistoryAt == 0){
+                queryBar->qHistoryAt = -1;
+                QueryBar_RemoveAllFromCursor(queryBar);
+            }
+        } break;
         default:{}
     }
 
@@ -417,6 +451,17 @@ int QueryBar_PreviousItem(QueryBar *queryBar, View *view){
             cursor.textPosition = vec2ui(line, p);
             r = QueryBarCommandSearch(queryBar, bView->lineBuffer, &cursor);
         } break;
+        case QUERY_BAR_CMD_INTERACTIVE:{
+            QueryBarHistory *qHistory = AppGetQueryBarHistory();
+            uint where = queryBar->qHistoryAt+1;
+            QueryBarHistoryItem *item = CircularStack_At(qHistory->history, where);
+            if(item){
+                char *data = (char *)item->value.c_str();
+                uint len = item->value.size();
+                QueryBar_SetEntry(queryBar, view, data, len);
+                queryBar->qHistoryAt = where;
+            }
+        } break;
         default:{}
     }
 
@@ -436,7 +481,9 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
     BufferView *bView = View_GetBufferView(view);
     int r = 1;
     if(commit == 0){
-        if(queryBar->cmd == QUERY_BAR_CMD_CUSTOM){
+        if(queryBar->cmd == QUERY_BAR_CMD_CUSTOM ||
+           queryBar->cmd == QUERY_BAR_CMD_INTERACTIVE)
+        {
             if(queryBar->cancelCallback){
                 r = queryBar->cancelCallback(queryBar, view);
             }
@@ -472,9 +519,21 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                     BufferView_CursorToPosition(bView, queryBar->searchCmd.lineNo, p);
                 }
             } break;
+            case QUERY_BAR_CMD_INTERACTIVE:
             case QUERY_BAR_CMD_CUSTOM:{
                 if(queryBar->commitCallback){
                     r = queryBar->commitCallback(queryBar, view);
+                    if(r != 0){
+                        QueryBarHistory *qHistory = AppGetQueryBarHistory();
+                        char *content = nullptr;
+                        uint size = 0;
+                        QueryBar_GetWrittenContent(queryBar, &content, &size);
+                        if(content && size > 0){
+                            QueryBarHistoryItem item;
+                            item.value = std::string(content, size);
+                            CircularStack_Push(qHistory->history, &item);
+                        }
+                    }
                 }
             } break;
             default:{}
@@ -487,6 +546,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
         Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count);
         queryBar->writePosU8 = 0;
         queryBar->writePos = 0;
+        queryBar->qHistoryAt = -1;
         queryBar->cursor.textPosition = vec2ui(0,0);
         queryBar->cursorBackup = vec2ui(0, 0);
         queryBar->entryCallback = nullptr;

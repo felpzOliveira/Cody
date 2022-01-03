@@ -564,6 +564,76 @@ void PriorityQueue_Free(PriorityQueue<Item> *pq){
 }
 
 /*
+* 'Circular' stack with fixed length.
+*/
+template<typename T>
+struct CircularStack{
+    T *items;
+    uint capacity;
+    uint size;
+    int top;
+};
+
+template<typename T> inline void CircularStack_Init(CircularStack<T> *cstack, uint n){
+    AssertA(cstack != nullptr, "Invalid pointer to circular stack");
+    cstack->capacity = Max(n, 1);
+    cstack->top = 0;
+    cstack->size = 0;
+    cstack->items = AllocatorGetN(T, cstack->capacity);
+}
+
+template<typename T> inline CircularStack<T> *CircularStack_Create(uint n){
+    CircularStack<T> *cstack = (CircularStack<T> *)AllocatorGet(sizeof(CircularStack<T>));
+    AssertA(cstack != nullptr, "Failed to get memory for ciruclar stack");
+    CircularStack_Init(cstack, n);
+    return cstack;
+}
+
+template<typename T> inline void CircularStack_Push(CircularStack<T> *cstack, T *item){
+    if(cstack->capacity == 0) return;
+    int pos = (cstack->top + 1) % (cstack->capacity);
+    cstack->items[cstack->top] = *item;
+    if(cstack->size < cstack->capacity) cstack->size += 1;
+    cstack->top = pos;
+}
+
+template<typename T> inline void CircularStack_Size(CircularStack<T> *cstack){
+    return cstack->size;
+}
+
+template<typename T> inline T *CircularStack_At(CircularStack<T> *cstack, uint at){
+    uint where = 0;
+    if(cstack->capacity == 0 || at >= cstack->size) return nullptr;
+
+    if(cstack->size == cstack->capacity){
+        where = cstack->top > 0 ? cstack->top-1 : cstack->capacity-1;
+        // it is actually very simple if the size is already equal to capacity
+        // it means top wrapped and we simply need to count forward
+        while(at > 0){
+            where = where > 0 ? where-1 : cstack->capacity-1;
+            at--;
+        }
+    }else{
+        // if not than simply count from the 0 which means where = at
+        where = (cstack->top-1) - at;
+    }
+
+    return &cstack->items[where];
+}
+
+template<typename T> inline void CircularStack_Clear(CircularStack<T> *cstack){
+    cstack->top = 0;
+    cstack->size = 0;
+}
+
+template<typename T> inline void CircularStack_Free(CircularStack<T> *cstack){
+    cstack->top = 0;
+    cstack->size = 0;
+    cstack->capacity = 0;
+    AllocatorFree(cstack->items);
+}
+
+/*
 * Fixed length stack.
 */
 template<typename T>

@@ -268,6 +268,10 @@ int waitForVisibilityNotify(WindowX11* window, LibHelperX11 *x11){
     return 1;
 }
 
+void MakeContextX11(WindowX11 *window){
+    MakeContextCurrentGLX((void *)window);
+}
+
 void _CreateWindowX11(int width, int height, const char *title,
                       Framebuffer *fb, ContextGL *context, LibHelperX11 *x11,
                       WindowX11 *window)
@@ -344,29 +348,51 @@ void SetSamplesX11(int samples){
     x11Framebuffer.samples = Max(0, samples);
 }
 
+void SetNoResizable(WindowX11 *window){
+    XSizeHints* hints = XAllocSizeHints();
+    hints->flags |= PWinGravity;
+    hints->win_gravity = StaticGravity;
+    hints->flags |= (PMinSize | PMaxSize);
+    hints->min_width  = hints->max_width  = window->width;
+    hints->min_height = hints->max_height = window->height;
+    XSetWMNormalHints(x11Helper.display, window->handle, hints);
+    XFree(hints);
+}
+
+
 void SetOpenGLVersionX11(int major, int minor){
     x11GLContext.major = major;
     x11GLContext.minor = minor;
 }
 
-void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback){
+void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv){
     window->onScrollCall = callback;
+    window->privScroll = priv;
 }
 
-void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback){
+void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback, void *priv){
     window->onMouseClickCall = callback;
+    window->privClick= priv;
 }
 
-void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback){
+void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv){
     window->onSizeChangeCall = callback;
+    window->privSize = priv;
 }
 
-void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback){
+void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv){
     window->onFocusChangeCall = callback;
+    window->privFocus = priv;
 }
 
-void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback){
+void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv){
     window->onMouseMotionCall = callback;
+    window->privMotion = priv;
+}
+
+void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv){
+    window->onMouseDClickCall = callback;
+    window->privDclick = priv;
 }
 
 WindowX11 *CreateWindowX11(int width, int height, const char *title){
@@ -765,7 +791,8 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
         AssertA(0, "Weird UTF8 character input");
     }
 
-    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS, buf, count, code);
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS,
+                  buf, count, code, (void *)window);
 
     window->lastKeyTime = event->xkey.time;
 }
@@ -773,7 +800,8 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
 void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     int code = event->xkey.keycode;
     int mappedKey = TranslateKeyX11(code);
-    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE, NULL, 0, code);
+    KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE,
+                  NULL, 0, code, (void *)window);
 }
 
 void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -790,14 +818,33 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
         case Button1:{
             if(window->onMouseClickCall){
                 window->onMouseClickCall(window->lastCursorPosX,
-                                         window->lastCursorPosY);
+                                         window->lastCursorPosY,
+                                         window->privClick);
             }
+            // I really hate that I have to do this, because all I wanted
+            // was to be happy. But aparently linux does not want me
+            // to be happy.
+            double dif = event->xbutton.time - window->lastClickTime;
+            vec2f vold((Float)window->xpos, (Float)window->ypos);
+            vec2f vnew((Float)window->lastCursorPosX, (Float)window->lastCursorPosY);
+            Float dist = (vold - vnew).Length();
+
+            if(dif < MOUSE_DCLICK_INTERVAL && dist < MOUSE_DCLICK_DISTANCE){
+                if(window->onMouseDClickCall){
+                    window->onMouseDClickCall(window->lastCursorPosX,
+                                              window->lastCursorPosY,
+                                              window->privDclick);
+                }
+            }
+            window->lastClickTime = event->xbutton.time;
+            window->xpos = window->lastCursorPosX;
+            window->ypos = window->lastCursorPosY;
         } break;
         default:{ }
     }
 
     if(is_scroll && window->onScrollCall){
-        window->onScrollCall(is_scroll_up);
+        window->onScrollCall(is_scroll_up, window->privScroll);
     }
 }
 
@@ -819,7 +866,7 @@ void ProcessEventMotionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     window->lastCursorPosX = x;
     window->lastCursorPosY = y;
     if(window->onMouseMotionCall){
-        window->onMouseMotionCall(x, y);
+        window->onMouseMotionCall(x, y, window->privMotion);
     }
 }
 
@@ -831,7 +878,7 @@ void ProcessEventConfigureX11(XEvent *event, WindowX11 *window, LibHelperX11 *x1
         window->height = event->xconfigure.height;
 
         if(window->onSizeChangeCall){
-            window->onSizeChangeCall(window->width, window->height);
+            window->onSizeChangeCall(window->width, window->height, window->privSize);
         }
     }
 }
@@ -881,14 +928,14 @@ void ProcessEventSelectionRequestX11(XEvent *event, WindowX11 *window, LibHelper
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     //printf("Focus IN\n");
     if(window->onFocusChangeCall){
-        window->onFocusChangeCall();
+        window->onFocusChangeCall(window->privFocus);
     }
 }
 
 void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     //printf("Focus OUT\n");
     if(window->onFocusChangeCall){
-        window->onFocusChangeCall();
+        window->onFocusChangeCall(window->privFocus);
     }
 }
 
@@ -909,7 +956,8 @@ void ProcessEventX11(XEvent *event){
     int filtered = XFilterEvent(event, None);
     XFindContext(x11Helper.display, event->xany.window,
                  x11Helper.context, (XPointer *)&window);
-    //if(rv != 0) return;
+
+    if(window == nullptr) return;
 
     switch(event->type){
         case ReparentNotify:{

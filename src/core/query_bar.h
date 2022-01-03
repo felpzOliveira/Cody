@@ -8,6 +8,7 @@
 #include <keyboard.h>
 #include <base_cmd.h>
 #include <functional>
+#include <vector>
 
 #define OnQueryBarEntry  std::function<int(QueryBar *, View*)>
 #define OnQueryBarCancel std::function<int(QueryBar *, View*)>
@@ -26,6 +27,14 @@ struct QueryBarInputFilter{
     int allowFreeType;
 };
 
+struct QueryBarHistoryItem{
+    std::string value;
+};
+
+struct QueryBarHistory{
+    CircularStack<QueryBarHistoryItem> *history;
+};
+
 struct QueryBar{
     Geometry geometry;
     Buffer buffer;
@@ -36,6 +45,7 @@ struct QueryBar{
     uint writePosU8;
     QueryBarCommand cmd;
     QueryBarInputFilter filter;
+    int qHistoryAt;
 
     /* Command related data */
     QueryBarCmdSearch searchCmd;
@@ -45,7 +55,7 @@ struct QueryBar{
     OnQueryBarEntry  entryCallback; // happens when the query bar buffer changes
     OnQueryBarCancel cancelCallback; // when user presses Esc on a query bar
     OnQueryBarCommit commitCallback; // when user presses Enter on a query bar
-    
+
     /* For file opening, this is called when user confirms a file */
     OnFileOpenCallback fileOpenCallback;
 };
@@ -73,9 +83,18 @@ void QueryBar_Activate(QueryBar *queryBar, QueryBarCommand cmd, View *view);
 * keep the state unchanged, >= 0 values will trigger default behaviour, while
 * negative values inform that an error occur and state should be reverted immediatly.
 */
-void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen, 
+void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
                              OnQueryBarEntry entry, OnQueryBarCancel cancel,
                              OnQueryBarCommit commit, QueryBarInputFilter *filter);
+
+/*
+* Same as QueryBar_ActivateCustom but allow you to set the cmd id. Be aware that
+* the id must be solvable by the query bar internal working.
+*/
+void QueryBar_ActiveCustomFull(QueryBar *queryBar, char *title, uint titlelen,
+                               OnQueryBarEntry entry, OnQueryBarCancel cancel,
+                               OnQueryBarCommit commit, QueryBarInputFilter *filter,
+                               QueryBarCommand cmd);
 /*
 * Move the cursor left.
 */

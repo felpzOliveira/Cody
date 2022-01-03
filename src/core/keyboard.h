@@ -116,6 +116,7 @@ typedef struct{
     int *bindingCount;
     KeyEntryCallback *entryCallback;
     KeyRawEntryCallback *entryRawCallback;
+    void *refWindow;
 }BindingMap;
 
 /*
@@ -130,9 +131,11 @@ const char *KeyboardGetKeyName(Key key);
 const char *KeyboardGetStateName(int state);
 
 /*
-* Creates a new keyboard mapping to handle key events.
+* Creates a new keyboard mapping to handle key events. Optionally
+* attach it to a specific window.
 */
 BindingMap *KeyboardCreateMapping();
+BindingMap *KeyboardCreateMapping(void *refWindow);
 
 /*
 * Sets the active mapping to handle key events.
@@ -140,9 +143,22 @@ BindingMap *KeyboardCreateMapping();
 void KeyboardSetActiveMapping(BindingMap *mapping);
 
 /*
+* Sets the window where the mapping should be applied. If a keyboard event
+* happens and the active binding does not have a reference window than
+* it is applied globally. Use this routine to tell cody to only call
+* this bindings when they happen on a given target window.
+*/
+void KeyboardSetReferenceWindow(BindingMap *mapping, void *window);
+
+/*
 * Queries the keyboard API for the current active mapping.
 */
 BindingMap *KeyboardGetActiveMapping();
+
+/*
+* Queries the keyboard API for the current active mapping for a specific window.
+*/
+BindingMap *KeyboardGetActiveMapping(void *window);
 
 /*
 * Register default callback for key entry values for unbinded UTF-8 strings.
@@ -167,7 +183,7 @@ void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
 * Reports a key event. This should be called by the underlying OS keyboard system.
 */
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
-                   int rawKeyCode);
+                   int rawKeyCode, void *window);
 
 /*
 * Forces the keyboard API table to restore all key states, no callbacks are triggered.

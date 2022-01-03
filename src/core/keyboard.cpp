@@ -3,6 +3,7 @@
 #include <types.h>
 #include <stdarg.h>
 #include <utilities.h>
+#include <unordered_map>
 
 #define GetKeyID(key) ((int)key - (int)Key_A)
 #define GetBindingID(ki, i) (ki * MAX_BINDINGS_PER_ENTRY + i)
@@ -10,16 +11,43 @@
 static BindingMap *activeMapping = nullptr;
 static int *keyStates;
 static int unmappedKeyState = KEYBOARD_EVENT_RELEASE;
+static std::unordered_map<void *, BindingMap *> activeWindowMapping;
 
 const char *KeyboardGetKeyName(Key key);
 const char *KeyboardGetStateName(int state);
 
 void KeyboardSetActiveMapping(BindingMap *mapping){
-    activeMapping = mapping;
+    if(mapping->refWindow){
+        activeWindowMapping[mapping->refWindow] = mapping;
+    }else{
+        activeMapping = mapping;
+    }
+}
+
+static BindingMap *KeyboardMappingForWindow(void *window){
+    BindingMap *mapping = activeMapping;
+    if(window){
+        if(activeWindowMapping.find(window) != activeWindowMapping.end()){
+            mapping = activeWindowMapping[window];
+        }
+    }
+
+    return mapping;
 }
 
 BindingMap *KeyboardGetActiveMapping(){
     return activeMapping;
+}
+
+BindingMap *KeyboardGetActiveMapping(void *window){
+    BindingMap *mapping = nullptr;
+    if(window){
+        if(activeWindowMapping.find(window) != activeWindowMapping.end()){
+            mapping = activeWindowMapping[window];
+        }
+    }
+
+    return mapping;
 }
 
 inline int KeyboardGetKeyState(Key key){
@@ -30,51 +58,61 @@ void KeyboardDebugPrintBindingKeys(Binding *binding){
     for(int i = 0; i < binding->keySetSize; i++){
         printf("%s ", KeyboardGetKeyName(binding->keySet[i]));
     }
-    
+
     printf("\n");
 }
 
-int KeyboardProcessBindingEvents(int keyId){
+void KeyboardSetReferenceWindow(BindingMap *mapping, void *window){
+    if(mapping && window){
+        mapping->refWindow = window;
+    }
+}
+
+int KeyboardProcessBindingEvents(int keyId, BindingMap *mapping){
     Binding *bestBinding = nullptr;
     int runningScore = -1;
-    int count = activeMapping->bindingCount[keyId];
     int runned = 0;
+    if(!mapping) return 0;
+
+    int count = mapping->bindingCount[keyId];
+
     for(int i = 0; i < count; i++){
         int score = 0;
-        Binding *bind = &activeMapping->bindings[GetBindingID(keyId, i)];
+        Binding *bind = &mapping->bindings[GetBindingID(keyId, i)];
         for(int k = 0; k < bind->keySetSize; k++){
             int kState = keyStates[GetKeyID(bind->keySet[k])];
             if(kState == KEYBOARD_EVENT_RELEASE){
                 score = -1;
                 break;
             }
-            
+
             if(kState == KEYBOARD_EVENT_PRESS || bind->supportsRepeat){
                 score ++;
             }
         }
-        
+
         if(score > runningScore){
             runningScore = score;
             bestBinding = bind;
         }
     }
-    
+
     if(bestBinding){
         runned = 1;
         bestBinding->callback();
     }
-    
+
     return runned;
 }
 
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
-                   int rawKeyCode)
+                   int rawKeyCode, void *window)
 {
     int consumed = 0;
     int kid = GetKeyID(eventKey);
     int realEventType = eventType;
-    
+    BindingMap *mapping = KeyboardMappingForWindow(window);
+
     if(eventKey != Key_Unmapped){
         int currentKeyState = keyStates[kid];
         if(eventType == KEYBOARD_EVENT_PRESS){
@@ -82,34 +120,34 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
                 realEventType = KEYBOARD_EVENT_REPEAT; // TODO: Check if this is enough
             }
         }
-        
+
         keyStates[kid] = realEventType;
     }else if(rawKeyCode != 0){
         // I'm somehow getting a 0 code for UTF-8 that only happens once
         // i'm not finding any references to this so I'm skip it
-        
+
         unmappedKeyState = eventType;
     }
-    
+
     if(realEventType != KEYBOARD_EVENT_RELEASE && eventKey != Key_Unmapped){
         // Check bindings, only if no unmapped key is active
-        if(activeMapping && unmappedKeyState == KEYBOARD_EVENT_RELEASE){
-            consumed = KeyboardProcessBindingEvents(kid);
+        if(mapping && unmappedKeyState == KEYBOARD_EVENT_RELEASE){
+            consumed = KeyboardProcessBindingEvents(kid, mapping);
         }
     }
-    
-    if(activeMapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE
+
+    if(mapping && utf8Size > 0 && eventType != KEYBOARD_EVENT_RELEASE
        && consumed == 0)
     {
-        if(activeMapping->entryCallback){
-            activeMapping->entryCallback(utf8Data, utf8Size);
+        if(mapping->entryCallback){
+            mapping->entryCallback(utf8Data, utf8Size);
             consumed = 1;
         }
     }
 
-    if(activeMapping && consumed == 0){
-        if(activeMapping->entryRawCallback){
-            activeMapping->entryRawCallback(rawKeyCode);
+    if(mapping && consumed == 0){
+        if(mapping->entryRawCallback){
+            mapping->entryRawCallback(rawKeyCode);
         }
     }
 }
@@ -171,12 +209,13 @@ BindingMap *KeyboardCreateMapping(){
     int keyCodes = GetMappedKeysCountX11();
     BindingMap *mapping = (BindingMap *)AllocatorGet(sizeof(BindingMap));
     int allocationSize = MAX_BINDINGS_PER_ENTRY * keyCodes;
-    
+
     mapping->bindings = (Binding *)AllocatorGet(sizeof(Binding) * allocationSize);
     mapping->bindingCount = (int *)AllocatorGet(sizeof(int) * keyCodes);
     mapping->entryCallback = nullptr;
     mapping->entryRawCallback = nullptr;
-    
+    mapping->refWindow = nullptr;
+
     for(int i = 0; i < allocationSize; i++){
         Binding *binding = &mapping->bindings[i];
         binding->keySetSize = 0;
@@ -185,8 +224,14 @@ BindingMap *KeyboardCreateMapping(){
             mapping->bindingCount[i] = 0;
         }
     }
-    
+
     //TODO: Bind some default stuff here
+    return mapping;
+}
+
+BindingMap *KeyboardCreateMapping(void *refWindow){
+    BindingMap *mapping = KeyboardCreateMapping();
+    KeyboardSetReferenceWindow(mapping, refWindow);
     return mapping;
 }
 

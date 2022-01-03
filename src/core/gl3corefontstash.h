@@ -32,12 +32,12 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-    
+
     FONS_DEF FONScontext* glfonsCreate(int width, int height, int flags);
     FONS_DEF void glfonsDelete(FONScontext* ctx);
-    
+
     /*FONS_DEF */unsigned int glfonsRGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
-    
+
 #ifdef __cplusplus
 }
 #endif
@@ -72,24 +72,24 @@ typedef struct GLFONScontext GLFONScontext;
 static int glfons__renderCreate(void* userPtr, int width, int height)
 {
 	GLFONScontext* gl = (GLFONScontext*)userPtr;
-    
+
 	// Create may be called multiple times, delete existing texture.
 	if (gl->tex != 0) {
 		glDeleteTextures(1, &gl->tex);
 		gl->tex = 0;
 	}
-    
+
 	glGenTextures(1, &gl->tex);
 	if (!gl->tex) return 0;
-    
+
     // Only use VAO if they are supported. This way the same implementation works on OpenGL ES2 too.
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	if (!gl->vertexArray) glGenVertexArrays(1, &gl->vertexArray);
 	if (!gl->vertexArray) return 0;
-    
+
 	glBindVertexArray(gl->vertexArray);
 #endif
-    
+
 	if (!gl->vertexBuffer){
         GL_CHK(glGenBuffers(1, &gl->vertexBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer));
@@ -97,9 +97,9 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
                             NULL, GL_DYNAMIC_DRAW));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
-    
+
 	if (!gl->vertexBuffer) return 0;
-    
+
 	if (!gl->tcoordBuffer){
         GL_CHK(glGenBuffers(1, &gl->tcoordBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer));
@@ -108,7 +108,7 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 	if (!gl->tcoordBuffer) return 0;
-    
+
 	if (!gl->colorBuffer){
         GL_CHK(glGenBuffers(1, &gl->colorBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer));
@@ -117,11 +117,11 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 	if (!gl->colorBuffer) return 0;
-    
+
 	gl->width = width;
 	gl->height = height;
 	GL_CHK(glBindTexture(GL_TEXTURE_2D, gl->tex));
-    
+
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
 	GL_CHK(glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, NULL));
 	GL_CHK(glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR));
@@ -133,7 +133,7 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
 	static GLint swizzleRgbaParams[4] = {GL_ONE, GL_ONE, GL_ONE, GL_RED};
 	GL_CHK(glTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_RGBA, swizzleRgbaParams));
 #endif
-    
+
 	return 1;
 }
 
@@ -146,7 +146,7 @@ static int glfons__renderResize(void* userPtr, int width, int height)
 static void glfons__renderUpdate(void* userPtr, int* rect, const unsigned char* data)
 {
 	GLFONScontext* gl = (GLFONScontext*)userPtr;
-    
+
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
 	GLint alignment;
 	glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
@@ -157,37 +157,38 @@ static void glfons__renderUpdate(void* userPtr, int* rect, const unsigned char* 
 	// portion with contiguous memory which is probably even worse.
 	GL_CHK(glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, gl->width, gl->height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, data));
 	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, alignment));
-    
+
 #else
 	// OpenGl desktop/es3 should use this version:
 	int w = rect[2] - rect[0];
 	int h = rect[3] - rect[1];
-    
+
 	if (gl->tex == 0) return;
-    
+
 	// Push old values
 	GLint alignment, rowLength, skipPixels, skipRows;
 	glGetIntegerv(GL_UNPACK_ALIGNMENT, &alignment);
 	glGetIntegerv(GL_UNPACK_ROW_LENGTH, &rowLength);
 	glGetIntegerv(GL_UNPACK_SKIP_PIXELS, &skipPixels);
 	glGetIntegerv(GL_UNPACK_SKIP_ROWS, &skipRows);
-    
+
 	glBindTexture(GL_TEXTURE_2D, gl->tex);
-    
+
 	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, 1));
     GL_CHK(glPixelStorei(GL_UNPACK_ROW_LENGTH, gl->width));
     GL_CHK(glPixelStorei(GL_UNPACK_SKIP_PIXELS, rect[0]));
     GL_CHK(glPixelStorei(GL_UNPACK_SKIP_ROWS, rect[1]));
-    
-	GL_CHK(glTexSubImage2D(GL_TEXTURE_2D, 0, rect[0], rect[1], w, h, GL_RED, GL_UNSIGNED_BYTE, data));
-    
+
+	GL_CHK(glTexSubImage2D(GL_TEXTURE_2D, 0, rect[0], rect[1], w,
+                           h, GL_RED, GL_UNSIGNED_BYTE, data));
+
 	// Pop old values
 	GL_CHK(glPixelStorei(GL_UNPACK_ALIGNMENT, alignment));
     GL_CHK(glPixelStorei(GL_UNPACK_ROW_LENGTH, rowLength));
     GL_CHK(glPixelStorei(GL_UNPACK_SKIP_PIXELS, skipPixels));
     GL_CHK(glPixelStorei(GL_UNPACK_SKIP_ROWS, skipRows));
 #endif
-    
+
 }
 
 static void glfons__renderDraw(void* userPtr, const float* verts, const float* tcoords, const unsigned int* colors, int nverts)
@@ -195,55 +196,55 @@ static void glfons__renderDraw(void* userPtr, const float* verts, const float* t
 	GLFONScontext* gl = (GLFONScontext*)userPtr;
     long int vertLen  = nverts * 2 * sizeof(float);
     long int colorLen = nverts * sizeof(unsigned int);
-    
+
     if(nverts >= FONS_VERTEX_COUNT){
         printf("Attempting to render more than estimated maximum %d\n", nverts);
         getchar();
     }
-    
+
 #ifdef GLFONTSTASH_IMPLEMENTATION_ES2
 	if (gl->tex == 0) return;
 #else
 	if (gl->tex == 0 || gl->vertexArray == 0) return;
-    
+
 	glBindVertexArray(gl->vertexArray);
 #endif
-    
+
     //printf("Nverts: %d\n", nverts);
 #if defined(MEMORY_DEBUG)
     //__gpu_gl_get_memory_usage();
 #endif
-    
+
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, gl->tex);
-    
+
 	glEnableVertexAttribArray(GLFONS_VERTEX_ATTRIB);
 	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer));
     GL_CHK_BINDING(gl->vertexBuffer, vertLen);
-    
+
     GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, vertLen, verts));
     GL_CHK(glVertexAttribPointer(GLFONS_VERTEX_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL));
-    
+
 	glEnableVertexAttribArray(GLFONS_TCOORD_ATTRIB);
 	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer));
     GL_CHK_BINDING(gl->tcoordBuffer, vertLen);
-    
+
     GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, vertLen, tcoords));
     GL_CHK(glVertexAttribPointer(GLFONS_TCOORD_ATTRIB, 2, GL_FLOAT, GL_FALSE, 0, NULL));
-    
+
 	glEnableVertexAttribArray(GLFONS_COLOR_ATTRIB);
 	GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer));
     GL_CHK_BINDING(gl->colorBuffer, colorLen);
-    
+
     GL_CHK(glBufferSubData(GL_ARRAY_BUFFER, 0, colorLen, colors));
     GL_CHK(glVertexAttribPointer(GLFONS_COLOR_ATTRIB, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, NULL));
-    
+
 	GL_CHK(glDrawArrays(GL_TRIANGLES, 0, nverts));
-    
+
 	glDisableVertexAttribArray(GLFONS_VERTEX_ATTRIB);
 	glDisableVertexAttribArray(GLFONS_TCOORD_ATTRIB);
 	glDisableVertexAttribArray(GLFONS_COLOR_ATTRIB);
-    
+
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	glBindVertexArray(0);
 #endif
@@ -257,35 +258,35 @@ static void glfons__renderDelete(void* userPtr)
 		glDeleteTextures(1, &gl->tex);
 		gl->tex = 0;
 	}
-    
+
     printf("Delete call!\n");
     return;
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	glBindVertexArray(0);
 #endif
-    
+
 	if (gl->vertexBuffer != 0) {
 		glDeleteBuffers(1, &gl->vertexBuffer);
 		gl->vertexBuffer = 0;
 	}
-    
+
 	if (gl->tcoordBuffer != 0) {
 		glDeleteBuffers(1, &gl->tcoordBuffer);
 		gl->tcoordBuffer = 0;
 	}
-    
+
 	if (gl->colorBuffer != 0) {
 		glDeleteBuffers(1, &gl->colorBuffer);
 		gl->colorBuffer = 0;
 	}
-    
+
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	if (gl->vertexArray != 0) {
 		glDeleteVertexArrays(1, &gl->vertexArray);
 		gl->vertexArray = 0;
 	}
 #endif
-    
+
 	free(gl);
 }
 
@@ -293,11 +294,11 @@ FONS_DEF FONScontext* glfonsCreate(int width, int height, int flags)
 {
 	FONSparams params;
 	GLFONScontext* gl;
-    
+
 	gl = (GLFONScontext*)malloc(sizeof(GLFONScontext));
 	if (gl == NULL) goto error;
 	memset(gl, 0, sizeof(GLFONScontext));
-    
+
 	memset(&params, 0, sizeof(params));
 	params.width = width;
 	params.height = height;
@@ -305,12 +306,12 @@ FONS_DEF FONScontext* glfonsCreate(int width, int height, int flags)
 	params.renderCreate = glfons__renderCreate;
 	params.renderResize = glfons__renderResize;
 	params.renderUpdate = glfons__renderUpdate;
-	params.renderDraw = glfons__renderDraw; 
+	params.renderDraw = glfons__renderDraw;
 	params.renderDelete = glfons__renderDelete;
 	params.userPtr = gl;
-    
+
 	return fonsCreateInternal(&params);
-    
+
     error:
 	if (gl != NULL) free(gl);
 	return NULL;

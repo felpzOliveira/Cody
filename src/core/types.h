@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+#define WITH_ASSERTS
+
 typedef unsigned char uint8;
 
 typedef unsigned short ushort;
@@ -48,15 +50,18 @@ inline void __assert_check(bool v, const char *name, const char *filename,
 
 #define AssertErr(x, msg) __assert_check((x), #x, __FILE__, __LINE__, msg)
 
+#if !defined(WITH_ASSERTS)
+    #define Assert(x)
+    #define AssertA(x, msg)
+#else
+    #define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
+    #define AssertA(x, msg) AssertErr(x, msg)
+#endif
 
 #if !defined(DEBUG_BUILD)
-#define Assert(x) 
-#define AssertA(x, msg)
-#define MEMORY_PRINT(...)
+    #define MEMORY_PRINT(...)
 #else
-#define Assert(x) __assert_check((x), #x, __FILE__, __LINE__, NULL)
-#define AssertA(x, msg) AssertErr(x, msg)
-#define MEMORY_PRINT(...) printf(__VA_ARGS__)
+    #define MEMORY_PRINT(...) printf(__VA_ARGS__)
 #endif
 
 #if defined(MEMORY_DEBUG)
@@ -93,7 +98,7 @@ inline void __gpu_check_binding(int bufferId, long int bindingSize,
     GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, bufferId));
     glGetBufferParameteriv(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
     if(size < bindingSize){
-        printf("[GPU] Binding of buffer %d will corrupt memory\n", bufferId); 
+        printf("[GPU] Binding of buffer %d will corrupt memory\n", bufferId);
         printf("[GPU]  **Attempted %ld, max is %d\n", bindingSize, size);
         getchar(); // sigtrap has proven to be unreliable
     }
@@ -195,7 +200,7 @@ inline void *_expand_memory(long size, long osize, void *p,
         MEMORY_PRINT("REALLOC %lu (%s : %d) of nullptr\n", size, filename, line);
         _debugger_trace(0);
     }
-    
+
     if(debug_memory_map.find(p) != debug_memory_map.end()){
         MemoryEntry e = debug_memory_map[p];
 		debug_memory_usage -= e.size;
@@ -206,7 +211,7 @@ inline void *_expand_memory(long size, long osize, void *p,
     }
 	__cpu_get_memory_usage(debug_memory_usage);
 #endif
-    
+
     void *ptr = realloc(p, size);
 
 #if defined(MEMORY_DEBUG)
@@ -220,7 +225,7 @@ inline void *_expand_memory(long size, long osize, void *p,
     MEMORY_PRINT("OK - Inserted %p\n", ptr);
     __cpu_get_memory_usage(debug_memory_usage);
 #endif
-    
+
     if(ptr == NULL){
         printf("Failed to expand memory to size: %lx (%s:%u)\n", size, filename, line);
     }else if(osize < size){
@@ -247,9 +252,9 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
                 _debugger_trace(0);
             }
 #endif
-            
+
             free(*ptr);
-            
+
 #if defined(MEMORY_DEBUG)
             MEMORY_PRINT("OK\n");
 			__cpu_get_memory_usage(debug_memory_usage);

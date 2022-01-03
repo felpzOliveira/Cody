@@ -40,6 +40,7 @@ typedef struct{
     Float currentLineHeight;
     bool hasDelayedCall;
     std::function<void(void)> delayedCall;
+    QueryBarHistory queryBarHistory;
 }App;
 
 static App appContext = {
@@ -123,6 +124,9 @@ void AppEarlyInitialize(){
     appGlobalConfig.rootFolder = appContext.cwd;
     appGlobalConfig.configFile = dir + std::string("/.config");
 
+    // TODO: Configurable number of entries?/init funciton?
+    appContext.queryBarHistory.history = CircularStack_Create<QueryBarHistoryItem>(64);
+
     Git_Initialize();
     Git_OpenRootRepository();
 
@@ -173,6 +177,10 @@ View *AppGetActiveView(){
 
 BufferView *AppGetActiveBufferView(){
     return &appContext.activeView->bufferView;
+}
+
+QueryBarHistory *AppGetQueryBarHistory(){
+    return &appContext.queryBarHistory;
 }
 
 void AppSetBindingsForState(ViewState state, ViewType type){
@@ -1102,8 +1110,9 @@ void AppCommandQueryBarInteractiveCommand(){
             return r == 2 ? 0 : -1;
         };
 
-        QueryBar_ActivateCustom(qbar, nullptr, 0, emptyFunc,
-                                emptyFunc, onCommit, nullptr);
+        QueryBar_ActiveCustomFull(qbar, nullptr, 0, emptyFunc,
+                                  emptyFunc, onCommit, nullptr,
+                                  QUERY_BAR_CMD_INTERACTIVE);
 
         View_ReturnToState(view, View_QueryBar);
         KeyboardSetActiveMapping(appContext.queryBarMapping);

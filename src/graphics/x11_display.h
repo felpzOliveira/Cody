@@ -14,6 +14,9 @@
 // The Xkb extension provides improved keyboard support
 #include <X11/XKBlib.h>
 
+#define MOUSE_DCLICK_INTERVAL 300 // ms
+#define MOUSE_DCLICK_DISTANCE 10 // pixels
+
 #define OPENGL_COMPAT_PROFILE 0
 #define OPENGL_CORE_PROFILE   1
 
@@ -75,17 +78,19 @@ typedef struct{
     uintptr_t handle;
 }Framebuffer;
 
-#define ON_SCROLL_CALLBACK(name) void name(int is_up)
-#define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y)
-#define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h)
-#define ON_FOCUS_CHANGE_CALLBACK(name) void name()
-#define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y)
+#define ON_SCROLL_CALLBACK(name) void name(int is_up, void *priv)
+#define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_MOUSE_DCLICK_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
+#define ON_FOCUS_CHANGE_CALLBACK(name) void name(void *priv)
+#define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y, void *priv)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
 typedef ON_MOUSE_CLICK_CALLBACK(onMouseClickCallback);
 typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
 typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
 typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
+typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDclickCallback);
 
 typedef struct{
     Colormap colormap;
@@ -97,13 +102,18 @@ typedef struct{
     int lastCursorPosX, lastCursorPosY;
     int shouldClose;
     Time lastKeyTime;
+    Time lastClickTime;
     GLXContextInfo glx;
-    
+
     onScrollCallback *onScrollCall;
     onMouseClickCallback *onMouseClickCall;
+    onMouseDclickCallback *onMouseDClickCall;
     onMouseMotionCallback *onMouseMotionCall;
     onSizeChangeCallback *onSizeChangeCall;
     onFocusChangeCallback *onFocusChangeCall;
+    void *privScroll, *privClick;
+    void *privDclick, *privMotion;
+    void *privSize, *privFocus;
 }WindowX11;
 
 typedef struct{
@@ -117,11 +127,11 @@ typedef struct{
     int screen;
     Window root;
     XContext context;
-    
+
     Window helperWindow;
     Cursor hiddenCursor;
     XIM im;
-    
+
     Atom WM_DELETE_WINDOW;
     Atom NET_WM_PING;
     Atom TARGETS;
@@ -136,12 +146,12 @@ typedef struct{
     Atom UTF8_STRING;
     Atom COMPOUND_STRING;
     Atom CODY_SELECTION;
-    
+
     char *primarySelectionString;
     char *clipboardString;
     unsigned int primarySelectionStringSize;
     unsigned int clipboardStringSize;
-    
+
     struct{
         int available;
         int detectable;
@@ -151,17 +161,19 @@ typedef struct{
         int major, minor;
         unsigned int group;
     }xkb;
-    
+
 }LibHelperX11;
 
 void InitializeX11();
 void SetSamplesX11(int samples);
+void SetNoResizable(WindowX11 *window);
 void SetOpenGLVersionX11(int major, int minor);
 int  WindowShouldCloseX11(WindowX11 *window);
 void SetWindowShouldCloseX11(WindowX11 *window);
 void SwapBuffersX11(WindowX11 *window);
 void SwapIntervalX11(WindowX11 *window, int interval);
 void PoolEventsX11();
+void MakeContextX11(WindowX11 *window);
 void WaitForEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
 void DestroyWindowX11(WindowX11 *window);
@@ -173,10 +185,11 @@ double GetElapsedTime();
 const char *ClipboardGetStringX11(unsigned int *size);
 void ClipboardSetStringX11(char *str, unsigned int len);
 
-void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback);
-void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback);
-void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback);
-void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback);
-void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback);
+void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv);
+void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback, void *priv);
+void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv);
+void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
+void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);
+void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv);
 
 #endif //X11_DISPLAY_H

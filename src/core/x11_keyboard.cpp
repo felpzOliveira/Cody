@@ -17,7 +17,7 @@ int TranslateKeyX11(int scancode){
 int TranslateKeyCodeX11(int scancode){
     int keySym = Key_Unmapped;
     if(scancode < 8 || scancode > 255) return keySym;
-    
+
     if(x11Helper.xkb.available){
         keySym = XkbKeycodeToKeysym(x11Helper.display, scancode, x11Helper.xkb.group, 1);
         switch(keySym){
@@ -43,7 +43,7 @@ int TranslateKeyCodeX11(int scancode){
         keySym = keySyms[0];
         XFree(keySyms);
     }
-    
+
     switch(keySym){
         case XK_Escape:         return Key_Escape;
         case XK_Tab:            return Key_Tab;
@@ -81,7 +81,7 @@ int TranslateKeyCodeX11(int scancode){
         case XK_F10:            return Key_F10;
         case XK_F11:            return Key_F11;
         case XK_F12:            return Key_F12;
-        
+
         case XK_KP_Insert:      return Key_0;
         case XK_KP_End:         return Key_1;
         case XK_KP_Down:        return Key_2;
@@ -94,7 +94,7 @@ int TranslateKeyCodeX11(int scancode){
         case XK_KP_Delete:      return Key_Delete;
         case XK_KP_Equal:       return Key_Equal;
         case XK_KP_Enter:       return Key_Enter;
-        
+
         case XK_a:              return Key_A;
         case XK_b:              return Key_B;
         case XK_c:              return Key_C;
@@ -143,7 +143,7 @@ int TranslateKeyCodeX11(int scancode){
         case XK_slash:          return Key_Slash;
         default:                break;
     }
-    
+
     return Key_Unmapped;
 }
 
@@ -155,6 +155,6 @@ int CreateKeyTableX11(){
     for(int scancode = 0; scancode < 256; scancode++){
         keycodes[scancode] = TranslateKeyCodeX11(scancode);
     }
-    
+
     return 256;
 }

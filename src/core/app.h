@@ -73,6 +73,11 @@ void AppSetViewingGeometry(Geometry geometry, Float lineHeight);
 View *AppGetActiveView();
 
 /*
+* Gets the global history of the querybar.
+*/
+QueryBarHistory *AppGetQueryBarHistory();
+
+/*
 * Search for the view that holds an accessor to the given linebuffer.
 * Considerations:
 *    1 - If no view is currently displaying the linebuffer than this routine

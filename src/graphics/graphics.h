@@ -127,7 +127,6 @@ struct OpenGLState{
     vec2ui mouse;
     int running, width, height;
     Float renderLineWidth;
-    Bounds2f windowBounds;
     Transform projection;
     Transform scale;
     Transform model;
@@ -172,6 +171,11 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
 * Pushes a new quad into the current OpenGLState quad batch to render.
 */
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color);
+
+/*
+* Retrieves the handler of the global (main) window.
+*/
+void *Graphics_GetBaseWindow();
 
 /*
 * Pushes a new quad into the current OpenGLState image batch to render a image.

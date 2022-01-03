@@ -240,7 +240,7 @@ static void DbgApp_ClearLinebufferList(){
     for(DbgLineBufferPair &p : dbgSync.lockedLBs){
         LineBuffer_SetWrittable(p.lineBuffer, p.state);
     }
-
+#if 0
     for(LineBuffer *lb : dbgSync.loadedLBs){
         // we need to inspect views and make them null
         // in case a loaded file is currently being displayed
@@ -260,6 +260,7 @@ static void DbgApp_ClearLinebufferList(){
         FileProvider_Remove(lb);
         LineBuffer_Free(lb);
     }
+#endif
     dbgSync.loadedLBs.clear();
     dbgSync.lockedLBs.clear();
 }

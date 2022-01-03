@@ -17,6 +17,7 @@
 #include <file_provider.h>
 #include <parallel.h>
 #include <dbgapp.h>
+#include <widgets.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -41,9 +42,12 @@ static OpenGLState GlobalGLState;
 *               font->fontMath.invReduceScale
 */
 
-
 void OpenGLClearErrors(){
     while(glGetError()) ;
+}
+
+void *Graphics_GetBaseWindow(){
+    return (void *)GlobalGLState.window;
 }
 
 static void ResetGLCursor(OpenGLCursor *cursor){
@@ -89,7 +93,6 @@ void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     Float zNear = -range;
     Float zFar = range;
     *transform = Orthographic(0, width, height, 0, zNear, zFar);
-
 }
 
 void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry){
@@ -491,7 +494,6 @@ static void _OpenGLStateInitialize(OpenGLState *state){
     state->window = nullptr;
     state->width = targetWidth;
     state->height = targetHeight;
-    state->windowBounds = Bounds2f(vec2f(0, 0), vec2f(targetWidth, targetHeight));
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
 }
 
@@ -519,17 +521,17 @@ void Timing_Update(){
     lastTime = GetElapsedTime();
 }
 
-void WindowOnSizeChange(int width, int height){
+void WindowOnSizeChange(int width, int height, void *){
     _OpenGLUpdateProjections(&GlobalGLState, width, height);
 }
 
-void WinOnMouseMotion(int x, int y){
+void WinOnMouseMotion(int x, int y, void *){
     //printf("Mouse to %d %d\n", x, y);
     GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
     AppHandleMouseMotion(x, y, &GlobalGLState);
 }
 
-void WindowOnScroll(int is_up){
+void WindowOnScroll(int is_up, void *){
     int x = 0, y = 0;
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
@@ -537,11 +539,11 @@ void WindowOnScroll(int is_up){
     AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
 }
 
-void WindowOnClick(int x, int y){
+void WindowOnClick(int x, int y, void *){
     AppHandleMouseClick(x, y, &GlobalGLState);
 }
 
-void WinOnFocusChange(){
+void WinOnFocusChange(void *){
     KeyboardResetState();
 }
 
@@ -551,11 +553,11 @@ int Font_SupportsCodepoint(int codepoint){
 }
 
 void RegisterInputs(WindowX11 *window){
-    RegisterOnScrollCallback(window, WindowOnScroll);
-    RegisterOnMouseClickCallback(window, WindowOnClick);
-    RegisterOnMouseMotionCallback(window, WinOnMouseMotion);
-    RegisterOnSizeChangeCallback(window, WindowOnSizeChange);
-    RegisterOnFocusChangeCallback(window, WinOnFocusChange);
+    RegisterOnScrollCallback(window, WindowOnScroll, nullptr);
+    RegisterOnMouseClickCallback(window, WindowOnClick, nullptr);
+    RegisterOnMouseMotionCallback(window, WinOnMouseMotion, nullptr);
+    RegisterOnSizeChangeCallback(window, WindowOnSizeChange, nullptr);
+    RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);
 }
 
 void OpenGLFontSetup(OpenGLState *state){
@@ -1046,6 +1048,7 @@ void UpdateEventsAndHandleRequests(int animating){
 *       transitions and the viewing interface? Also it allows us to by-pass
 *       the 'translate at end of file' issue we have right now.
 */
+PopupWidget *popup = nullptr;
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
@@ -1060,7 +1063,11 @@ void OpenGLEntry(){
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
+    popup = new PopupWidget;
+    WidgetRenderContext wctx = {.state = &GlobalGLState};
+
     while(!WindowShouldCloseX11(state->window)){
+        MakeContextX11(state->window);
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
@@ -1124,6 +1131,8 @@ void OpenGLEntry(){
         }
 
         SwapBuffersX11(state->window);
+        //printf("================================\n");
+        popup->Render(&wctx);
 
         UpdateEventsAndHandleRequests(animating);
     }
