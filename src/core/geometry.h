@@ -970,7 +970,10 @@ class Geometry{
     }
 
     void PrintSelf(){
-        printf("Lower %u %u, Upper: %u %u\n", lower.x, lower.y, upper.x, upper.y);
+        Float w = upper.x - lower.x;
+        Float h = upper.y - lower.y;
+        printf("Lower %u %u, Upper: %u %u, Width = %g, Height = %g\n",
+                lower.x, lower.y, upper.x, upper.y, w, h);
     }
 };
 

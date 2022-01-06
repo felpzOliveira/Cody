@@ -5,6 +5,9 @@
 #include <sstream>
 #include <glad/glad.h>
 #include <string.h>
+#include <app.h>
+#include <thread>
+#include <iostream>
 
 #define MODULE_NAME "Shader"
 
@@ -15,6 +18,10 @@
 
 /* Persist shaders for dynamic inclusion */
 static std::map<std::string, std::string> ShaderStorage;
+static std::map<std::string, int> loggedMap;
+static std::map<int, std::thread::id> progMap;
+
+std::string OpenGLValidateErrorStr(int *err);
 
 int Shader_CheckForCompileErrors(GLuint object, std::string type){
     int err = 0;
@@ -58,7 +65,7 @@ int Shader_CheckForCompileErrors(GLuint object, std::string type){
             }
         }
     }
-    
+
     return err;
 }
 
@@ -70,10 +77,10 @@ void Shader_StoragePublic(const char *path){
     char *p = nullptr;
     char *content = nullptr;
     uint size = 0;
-    
+
     int addr = GetRightmostSplitter(path, strlen(path));
     p = (char *)&path[addr+1];
-    
+
     content = GetFileContents(path, &size);
     if(content != nullptr){
         Shader_StoragePublic(p, std::string(content));
@@ -89,7 +96,7 @@ int Shader_StorageQueryContent(const std::string &shadername, std::string &conte
         content = ShaderStorage[shadername];
         rv = 0;
     }
-    
+
     return rv;
 }
 
@@ -100,7 +107,7 @@ int Shader_TranslateShaderContent(const std::string &content, std::string &data)
     for(std::string linebuf; std::getline(iss, linebuf); ){
         RemoveUnwantedLineTerminators(linebuf);
         if(linebuf.empty()) continue;
-        
+
         if(linebuf.find("#include") == 0){
             std::string subs = linebuf.substr(8);
             const char *token = subs.c_str();
@@ -113,15 +120,15 @@ int Shader_TranslateShaderContent(const std::string &content, std::string &data)
                 work.clear();
                 break;
             }
-            
+
             work += included;
         }else{
             work += linebuf;
         }
-        
+
         work += "\n";
     }
-    
+
     if(fullParse) data = work;
     return fullParse;
 }
@@ -153,14 +160,14 @@ int Shader_CompileSource(const std::string &content, int type){
     }
 
     p = (char *)translated.c_str();
-    glShaderSource(id, 1, (char **)&p, NULL);
-    glCompileShader(id);
+    OpenGLCHK(glShaderSource(id, 1, (char **)&p, NULL));
+    OpenGLCHK(glCompileShader(id));
 
     if(Shader_CheckForCompileErrors(id, str)) goto end;
 
     rv = (int)id;
 
-    end:
+end:
     return rv;
 }
 
@@ -174,81 +181,129 @@ int Shader_CompileFile(const char *path, int type, char *oContent){
     const char *f = "FRAGMENT";
     char *str = (char *)v;
     char *p = nullptr;
-    
-    if((type != SHADER_TYPE_VERTEX && 
+
+    if((type != SHADER_TYPE_VERTEX &&
         type != SHADER_TYPE_FRAGMENT) || path == nullptr) return rv;
-    
+
     char *content = GetFileContents(path, &filesize);
     if(content == nullptr) return rv;
-    
+
     if(Shader_TranslateShaderContent(content, translated) != 1) goto end;
-    
+
     if(type == SHADER_TYPE_FRAGMENT){
         str = (char *)f;
         gltype = GL_FRAGMENT_SHADER;
     }
-    
+
     id = glCreateShader(gltype);
     if(id == 0){
         DEBUG_MSG("Failed to create shader");
         goto end;
     }
-    
+
     p = (char *)translated.c_str();
     glShaderSource(id, 1, (char **)&p, NULL);
     glCompileShader(id);
-    
+
     if(Shader_CheckForCompileErrors(id, str)) goto end;
-    
+
     if(oContent){
         oContent = content;
         content = nullptr;
     }
-    
+
     rv = (int)id;
-    
-    end:
+
+end:
     if(content) AllocatorFree(content);
     return rv;
 }
 
 int Shader_Create(Shader &shader, uint vertex, uint fragment){
     int rv = -1;
-    
+
     shader.id = glCreateProgram();
     glAttachShader(shader.id, vertex);
     glAttachShader(shader.id, fragment);
     glLinkProgram(shader.id);
-    
+
     if(Shader_CheckForCompileErrors(shader.id, "PROGRAM") == 0){
         rv = 0;
+        progMap[shader.id] = std::this_thread::get_id();
     }
-    
+
     return rv;
 }
 
-static std::map<std::string, int> loggedMap;
+static void Shader_LogUniformError(Shader &shader, const char *name){
+    std::string msg;
+    char pm[256];
+    bool isProg = glIsProgram(shader.id);
+    std::string err = OpenGLValidateErrorStr(nullptr);
+
+    if(progMap.find(shader.id) == progMap.end()){
+        snprintf(pm, 256, "Program %d was never created", shader.id);
+    }else{
+        std::thread::id id = std::this_thread::get_id();
+        if(id == progMap[shader.id]){
+            snprintf(pm, 256, "Program %d seems valid", shader.id);
+        }else{
+            snprintf(pm, 256, "Program %d was created by different thread", shader.id);
+        }
+    }
+
+    msg = std::string(pm);
+
+    loggedMap[name] = 1;
+    DEBUG_MSG("Failed to load uniform %s : %s ( Is prog: %d )\n > Msg: %s\n",
+              name, err.c_str(), (int)isProg, msg.c_str());
+}
+
 void Shader_UniformInteger(Shader &shader, const char *name, int value){
+    OpenGLClearErrors();
     int id = glGetUniformLocation(shader.id, name);
     if(id >= 0){
         glUniform1i(id, value);
     }else{
         if(loggedMap.find(name) == loggedMap.end()){
-            DEBUG_MSG("Failed to load uniform %s\n", name);
-            loggedMap[name] = 1;
+            Shader_LogUniformError(shader, name);
+        }
+    }
+}
+
+void Shader_UniformVec4(Shader &shader, const char *name, vec4f value){
+    OpenGLClearErrors();
+    int id = glGetUniformLocation(shader.id, name);
+    if(id >= 0){
+        glUniform4f(id, value.x, value.y, value.z, value.w);
+    }else{
+        if(loggedMap.find(name) == loggedMap.end()){
+            Shader_LogUniformError(shader, name);
+        }
+    }
+}
+
+void Shader_UniformVec2(Shader &shader, const char *name, vec2f value){
+    OpenGLClearErrors();
+    int id = glGetUniformLocation(shader.id, name);
+    if(id >= 0){
+        glUniform2f(id, value.x, value.y);
+    }else{
+        if(loggedMap.find(name) == loggedMap.end()){
+            Shader_LogUniformError(shader, name);
         }
     }
 }
 
 void Shader_UniformMatrix4(Shader &shader, const char *name, Matrix4x4 *matrix){
+    OpenGLClearErrors();
     Float *rawMatrix = (Float *)matrix->m;
     int id = glGetUniformLocation(shader.id, name);
     if(id >= 0){
         glUniformMatrix4fv(id, 1, GL_FALSE, rawMatrix);
     }else{
         if(loggedMap.find(name) == loggedMap.end()){
-            DEBUG_MSG("Failed to load uniform %s\n", name);
-            loggedMap[name] = 1;
+            Shader_LogUniformError(shader, name);
         }
     }
 }

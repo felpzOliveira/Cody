@@ -137,7 +137,7 @@ typedef struct{
     vec4i dbgArrowColor;
     // color used for the debugger line highlighting
     vec4i dbgLinehighlightColor;
-    // flag indicating if this theme is visually bright, i.e.: light
+    // flag indicating if this theme is visually bright, i.e.: light,
     // this helps better select what icons are to be used and make decisions
     // on components that have different colors on dark/light modes
     bool isLight;
@@ -149,6 +149,9 @@ typedef struct{
 }ThemeDescription;
 
 extern Theme *defaultTheme;
+
+#define DefaultGetUIColorf(id) GetUIColorf(defaultTheme, id)
+#define DefaultGetUIColor(id) GetUIColor(defaultTheme, id)
 
 void SetAlpha(int active);
 vec4i GetNestColor(Theme *theme, TokenId id, int level);

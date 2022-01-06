@@ -40,7 +40,10 @@ static OpenGLState GlobalGLState;
 * a rectangle or whatever in screen space [0, 0] x [width, height]
 * you need to multiply the coordinates by the inverse scale:
 *               font->fontMath.invReduceScale
+* This is because of the cheap AA and better scaling for larger fonts
 */
+
+#define TOOGLE_VAR(var) (var) = !(var)
 
 void OpenGLClearErrors(){
     while(glGetError()) ;
@@ -48,6 +51,23 @@ void OpenGLClearErrors(){
 
 void *Graphics_GetBaseWindow(){
     return (void *)GlobalGLState.window;
+}
+
+OpenGLState *Graphics_GetGlobalContext(){
+    return &GlobalGLState;
+}
+
+void Graphics_ToogleCursorSegment(){
+    TOOGLE_VAR(GlobalGLState.params.cursorSegments);
+}
+
+void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src){
+    dst->fsContext = src->fsContext;
+    dst->sdfSettings = src->sdfSettings;
+    dst->shader = src->shader;
+    dst->cursorShader = src->cursorShader;
+    dst->fontId = src->fontId;
+    dst->fontMath = src->fontMath;
 }
 
 static void ResetGLCursor(OpenGLCursor *cursor){
@@ -64,10 +84,10 @@ void OpenGLResetCursors(OpenGLState *state){
     ResetGLCursor(&state->glGhostCursor);
 }
 
-void OpenGLValidateErrors(const char *fn, int line, const char *file){
+std::string OpenGLValidateErrorStr(int *err){
     int val = glGetError();
+    std::string error;
     if(val != GL_NO_ERROR){
-        std::string error;
         switch(val){
             case GL_INVALID_ENUM:                  error = "INVALID_ENUM"; break;
             case GL_INVALID_VALUE:                 error = "INVALID_VALUE"; break;
@@ -78,12 +98,19 @@ void OpenGLValidateErrors(const char *fn, int line, const char *file){
             case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
             default: error = "Unknown Error";
         }
-
-        printf("OpenGL Error: %s (%d) -- %s (%s:%d)\n", error.c_str(),
-                val, fn, file, line);
     }
+    if(err) *err = val;
+    return error;
+}
 
-    AssertA(val == GL_NO_ERROR, "Invalid OpenGL call");
+void OpenGLValidateErrors(const char *fn, int line, const char *file){
+    int val = 0;
+    std::string error = OpenGLValidateErrorStr(&val);
+    if(error.size() > 0){
+        printf("OpenGL Error: %s (%d) -- %s (%s:%d)\n", error.c_str(),
+               val, fn, file, line);
+        AssertA(val == GL_NO_ERROR, "Invalid OpenGL call");
+    }
 }
 
 void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
@@ -175,6 +202,20 @@ Float GLToScreen(Float x, OpenGLState *state){
     vec3f p(x, 0, 0);
     p = state->model.Point(p);
     return p.x;
+}
+
+vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
+                                     uint len, Geometry *geometry)
+{
+    int pGlyph = -1;
+    Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
+    Float x = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale * 0.5;
+    Float dx = fonsComputeStringAdvance(font->fsContext, (char *)text, len, &pGlyph) * 0.5;
+
+    x = x - dx;
+    y -= font->fontMath.fontSizeAtRenderCall * 0.5;
+
+    return vec2f(x, y);
 }
 
 Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
@@ -378,10 +419,9 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
     }
 }
 
-void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
+void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
                                    Transform *model)
 {
-    OpenGLFont *font = &state->font;
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
@@ -394,31 +434,48 @@ void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
     Shader_UniformMatrix4(font->shader, "modelView", &model->m);
 }
 
-void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
+void Graphics_PushText(OpenGLFont *font, Float &x, Float &y, char *text,
                        uint len, vec4i col, int *pGlyph)
 {
-    OpenGLFont *font = &state->font;
     x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
                                 text, text+len, pGlyph);
 }
 
-void Graphics_FlushText(OpenGLState *state){
-    OpenGLFont *font = &state->font;
+void Graphics_FlushText(OpenGLFont *font){
     fonsStashFlush(font->fsContext);
     glDisable(GL_BLEND);
     glUseProgram(0);
+}
+
+void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
+                                   Transform *model)
+{
+    OpenGLFont *font = &state->font;
+    Graphics_PrepareTextRendering(font, projection, model);
+}
+
+void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
+                       uint len, vec4i col, int *pGlyph)
+{
+    OpenGLFont *font = &state->font;
+    Graphics_PushText(font, x, y, text, len, col, pGlyph);
+}
+
+void Graphics_FlushText(OpenGLState *state){
+    OpenGLFont *font = &state->font;
+    Graphics_FlushText(font);
 }
 
 vec2ui Graphics_GetMouse(OpenGLState *state){
     return state->mouse;
 }
 
-static void _OpenGLTextureInitialize(OpenGLState *state){
+static void OpenGLTextureInitialize(OpenGLState *state){
     state->texBinds = 0;
     state->glQuadImageBuffer.units = 0;
 }
 
-static void _OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
+void OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
     buffer->vertex = AllocatorGetN(Float, 3 * n);
     buffer->tex = AllocatorGetN(Float, 2 * n);
     buffer->size = n;
@@ -431,7 +488,18 @@ static void _OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
     glGenBuffers(1, &buffer->texBuffer);
 }
 
-static void _OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
+void OpenGLBufferInitializeFrom(OpenGLBuffer *buffer, OpenGLBuffer *other){
+    buffer->vertex = other->vertex;
+    buffer->colors = other->colors;
+    buffer->size = other->size;
+    buffer->length = other->length;
+    buffer->vertexBuffer = other->vertexBuffer;
+    buffer->colorBuffer = other->colorBuffer;
+
+    glGenVertexArrays(1, &buffer->vertexArray);
+}
+
+void OpenGLBufferInitialize(OpenGLBuffer *buffer, int n){
     buffer->vertex = AllocatorGetN(Float, 2 * n);
     buffer->colors = AllocatorGetN(Float, 4 * n);
     buffer->size = n;
@@ -495,6 +563,7 @@ static void _OpenGLStateInitialize(OpenGLState *state){
     state->width = targetWidth;
     state->height = targetHeight;
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
+    state->params.cursorSegments = true;
 }
 
 static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
@@ -571,10 +640,13 @@ void OpenGLFontSetup(OpenGLState *state){
     uint cfragment = Shader_CompileSource(shader_cursor_f, SHADER_TYPE_FRAGMENT);
     uint ivertex   = Shader_CompileSource(shader_icon_v, SHADER_TYPE_VERTEX);
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
+    uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
+    uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
 
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
+    Shader_Create(state->buttonShader, bvertex, bfragment);
 
     font->sdfSettings.sdfEnabled = 0;
     font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
@@ -633,10 +705,10 @@ void OpenGLInitialize(OpenGLState *state){
     GLenum error = glGetError();
     AssertErr(error == GL_NO_ERROR, "Failed to setup opengl context");
 
-    _OpenGLBufferInitialize(quad, 1024);
-    _OpenGLBufferInitialize(imageQuad, 1024);
-    _OpenGLBufferInitialize(lines, 1024);
-    _OpenGLTextureInitialize(state);
+    OpenGLBufferInitialize(quad, 1024);
+    OpenGLBufferInitialize(imageQuad, 1024);
+    OpenGLBufferInitialize(lines, 1024);
+    OpenGLTextureInitialize(state);
     AppInitialize();
 
     SwapIntervalX11(state->window, 0);
@@ -664,6 +736,17 @@ int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid){
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color){
     Float x0 = left.x, y0 = left.y, x1 = right.x, y1 = right.y;
     OpenGLBuffer *quad = &state->glQuadBuffer;
+    _OpenGLBufferPushVertex(quad, x0, y0, color);
+    _OpenGLBufferPushVertex(quad, x1, y1, color);
+    _OpenGLBufferPushVertex(quad, x1, y0, color);
+
+    _OpenGLBufferPushVertex(quad, x0, y0, color);
+    _OpenGLBufferPushVertex(quad, x0, y1, color);
+    _OpenGLBufferPushVertex(quad, x1, y1, color);
+}
+
+void Graphics_QuadPush(OpenGLBuffer *quad, vec2ui left, vec2ui right, vec4f color){
+    Float x0 = left.x, y0 = left.y, x1 = right.x, y1 = right.y;
     _OpenGLBufferPushVertex(quad, x0, y0, color);
     _OpenGLBufferPushVertex(quad, x1, y1, color);
     _OpenGLBufferPushVertex(quad, x1, y0, color);
@@ -714,8 +797,7 @@ void Graphics_ImageFlush(OpenGLState *state, int reset){
     }
 }
 
-void Graphics_QuadFlush(OpenGLState *state, int blend){
-    OpenGLBuffer *quad = &state->glQuadBuffer;
+void Graphics_QuadFlush(OpenGLBuffer *quad, int blend){
     if(quad->length > 0){
         if(blend){
             glEnable(GL_BLEND);
@@ -743,6 +825,11 @@ void Graphics_QuadFlush(OpenGLState *state, int blend){
         glDisable(GL_BLEND);
     }
     quad->length = 0;
+}
+
+void Graphics_QuadFlush(OpenGLState *state, int blend){
+    OpenGLBuffer *quad = &state->glQuadBuffer;
+    Graphics_QuadFlush(quad, blend);
 }
 
 void Graphics_LineFlush(OpenGLState *state, int blend){
@@ -1048,7 +1135,7 @@ void UpdateEventsAndHandleRequests(int animating){
 *       transitions and the viewing interface? Also it allows us to by-pass
 *       the 'translate at end of file' issue we have right now.
 */
-PopupWidget *popup = nullptr;
+PopupWindow *popup = nullptr;
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
@@ -1063,7 +1150,7 @@ void OpenGLEntry(){
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
-    popup = new PopupWidget;
+    popup = new PopupWindow;
     WidgetRenderContext wctx = {.state = &GlobalGLState};
 
     while(!WindowShouldCloseX11(state->window)){
@@ -1071,7 +1158,7 @@ void OpenGLEntry(){
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
-        int transitioning = 0;
+        wctx.dt = dt;
 
         lastTime = currTime;
         AppUpdateViews();
@@ -1111,28 +1198,16 @@ void OpenGLEntry(){
 
             // account for chromatic transition
             animating |= bView->is_transitioning;
-            transitioning |= bView->is_transitioning;
+            if(bView->is_transitioning){
+                LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+                LineBuffer_AdvanceCopySection(lineBuffer, dt);
+            }
             ViewTree_Next(&iterator);
         }
 
-        if(transitioning){
-            // adjust copy sections running interval
-            ViewTree_Begin(&iterator);
-            while(iterator.value){
-                View *view = iterator.value->view;
-                BufferView *bView = View_GetBufferView(view);
-                if(bView){
-                    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
-                    LineBuffer_AdvanceCopySection(lineBuffer, dt);
-                }
-
-                ViewTree_Next(&iterator);
-            }
-        }
-
         SwapBuffersX11(state->window);
-        //printf("================================\n");
-        popup->Render(&wctx);
+
+        animating |= popup->DispatchRender(&wctx);
 
         UpdateEventsAndHandleRequests(animating);
     }

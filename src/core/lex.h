@@ -38,7 +38,7 @@
 * this is the name of the struct so it changes its id to <TOKEN_ID_DATATYPE_USER_STRUCT>
 * On the following token 'lex' (TOKEN_ID_NONE) once again the struct's logical unit is
 * called but now because it already got its key it pops itself and allows the next
-* unit to process, i.e.: typedef's. Now typedef's is assure that the <SOMETHING> in its
+* unit to process, i.e.: typedef's. Now typedef's is sure that the <SOMETHING> in its
 * rule was consumed and because it is in a unested state it gets the token and marks it
 * as <TOKEN_ID_DATATYPE_USER_TYPEDEF>, when the ';' appears, because typedef's unit is 
 * in unested state it means the declaration is done. So it pops itself from the stack
@@ -182,15 +182,15 @@ typedef struct{
     uint backTrack;
     uint forwardTrack;
     BoundedStack procStack;
-    
+
     // utility for faster nest computation and identation
     uint indentLevel;
     uint parenLevel;
-    
+
     // Comment parsing
     int aggregate;
     int type;
-    
+
     // #include 
     int inclusion;
 }TokenizerStateContext;
@@ -216,15 +216,15 @@ struct Tokenizer{
     uint runningLine;
     int givenTokens;
     SymbolTable *symbolTable;
-    
+
     // help bufferview with information about nest at start of line
     uint runningIndentLevel;
     uint runningParenIndentLevel;
-    
+
     // Comment parsing
     int aggregate;
     int type;
-    
+
     // #include 
     int inclusion;
 

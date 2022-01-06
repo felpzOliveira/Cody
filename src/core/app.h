@@ -14,6 +14,7 @@ struct Buffer;
 typedef enum{
     CURSOR_RECT,
     CURSOR_DASH,
+    CURSOR_QUAD,
 }CursorStyle;
 
 typedef struct{
@@ -50,6 +51,11 @@ BufferView *AppGetActiveBufferView();
 * 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
 */
 int AppGetTabConfiguration(int *using_tab);
+
+/*
+* Sets the style for rendering the cursor.
+*/
+void AppSetCursorFormat(CursorStyle style);
 
 /*
 * Triggers the view at (x,y) to be active. Variable force_binding

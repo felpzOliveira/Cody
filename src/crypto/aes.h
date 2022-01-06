@@ -63,7 +63,8 @@ bool AES_GenerateKey(void *buffer, AesKeyLength length);
 /*
  * Encrypts a sequence of bytes using AES-CBC with a specific key. Passing
  * an already filled iv vector makes this routine uses it for encryption, if
- * the iv vector is empty than a new iv is generated and returned in it.
+ * the iv vector is empty or has an incompatible size than a new iv is generated
+ * and returned in it.
  *
  * CBC Encryption using AES as block cipher with PKCS#7 padding.
  * Algorithm is straightforward:

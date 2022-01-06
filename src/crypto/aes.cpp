@@ -553,11 +553,9 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
     // we need to do one more to insert the padding, in this case the entire
     // block is a pad, i.e.: encrypt of 16 bytes of value 0x10.
     if(!is_last_block){
-        for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++) block[i] = padByte;
-
         // xor the block with the previous cipher
         for(size_t i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++){
-            block[i] ^= ci1[i];
+            block[i] = padByte ^ ci1[i];
         }
 
         // encrypt the block

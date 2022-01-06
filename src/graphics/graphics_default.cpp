@@ -2,7 +2,6 @@
 #include <view.h>
 #include <glad/glad.h>
 
-
 /* Renders the default screen (no linebuffers available to the view) */
 
 int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Float dt){
@@ -27,16 +26,13 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
     Graphics_SetFontSize(state, fontSize);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
-
-    Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
-    Float x = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale * 0.5;
-    Float dx = fonsComputeStringAdvance(font->fsContext, line0, line0len, &pGlyph) * 0.5;
-    x = x - dx;
-    y -= font->fontMath.fontSizeAtRenderCall;
+    vec2f p = Graphics_ComputeCenteringStart(font, line0, line0len, geometry);
     pGlyph = -1;
 
-    Graphics_PushText(state, x, y, (char *)line0,
-                      line0len, color, &pGlyph);
+    // move it half a line up
+    p.y -= font->fontMath.fontSizeAtRenderCall;
+
+    Graphics_PushText(state, p.x, p.y, (char *)line0, line0len, color, &pGlyph);
 
     Graphics_FlushText(state);
     Graphics_SetFontSize(state, currFontSize);

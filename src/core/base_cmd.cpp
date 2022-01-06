@@ -10,7 +10,9 @@
 #include <map>
 #include <theme.h>
 #include <dbgapp.h>
+#include <graphics.h>
 
+#define CMD_CURSORSET_STR "cursor-format "
 #define CMD_DIMM_STR "dimm "
 #define CMD_KILLSPACES_STR "kill-spaces"
 #define CMD_SEARCH_STR "search "
@@ -20,6 +22,7 @@
 #define CMD_EXPAND_STR "expand"
 #define CMD_KILLVIEW_STR "kill-view"
 #define CMD_KILLBUFFER_STR "kill-buffer"
+#define CMD_CURSORSEG_STR "cursor-seg "
 #define CMD_DBG_START_STR "dbg start "
 #define CMD_DBG_BREAK_STR "dbg break "
 #define CMD_DBG_EXIT_STR "dbg exit"
@@ -491,6 +494,20 @@ int BaseCommand_SetDimm(char *cmd, uint size, View *){
     return r;
 }
 
+int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
+    int r = 1;
+    uint len = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringEqual(arg, (char *)"quad", Min(len, 4))){
+        AppSetCursorFormat(CURSOR_QUAD);
+    }else if(StringEqual(arg, (char *)"dash", Min(len, 4))){
+        AppSetCursorFormat(CURSOR_DASH);
+    }else if(StringEqual(arg, (char *)"rect", Min(len, 4))){
+        AppSetCursorFormat(CURSOR_RECT);
+    }
+    return r;
+}
+
 int BaseCommand_DbgStart(char *cmd, uint size, View *view){
     int r = 1;
     char pmax[PATH_MAX];
@@ -610,6 +627,11 @@ int BaseCommand_KillBuffer(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_CursorSegmentToogle(char *, uint, View *){
+    Graphics_ToogleCursorSegment();
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = BaseCommand_SetDimm;
     cmdMap[CMD_KILLSPACES_STR] = BaseCommand_KillSpaces;
@@ -625,6 +647,8 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DBG_EXIT_STR] = BaseCommand_DbgExit;
     cmdMap[CMD_DBG_RUN_STR] = BaseCommand_DbgRun;
     cmdMap[CMD_DBG_FINISH_STR] = BaseCommand_DbgFinish;
+    cmdMap[CMD_CURSORSEG_STR] = BaseCommand_CursorSegmentToogle;
+    cmdMap[CMD_CURSORSET_STR] = BaseCommand_CursorSetFormat;
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

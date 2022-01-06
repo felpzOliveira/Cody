@@ -181,7 +181,7 @@ int XIMHasInputStyles(LibHelperX11 *x11){
 
     XFree(styles);
 
-    __ret:
+__ret:
     return found_styles;
 }
 
@@ -348,7 +348,7 @@ void SetSamplesX11(int samples){
     x11Framebuffer.samples = Max(0, samples);
 }
 
-void SetNoResizable(WindowX11 *window){
+void SetNotResizable(WindowX11 *window){
     XSizeHints* hints = XAllocSizeHints();
     hints->flags |= PWinGravity;
     hints->win_gravity = StaticGravity;
@@ -393,6 +393,17 @@ void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *cal
 void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv){
     window->onMouseDClickCall = callback;
     window->privDclick = priv;
+}
+
+WindowX11 *CreateWindowX11Shared(int width, int height,
+                                 const char *title, WindowX11 *share)
+{
+    WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
+    x11GLContext.share = (void *)share;
+    _CreateWindowX11(width, height, title, &x11Framebuffer,
+                     &x11GLContext, &x11Helper, window);
+    window->onScrollCall = NULL;
+    return window;
 }
 
 WindowX11 *CreateWindowX11(int width, int height, const char *title){

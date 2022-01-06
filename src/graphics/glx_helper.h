@@ -97,10 +97,10 @@ typedef struct{
     int             major, minor;
     int             eventBase;
     int             errorBase;
-    
+
     // dlopen handle for libGL.so.1
     void*           handle;
-    
+
     // GLX 1.3 functions
     PFNGLXGETFBCONFIGSPROC              GetFBConfigs;
     PFNGLXGETFBCONFIGATTRIBPROC         GetFBConfigAttrib;
@@ -115,7 +115,7 @@ typedef struct{
     PFNGLXGETVISUALFROMFBCONFIGPROC     GetVisualFromFBConfig;
     PFNGLXCREATEWINDOWPROC              CreateWindow;
     PFNGLXDESTROYWINDOWPROC             DestroyWindow;
-    
+
     // GLX 1.4 and extension functions
     PFNGLXGETPROCADDRESSPROC            GetProcAddress;
     PFNGLXGETPROCADDRESSPROC            GetProcAddressARB;
@@ -135,7 +135,7 @@ typedef struct{
     int        EXT_create_context_es2_profile;
     int        ARB_create_context_no_error;
     int        ARB_context_flush_control;
-    
+
 }LibHelperGLX;
 
 int  InitGLX(LibHelperX11 *x11);

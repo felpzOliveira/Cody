@@ -110,28 +110,104 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
     }
 }
 
-void OpenGLRenderCursor(OpenGLState *state, OpenGLCursor *glCursor, vec4f color,
-                        uint thickness, int isActive)
+void OpenGLRenderCursorSegment(OpenGLState *state, View *view, vec4f color, uint thickness){
+    if(view->isActive && state->params.cursorSegments){
+        OpenGLCursor *cursor = &state->glCursor;
+        OpenGLCursor *gcursor = &state->glGhostCursor;
+        Float y0 = 0, y1 = 0;
+        // 1 - if the ghost cursor is visible than we can actually draw a line
+        if(gcursor->valid){
+            y0 = cursor->pMax.y;
+            y1 = gcursor->pMax.y;
+            // check if both cursors are on the same line
+            // in this case we don't have anything to do
+            if(IsZero(y0 - y1)) return;
+            if(y0 > y1){
+                y0 = gcursor->pMin.y;
+                y1 = cursor->pMax.y;
+            }else{
+                y0 = cursor->pMin.y;
+                y1 = gcursor->pMax.y;
+            }
+        }else{
+            // 2 - if the ghost cursor is not visible we need
+            //     to know if it up or down
+            OpenGLFont *font = &state->font;
+            BufferView *bView = View_GetBufferView(view);
+            y1 = cursor->pMax.y;
+            y0 = 0;
+            if(view->descLocation == DescriptionTop){
+                y0 = font->fontMath.fontSizeAtRenderCall;
+            }
+
+            vec2ui normal = BufferView_GetCursorPosition(bView);
+            vec2ui ghost  = BufferView_GetGhostCursorPosition(bView);
+            if(ghost.x > normal.x){ // our base cursor is up
+                vec2ui vlines = BufferView_GetViewRange(bView);
+                y0 = cursor->pMin.y;
+                y1 = ((Float)ghost.x - (Float)vlines.x) * font->fontMath.fontSizeAtRenderCall;
+            }
+        }
+
+        Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(thickness, y1), color);
+    }
+}
+
+void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
+                             Float y1, vec4f color, uint thickness, int isActive)
 {
-    Float x0 = glCursor->pMin.x, x1 = glCursor->pMax.x;
-    Float y0 = glCursor->pMin.y, y1 = glCursor->pMax.y;
     if(isActive){
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), color);
-        }else{
+        }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
-            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x0+3, y1), color);
+            OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x0+3, y1),
+                                        color, thickness);
+            //Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x0+3, y1), color);
+        }else if(appGlobalConfig.cStyle == CURSOR_QUAD){
+            Float thick = 3;
+            y1 -= thick;
+            Float x01 = x0 + thick;
+            Float y01 = y1 + thick;
+            Float y11 = y0 + thick;
+            Float xh = x0 + (x1 - x0) * 0.6;
+            Float xu = x0 + (x1 - x0) * 0.4;
+            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x01, y1), color);
+            Graphics_QuadPush(state, vec2ui(x0, y01), vec2ui(xh, y1), color);
+            Graphics_QuadPush(state, vec2ui(xu, y0), vec2ui(x1, y11), color);
+            Graphics_QuadPush(state, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
         }
     }else{
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x1, y1),
                                         color, thickness);
-        }else{
+        }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
             OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x0+3, y1),
                                         color, thickness);
+        }else if(appGlobalConfig.cStyle == CURSOR_QUAD){
+            Float thick = 3;
+            y1 -= thick;
+            Float x01 = x0 + thick;
+            Float y01 = y1 + thick;
+            Float y11 = y0 + thick;
+            Float xh = x0 + (x1 - x0) * 0.6;
+            Float xu = x0 + (x1 - x0) * 0.4;
+            color.w *= 0.5;
+            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x01, y1), color);
+            Graphics_QuadPush(state, vec2ui(x0, y01), vec2ui(xh, y1), color);
+            Graphics_QuadPush(state, vec2ui(xu, y0), vec2ui(x1, y11), color);
+            Graphics_QuadPush(state, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
         }
     }
+}
+
+void OpenGLRenderCursor(OpenGLState *state, OpenGLCursor *glCursor, vec4f color,
+                        uint thickness, int isActive)
+{
+    Float x0 = glCursor->pMin.x, x1 = glCursor->pMax.x;
+    Float y0 = glCursor->pMin.y, y1 = glCursor->pMax.y;
+    Graphics_RenderCursorAt(state, x0, y0, x1, y1, color, thickness, isActive);
 }
 
 static void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
@@ -310,6 +386,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
 
     if(!buffer){
         // This is a bug
+        BUG();
         printf("Warning: Attempting to render cursor at position {%d %d} "
                "but linebuffer has {%d}\n", cursor->textPos.x, cursor->textPos.y,
                 bufferView->lineBuffer->lineCount);
@@ -323,17 +400,20 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
 
     if(vstate == View_FreeTyping){
         vec4f col = Graphics_GetCursorColor(bufferView, defaultTheme);
+        uint dashThick = 6;
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
         Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
 
         glDisable(GL_BLEND);
+        OpenGLRenderCursorSegment(state, view, vec4f(1.0,1.0,1.0,0.25), 12.0);
+
         OpenGLRenderCursor(state, &state->glCursor, col,
-                           4, bufferView->isActive && vstate == View_FreeTyping);
+                           dashThick, bufferView->isActive && vstate == View_FreeTyping);
 
         if(state->glGhostCursor.valid){
             col = Graphics_GetCursorColor(bufferView, defaultTheme, 1);
-            OpenGLRenderCursor(state, &state->glGhostCursor, col, 2, 0);
+            OpenGLRenderCursor(state, &state->glGhostCursor, col, dashThick, 0);
         }
     }
 

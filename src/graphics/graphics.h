@@ -28,14 +28,18 @@
 #define FONT_UPSCALE_DEFAULT_SIZE 65
 #define FONT_UPSCALE_DEFAULT_OFFSET 47
 
-#if defined(DEBUG_BUILD)
-#define OpenGLCHK(fn) do{\
-    OpenGLClearErrors();\
-    (fn);\
-    OpenGLValidateErrors(#fn, __LINE__, __FILE__);\
-}while(0)
+#if 1
+    #define OpenGLCHK(fn) do{\
+        OpenGLClearErrors();\
+        (fn);\
+        OpenGLValidateErrors(#fn, __LINE__, __FILE__);\
+    }while(0)
+
+    #define OpenGLCHK_ERR() do{\
+        OpenGLValidateErrors("ERR_CHK", __LINE__, __FILE__);\
+    }while(0)
 #else
-#define OpenGLCHK(fn) fn
+    #define OpenGLCHK(fn) fn
 #endif
 
 struct View;
@@ -114,8 +118,15 @@ struct EventHandler{
     double interval;
 };
 
+// enables/disables rendering stuff
+struct RenderProps{
+    // renders the segment that connects cursor to ghost cursor
+    bool cursorSegments;
+};
+
 struct OpenGLState{
     WindowX11 *window;
+    RenderProps params;
     OpenGLFont font;
     OpenGLBuffer glQuadBuffer;
     OpenGLImageQuadBuffer glQuadImageBuffer;
@@ -132,6 +143,7 @@ struct OpenGLState{
     Transform model;
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
+    Shader buttonShader;
     // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
     std::map<FileExtension, std::string> fileMap;
@@ -162,20 +174,39 @@ void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len,
                           const char *key, FileExtension type = FILE_EXTENSION_NONE);
 
 /*
+* Toogles the rendering of the cursor segments.
+*/
+void Graphics_ToogleCursorSegment();
+
+/*
+* Initializes a openglbuffer to the current binding context.
+*/
+void OpenGLBufferInitialize(OpenGLBuffer *buffer, int n);
+void OpenGLBufferInitializeFrom(OpenGLBuffer *buffer, OpenGLBuffer *other);
+
+void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
+
+/*
 * Get the id of a texture for a given file.
 */
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
 
 /*
-* Pushes a new quad into the current OpenGLState quad batch to render.
+* Pushes a new quad into the current OpenGLState/OpenGLBuffer quad batch to render.
 */
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color);
+void Graphics_QuadPush(OpenGLBuffer *quadB, vec2ui left, vec2ui right, vec4f color);
 
 /*
 * Retrieves the handler of the global (main) window.
 */
 void *Graphics_GetBaseWindow();
+
+/*
+* Retrieves the global gl context.
+*/
+OpenGLState *Graphics_GetGlobalContext();
 
 /*
 * Pushes a new quad into the current OpenGLState image batch to render a image.
@@ -196,9 +227,10 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
 void Graphics_LinePush(OpenGLState *state, vec2ui p0, vec2ui p1, vec4f color);
 
 /*
-* Triggers the OpenGLState quad accumulated batch to render all quads pushed.
+* Triggers the OpenGLState/OpenGLBuffer quad accumulated batch to render all quads pushed.
 */
 void Graphics_QuadFlush(OpenGLState *state, int blend=1);
+void Graphics_QuadFlush(OpenGLBuffer *quad, int blend=1);
 
 /*
 * Triggers the OpenGLState line accumulated batch to render all lines pushed.
@@ -253,6 +285,14 @@ Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
 int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
                                Theme *theme, uint lineNr, uint tid,
                                BufferView *bView, vec4i *color);
+
+/*
+* Renders the cursor at a specific location within the current bounded window
+* into the quad of size (x0, y0) x (x1, y1). This routine queries the editor
+* state to check the cursor format.
+*/
+void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
+                             Float y1, vec4f color, uint thickness, int isActive);
 
 /*
 * Computes the color of the editing cursor.
@@ -323,22 +363,34 @@ void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry);
 */
 void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
                                    Transform *model);
+void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
+                                   Transform *model);
 
 /*
 * Batches text to perform rendering.
 */
 void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
                        uint len, vec4i col, int *pGlyph);
+void Graphics_PushText(OpenGLFont *font, Float &x, Float &y, char *text,
+                       uint len, vec4i col, int *pGlyph);
 
 /*
 * Triggers a render call for all batched texts pushed.
 */
 void Graphics_FlushText(OpenGLState *state);
+void Graphics_FlushText(OpenGLFont *font);
 
 /*
 * TODO
 */
 vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view);
+
+/*
+* Computes the coordinates to start rendering the 'text' with size 'len' using 'font'
+* inside 'geometry' such that the text be centered.
+*/
+vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
+                                     uint len, Geometry *geometry);
 
 /*
 * Bind all image units.

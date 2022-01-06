@@ -1,4 +1,5 @@
 #include <scroll_controller.h>
+#include <timing.h>
 
 int Animation_Finished(AnimationProps *anim);
 void Animation_FinishCallback(){}
@@ -178,43 +179,6 @@ void VScroll_CursorTo(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
     ss->cursor.is_dirty = 1;
 }
 
-void VScroll_CursorTo2(VScroll *ss, uint lineNo, LineBuffer *lineBuffer){
-    AssertA(ss != nullptr, "Invalid scroll controller pointer");
-    int gap = 1;
-    vec2ui visibleRect = ss->visibleRect;
-    uint lineRangeSize = ss->currentMaxRange;
-    if(!(lineNo < visibleRect.y-gap && lineNo > visibleRect.x+gap)){
-        // Outside screen
-        if(lineNo <= visibleRect.x + gap && visibleRect.x != 0){ // going up
-            int iLine = (int)lineNo;
-            iLine = Max(0, iLine - gap);
-            visibleRect.x = (uint)iLine;
-            visibleRect.y = Min(visibleRect.x + lineRangeSize, lineBuffer->lineCount);
-        }else if(lineNo >= visibleRect.y - gap){ // going down
-#if 1
-            uint currRange = visibleRect.y - visibleRect.x;
-            if(lineNo == lineBuffer->lineCount - 1){
-                if(currRange > 1){
-                    visibleRect.y = lineBuffer->lineCount;
-                    visibleRect.x = visibleRect.y - currRange;
-                }
-            }else{
-                visibleRect.y = Min(lineNo + gap + 1, lineBuffer->lineCount);
-                visibleRect.x = visibleRect.y - lineRangeSize;
-            }
-#endif
-        }
-    }
-
-    ss->visibleRect = visibleRect;
-    if(lineNo < lineBuffer->lineCount){
-        ss->cursor.textPosition.x = lineNo;
-        VScroll_UpdateRelativeDistance(ss, lineNo, lineBuffer->lineCount);
-    }
-
-    ss->cursor.is_dirty = 1;
-}
-
 void VScroll_StartScrollViewTransition(VScroll *ss, int lineDiffs,
                                        Float duration, LineBuffer *lineBuffer)
 {
@@ -236,6 +200,7 @@ void VScroll_StartScrollViewTransition(VScroll *ss, int lineDiffs,
         ss->transitionAnim.startLine = ss->visibleRect.x;
         ss->transitionAnim.runningPosition = (Float)ss->visibleRect.x;
         ss->transitionAnim.is_down = lineDiffs > 0;
+        Timing_Update();
     }else if(ss->transitionAnim.transition == TransitionScroll){
         expectedEnd = ss->transitionAnim.endLine + lineDiffs;
         if(lineDiffs < 0){ // going up
@@ -341,6 +306,7 @@ void VScroll_StartCursorTransition(VScroll *ss, uint lineNo, uint col,
         ss->transitionAnim.runningPosition = (Float)ss->cursor.textPosition.x;
         ss->transitionAnim.is_down = ss->cursor.textPosition.x < lineNo;
         ss->transitionAnim.velocity = ss->transitionAnim.is_down ? 10 : -10;
+        Timing_Update();
     }else if(ss->cursor.textPosition.x == lineNo){ // change in col, no anim
         VScroll_CursorToPosition(ss, lineNo, col, lineBuffer);
     }
@@ -413,7 +379,7 @@ int VScroll_GetCursorTransition(VScroll *ss, Float dt, vec2ui *rRange,
     }
 
     return 0;
-    __set_end_transition:
+__set_end_transition:
     rRange->x = ss->visibleRect.x;
     rRange->y = ss->visibleRect.y;
     cursorAt->x = ss->cursor.textPosition.x;

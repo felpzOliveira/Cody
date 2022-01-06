@@ -192,6 +192,8 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
 }
 
 uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
+    if(buffer->taken == 0) return 0;
+
     if(!(rawp <= buffer->taken)){
         BUG();
         Buffer_DebugStdoutData(buffer);

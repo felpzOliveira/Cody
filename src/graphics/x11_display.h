@@ -56,6 +56,7 @@ typedef struct{
     int forward;
     int profile;
     void *window;
+    void *share;
 }ContextGL;
 
 typedef struct{
@@ -92,7 +93,7 @@ typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
 typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
 typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDclickCallback);
 
-typedef struct{
+typedef struct WindowX11{
     Colormap colormap;
     Window handle;
     Window parent;
@@ -166,7 +167,7 @@ typedef struct{
 
 void InitializeX11();
 void SetSamplesX11(int samples);
-void SetNoResizable(WindowX11 *window);
+void SetNotResizable(WindowX11 *window);
 void SetOpenGLVersionX11(int major, int minor);
 int  WindowShouldCloseX11(WindowX11 *window);
 void SetWindowShouldCloseX11(WindowX11 *window);
@@ -176,6 +177,8 @@ void PoolEventsX11();
 void MakeContextX11(WindowX11 *window);
 void WaitForEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
+WindowX11 *CreateWindowX11Shared(int width, int height,
+                                 const char *title, WindowX11 *share);
 void DestroyWindowX11(WindowX11 *window);
 void TerminateX11();
 void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y);

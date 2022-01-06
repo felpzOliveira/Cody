@@ -6,8 +6,26 @@
 #include <functional>
 #include <x11_display.h>
 #include <keyboard.h>
+#include <shaders.h>
+#include <graphics.h>
+
+#define WIDGET_TRANSITION_SCALE 0
 
 struct OpenGLState;
+class Widget;
+class WidgetWindow;
+
+/*
+* Because I feel like creating several different pieces I'll abuse C++
+* here instead of the C-like we have been doing on the rest of the code.
+*/
+
+/*
+* Signal-Slot pattern for widgets. Currently this is very simple.
+* It is implemented as a simple list of functions to call, if a slot
+* should be called by different threads than this might be need more
+* support. I'm however not wanting to implement threading here.
+*/
 
 template<typename ...Args>
 class Slot{
@@ -68,64 +86,230 @@ class Signal{
     }
 };
 
+// Wrapper for everything that might be required to render a widget
 struct WidgetRenderContext{
     OpenGLState *state;
+    Float dt;
+    WidgetWindow *window;
+
+    // filled in by the window handler
+    vec4f windowBackground; // give background for hacky AA
 };
 
+struct WidgetTransition{
+    int type;
+    Float scale;
+    Float interval;
+    Float dt;
+    vec2f velocity;
+    vec2f startValues;
+    vec2f endValues;
+    bool running;
+};
+
+// Overall style for things we can generic render
 struct WidgetStyle{
     vec4f background;
 };
 
-class Widget;
+/*
+* The design will be very simple. Components that require a specific window,
+* i.e.: popup windows, error windows, specific windows for opening files, etc...
+* must be extended from WidgetWindow, this will automatically create a new window
+* and handle keyboard/mouse events, they also hold a list of widgets that are
+* referenced by the window and trigger rendering on them.
+*
+* Components that are part of windows are referenced as widget and are described
+* by the Widget class. It represents something that is rendered within a window,
+* i.e.: buttons, text, textinput, etc...
+* Custom widgets can be created by extending the Widget class. Doing so automatically
+* allow you to have stuff like style rendering and input event handling for you. It also
+* removes some of the boilerplate code needed to link rendering/updating components.
+*/
 class WidgetWindow{
     public:
-    WindowX11 *window;
-    BindingMap *mapping;
-    vec2f resolution;
-    std::vector<Widget *> widgetList;
+    WindowX11 *window; // the main window for the widgets
+    BindingMap *mapping; // keyboard event handling
+    vec2f resolution; // window resolution
+    std::vector<Widget *> widgetList; // the list of widgets registered
 
+    // utilities for detecting entered/leave events
+    Widget *lastWidget;
+
+    // these rendering components are instancied as references from global context
+    // and don't actually hold any memory
+    OpenGLBuffer quadBuffer; // shared quad buffer
+    OpenGLFont font; // shared font
+
+    /*
+    * Basic constructor for WidgetWindow, receives the resolution in
+    * width and height, and the window title in 'name'. Be aware that
+    * the window created cannot be resizable.
+    */
     WidgetWindow(int width, int height, const char *name);
-    void MakeContext();
-    void Update();
-    void PushWidget(Widget *widget);
-    ~WidgetWindow();
 
-    virtual void OnSizeChange() = 0;
+    /*
+    * Get a geometry instance reference that describes this window.
+    */
+    Geometry GetGeometry();
+
+    /*
+    * Makes this window target for rendering.
+    */
+    void MakeContext();
+
+    /*
+    * Triggers framebuffer swap for displaying the contents of the window.
+    */
+    void Update();
+
+    /*
+    * Adds a new widget into the widget list of this window. Whenever the window
+    * is destroyed, the widget is destroyed as well so you don't need to track the
+    * widget pointer.
+    */
+    void PushWidget(Widget *widget){ widgetList.push_back(widget); }
+
+    /*
+    * Triggers the rendering of the window. This will automatically call
+    * MakeContext and Update as well as the rendering of all required widgets,
+    * it is the main routine you want to use for updating the window.
+    * Returns 1 in case *anything* in this window is animating and therefore
+    * requires the rendering loop to not sleep, 0 otherwise.
+    */
+    int DispatchRender(WidgetRenderContext *wctx);
+
+    /*
+    * Destructor.
+    */
+    virtual ~WidgetWindow();
 };
 
 class Widget{
     public:
-    Geometry geometry;
-    WidgetStyle style;
+    Geometry geometry; // widget's geometry as a reference to where to find it
+    WidgetStyle style; // basic global styles
+    Signal<> signalClicked; // on click signal to be emitted
+    Signal<> signalEntered; // on mouse entered signal to be emitted
+    Signal<> signalExited; // on mouse exited signal to be emitted
+    WidgetTransition transition; // used for animation purposes
 
-    Widget();
-    void SetStyle(WidgetStyle stl);
+    // geometry used as reference for aspect computation, usually parent geometry
+    Geometry refGeometry;
+
+    /*
+    * Basic constructor.
+    */
+    Widget(WidgetWindow *window);
+
+    /*
+    * Sets the global style of this widget.
+    */
+    void SetStyle(WidgetStyle stl){ style = stl; }
+
+    /*
+    * Starts a animation (transition) in this widget. If a transition is already
+    * in place than this call is ignored.
+    */
+    void Animate(const WidgetTransition &wtransition);
+
+    /*
+    * Interrupts whatever animation is currently running and force the
+    * widget to go to its end as if it was finished. Use a composition
+    * with this routine and 'Animate' if you need to overwrite the animation
+    * immediately. Be aware that interrupting animations can make for weird
+    * effects, use with care.
+    */
+    void InterruptAnimation();
+
+    /*
+    * Computest the widget geometry *after* applying the transition in place.
+    */
+    Geometry GetAnimatedGeometry(Float dt);
+
+    /*
+    * Sets the geometry of this widget as a reference to another geometry
+    * and aspects. i.e.: it computes the geometry as a fraction of another
+    * geometry.
+    */
     void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY);
-    void Render(WidgetRenderContext *);
+
+    /*
+    * Main routine to render a widget.
+    */
+    int Render(WidgetRenderContext *wctx);
+
+    /*
+    * Register a new slot to be invoked whenever a click event happens.
+    */
+    void AddClickedSlot(Slot<> slot);
+
+    /*
+    * Destructor.
+    */
     virtual ~Widget();
-    virtual void OnRender(WidgetRenderContext *) = 0;
-    virtual void OnClick(){}
+
+    /*
+    * Base mouse routine that triggers signals only.
+    */
+    virtual void OnClick(){ signalClicked.Emit(); }
+    virtual void OnExited(){ signalExited.Emit(); }
+    virtual void OnEntered(){ signalEntered.Emit(); }
+
+    /*
+    * Widgets must be implement a OnRender method that *actually* do rendering.
+    */
+    virtual int OnRender(WidgetRenderContext *wctx) = 0;
+
+    /*
+    * If the widget has a preferred geometry makes it take it around center.
+    */
+    virtual void PreferredGeometry(vec2f center, Geometry parentGeo){}
 };
+
+/* Basic implementation */
 
 class ButtonWidget : public Widget{
     public:
-    Signal<> clicked;
-    std::string text;
-    ButtonWidget();
-    ButtonWidget(std::string val);
-    void SetText(std::string val);
-    void AddClickedSlot(Slot<> slot);
-    void AddOnClickFn(std::function<void(void)> fn);
-    virtual ~ButtonWidget() override;
-    virtual void OnRender(WidgetRenderContext *) override;
+    std::string text; // the text written in the button
+
+    // utilities for preferred dimensions and animations
+    static uint kWidth;
+    static uint kHeight;
+    static Float kScaleUp;
+    static Float kScaleDown;
+    static Float kScaleDuration;
+
+    /*
+    * Basic constructors.
+    */
+    ButtonWidget(WidgetWindow *window);
+    ButtonWidget(WidgetWindow *window, std::string val);
+
+    /*
+    * Sets the label for this button.
+    */
+    void SetText(std::string val){ text = val; }
+
+    /*
+    * Renders the contents of the button.
+    */
+    virtual int OnRender(WidgetRenderContext *) override;
+
+    /*
+    * Slot implementation for the mouse events.
+    */
     virtual void OnClick() override;
+    virtual void OnEntered() override;
+    virtual void OnExited() override;
+
+    /*
+    * Sets the button to take geometry around center with pwidth and pheight.
+    */
+    virtual void PreferredGeometry(vec2f center, Geometry parentGeo) override;
 };
 
-class PopupWidget : public Widget, public WidgetWindow{
+class PopupWindow : public WidgetWindow{
     public:
-    ButtonWidget *b0, *b1;
-    PopupWidget();
-    virtual ~PopupWidget() override;
-    virtual void OnRender(WidgetRenderContext *) override;
-    virtual void OnSizeChange() override;
+    PopupWindow();
 };

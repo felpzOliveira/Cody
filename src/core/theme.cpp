@@ -223,8 +223,8 @@ Theme themeYavid = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0xFF16191C),
-        //ColorFromHex(0xFF202020),
+        //ColorFromHex(0xFF16191C),
+        ColorFromHex(0xFF202020),
     },
     .userDatatypeColor = ColorFromHex(0xCC8EE7BF),
     .userDatatypeEnum = ColorFromHex(0xCCd8ddad),

@@ -19,7 +19,6 @@ mat4 contrastMatrix(float contrast){
                 0, contrast, 0, 0,
                 0, 0, contrast, 0,
                 t, t, t, 1);
-    
 }
 
 mat4 saturationMatrix(float saturation){

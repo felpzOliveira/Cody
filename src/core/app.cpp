@@ -93,6 +93,10 @@ void AppSetDelayedCall(std::function<void(void)> fn){
     appContext.hasDelayedCall = true;
 }
 
+void AppSetCursorFormat(CursorStyle style){
+    appGlobalConfig.cStyle = style;
+}
+
 void AppEarlyInitialize(){
     View *view = nullptr;
 

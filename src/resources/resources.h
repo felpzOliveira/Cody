@@ -33,3 +33,5 @@ extern unsigned char wave_dark_png[];
 extern unsigned int wave_dark_png_len;
 extern unsigned char wave_white_png[];
 extern unsigned int wave_white_png_len;
+extern const char *shader_button_v;
+extern const char *shader_button_f;

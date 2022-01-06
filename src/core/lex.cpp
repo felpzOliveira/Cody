@@ -73,9 +73,9 @@ static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback
             s++;
             n++;
         }
-        
+
         if(n < runLen) return *s;
-        
+
         // Need to look next segment
         if(fetcher){
             fetched += n;
@@ -84,7 +84,7 @@ static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback
             s = NULL;
         }
     }
-    
+
     return 0;
 }
 
@@ -100,7 +100,7 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
             .nestedLevel = 0,
             .currentState = 0,
         };
-        
+
         BoundedStack_Push(tokenizer->procStack, &proc);
         added = 1;
     }else if(token->identifier == TOKEN_ID_DATATYPE_TYPEDEF_DEF){
@@ -109,7 +109,7 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
             .nestedLevel = 0,
             .currentState = 0,
         };
-        
+
         BoundedStack_Push(tokenizer->procStack, &proc);
         added = 1;
     }else if(token->identifier == TOKEN_ID_DATATYPE_ENUM_DEF){
@@ -118,7 +118,7 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
             .nestedLevel = 0,
             .currentState = 0,
         };
-        
+
         BoundedStack_Push(tokenizer->procStack, &proc);
         added = 1;
     }else if(token->identifier == TOKEN_ID_DATATYPE_CLASS_DEF){
@@ -127,22 +127,22 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
             .nestedLevel = 0,
             .currentState = 0,
         };
-        
+
         BoundedStack_Push(tokenizer->procStack, &proc);
         added = 1;
     }
-    
+
     return added;
 }
 
-int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token, 
+int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
                            LogicalProcessor *proc, TokenId refId, char **p)
 {
     if(token->identifier == refId){
         proc->range.x = tokenizer->runningLine;
         return 1;
     }
-    
+
     int filtered = 1;
     switch(token->identifier){
         /* templates */
@@ -165,14 +165,14 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
         } break;
         default: filtered = 0; break;
     }
-    
+
     //TODO: This tests avoid broken statements to propagate
     //      the logical expression to the whole doc. Check if it is sane.
     if(Lex_IsTokenReserved(token)){
         BoundedStack_Pop(tokenizer->procStack);
         filtered = 1;
     }
-    
+
     return filtered;
 }
 
@@ -184,7 +184,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_CLASS_DEF, p);
-    
+
     char *h = (*p) - token->size;
     int grabbed = 0;
     switch(token->identifier){
@@ -215,7 +215,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
                 filter = 2;
             }
         } break;
-        
+
         case TOKEN_ID_BRACE_OPEN:{
             if(proc->nestedLevel == 1 && proc->currentState == 1){
                 /*
@@ -227,10 +227,10 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
                 filter = 2;
             }
         } break;
-        
+
         default: {}
     }
-    
+
     if(emitWarningToken){
         if(!BoundedStack_IsEmpty(tokenizer->procStack)){
             Token infoToken;
@@ -242,7 +242,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
             }
         }
     }
-    
+
     if(grabbed){
         if(SymbolTable_Insert(tokenizer->symbolTable, h,
                               token->size, token->identifier) == 0)
@@ -252,7 +252,7 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
             token->reserved = StringDup(h, token->size);
         }
     }
-    
+
     return filter > 1 ? 0 : 1;
 }
 
@@ -267,7 +267,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_ENUM_DEF, p);
-    
+
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
             if(proc->nestedLevel == 0){
@@ -307,10 +307,10 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
                 }
             }
         } break;
-        
+
         default: {}
     }
-    
+
     if(emitWarningToken){
         if(!BoundedStack_IsEmpty(tokenizer->procStack)){
             Token infoToken;
@@ -322,7 +322,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
             }
         }
     }
-    
+
     return filter > 1 ? 0 : 1;
 }
 
@@ -335,7 +335,7 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_STRUCT_DEF, p);
-    
+
     char *h = (*p) - token->size;
     int grabbed = 0;
     switch(token->identifier){
@@ -366,10 +366,10 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
                 filter = 2;
             }
         } break;
-        
+
         default: {}
     }
-    
+
     if(emitWarningToken){
         if(!BoundedStack_IsEmpty(tokenizer->procStack)){
             Token infoToken;
@@ -381,7 +381,7 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
             }
         }
     }
-    
+
     if(grabbed){
         if(SymbolTable_Insert(tokenizer->symbolTable, h,
                               token->size, token->identifier) == 0)
@@ -394,8 +394,8 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
         // this stabilizes the typedef struct{}<type>; synthax
         BoundedStack_Pop(tokenizer->procStack);
     }
-    
-    
+
+
     return filter > 1 ? 0 : 1;
 }
 
@@ -414,14 +414,14 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
                                         TOKEN_ID_DATATYPE_TYPEDEF_DEF, p);
     int grabbed = 0;
     char *h = (*p) - token->size;
-    
+
     if(token->identifier != TOKEN_ID_DATATYPE_TYPEDEF_DEF){
         if(token->identifier == TOKEN_ID_PARENTHESE_OPEN){
             if(proc->nestedLevel == 1){
                 proc->currentState = 2;
             }
         }else if(proc->currentState == 2){
-            if(token->identifier == TOKEN_ID_ASTERISK && 
+            if(token->identifier == TOKEN_ID_ASTERISK &&
                lastToken->identifier == TOKEN_ID_PARENTHESE_OPEN)
             {
                 proc->currentState = 3;
@@ -432,7 +432,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             proc->range.y = tokenizer->runningLine;
             grabbed = 1;
             PRINT_SAFE("TYPEDEF > ", h, token->size);
-        }else if(token->identifier == TOKEN_ID_NONE && 
+        }else if(token->identifier == TOKEN_ID_NONE &&
                  proc->nestedLevel == 0 && proc->currentState == 1)
         {
             //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
@@ -446,11 +446,11 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             proc->currentState = 1;
         }
     }
-    
+
     if(token->identifier == TOKEN_ID_IGNORE){
         proc->currentState = 1;
     }
-    
+
     if(grabbed){
         if(SymbolTable_Insert(tokenizer->symbolTable, h,
                               token->size, token->identifier) == 0)
@@ -460,7 +460,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             token->reserved = StringDup(h, token->size);
         }
     }
-    
+
     return filter > 1 ? 0 : 1;
 }
 
@@ -477,7 +477,7 @@ LEX_PROCESSOR(Lex_Number){
     int lCount = 0;
     *len = 0;
     *head = *p;
-    
+
     LEX_DEBUG("Starting Numeric parser at \'%c\'\n", **p);
 
     if(!tokenizer->support.numbers){
@@ -485,19 +485,19 @@ LEX_PROCESSOR(Lex_Number){
     }
 
     iValue = (**p) - '0';
-    
+
     if(**p == '.'){
         if(n < 2) return 0;
         int k = *((*p)+1) - '0';
         if(k < 0 || k > 9) return 0;
-        
+
         dotCount = 1;
         rLen = 1;
         INC_OR_ZERO(p, n, rLen);
     }
-    
+
     if(dotCount == 0 && (iValue < 0 || iValue > 9)) return 0;
-    
+
     do{
         _number_start:
         iValue = (**p) - '0';
@@ -528,7 +528,7 @@ LEX_PROCESSOR(Lex_Number){
                 *len = rLen;
                 return 2;
             }
-            
+
             rLen ++;
             (*p)++;
             goto _number_start;
@@ -537,7 +537,7 @@ LEX_PROCESSOR(Lex_Number){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
             }
-            
+
             rLen++;
             (*p)++;
             goto end;
@@ -546,12 +546,12 @@ LEX_PROCESSOR(Lex_Number){
                 LEX_DEBUG("Found \'x\' but token is large\n");
                 goto end;
             }
-            
+
             if(xCount != 0){
                 LEX_DEBUG("Found multiple \'x\'\n");
                 goto end;
             }
-            
+
             if(rLen+1 < n){
                 if(Lex_IsAnyNumber((*((*p)+1))) && dotCount == 0 && eCount == 0){
                     xCount = 1;
@@ -567,18 +567,18 @@ LEX_PROCESSOR(Lex_Number){
                 LEX_DEBUG("Found \'e\' at first token position\n");
                 return 0;
             }
-            
+
             eCount++;
             if(eCount > 1){
                 LEX_DEBUG("Multiple \'e\' found in token\n");
                 goto end;
             }
-            
+
             if(xCount > 0){
                 LEX_DEBUG("Found \'e\' but number has \'x\' in token\n");
                 goto end;
             }
-            
+
             // check for symbol and/or value
             if(rLen+1 < n){
                 int sValue = *((*p)+1) - '0';
@@ -593,7 +593,7 @@ LEX_PROCESSOR(Lex_Number){
                         LEX_DEBUG("Found \'e(+-)\' without value\n");
                         goto end;
                     }
-                    
+
                     rLen += 2;
                     (*p)++; (*p)++;
                     goto _number_start;
@@ -610,18 +610,18 @@ LEX_PROCESSOR(Lex_Number){
                 goto end;
             }
         }
-        
+
         iNum = Lex_IsDecimalValue(**p);
         if(!iNum && xCount == 1){
             iNum = Lex_IsHexValue(**p);
         }
-        
+
         if(iNum){
             rLen ++;
             (*p)++;
         }
     }while(iNum != 0 && rLen < n);
-    
+
     end:
     *len = rLen;
     return rLen > 0 ? 1 : 0;
@@ -634,7 +634,7 @@ LEX_PROCESSOR(Lex_Inclusion){
     *len = 0;
     *head = *p;
     LEX_DEBUG("Starting inclusion parser at \'%c\'\n", **p);
-    
+
     if(**p == '<'){
         level += 1;
         rLen = 1;
@@ -642,7 +642,7 @@ LEX_PROCESSOR(Lex_Inclusion){
     }else{
         goto end;
     }
-    
+
     while(level > 0 && n > rLen){
         (*p)++;
         if(**p == '>'){
@@ -654,7 +654,7 @@ LEX_PROCESSOR(Lex_Inclusion){
         }
         rLen++;
     }
-    
+
     end:
     *len = rLen;
     return rLen > 0 ? 1 : 0;
@@ -684,7 +684,7 @@ LEX_PROCESSOR(Lex_String){
     }else{
         goto end;
     }
-    
+
     while(level > 0 && n > rLen){
         (*p)++;
         if(**p == '\\' && !reverseSlash){
@@ -698,7 +698,7 @@ LEX_PROCESSOR(Lex_String){
         }
         rLen++;
     }
-    
+
     end:
     *len = rLen;
     return rLen > 0 ? 1 : 0;
@@ -709,7 +709,7 @@ LEX_PROCESSOR(Lex_Comments){
     int aggregate = tokenizer->aggregate;
     int type = tokenizer->type;
     //token->identifier = TOKEN_ID_COMMENT;
-    
+
     size_t rLen = 0;
     char prev = 0;
     char lineChar = tokenizer->support.lineCommentChar;
@@ -752,7 +752,7 @@ LEX_PROCESSOR(Lex_Comments){
             rLen += 1;
         }
     }
-    
+
     while(rLen < n){
         if(type == 2){
             if(**p == '/' && prev == '*'){
@@ -790,7 +790,7 @@ LEX_PROCESSOR(Lex_Comments){
             aggregate = 0;
         }
     }
-    
+
     end:
     *len = rLen;
     tokenizer->aggregate = aggregate;
@@ -805,12 +805,12 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
     uint length = 1;
 
     token->identifier = TOKEN_ID_NONE;
-    
+
     if(TerminatorChar(**p)){
         (*p)++;
         goto consume;
     }
-    
+
     // 1- select token
     while(*p != nullptr && length <= n){
         (*p)++;
@@ -820,9 +820,9 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             length++;
         }
     }
-    
+
     consume:
-    
+
     // 2- check against lookup table
     token->size = length;
     if(!tokenizer->support.lookups){
@@ -836,7 +836,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             break;
         }
     }
-    
+
     if(tableIndex >= 0){
         LookupToken *tList = lookup->table[tableIndex];
         int count = lookup->sizes[tableIndex].x;
@@ -848,7 +848,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             }
         }
     }
-    
+
     if(!matched){
         if(length > 0){
             if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR_DEFINE){
@@ -857,7 +857,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
                 token->reserved = StringDup(h, length);
                 SymbolTable_Insert(tokenizer->symbolTable, h, length,
                                    TOKEN_ID_PREPROCESSOR_DEFINITION);
-                
+
             }else if(!(length == 1 && TerminatorChar(**p))){
                 uint maxn = n - length;
                 char nextC = Lex_LookAhead(*p, length, maxn, fetcher);
@@ -888,7 +888,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
             }
         }
     }
-    
+
     return length;
 }
 
@@ -900,15 +900,15 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     int lexrv = 0;
     char *h = *p;
     uint len = 1;
-    
+
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
-    
+
     if(n == 1 && **p == '\\'){
         rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }
-    
+
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
         token->size = len;
@@ -920,23 +920,23 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
         token->identifier = TOKEN_ID_COMMENT;
         goto end;
     }
-    
+
     lexrv = Lex_String(p, n, &h, &len, context, token, tokenizer);
     if(lexrv > 0){
         token->size = len;
         token->identifier = TOKEN_ID_STRING;
         goto end;
     }
-    
+
     lexrv = Lex_Number(p, n, &h, &len, context, token, tokenizer);
     if(lexrv > 0){
         token->size = len;
         token->identifier = TOKEN_ID_NUMBER;
         goto end;
     }
-    
+
     len = Lex_TokenLookupAny(p, n, token, context->lookup, fetcher, context, tokenizer);
-    
+
     end:
     *offset = len;
     context->has_pending_work = 0;
@@ -955,15 +955,15 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     int lexrv = 0;
     char *h = *p;
     uint len = 1;
-    
+
     token->size = 1;
     token->identifier = TOKEN_ID_NONE;
-    
+
     if(n == 1 && **p == '\\'){
         rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }
-    
+
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
         token->size = len;
@@ -975,14 +975,14 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
         token->identifier = TOKEN_ID_COMMENT;
         goto end;
     }
-    
+
     lexrv = Lex_String(p, n, &h, &len, context, token, tokenizer);
     if(lexrv > 0){
         token->size = len;
         token->identifier = TOKEN_ID_STRING;
         goto end;
     }
-    
+
     if(tokenizer->inclusion){
         lexrv = Lex_Inclusion(p, n, &h, &len, context, token, tokenizer);
         if(lexrv > 0){
@@ -991,20 +991,20 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
             goto end;
         }
     }
-    
+
     lexrv = Lex_Number(p, n, &h, &len, context, token, tokenizer);
     if(lexrv > 0){
         token->size = len;
         token->identifier = TOKEN_ID_NUMBER;
         goto end;
     }
-    
+
     len = Lex_TokenLookupAny(p, n, token, context->lookup, fetcher, context, tokenizer);
     if(token->identifier == TOKEN_ID_INCLUDE_SEL){
         token->identifier = TOKEN_ID_PREPROCESSOR;
         tokenizer->inclusion = 1;
     }else if(token->identifier == TOKEN_ID_PREPROCESSOR_IF){
-        if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR && 
+        if(tokenizer->lastToken.identifier == TOKEN_ID_PREPROCESSOR &&
            tokenizer->lastToken.size == 1)
         {
             token->identifier = TOKEN_ID_PREPROCESSOR;
@@ -1012,7 +1012,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
             token->identifier = TOKEN_ID_OPERATOR;
         }
     }
-    
+
     end:
     *offset = len;
     context->has_pending_work = 0;
@@ -1028,32 +1028,32 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     uint len = 0;
     int rv = 0;
     //printf("Starting at \'%c\'\n", **p);
-    
+
     TokenizerContext *tCtx = nullptr;
     int unfinished = tokenizer->unfinishedContext;
     int lineBeginning = tokenizer->lineBeginning;
-    
+
     tokenizer->lineBeginning = 0;
     tokenizer->unfinishedContext = -1;
     token->reserved = nullptr;
-    
+
     // Compute the amount of lines being grouped by unfinished work
     if(lineBeginning){
         if(unfinished >= 0) tokenizer->linesAggregated ++;
         else tokenizer->linesAggregated = 0;
         tokenizer->autoIncrementor = 0;
     }
-    
+
     if(n == 0){
         tokenizer->unfinishedContext = unfinished;
         return -1;
     }
-    
+
     if(**p == '\n'){
         tokenizer->unfinishedContext = unfinished;
         return -1;
     }
-    
+
     tokenizer->givenTokens ++;
     uint tablen = 0;
     // 1- Skip spaces and encode in our format
@@ -1067,11 +1067,11 @@ LEX_TOKENIZER(Lex_TokenizeNext){
                 }
             }
         }
-        
+
         offset++;
         (*p)++;
     }
-    
+
     // 2- Check which contexts want to process this line
     if(lineBeginning){
         for(int i = 0; i < tokenizer->contextCount; i++){
@@ -1082,7 +1082,7 @@ LEX_TOKENIZER(Lex_TokenizeNext){
             }
         }
     }
-    
+
     if(offset > 0 /*&& lineBeginning*/){
         tokenizer->unfinishedContext = unfinished;
         token->position = tokenizer->linePosition + tokenizer->autoIncrementor;
@@ -1093,45 +1093,45 @@ LEX_TOKENIZER(Lex_TokenizeNext){
         //tokenizer->lastToken = *token; // do not register space Tokens for preprocessing
         return offset;
     }
-    
+
     // 3- If some context did not finish its job, let it continue
     if(unfinished >= 0){
         tCtx = &tokenizer->contexts[unfinished];
         rv = tCtx->exec(p, n-offset, token, &len, tCtx, tokenizer);
         if(rv == TOKENIZER_OP_UNFINISHED){
             tokenizer->unfinishedContext = unfinished;
-            
-            token->position = tokenizer->linePosition + 
+
+            token->position = tokenizer->linePosition +
                 tokenizer->autoIncrementor + offset;
-            
+
             tokenizer->linePosition += offset + len;
             tokenizer->lastToken = *token;
-            
+
             return offset + len;
         }else if(rv == TOKENIZER_OP_FINISHED){
-            token->position = tokenizer->linePosition + 
+            token->position = tokenizer->linePosition +
                 tokenizer->autoIncrementor + offset;
-            
+
             tokenizer->linePosition += offset + len;
-            
+
             if(!BoundedStack_IsEmpty(tokenizer->procStack)){
                 LogicalProcessor *proc = BoundedStack_Peek(tokenizer->procStack);
                 (void) proc->proc(tokenizer, token, proc, p);
             }
-            
+
             TokenizerUpdateState(tokenizer, token);
             tokenizer->lastToken = *token;
             return offset + len;
         }
     }
-    
+
     if(offset + len >= n){
         printf("Untested condition\n");
         return offset + len;
     }
-    
+
     offset += len;
-    
+
     // 4- Give a chance to other contexts to get a token
     for(int i = 0; i < tokenizer->contextCount; i++){
         tCtx = &tokenizer->contexts[i];
@@ -1139,30 +1139,30 @@ LEX_TOKENIZER(Lex_TokenizeNext){
             rv = tCtx->exec(p, n-offset, token, &len, tCtx, tokenizer);
             if(rv == TOKENIZER_OP_UNFINISHED){
                 tokenizer->unfinishedContext = i;
-                token->position = tokenizer->linePosition + 
+                token->position = tokenizer->linePosition +
                     tokenizer->autoIncrementor + offset;
-                
+
                 tokenizer->linePosition += offset + len;
                 TokenizerUpdateState(tokenizer, token);
                 tokenizer->lastToken = *token;
                 return offset + len;
             }else if(rv == TOKENIZER_OP_FINISHED){
-                token->position = tokenizer->linePosition + 
+                token->position = tokenizer->linePosition +
                     tokenizer->autoIncrementor + offset;
-                
+
                 tokenizer->linePosition += offset + len;
                 if(!BoundedStack_IsEmpty(tokenizer->procStack)){
                     LogicalProcessor *proc = BoundedStack_Peek(tokenizer->procStack);
                     (void) proc->proc(tokenizer, token, proc, p);
                 }
-                
+
                 TokenizerUpdateState(tokenizer, token);
                 tokenizer->lastToken = *token;
                 return offset + len;
             }
         }
     }
-    
+
     AssertA(0, "No context generated token for input\n");
     return -1;
 }
@@ -1172,7 +1172,7 @@ static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
     *found = 0;
     while(i < (int)buffer->tokenCount){
         Token *token = &buffer->tokens[i];
-        if(token->identifier != TOKEN_ID_SPACE && 
+        if(token->identifier != TOKEN_ID_SPACE &&
            token->identifier != TOKEN_ID_ASTERISK)
         {
             *found = 1;
@@ -1180,7 +1180,7 @@ static inline int QueryNextNonReservedToken(Buffer *buffer, int i, int *found){
         }
         i++;
     }
-    
+
     return i;
 }
 
@@ -1197,10 +1197,10 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
             p++;
             processed++;
         }
-        
+
         if(*p == '\n'){
             //*p = 0;
-            processor(&lineStart, lineSize+1, lineNr, 
+            processor(&lineStart, lineSize+1, lineNr,
                       processed-lineSize, textsize, prv);
             *p = '\n';
             p++;
@@ -1214,9 +1214,9 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
             processed++;
         }
     }
-    
+
     if(lineSize > 0){
-        processor(&lineStart, lineSize+1, lineNr, 
+        processor(&lineStart, lineSize+1, lineNr,
                   processed-lineSize, textsize, prv);
     }
 
@@ -1238,18 +1238,18 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
                                std::vector<std::vector<GToken>> *cppTable)
 {
     AssertA(lookupTable != nullptr, "Invalid lookup table given");
-    AssertA(lookupTable->table == nullptr, 
+    AssertA(lookupTable->table == nullptr,
             "Re-generation of lookup table is not supported");
 
     if(cppTable->size() == 0) return;
 
     std::vector<GToken> tokens = cppTable->at(0);
     int elements = cppTable->size();
-    
+
     lookupTable->realSize = elements + DefaultAllocatorSize;
     lookupTable->table = (LookupToken **)AllocatorGet(sizeof(LookupToken *) * lookupTable->realSize);
     lookupTable->sizes = (vec3i *)AllocatorGet(sizeof(vec3i) * lookupTable->realSize);
-    
+
     for(int i = 0; i < elements; i++){
         LookupToken *tokenList = nullptr;
         tokens = cppTable->at(i);
@@ -1261,12 +1261,12 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
             tokenList[k].identifier = gToken.identifier;
             tokenList[k].size = len;
         }
-        
+
         lookupTable->table[i] = tokenList;
         lookupTable->sizes[i] = vec3i(tokens.size(), tokenList[0].size,
                                       tokens.size() + DefaultAllocatorSize);
     }
-    
+
     lookupTable->nSize = elements;
 }
 
@@ -1289,10 +1289,10 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTa
     tokenizer->inclusion = 0;
     tokenizer->runningIndentLevel = 0;
     tokenizer->runningParenIndentLevel = 0;
-    
-    tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) * 
+
+    tables = (TokenLookupTable *)AllocatorGet(sizeof(TokenLookupTable) *
                                               tokenizer->contextCount);
-    
+
     workContext = (TokenizerWorkContext *)AllocatorGet(sizeof(TokenizerWorkContext));
     workContext->workTokenList = AllocatorGetN(Token, 32);
     workContext->workTokenListSize = 32;
@@ -1375,7 +1375,7 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
             "Invalid inputs for Lex_TokenizerGetCurrentState");
     tokenizer->unfinishedContext = context->activeWorkProcessor;
     tokenizer->linesAggregated = context->backTrack > 0 ? context->backTrack-1 : 0;
-    
+
     tokenizer->inclusion = context->inclusion;
     tokenizer->aggregate = context->aggregate;
     tokenizer->type = context->type;
