@@ -9,11 +9,14 @@
 #include <sys/time.h>
 #include <x11_keyboard.h>
 #include <climits>
+#include <vector>
 
 LibHelperX11 x11Helper;
 Timer timer;
 Framebuffer x11Framebuffer;
 ContextGL x11GLContext;
+
+std::vector<WindowX11 *> x11ActiveWindows;
 
 void ProcessEventX11(XEvent *event);
 
@@ -285,11 +288,17 @@ void _CreateWindowX11(int width, int height, const char *title,
     XSetWindowAttributes wa = { 0 };
 
     wa.colormap = window->colormap;
+#if 1
     wa.event_mask = StructureNotifyMask | KeyPressMask | KeyReleaseMask |
         PointerMotionMask | ButtonPressMask | ButtonReleaseMask |
         ExposureMask | FocusChangeMask | VisibilityChangeMask |
         EnterWindowMask | LeaveWindowMask | PropertyChangeMask;
-
+#else
+    wa.event_mask = StructureNotifyMask | KeyPressMask | KeyReleaseMask |
+        ButtonPressMask | ButtonReleaseMask |
+        ExposureMask | FocusChangeMask | VisibilityChangeMask |
+        PropertyChangeMask;
+#endif
     window->parent = x11->root;
     window->handle = XCreateWindow(x11->display, x11->root, 0, 0,
                                    width, height, 0, depth, InputOutput,
@@ -370,9 +379,24 @@ void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, voi
     window->privScroll = priv;
 }
 
-void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback, void *priv){
-    window->onMouseClickCall = callback;
-    window->privClick= priv;
+void RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv){
+    window->onMouseLClickCall = callback;
+    window->privLClick = priv;
+}
+
+void RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv){
+    window->onMouseRClickCall = callback;
+    window->privRClick = priv;
+}
+
+void RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv){
+    window->onMousePressedCall = callback;
+    window->privPressed = priv;
+}
+
+void RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv){
+    window->onMouseReleasedCall = callback;
+    window->privReleased = priv;
 }
 
 void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv){
@@ -403,6 +427,7 @@ WindowX11 *CreateWindowX11Shared(int width, int height,
     _CreateWindowX11(width, height, title, &x11Framebuffer,
                      &x11GLContext, &x11Helper, window);
     window->onScrollCall = NULL;
+    x11ActiveWindows.push_back(window);
     return window;
 }
 
@@ -413,6 +438,7 @@ WindowX11 *CreateWindowX11(int width, int height, const char *title){
 
     //TODO: Set callbacks to empty
     window->onScrollCall = NULL;
+    x11ActiveWindows.push_back(window);
     return window;
 }
 
@@ -760,8 +786,9 @@ void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y){
 }
 
 void WaitForEventsX11(){
-    while(!XPending(x11Helper.display))
+    while(!XPending(x11Helper.display)){
         waitForEvent(NULL);
+    }
 
     PoolEventsX11();
 }
@@ -827,10 +854,32 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
             is_scroll = 1;
         } break;
         case Button1:{
-            if(window->onMouseClickCall){
-                window->onMouseClickCall(window->lastCursorPosX,
-                                         window->lastCursorPosY,
-                                         window->privClick);
+            if(window->onMousePressedCall){
+                window->onMousePressedCall(window->lastCursorPosX,
+                                           window->lastCursorPosY,
+                                           window->privPressed);
+            }
+        } break;
+        default:{ }
+    }
+
+    if(is_scroll && window->onScrollCall){
+        window->onScrollCall(is_scroll_up, window->privScroll);
+    }
+}
+
+void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    switch(event->xbutton.button){
+        case Button1:{
+            if(window->onMouseReleasedCall){
+                // TODO: Should we call this
+                window->onMouseReleasedCall(window->privReleased);
+            }
+
+            if(window->onMouseLClickCall){
+                window->onMouseLClickCall(window->lastCursorPosX,
+                                          window->lastCursorPosY,
+                                          window->privLClick);
             }
             // I really hate that I have to do this, because all I wanted
             // was to be happy. But aparently linux does not want me
@@ -851,16 +900,15 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
             window->xpos = window->lastCursorPosX;
             window->ypos = window->lastCursorPosY;
         } break;
+        case Button3: {
+            if(window->onMouseRClickCall){
+                window->onMouseRClickCall(window->lastCursorPosX,
+                                          window->lastCursorPosY,
+                                          window->privRClick);
+            }
+        } break;
         default:{ }
     }
-
-    if(is_scroll && window->onScrollCall){
-        window->onScrollCall(is_scroll_up, window->privScroll);
-    }
-}
-
-void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    //printf("Button Release\n");
 }
 
 void ProcessEventEnterX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){

@@ -36,6 +36,7 @@ typedef enum{
     UIHoverableListItem,
     UIHoverableListItemBackground,
     UIPasteColor,
+    UISelectionColor,
     UIDbgArrowColor,
     UIDbgLineHighlightColor,
 }UIElement;
@@ -137,6 +138,8 @@ typedef struct{
     vec4i dbgArrowColor;
     // color used for the debugger line highlighting
     vec4i dbgLinehighlightColor;
+    // color used to highlight text selection with mouse
+    vec4i mouseSelectionColor;
     // flag indicating if this theme is visually bright, i.e.: light,
     // this helps better select what icons are to be used and make decisions
     // on components that have different colors on dark/light modes

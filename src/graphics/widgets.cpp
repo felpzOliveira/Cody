@@ -5,6 +5,7 @@
 #include <theme.h>
 #include <gl3corefontstash.h>
 #include <timing.h>
+#include <buffers.h>
 
 uint ButtonWidget::kWidth  = 92;
 uint ButtonWidget::kHeight = 32;
@@ -66,33 +67,55 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
     ww->lastWidget = currWidget;
 }
 
-// TODO: maybe cache the keyboard mapping?
+WidgetWindow::WidgetWindow(){
+    window = nullptr;
+    mapping = nullptr;
+}
 WidgetWindow::WidgetWindow(int width, int height, const char *name){
+    window = nullptr;
+    mapping = nullptr;
+    Open(width, height, name);
+}
+
+// TODO: maybe cache the keyboard mapping?
+void WidgetWindow::Open(int width, int height, const char *name){
+    if(window){
+        DestroyWindowX11(window);
+    }
+
     OpenGLState *state = Graphics_GetGlobalContext();
     WindowX11 *shared = (WindowX11 *)Graphics_GetBaseWindow();
     OpenGLFont *ofont = &state->font;
     window = CreateWindowX11Shared(width, height, name, shared);
+    resolution = vec2f((Float)width, (Float)height);
     lastWidget = nullptr;
     SetNotResizable(window);
-
-    mapping = KeyboardCreateMapping(window);
-    resolution = vec2f((Float)width, (Float)height);
-    KeyboardSetActiveMapping(mapping);
-    RegisterOnMouseClickCallback(window, WidgetWindowOnClick, this);
-    RegisterOnMouseMotionCallback(window, WidgetWindowOnMotion, this);
-
-    // TODO: Set mapping callbacks
-    // TODO: Cache mapping?
     SwapIntervalX11(window, 0);
-    // TODO: Register inputs
 
-    MakeContext();
-    OpenGLFontCopy(&font, ofont);
+    if(!mapping){
+        MakeContext();
+        mapping = KeyboardCreateMapping(window);
+        KeyboardSetActiveMapping(mapping);
+        RegisterOnMouseLeftClickCallback(window, WidgetWindowOnClick, this);
+        RegisterOnMouseMotionCallback(window, WidgetWindowOnMotion, this);
+
+        OpenGLFontCopy(&font, ofont);
+    }else{
+        OpenGLBufferContextDelete(&quadBuffer);
+        OpenGLBufferContextDelete(&quadImageBuffer);
+        glfonsDeleteContext(font.fsContext);
+    }
+
     OpenGLBufferInitializeFrom(&quadBuffer, &state->glQuadBuffer);
+    OpenGLImageBufferInitializeFrom(&quadImageBuffer, &state->glQuadImageBuffer);
     font.fsContext = glfonsCreateFrom(ofont->fsContext);
     if(font.fsContext == nullptr){
         printf("[Widget] Failed to create font locally\n");
     }
+
+    // TODO: Set mapping callbacks
+    // TODO: Cache mapping?
+    // TODO: Register inputs
 }
 
 Geometry WidgetWindow::GetGeometry(){
@@ -116,8 +139,7 @@ int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
     Geometry geometry = GetGeometry();
     vec4f background = DefaultGetUIColorf(UISelectorBackground);
     ActivateViewportAndProjection(wctx->state, &geometry);
-    Float fcol[] = {background.x, background.y,
-                    background.z, background.w};
+    Float fcol[] = {background.x, background.y, background.z, background.w};
 
     glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, kOnes);
@@ -129,6 +151,7 @@ int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
     for(Widget *w : widgetList){
         is_animating |= w->Render(wctx);
     }
+
     Update();
     return is_animating;
 }
@@ -145,19 +168,14 @@ void WidgetWindow::Update(){
 }
 
 WidgetWindow::~WidgetWindow(){
-    for(Widget *w : widgetList){
-        if(w){
-            delete w;
-        }
-    }
-
     if(window){
         DestroyWindowX11(window);
     }
 }
 
-Widget::Widget(WidgetWindow *window){
+Widget::Widget(){
     transition.running = false;
+    style.valid = false;
 }
 Widget::~Widget(){
     signalClicked.DisconnectAll();
@@ -165,7 +183,7 @@ Widget::~Widget(){
 
 void Widget::InterruptAnimation(){
     // simply simulate the maximum step
-    geometry = GetAnimatedGeometry(transition.interval + Epsilon);
+    geometry = AdvanceAnimation(transition.interval + Epsilon);
 }
 
 void Widget::Animate(const WidgetTransition &wtransition){
@@ -199,7 +217,7 @@ void Widget::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY){
     refGeometry = geo;
 }
 
-Geometry Widget::GetAnimatedGeometry(Float dt){
+Geometry Widget::AdvanceAnimation(Float dt){
     Geometry geo = geometry;
     if(!transition.running) return geometry;
 
@@ -250,13 +268,13 @@ Geometry Widget::GetAnimatedGeometry(Float dt){
     else{
         // not yet supported
     }
-    transition.dt += dt;
+
+    bool finish = !((transition.dt + dt) <= transition.interval);
+
+    OnAnimationUpdate(dt, geo, finish);
     geometry = geo;
-    transition.running = transition.dt <= transition.interval;
-    if(!transition.running){
-        printf("Finish at : ");
-        geometry.PrintSelf();
-    }
+    transition.dt += dt;
+    transition.running = !finish;
 
     return geo;
 }
@@ -266,14 +284,14 @@ int Widget::Render(WidgetRenderContext *wctx){
     // and call specifics to render itself
     int animating = transition.running ? 1 : 0;
     if(animating){
-        geometry = GetAnimatedGeometry(wctx->dt);
+        geometry = AdvanceAnimation(wctx->dt);
     }
     ActivateViewportAndProjection(wctx->state, &geometry);
-    Float fcol[] = {style.background.x, style.background.y,
-                    style.background.z, style.background.w};
-
+#if 0
+    vec4f col = DefaultGetUIColorf(UISelectorBackground);
+    Float fcol[] = {col.x, col.y, col.z, col.w};
     glClearBufferfv(GL_COLOR, 0, fcol);
-
+#endif
     animating |= OnRender(wctx);
 
     glDisable(GL_SCISSOR_TEST);
@@ -284,9 +302,16 @@ void Widget::AddClickedSlot(Slot<> slot){
     signalClicked.Connect(slot);
 }
 
-ButtonWidget::ButtonWidget(WidgetWindow *window) : Widget(window){}
-ButtonWidget::ButtonWidget(WidgetWindow *window, std::string val) : Widget(window){
+ButtonWidget::ButtonWidget() : Widget(){
+    baseFontSize = Graphics_GetFontSize();
+    a_fontSize = (Float)baseFontSize;
+    textureId = -1;
+}
+ButtonWidget::ButtonWidget(std::string val) : Widget(){
     SetText(val);
+    baseFontSize = Graphics_GetFontSize();
+    a_fontSize = (Float)baseFontSize;
+    textureId = -1;
 }
 
 void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
@@ -319,6 +344,9 @@ void ButtonWidget::OnEntered(){
         .running =  true,
     };
 
+    a_fontSize = (Float)baseFontSize;
+    a_vel = 0;
+
     Widget::OnEntered();
     Widget::InterruptAnimation();
     Widget::Animate(transition);
@@ -333,53 +361,122 @@ void ButtonWidget::OnExited(){
         .running =  true,
     };
 
+    a_fontSize = (Float)baseFontSize;
+    a_vel = 0;
+
     Widget::OnExited();
     Widget::InterruptAnimation();
     Widget::Animate(transition);
+}
+
+void ButtonWidget::OnAnimationUpdate(Float dt, Geometry newGeometry, bool willFinish){
+    if(transition.type == WIDGET_TRANSITION_SCALE){
+        if(willFinish){
+            // we need to make sure the ending point for the font
+            // is *exactly* the scaling term otherwise float point
+            // precision could kill the view on chained animation
+            baseFontSize *= transition.scale;
+            a_fontSize = (Float)baseFontSize;
+        }else{
+            Float remaining = transition.interval - transition.dt;
+            Float fontSizeFinal = (Float)baseFontSize * transition.scale;
+            InterpolateValueCubic(dt, remaining, &a_fontSize, fontSizeFinal, &a_vel);
+        }
+    }
 }
 
 int ButtonWidget::OnRender(WidgetRenderContext *wctx){
     OpenGLState *gl = wctx->state;
     WidgetWindow *parent = wctx->window;
     OpenGLFont *font = &parent->font;
+    FontMath fMath = font->fontMath;
+    Transform model;
+    uint xoff = 0;
 
     Shader shader = gl->buttonShader;
     vec2f upper(geometry.upper.x - geometry.lower.x, geometry.upper.y - geometry.lower.y);
     upper *= font->fontMath.invReduceScale;
 
     ActivateShaderAndProjections(shader, gl);
-    Shader_UniformVec4(shader, "backgroundColor", wctx->windowBackground);
-    Shader_UniformVec2(shader, "buttonResolution", upper);
+    //Shader_UniformVec4(shader, "backgroundColor", wctx->windowBackground);
+    //Shader_UniformVec2(shader, "buttonResolution", upper);
 
-    Graphics_QuadPush(&parent->quadBuffer, vec2ui(0,0), upper, style.background);
+    Graphics_QuadPushBorder(&parent->quadBuffer, 0, 0, upper.x,
+                            upper.y, 2.0, style.background);
+
+    vec4f back = DefaultGetUIColorf(UISelectorBackground);
+    back.w = 1.0;
+
+    Graphics_QuadPush(&parent->quadBuffer, vec2ui(0,0), upper, back * 1.2);
+    Graphics_QuadPushBorder(&parent->quadBuffer, 0, 0, upper.x,
+                            upper.y, 2.0, vec4f(1.0));
+
     Graphics_QuadFlush(&parent->quadBuffer);
+    if(textureId >= 0){
+        upper.x *= 0.3;
+        xoff = 25;
+        OpenGLTexture texture = Graphics_GetTextureInfo(textureId);
+        Float aspect = texture.width / texture.height;
+            Float h = upper.x / aspect;
+        Float dy = (upper.y - h) * 0.5;
+        upper.y = h;
+        upper += vec2ui(xoff, dy);
+        Graphics_ImagePush(&parent->quadImageBuffer, vec2ui(xoff, dy), upper, textureId);
+        Graphics_ImageFlush(gl, &parent->quadImageBuffer);
+    }
 
-    Graphics_PrepareTextRendering(font, &gl->projection, &gl->scale);
+    Graphics_ComputeTransformsForFontSize(font, a_fontSize, &model);
+
+    Graphics_PrepareTextRendering(font, &gl->projection, &model);
     vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(), text.size(), &geometry);
+    if(textureId >= 0){
+        p.x += (Float)xoff;
+    }
+
     vec4i color = DefaultGetUIColor(UIScopeLine) * 1.3;
     int pGlyph = -1;
     Graphics_PushText(font, p.x, p.y, (char *)text.c_str(), text.size(), color, &pGlyph);
     Graphics_FlushText(font);
 
+    // restore the font transforms for all other components
+    font->fontMath = fMath;
+    return 0;
+}
+
+int ImageTextureWidget::OnRender(WidgetRenderContext *wctx){
+    WidgetWindow *parent = wctx->window;
+    OpenGLState *gl = wctx->state;
+    OpenGLFont *font = &parent->font;
+    vec2f upper(geometry.upper.x - geometry.lower.x, geometry.upper.y - geometry.lower.y);
+    upper *= font->fontMath.invReduceScale;
+    Graphics_ImagePush(&parent->quadImageBuffer, vec2ui(0,0), upper, textureId);
+    Graphics_ImageFlush(gl, &parent->quadImageBuffer);
     return 0;
 }
 
 PopupWindow::PopupWindow() : WidgetWindow(600, 400, "Popup!"){
-    ButtonWidget *b0 = new ButtonWidget(this, "B0");
-    ButtonWidget *b1 = new ButtonWidget(this, "B1");
-
     WidgetStyle s0, s1;
+    int off = 0;
+    OpenGLState *state = Graphics_GetGlobalContext();
 
-    s0.background = vec4f(0.6, 0.6, 0.6, 1.0);
-    s1.background = vec4f(1.0, 1.0, 1.0, 1.0);
-    b0->SetStyle(s0);
-    b1->SetStyle(s1);
+    s0.background = vec4f(0.9);
+    s1.background = vec4f(1.0);
+    b0.SetStyle(s0);
+    b1.SetStyle(s1);
+
+    b0.SetText("B0");
+    b1.SetText("B1");
+    b0.SetTextureId(Graphics_FetchTextureFor(state, FILE_EXTENSION_CUDA, &off));
 
     Geometry geometry = WidgetWindow::GetGeometry();
-    b0->PreferredGeometry(vec2f(0.3, .24), geometry);
-    b1->PreferredGeometry(vec2f(0.7, .24), geometry);
+    b0.PreferredGeometry(vec2f(0.3, .24), geometry);
+    b1.PreferredGeometry(vec2f(0.7, .24), geometry);
 
-    WidgetWindow::PushWidget(b0);
-    WidgetWindow::PushWidget(b1);
+    image.SetGeometry(geometry, vec2f(0.1, 0.3), vec2f(0.7, 0.9));
+    image.SetTextureId(Graphics_FetchTextureFor(state, FILE_EXTENSION_CUDA, &off));
+
+    WidgetWindow::PushWidget(&image);
+    WidgetWindow::PushWidget(&b0);
+    WidgetWindow::PushWidget(&b1);
 }
 

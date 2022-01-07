@@ -26,8 +26,8 @@ typedef unsigned long long ullong;
 
 typedef struct CharU8{ char x[5]; }CharU8;
 
-//#define DEBUG(...) do{ printf("[DEBUG] "); printf(__VA_ARGS__); }while(0)
-#define DEBUG(...)
+#define DEBUG(...) do{ printf("[DEBUG] "); printf(__VA_ARGS__); }while(0)
+//#define DEBUG(...)
 
 #define DEBUG_MSG(...) do{ printf("[%s] ", MODULE_NAME); printf(__VA_ARGS__); fflush(stdout); }while(0)
 //#define DEBUG_MSG(...)

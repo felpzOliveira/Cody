@@ -265,7 +265,59 @@ void AppRestoreCurrentBufferViewState(){
     }
 }
 
+void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
+    View *view = AppGetActiveView();
+    vec2ui mouse(x, state->height - y);
+    if(press){
+        mouse = AppActivateViewAt(x, state->height - y);
+        view = AppGetActiveView();
+        NullRet(view);
+    }else{
+        Geometry geo;
+        BufferView *bView = View_GetBufferView(view);
+        BufferView_GetGeometry(bView, &geo);
+        if(!Geometry_IsPointInside(&geo, mouse) || !BufferView_GetMousePressed(bView)){
+            return;
+        }
+        mouse = mouse - geo.lower;
+    }
+
+    ViewState vstate = View_GetState(view);
+    BufferView *bufferView = View_GetBufferView(view);
+    uint dy = view->geometry.upper.y - view->geometry.lower.y;
+
+    if(vstate == View_FreeTyping){
+        int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y,
+                                                view->descLocation);
+        if(lineNo < 0) return;
+
+        lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
+
+        uint colNo = 0;
+        Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
+        x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
+        if(x > 0){
+            colNo = fonsComputeStringOffsetCount(state->font.fsContext,
+                                                 buffer->data, x);
+
+            colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
+
+            BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
+            if(press){
+                BufferView_GhostCursorFollow(bufferView);
+                BufferView_SetMousePressed(bufferView, 1);
+            }else{
+                vec2ui ghost = BufferView_GetGhostCursorPosition(bufferView);
+                if(ghost.x != (uint)lineNo || ghost.y != colNo){
+                    BufferView_SetRangeVisible(bufferView, 1);
+                }
+            }
+        }
+    }
+}
+
 void AppHandleMouseMotion(int x, int y, OpenGLState *state){
+    AppOnMouseMotion(x, y, state, false);
 #if 0
     vec2ui mouse(x, state->height - y);
     View *view = AppGetActiveView();
@@ -299,52 +351,54 @@ void AppHandleMouseMotion(int x, int y, OpenGLState *state){
 
 void AppHandleMouseClick(int x, int y, OpenGLState *state){
     View *view = AppGetActiveView();
-    BufferView *bufferView = View_GetBufferView(view);
     vec2ui mouse = AppActivateViewAt(x, state->height - y);
     view = AppGetActiveView();
     NullRet(view);
     ViewState vstate = View_GetState(view);
-    bufferView = View_GetBufferView(view);
     uint dy = view->geometry.upper.y - view->geometry.lower.y;
 
-    switch(vstate){
-        case View_FreeTyping:{
-            int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y,
-                                                    view->descLocation);
-            if(lineNo < 0) return;
-
-            lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
-
-            uint colNo = 0;
-            Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
-            x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
-            if(x > 0){
-                colNo = fonsComputeStringOffsetCount(state->font.fsContext,
-                                                     buffer->data, x);
-
-                colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
-
-                BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
-                BufferView_GhostCursorFollow(bufferView);
-            }
-        } break;
-        case View_SelectableList:{
-            SelectableList *list = &view->selectableList;
-            y = dy - mouse.y;
-            y = ScreenToGL(y, state);
-            if(view->descLocation == DescriptionTop){
-                y -= state->font.fontMath.fontSizeAtRenderCall;
-            }
-            vec2i item = Graphics_ComputeSelectableListItem(state, y, view);
-            if(item.y >= 0){
-                SelectableList_SetItem(list, item.y);
-                AppCommandQueryBarCommit();
-            }
-        } break;
-        default:{
-            // nothing
+    if(vstate == View_SelectableList){
+        SelectableList *list = &view->selectableList;
+        y = dy - mouse.y;
+        y = ScreenToGL(y, state);
+        if(view->descLocation == DescriptionTop){
+            y -= state->font.fontMath.fontSizeAtRenderCall;
         }
+        vec2i item = Graphics_ComputeSelectableListItem(state, y, view);
+        if(item.y >= 0){
+            SelectableList_SetItem(list, item.y);
+            AppCommandQueryBarCommit();
+        }
+    }else if(vstate == View_FreeTyping){
+        // becase this is also a release event we can actually do this
+        BufferView *bufferView = View_GetBufferView(view);
+        vec2ui ghost = BufferView_GetGhostCursorPosition(bufferView);
+        int lineNo = BufferView_ComputeTextLine(bufferView, dy - mouse.y,
+                                                view->descLocation);
+        if(lineNo < 0) return;
+
+        lineNo = Clamp((uint)lineNo, (uint)0, BufferView_GetLineCount(bufferView)-1);
+
+        uint colNo = 0;
+        Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
+        Float x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
+        if(x < 0) return;
+        colNo = fonsComputeStringOffsetCount(state->font.fsContext,
+                                             buffer->data, x);
+
+        colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
+        if(ghost.x != (uint)lineNo || ghost.y != colNo){
+            BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
+        }else{
+            BufferView_SetRangeVisible(bufferView, 0);
+        }
+
+        BufferView_SetMousePressed(bufferView, 0);
     }
+}
+
+void AppHandleMousePress(int x, int y, OpenGLState *state){
+    AppOnMouseMotion(x, y, state, true);
 }
 
 void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
@@ -385,6 +439,7 @@ void AppCommandFreeTypingJumpToDirection(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
     //CODEVIEW_OR_RET(bufferView);
     if(!bufferView->lineBuffer) return;
+    BufferView_SetRangeVisible(bufferView, 0);
 
     Token *token = nullptr;
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -451,6 +506,7 @@ void AppCommandFreeTypingArrows(int direction){
     BufferView *bufferView = AppGetActiveBufferView();
     //CODEVIEW_OR_RET(bufferView);
     if(!bufferView->lineBuffer) return;
+    BufferView_SetRangeVisible(bufferView, 0);
 
     uint lineCount = BufferView_GetLineCount(bufferView);
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
@@ -527,6 +583,32 @@ void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view){
     }
 }
 
+void AppHandleRegionCut(bool toClipboard=true){
+    vec2ui start, end;
+    uint size = 0;
+    char *ptr = nullptr;
+    BufferView *view = AppGetActiveBufferView();
+
+    NullRet(view->lineBuffer);
+    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+
+    if(BufferView_GetCursorSelectionRange(view, &start, &end)){
+        size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
+        if(toClipboard){
+            ClipboardSetStringX11(ptr, size);
+        }
+
+        UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
+        AppCommandRemoveTextBlock(view, start, end);
+
+        RemountTokensBasedOn(view, start.x, 1);
+        BufferView_CursorToPosition(view, start.x, start.y);
+        BufferView_AdjustGhostCursorIfOut(view);
+        BufferView_Dirty(view);
+        BufferView_SetRangeVisible(view, 0);
+    }
+}
+
 void AppDefaultRemoveOne(){
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
@@ -539,6 +621,13 @@ void AppDefaultRemoveOne(){
         NullRet(buffer);
         NullRet(bufferView->lineBuffer);
         NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+
+        if(BufferView_GetRangeVisible(bufferView)){
+            // in case we are in a block selection erase the block
+            AppHandleRegionCut(false);
+            return;
+        }
+
         Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
         SymbolTable *symTable = tokenizer->symbolTable;
 
@@ -779,6 +868,7 @@ void AppCommandNewLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
     NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+    BufferView_SetRangeVisible(bufferView, 0);
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -928,6 +1018,7 @@ void AppCommandUndo(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
     NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+    BufferView_SetRangeVisible(bufferView, 0);
 
     LineBuffer *lineBuffer = bufferView->lineBuffer;
     BufferChange *bChange = UndoRedoGetNextUndo(&lineBuffer->undoRedo);
@@ -1027,6 +1118,7 @@ void AppCommandUndo(){
 void AppCommandHomeLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     if(!bufferView->lineBuffer) return;
+    BufferView_SetRangeVisible(bufferView, 0);
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -1186,6 +1278,7 @@ void AppCommandQueryBarRevSearch(){
 void AppCommandEndLine(){
     BufferView *bufferView = AppGetActiveBufferView();
     NullRet(bufferView->lineBuffer);
+    BufferView_SetRangeVisible(bufferView, 0);
 
     vec2ui cursor = BufferView_GetCursorPosition(bufferView);
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
@@ -1230,6 +1323,7 @@ void AppCommandSetGhostCursor(){
     BufferView *bufferView = AppGetActiveBufferView();
     NullRet(bufferView->lineBuffer);
     BufferView_GhostCursorFollow(bufferView);
+    BufferView_SetRangeVisible(bufferView, 0);
 }
 
 void AppCommandSwapLineNbs(){
@@ -1298,7 +1392,6 @@ void AppCommandCopy(){
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         uint size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         ClipboardSetStringX11(ptr, size);
-        //printf("Copied %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
     }
 }
 
@@ -1320,31 +1413,12 @@ void AppCommandJumpNesting(){
         Buffer *buffer = BufferView_GetBufferAt(view, p.x);
         uint pos = Buffer_Utf8RawPositionToPosition(buffer, buffer->tokens[p.y].position);
         BufferView_CursorToPosition(view, p.x, pos);
+        BufferView_SetRangeVisible(view, 0);
     }
 }
 
 void AppCommandCut(){
-    vec2ui start, end;
-    uint size = 0;
-    char *ptr = nullptr;
-    BufferView *view = AppGetActiveBufferView();
-
-    NullRet(view->lineBuffer);
-    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
-
-    if(BufferView_GetCursorSelectionRange(view, &start, &end)){
-        size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
-        ClipboardSetStringX11(ptr, size);
-        //printf("Cut %s === last byte: %d -- size: %u\n", ptr, (int)ptr[size], size);
-
-        UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
-        AppCommandRemoveTextBlock(view, start, end);
-
-        RemountTokensBasedOn(view, start.x, 1);
-        BufferView_CursorToPosition(view, start.x, start.y);
-        BufferView_AdjustGhostCursorIfOut(view);
-        BufferView_Dirty(view);
-    }
+    AppHandleRegionCut();
 }
 
 void AppPasteString(const char *p, uint size){
@@ -1356,6 +1430,7 @@ void AppPasteString(const char *p, uint size){
         SymbolTable *symTable = tokenizer->symbolTable;
         NullRet(view->lineBuffer);
         NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+        BufferView_SetRangeVisible(view, 0);
 
         if(size > 0 && p){
             CopySection section;
@@ -1598,6 +1673,7 @@ void AppDefaultEntry(char *utf8Data, int utf8Size){
                 NullRet(bufferView);
                 NullRet(bufferView->lineBuffer);
                 NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+                BufferView_SetRangeVisible(bufferView, 0);
 
                 Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(bufferView->lineBuffer);
                 SymbolTable *symTable = tokenizer->symbolTable;

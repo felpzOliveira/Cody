@@ -62,6 +62,7 @@ Theme themeTerminal = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
+    .mouseSelectionColor = ColorFromHex(0xff5e083a),
     .isLight = false,
 };
 
@@ -126,6 +127,7 @@ Theme themeGruvboxLight = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xff000000),
     .dbgLinehighlightColor = ColorFromHex(0xFFfbdbb2),
+    .mouseSelectionColor = ColorFromHex(0xFFffcbb2),
     .isLight = true,
 };
 
@@ -183,6 +185,7 @@ Theme themeDracula = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xFF44476a),
+    .mouseSelectionColor = ColorFromHex(0xFF44475a),
     .isLight = false,
 };
 
@@ -241,6 +244,7 @@ Theme themeYavid = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xFF272739),
+    .mouseSelectionColor = ColorFromHex(0xFF858688),
     .isLight = false,
 };
 
@@ -305,6 +309,7 @@ Theme themeRadical = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xFF241640),
+    .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
 };
 
@@ -334,6 +339,7 @@ Theme theme4Coder = {
     .tokensOverCursorColor = ColorFromHex(0xFF0C0C0C),
     .preprocessorColor = ColorFromHex(0xCCfff0ba),
     .preprocessorDefineColor = ColorFromHex(0xCCfff0ba),
+
     //.preprocessorDefineColor = ColorFromHex(0xFFDD1A01),
     .borderColor = ColorFromHex(0xFFFF7F50),
     .braces = ColorFromHex(0xFF00FFFF),
@@ -363,6 +369,7 @@ Theme theme4Coder = {
     .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
     .selectorLoadedColor = ColorFromHex(0xFFCB9401),
     .userDefineColor = ColorFromHex(0xCCff628a),
+    //.userDefineColor = ColorFromHex(0xCC28d5c7),
     .backTextCount = 4,
     .lineBorderWidth = 0,
     .alphaDimm = 1,
@@ -371,6 +378,7 @@ Theme theme4Coder = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
 };
 
@@ -431,11 +439,12 @@ Theme themeNoah = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xff252848),
+    .mouseSelectionColor = ColorFromHex(0xff252838),
     .isLight = false,
 };
 
-Theme *defaultTheme = &themeRadical;
-//Theme *defaultTheme = &theme4Coder;
+//Theme *defaultTheme = &themeRadical;
+Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
 //Theme *defaultTheme = &themeTerminal;
@@ -590,6 +599,7 @@ vec4i GetUIColor(Theme *theme, UIElement id){
         COLOR_RET(UIPasteColor, pasteColor);
         COLOR_RET(UIDbgArrowColor, dbgArrowColor);
         COLOR_RET(UIDbgLineHighlightColor, dbgLinehighlightColor);
+        COLOR_RET(UISelectionColor, mouseSelectionColor);
         default:{
             AssertA(0, "Unknown mapping for id");
             return vec4i(255);

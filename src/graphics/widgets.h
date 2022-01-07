@@ -110,6 +110,7 @@ struct WidgetTransition{
 // Overall style for things we can generic render
 struct WidgetStyle{
     vec4f background;
+    bool valid;
 };
 
 /*
@@ -139,6 +140,7 @@ class WidgetWindow{
     // these rendering components are instancied as references from global context
     // and don't actually hold any memory
     OpenGLBuffer quadBuffer; // shared quad buffer
+    OpenGLImageQuadBuffer quadImageBuffer; // shared image buffer
     OpenGLFont font; // shared font
 
     /*
@@ -146,7 +148,15 @@ class WidgetWindow{
     * width and height, and the window title in 'name'. Be aware that
     * the window created cannot be resizable.
     */
+    WidgetWindow();
     WidgetWindow(int width, int height, const char *name);
+
+    /*
+    * Opens the window for this component. Note that this is meant to be
+    * used for components that wish to not initialize the window during
+    * declaration.
+    */
+    void Open(int width, int height, const char *name);
 
     /*
     * Get a geometry instance reference that describes this window.
@@ -198,14 +208,14 @@ class Widget{
     Geometry refGeometry;
 
     /*
-    * Basic constructor.
+    * Basic constructors.
     */
-    Widget(WidgetWindow *window);
+    Widget();
 
     /*
     * Sets the global style of this widget.
     */
-    void SetStyle(WidgetStyle stl){ style = stl; }
+    void SetStyle(WidgetStyle stl){ style = stl; style.valid = true; }
 
     /*
     * Starts a animation (transition) in this widget. If a transition is already
@@ -224,8 +234,11 @@ class Widget{
 
     /*
     * Computest the widget geometry *after* applying the transition in place.
+    * Calling this is the same as advancing the animation by 'dt'. This routine
+    * calls OnAnimationUpdate to allow childs to update, returns the new geometry
+    * which is also updated to the widget's global geometry.
     */
-    Geometry GetAnimatedGeometry(Float dt);
+    Geometry AdvanceAnimation(Float dt);
 
     /*
     * Sets the geometry of this widget as a reference to another geometry
@@ -257,6 +270,16 @@ class Widget{
     virtual void OnEntered(){ signalEntered.Emit(); }
 
     /*
+    * Utility calls for updating the widget' content. It gives the new geometry
+    * the widget is going to take after the update. The current geometry is kept
+    * during this call and can be used for deformations computations. It also
+    * informs if after this call the animation sequence is done with the flag
+    * willFinish, in which cases implementations should adjust their variables
+    * as the animation will stop.
+    */
+    virtual void OnAnimationUpdate(Float dt, Geometry newGeometry, bool willFinish){}
+
+    /*
     * Widgets must be implement a OnRender method that *actually* do rendering.
     */
     virtual int OnRender(WidgetRenderContext *wctx) = 0;
@@ -271,7 +294,10 @@ class Widget{
 
 class ButtonWidget : public Widget{
     public:
+    Float baseFontSize; // base font size for the system, copy for animation
+    Float a_fontSize, a_vel; // animation purpose variables
     std::string text; // the text written in the button
+    int textureId; // texture in case a icon is to also be displayed
 
     // utilities for preferred dimensions and animations
     static uint kWidth;
@@ -283,13 +309,23 @@ class ButtonWidget : public Widget{
     /*
     * Basic constructors.
     */
-    ButtonWidget(WidgetWindow *window);
-    ButtonWidget(WidgetWindow *window, std::string val);
+    ButtonWidget();
+    ButtonWidget(std::string val);
 
     /*
     * Sets the label for this button.
     */
     void SetText(std::string val){ text = val; }
+
+    /*
+    * Sets the textureId for the button icon.
+    */
+    void SetTextureId(int id){ textureId = id; }
+
+    /*
+    * Update the font size for rendering during animation.
+    */
+    virtual void OnAnimationUpdate(Float dt, Geometry newGeometry, bool wFinish) override;
 
     /*
     * Renders the contents of the button.
@@ -304,12 +340,41 @@ class ButtonWidget : public Widget{
     virtual void OnExited() override;
 
     /*
-    * Sets the button to take geometry around center with pwidth and pheight.
+    * Sets the button to take geometry around center with kWidth and kHeight.
     */
     virtual void PreferredGeometry(vec2f center, Geometry parentGeo) override;
 };
 
+/*
+* TODO: Images being a widget mean we need to do one render call per image
+* because the projection gets re-computed for each widget. If we don't have many
+* images at the same time in the screen it shouldn't be a problem but if there are
+* than we might want to re-think this thing.
+*/
+class ImageTextureWidget : public Widget{
+    public:
+    uint textureId;
+
+    /*
+    * Basic constructors.
+    */
+    ImageTextureWidget(){}
+    ImageTextureWidget(uint texId){ SetTextureId(texId); }
+
+    /*
+    * Sets the texture id for the widget.
+    */
+    void SetTextureId(uint texId){ textureId = texId; }
+
+    /*
+    * Renders the contents of the image.
+    */
+    virtual int OnRender(WidgetRenderContext *) override;
+};
+
 class PopupWindow : public WidgetWindow{
     public:
+    ButtonWidget b0, b1;
+    ImageTextureWidget image;
     PopupWindow();
 };

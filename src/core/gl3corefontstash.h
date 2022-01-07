@@ -36,6 +36,7 @@ extern "C" {
     FONS_DEF FONScontext* glfonsCreate(int width, int height, int flags);
     FONS_DEF FONScontext* glfonsCreateFrom(FONScontext *other);
     FONS_DEF void glfonsDelete(FONScontext* ctx);
+    FONS_DEF void glfonsDeleteContext(FONScontext* ctx);
 
     /*FONS_DEF */unsigned int glfonsRGBA(unsigned char r, unsigned char g, unsigned char b, unsigned char a);
 
@@ -310,6 +311,14 @@ static void glfons__renderDelete(void* userPtr)
 	free(gl);
 }
 
+
+FONS_DEF void glfonsDeleteContext(FONScontext* ctx){
+    if(ctx){
+        GLFONScontext* gl  = (GLFONScontext*)ctx->params.userPtr;
+        glDeleteVertexArrays(1, &gl->vertexArray);
+        free(ctx);
+    }
+}
 
 // TODO: Note this is creating a new context that shared GPU memory
 //       it does not share the data in the context. So things like

@@ -120,17 +120,17 @@ void _UndoRedoPushMerge(UndoRedo *redo, Buffer *buffer, vec2ui cursor, int is_un
         .size = 0,
         .change = CHANGE_MERGE,
     };
-    
+
     Buffer *b = UndoSystemGetBuffer();
     if(b == nullptr){
         BUG();
         printf("Undo system retrieved nullptr\n");
         return;
     }
-    
+
     Buffer_CopyDeep(b, buffer);
     bufferChange.buffer = b;
-    
+
     if(is_undo)
         DoStack_Push(redo->undoStack, &bufferChange);
     else
@@ -161,7 +161,7 @@ void UndoRedoUndoPushInsert(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
         .size = 0,
         .change = CHANGE_INSERT,
     };
-    
+
     Buffer *b = UndoSystemGetBuffer();
     Buffer_CopyDeep(b, buffer);
     bufferChange.buffer = b;
@@ -177,7 +177,7 @@ void UndoRedoUndoPushRemove(UndoRedo *redo, Buffer *buffer, vec2ui cursor){
         .size = 0,
         .change = CHANGE_REMOVE,
     };
-    
+
     Buffer *b = UndoSystemGetBuffer();
     Buffer_CopyDeep(b, buffer);
     bufferChange.buffer = b;
@@ -193,7 +193,7 @@ void UndoRedoUndoPushRemoveBlock(UndoRedo *redo, vec2ui start, vec2ui end){
         .size = 0,
         .change = CHANGE_BLOCK_REMOVE,
     };
-    
+
     DoStack_Push(redo->undoStack, &bufferChange);
 }
 
@@ -206,7 +206,7 @@ void UndoRedoUndoPushInsertBlock(UndoRedo *redo, vec2ui start, char *text, uint 
         .size = size,
         .change = CHANGE_BLOCK_INSERT,
     };
-    
+
     DoStack_Push(redo->undoStack, &bufferChange);
 }
 
@@ -254,7 +254,7 @@ void UndoRedoCleanup(UndoRedo *redo){
         UndoRedoPopUndo(redo);
         bChange = UndoRedoGetNextUndo(redo);
     }
-    
+
     bChange = UndoRedoGetNextRedo(redo);
     while(bChange != nullptr){
         DoStack_FreeIfNeeded(bChange);

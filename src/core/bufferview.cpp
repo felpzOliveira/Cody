@@ -157,6 +157,8 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->scroll.horizontal = Transform();
     view->is_visible = 1;
     view->activeType = type;
+    view->is_mouse_pressed = 0;
+    view->is_range_selected = 0;
     view->highlightLine = {};
 }
 
@@ -168,6 +170,8 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->scroll.currX = 0;
     view->activeNestPoint = -1;
     view->activeType = type;
+    view->is_mouse_pressed = 0;
+    view->is_range_selected = 0;
     view->highlightLine = {};
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
@@ -656,6 +660,22 @@ void BufferView_GetGeometry(BufferView *view, Geometry *geometry){
 
 void BufferView_GetCursor(BufferView *view, DoubleCursor **cursor){
     *cursor = &view->sController.cursor;
+}
+
+void BufferView_SetMousePressed(BufferView *view, int pressed){
+    view->is_mouse_pressed = pressed;
+}
+
+void BufferView_SetRangeVisible(BufferView *view, int visible){
+    view->is_range_selected = visible;
+}
+
+int BufferView_GetRangeVisible(BufferView *view){
+    return view->is_range_selected;
+}
+
+int BufferView_GetMousePressed(BufferView *view){
+    return view->is_mouse_pressed;
 }
 
 vec2ui BufferView_GetCursorPosition(BufferView *view){

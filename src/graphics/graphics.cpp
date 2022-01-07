@@ -70,6 +70,10 @@ void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src){
     dst->fontMath = src->fontMath;
 }
 
+uint Graphics_GetFontSize(){
+    return GlobalGLState.font.fontMath.fontSizeAtDisplay;
+}
+
 static void ResetGLCursor(OpenGLCursor *cursor){
     cursor->pMin = vec2f(0,0);
     cursor->pMax = vec2f(0,0);
@@ -284,15 +288,21 @@ vec2f Graphics_GetLineYPos(OpenGLState *state, vec2ui visible, uint i, View *vvi
     return vec2f(y0, y0 + font->fontMath.fontSizeAtRenderCall);
 }
 
-void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
-    OpenGLFont *font = &state->font;
+void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize,
+                                           Transform *model, Float reference)
+{
     FontMath *fMath = &font->fontMath;
     fMath->fontSizeAtRenderCall = reference;
     fMath->fontSizeAtDisplay = fontSize;
 
     fMath->reduceScale = fMath->fontSizeAtDisplay / fMath->fontSizeAtRenderCall;
     fMath->invReduceScale = 1.0 / fMath->reduceScale;
-    state->scale = Scale(fMath->reduceScale, fMath->reduceScale, 1);
+    *model = Scale(fMath->reduceScale, fMath->reduceScale, 1);
+}
+
+void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
+    OpenGLFont *font = &state->font;
+    Graphics_ComputeTransformsForFontSize(font, fontSize, &state->scale, reference);
 }
 
 int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
@@ -467,7 +477,7 @@ void Graphics_FlushText(OpenGLState *state){
 }
 
 vec2ui Graphics_GetMouse(OpenGLState *state){
-    return state->mouse;
+    return state->mouse.position;
 }
 
 static void OpenGLTextureInitialize(OpenGLState *state){
@@ -486,6 +496,26 @@ void OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
 
     glGenBuffers(1, &buffer->vertexBuffer);
     glGenBuffers(1, &buffer->texBuffer);
+}
+
+void OpenGLBufferContextDelete(OpenGLBuffer *buffer){
+    glDeleteVertexArrays(1, &buffer->vertexArray);
+}
+
+void OpenGLBufferContextDelete(OpenGLImageQuadBuffer *buffer){
+    glDeleteVertexArrays(1, &buffer->vertexArray);
+}
+
+void OpenGLImageBufferInitializeFrom(OpenGLImageQuadBuffer *buffer,
+                                     OpenGLImageQuadBuffer *other)
+{
+    buffer->vertex = other->vertex;
+    buffer->tex = other->tex;
+    buffer->size = other->size;
+    buffer->length = other->length;
+    buffer->vertexBuffer = other->vertexBuffer;
+    buffer->texBuffer = other->texBuffer;
+    glGenVertexArrays(1, &buffer->vertexArray);
 }
 
 void OpenGLBufferInitializeFrom(OpenGLBuffer *buffer, OpenGLBuffer *other){
@@ -594,10 +624,14 @@ void WindowOnSizeChange(int width, int height, void *){
     _OpenGLUpdateProjections(&GlobalGLState, width, height);
 }
 
+// Mouse motion generates a lot of cpu usage...
 void WinOnMouseMotion(int x, int y, void *){
-    //printf("Mouse to %d %d\n", x, y);
-    GlobalGLState.mouse = vec2ui((uint)x, (uint)y);
+    GlobalGLState.mouse.position = vec2ui((uint)x, (uint)y);
     AppHandleMouseMotion(x, y, &GlobalGLState);
+}
+
+void WindowOnMouseClick(int x, int y, void *){
+    AppHandleMouseClick(x, y, &GlobalGLState);
 }
 
 void WindowOnScroll(int is_up, void *){
@@ -608,8 +642,9 @@ void WindowOnScroll(int is_up, void *){
     AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
 }
 
-void WindowOnClick(int x, int y, void *){
-    AppHandleMouseClick(x, y, &GlobalGLState);
+void WindowOnPress(int x, int y, void *){
+    GlobalGLState.mouse.isPressed = true;
+    AppHandleMousePress(x, y, &GlobalGLState);
 }
 
 void WinOnFocusChange(void *){
@@ -623,7 +658,8 @@ int Font_SupportsCodepoint(int codepoint){
 
 void RegisterInputs(WindowX11 *window){
     RegisterOnScrollCallback(window, WindowOnScroll, nullptr);
-    RegisterOnMouseClickCallback(window, WindowOnClick, nullptr);
+    RegisterOnMouseLeftClickCallback(window, WindowOnMouseClick, nullptr);
+    RegisterOnMousePressedCallback(window, WindowOnPress, nullptr);
     RegisterOnMouseMotionCallback(window, WinOnMouseMotion, nullptr);
     RegisterOnSizeChangeCallback(window, WindowOnSizeChange, nullptr);
     RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);
@@ -662,13 +698,20 @@ void OpenGLFontSetup(OpenGLState *state){
     Graphics_SetFontSize(state, 19); // TODO: User
 }
 
+void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
+                             Float x1, Float y1, Float w, vec4f col)
+{
+    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(w, y1), col);
+    Graphics_QuadPush(quadB, vec2ui(x0, y1-w), vec2ui(x1, y1), col);
+    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(x1, y0+w), col);
+    Graphics_QuadPush(quadB, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
+}
+
 void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
                              Float x1, Float y1, Float w, vec4f col)
 {
-    Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(w, y1), col);
-    Graphics_QuadPush(state, vec2ui(x0, y1-w), vec2ui(x1, y1), col);
-    Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y0+w), col);
-    Graphics_QuadPush(state, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
+    OpenGLBuffer *quad = &state->glQuadBuffer;
+    Graphics_QuadPushBorder(quad, x0, y0, x1, y1, w, col);
 }
 
 static void OpenGLLoadIcons(OpenGLState *state){
@@ -699,6 +742,8 @@ void OpenGLInitialize(OpenGLState *state){
     InitializeX11();
     SetSamplesX11(16);
     SetOpenGLVersionX11(3, 3);
+    state->mouse.position = vec2ui(0);
+    state->mouse.isPressed = false;
     state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
 
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
@@ -716,9 +761,8 @@ void OpenGLInitialize(OpenGLState *state){
     OpenGLLoadIcons(state);
 }
 
-int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid){
+int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid){
     Float x0 = left.x, y0 = left.y, x1 = right.x, y1 = right.y;
-    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
     if(!(quad->units+1 < MAX_TEXTURES_PER_BATCH)){
         return 1;
     }
@@ -731,6 +775,11 @@ int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid){
     _OpenGLBufferPushVertex(quad, x0, y1, vec2f(0, 1), mid);
     _OpenGLBufferPushVertex(quad, x1, y1, vec2f(1, 1), mid);
     return 0;
+}
+
+int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid){
+    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+    return Graphics_ImagePush(quad, left, right, mid);
 }
 
 void Graphics_QuadPush(OpenGLState *state, vec2ui left, vec2ui right, vec4f color){
@@ -762,28 +811,34 @@ void Graphics_LinePush(OpenGLState *state, vec2ui p0, vec2ui p1, vec4f color){
     _OpenGLBufferPushVertex(lines, p1.x, p1.y, color);
 }
 
-void Graphics_ImageFlush(OpenGLState *state, int reset){
+void Graphics_ImageFlush(OpenGLState *state, OpenGLImageQuadBuffer *oquad){
     OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+    if(oquad){
+        quad = oquad;
+    }
+
     if(quad->length > 0){
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(state->imageShader.id);
-        glBindVertexArray(quad->vertexArray);
-        glEnableVertexAttribArray(0);
-        glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer);
-        glBufferData(GL_ARRAY_BUFFER, quad->length * 3 * sizeof(Float),
-                     quad->vertex, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+        Shader_UniformMatrix4(state->imageShader, "projection", &state->projection.m);
+        Shader_UniformMatrix4(state->imageShader, "modelView", &state->scale.m);
+        OpenGLCHK(glBindVertexArray(quad->vertexArray));
+        OpenGLCHK(glEnableVertexAttribArray(0));
+        OpenGLCHK(glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer));
+        OpenGLCHK(glBufferData(GL_ARRAY_BUFFER, quad->length * 3 * sizeof(Float),
+                               quad->vertex, GL_DYNAMIC_DRAW));
+        OpenGLCHK(glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL));
 
         glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER, quad->texBuffer);
-        glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float),
-                     quad->tex, GL_DYNAMIC_DRAW);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+        OpenGLCHK(glBindBuffer(GL_ARRAY_BUFFER, quad->texBuffer));
+        OpenGLCHK(glBufferData(GL_ARRAY_BUFFER, quad->length * 2 * sizeof(Float),
+                               quad->tex, GL_DYNAMIC_DRAW));
+        OpenGLCHK(glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 0, NULL));
 
 
-        Graphics_BindImages(state);
-        glDrawArrays(GL_TRIANGLES, 0, quad->length);
+        Graphics_BindImages(state, quad);
+        OpenGLCHK(glDrawArrays(GL_TRIANGLES, 0, quad->length));
 
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(0);
@@ -792,9 +847,6 @@ void Graphics_ImageFlush(OpenGLState *state, int reset){
 
     quad->length = 0;
     quad->units = 0;
-    if(reset){
-        // ??
-    }
 }
 
 void Graphics_QuadFlush(OpenGLBuffer *quad, int blend){
@@ -906,6 +958,8 @@ static void _Graphics_InitTexture(OpenGLState *state, uint8 *data,
     GlTextureId id = state->texBinds;
     state->textures[id].textureId = tid;
     state->textures[id].format = format;
+    state->textures[id].width = width;
+    state->textures[id].height = height;
     state->textureMap[key] = id;
     state->texBinds++;
 }
@@ -971,6 +1025,13 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     return id;
 }
 
+OpenGLTexture Graphics_GetTextureInfo(uint id){
+    if(id < MAX_TEXTURES_COUNT){
+        return GlobalGLState.textures[id];
+    }
+    return OpenGLTexture();
+}
+
 FileExtension Graphics_TranslateFileExtension(FileExtension ext){
     FileExtension f = ext;
     if(ext == FILE_EXTENSION_LIT){
@@ -1029,8 +1090,7 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){
     return id;
 }
 
-void Graphics_BindImages(OpenGLState *state){
-    OpenGLImageQuadBuffer *quad = &state->glQuadImageBuffer;
+void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad){
     for(uint i = 0; i < quad->units; i++){
         _Graphics_BindTexture(state, (GlTextureId)i, quad->textureIds[i]);
     }
@@ -1150,7 +1210,7 @@ void OpenGLEntry(){
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
-    popup = new PopupWindow;
+    //popup = new PopupWindow;
     WidgetRenderContext wctx = {.state = &GlobalGLState};
 
     while(!WindowShouldCloseX11(state->window)){
@@ -1207,7 +1267,7 @@ void OpenGLEntry(){
 
         SwapBuffersX11(state->window);
 
-        animating |= popup->DispatchRender(&wctx);
+        //animating |= popup->DispatchRender(&wctx);
 
         UpdateEventsAndHandleRequests(animating);
     }

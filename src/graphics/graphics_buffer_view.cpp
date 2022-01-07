@@ -180,7 +180,7 @@ void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
     }else{
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x1, y1),
-                                        color, thickness);
+                                        color, 2);
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
             OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x0+3, y1),
@@ -400,13 +400,13 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
 
     if(vstate == View_FreeTyping){
         vec4f col = Graphics_GetCursorColor(bufferView, defaultTheme);
-        uint dashThick = 6;
+        uint dashThick = 4;
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
         Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
 
         glDisable(GL_BLEND);
-        OpenGLRenderCursorSegment(state, view, vec4f(1.0,1.0,1.0,0.25), 12.0);
+        OpenGLRenderCursorSegment(state, view, vec4f(1.0,1.0,1.0,0.25), 8.0);
 
         OpenGLRenderCursor(state, &state->glCursor, col,
                            dashThick, bufferView->isActive && vstate == View_FreeTyping);
@@ -706,12 +706,12 @@ bool Graphics_RenderLineHighlight(OpenGLState *state, View *vview, Float lineSpa
                                   Transform *projection, Transform *model, Theme *theme)
 {
     BufferView *view = View_GetBufferView(vview);
+    OpenGLFont *font = &state->font;
     bool rendered = false;
     if(view->isActive){
         LineBuffer *lineBuffer = BufferView_GetLineBuffer(view);
         bool any = false;
         if(lineBuffer){
-            OpenGLFont *font = &state->font;
             ViewType vtype = BufferView_GetViewType(view);
             vec2ui visibleLines = BufferView_GetViewRange(view);
             // TODO: Make this better
@@ -723,32 +723,71 @@ bool Graphics_RenderLineHighlight(OpenGLState *state, View *vview, Float lineSpa
             std::vector<LineHighlightInfo> *lh =
                                         LineBuffer_GetLineHighlightPtr(lineBuffer, 0);
             std::vector<vec2ui> *ptr = LineBuffer_GetDiffRangePtr(lineBuffer, &any);
-            if(!any || !ptr || lh->size() < 1) return rendered;
+            if(!(!any || !ptr || lh->size() < 1)){
+                glUseProgram(font->cursorShader.id);
+                Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+                Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+                rendered = true;
+                for(vec2ui val : *ptr){
+                    if(!(val.x >= visibleLines.x && val.x <= visibleLines.y)){
+                        continue;
+                    }
 
+                    Float y0 = ((Float)val.x - (Float)visibleLines.x) *
+                    font->fontMath.fontSizeAtRenderCall;
+                    if(vview->descLocation == DescriptionTop){
+                        y0 += font->fontMath.fontSizeAtRenderCall;
+                    }
+
+                    Float y1 = y0 + font->fontMath.fontSizeAtRenderCall;
+                    Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lineSpan, y1),
+                    Graphics_GetLineHighlightColor(val.y));
+                }
+
+                Graphics_QuadFlush(state);
+
+                Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+                Graphics_LineFlush(state);
+            }
+        }
+
+        if(BufferView_GetRangeVisible(view)){
+            OpenGLCursor *gstart = &state->glCursor;
+            OpenGLCursor *gend   = &state->glGhostCursor;
+            vec2ui cursor = BufferView_GetCursorPosition(view);
+            vec2ui ghostCursor = BufferView_GetGhostCursorPosition(view);
+            vec2ui vlines = BufferView_GetViewRange(view);
+            vec2ui start = cursor, end = ghostCursor;
             glUseProgram(font->cursorShader.id);
             Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
             Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
-            rendered = true;
-            for(vec2ui val : *ptr){
-                if(!(val.x >= visibleLines.x && val.x <= visibleLines.y)){
-                    continue;
-                }
-
-                Float y0 = ((Float)val.x - (Float)visibleLines.x) *
-                        font->fontMath.fontSizeAtRenderCall;
-                if(vview->descLocation == DescriptionTop){
-                    y0 += font->fontMath.fontSizeAtRenderCall;
-                }
-
-                Float y1 = y0 + font->fontMath.fontSizeAtRenderCall;
-                Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lineSpan, y1),
-                                  Graphics_GetLineHighlightColor(val.y));
+            if(start.x > end.x || (start.x == end.x && start.y > end.y)){
+                start  = ghostCursor;
+                end    = cursor;
+                gstart = &state->glGhostCursor;
+                gend   = &state->glCursor;
             }
 
-            Graphics_QuadFlush(state);
+            if(start.x < vlines.x) start.x = vlines.x;
+            if(end.x > vlines.y) end.x = vlines.y;
 
-            Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
-            Graphics_LineFlush(state);
+            Float xpos = gstart->pMin.x;
+            Float ypos = gstart->pMin.y;
+            Float ey = 0;
+            vec4f cc = GetUIColorf(theme, UISelectionColor);
+            for(uint i = start.x; i < end.x; i++){
+                // these lines need to be painted at full
+                ey = ypos + font->fontMath.fontSizeAtRenderCall;
+                Graphics_QuadPush(state, vec2ui(xpos, ypos),
+                                  vec2ui(xpos + lineSpan, ey), cc);
+                ypos += font->fontMath.fontSizeAtRenderCall;
+                xpos = 0;
+            }
+
+            ey = ypos + font->fontMath.fontSizeAtRenderCall;
+            Float ex = gend->pMin.x;
+            Graphics_QuadPush(state, vec2ui(xpos, ypos), vec2ui(ex, ey), cc);
+            Graphics_QuadFlush(state, 1);
         }
     }
 

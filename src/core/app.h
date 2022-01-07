@@ -194,8 +194,15 @@ void AppPasteString(const char *p, uint size);
 void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state);
 
 /*
-* Handles the mouse click event. Receives the mouse coordinates in x and y in window
-* coordinates, the **global** opengl state fore rendering.
+* Handles the mouse press event. Receives the mouse coordinates in x and y in window
+* coordinates, the **global** opengl state fore rendering. It uses the press event
+* to handle cursor movement while in code view.
+*/
+void AppHandleMousePress(int x, int y, OpenGLState *state);
+
+/*
+* Handles the mouse click event. It uses this event when the view is using a selectable
+* list mode, i.e.: listing files, buffers, ...
 */
 void AppHandleMouseClick(int x, int y, OpenGLState *state);
 

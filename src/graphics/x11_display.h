@@ -80,18 +80,24 @@ typedef struct{
 }Framebuffer;
 
 #define ON_SCROLL_CALLBACK(name) void name(int is_up, void *priv)
-#define ON_MOUSE_CLICK_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_MOUSE_LCLICK_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_MOUSE_RCLICK_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_MOUSE_PRESS_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_MOUSE_RELEASE_CALLBACK(name) void name(void *priv)
 #define ON_MOUSE_DCLICK_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
 #define ON_FOCUS_CHANGE_CALLBACK(name) void name(void *priv)
 #define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y, void *priv)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
-typedef ON_MOUSE_CLICK_CALLBACK(onMouseClickCallback);
+typedef ON_MOUSE_LCLICK_CALLBACK(onMouseLClickCallback);
+typedef ON_MOUSE_RCLICK_CALLBACK(onMouseRClickCallback);
 typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
 typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
 typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
 typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDclickCallback);
+typedef ON_MOUSE_PRESS_CALLBACK(onMousePressedCallback);
+typedef ON_MOUSE_RELEASE_CALLBACK(onMouseReleasedCallback);
 
 typedef struct WindowX11{
     Colormap colormap;
@@ -107,14 +113,19 @@ typedef struct WindowX11{
     GLXContextInfo glx;
 
     onScrollCallback *onScrollCall;
-    onMouseClickCallback *onMouseClickCall;
+    onMouseLClickCallback *onMouseLClickCall;
+    onMouseRClickCallback *onMouseRClickCall;
+    onMousePressedCallback *onMousePressedCall;
+    onMouseReleasedCallback *onMouseReleasedCall;
     onMouseDclickCallback *onMouseDClickCall;
     onMouseMotionCallback *onMouseMotionCall;
     onSizeChangeCallback *onSizeChangeCall;
     onFocusChangeCallback *onFocusChangeCall;
-    void *privScroll, *privClick;
+    void *privScroll, *privLClick;
     void *privDclick, *privMotion;
     void *privSize, *privFocus;
+    void *privPressed, *privRClick;
+    void *privReleased;
 }WindowX11;
 
 typedef struct{
@@ -189,7 +200,10 @@ const char *ClipboardGetStringX11(unsigned int *size);
 void ClipboardSetStringX11(char *str, unsigned int len);
 
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv);
-void RegisterOnMouseClickCallback(WindowX11 *window, onMouseClickCallback *callback, void *priv);
+void RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv);
+void RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv);
+void RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv);
+void RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv);
 void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv);
 void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
 void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);

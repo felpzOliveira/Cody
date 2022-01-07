@@ -65,6 +65,8 @@ struct BufferView{
     int startNestCount;
     int endNestCount;
     int is_visible;
+    int is_mouse_pressed;
+    int is_range_selected;
 
     // test this
     std::optional<LineHints> highlightLine;
@@ -322,6 +324,26 @@ int BufferView_IsVisible(BufferView *view);
 * Gets the highlight line value, note that this is optinal.
 */
 std::optional<LineHints> BufferView_GetLineHighlight(BufferView *view);
+
+/*
+* Sets the state of the mouse pressed event.
+*/
+void BufferView_SetMousePressed(BufferView *view, int pressed);
+
+/*
+* Gets the state of the mouse pressed event.
+*/
+int BufferView_GetMousePressed(BufferView *view);
+
+/*
+* Sets the state of the mouse range visible rect.
+*/
+void BufferView_SetRangeVisible(BufferView *view, int visible);
+
+/*
+* Gets the state of the mouse range visible rect.
+*/
+int BufferView_GetRangeVisible(BufferView *view);
 
 /*
 * Sets the highlight line value.

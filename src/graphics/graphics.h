@@ -111,6 +111,8 @@ struct OpenGLImageQuadBuffer{
 struct OpenGLTexture{
     uint textureId;
     int format;
+    int width;
+    int height;
 };
 
 struct EventHandler{
@@ -124,6 +126,11 @@ struct RenderProps{
     bool cursorSegments;
 };
 
+struct Mouse{
+    vec2ui position;
+    bool isPressed;
+};
+
 struct OpenGLState{
     WindowX11 *window;
     RenderProps params;
@@ -135,7 +142,7 @@ struct OpenGLState{
     OpenGLTexture textures[MAX_TEXTURES_COUNT];
     uint texBinds;
     Shader imageShader;
-    vec2ui mouse;
+    Mouse mouse;
     int running, width, height;
     Float renderLineWidth;
     Transform projection;
@@ -183,6 +190,16 @@ void Graphics_ToogleCursorSegment();
 */
 void OpenGLBufferInitialize(OpenGLBuffer *buffer, int n);
 void OpenGLBufferInitializeFrom(OpenGLBuffer *buffer, OpenGLBuffer *other);
+void OpenGLImageBufferInitializeFrom(OpenGLImageQuadBuffer *buffer,
+                                     OpenGLImageQuadBuffer *other);
+
+/*
+* Deletes the context-aware information from the OpenGLBuffer. This does not
+* delete storage information, only OpenGL related data that cannot be shared
+* i.e.: vertex arrays, ...
+*/
+void OpenGLBufferContextDelete(OpenGLBuffer *buffer);
+void OpenGLBufferContextDelete(OpenGLImageQuadBuffer *buffer);
 
 void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
 
@@ -191,6 +208,11 @@ void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
 */
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
+
+/*
+* Get all information from a texture given its id.
+*/
+OpenGLTexture Graphics_GetTextureInfo(uint id);
 
 /*
 * Pushes a new quad into the current OpenGLState/OpenGLBuffer quad batch to render.
@@ -211,14 +233,18 @@ OpenGLState *Graphics_GetGlobalContext();
 /*
 * Pushes a new quad into the current OpenGLState image batch to render a image.
 * Returns whether or not it was possible to render, i.e.: maximum amount of
-* textures was reached and should be flushed.
+* textures was reached and should be flushed. Optinally can also use the image
+* buffer directly in case it is being shared.
 */
 int Graphics_ImagePush(OpenGLState *state, vec2ui left, vec2ui right, int mid);
+int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid);
 
 /*
 * Pushes a quad border into the quad batch buffer.
 */
 void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
+                             Float x1, Float y1, Float w, vec4f col);
+void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
                              Float x1, Float y1, Float w, vec4f col);
 
 /*
@@ -240,7 +266,12 @@ void Graphics_LineFlush(OpenGLState *state, int blend=1);
 /*
 * Triggers the OpenGLState image buffer accumulated batch to render all images.
 */
-void Graphics_ImageFlush(OpenGLState *state, int reset=1);
+void Graphics_ImageFlush(OpenGLState *state, OpenGLImageQuadBuffer *quad=nullptr);
+
+/*
+* Gets the font size being used by the global renderer.
+*/
+uint Graphics_GetFontSize();
 
 /*
 * Sets the font size being used.
@@ -248,6 +279,9 @@ void Graphics_ImageFlush(OpenGLState *state, int reset=1);
 */
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize,
                           Float reference=FONT_UPSCALE_DEFAULT_SIZE);
+
+void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize, Transform *model,
+                                           Float reference=FONT_UPSCALE_DEFAULT_SIZE);
 
 /*
 * Queries the opengl state for the last known cursor position.
@@ -393,9 +427,9 @@ vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
                                      uint len, Geometry *geometry);
 
 /*
-* Bind all image units.
+* Bind all image units in the quad image buffer using the global rendering state.
 */
-void Graphics_BindImages(OpenGLState *state);
+void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad);
 
 /*
 * Add an event handling function into the rendering thread. This can be used by
