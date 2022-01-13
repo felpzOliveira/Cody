@@ -13,6 +13,7 @@
 #include <map>
 #include <file_provider.h>
 #include <functional>
+#include <vector>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -43,6 +44,7 @@
 #endif
 
 struct View;
+class WidgetWindow;
 
 /*
 * OpenGL rendering system for the editor.
@@ -151,6 +153,17 @@ struct OpenGLState{
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
     Shader buttonShader;
+
+    // NOTE: We use shared_ptr here because otherwise we would need cyclic
+    // dependencies because the signal for closing a widget goes to a widget
+    // but it needs to report to the global state, so we would get a cyclic
+    // call where widgets(onClose) -> state(remove) -> wigets(delete) which
+    // it is not very good as onClose would return to a null object. Note
+    // however that using shared_ptr will cause this anyways but at least we
+    // don't actually need to explicitly handle. While it is kinda ugly it
+    // does work really well.
+    std::vector<std::shared_ptr<WidgetWindow>> widgetWindows;
+
     // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
     std::map<FileExtension, std::string> fileMap;
@@ -194,6 +207,17 @@ void OpenGLImageBufferInitializeFrom(OpenGLImageQuadBuffer *buffer,
                                      OpenGLImageQuadBuffer *other);
 
 /*
+* Computes the orthographic projection from the rectangle given by lower and upper.
+*/
+void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform);
+
+/*
+* Computes the viweing geometry of the cursor.
+*/
+void OpenGLComputeCursor(OpenGLFont *font, OpenGLCursor *glCursor, const char *buffer,
+                         uint len, Float x, Float cursorOffset, Float baseHeight);
+
+/*
 * Deletes the context-aware information from the OpenGLBuffer. This does not
 * delete storage information, only OpenGL related data that cannot be shared
 * i.e.: vertex arrays, ...
@@ -229,6 +253,11 @@ void *Graphics_GetBaseWindow();
 * Retrieves the global gl context.
 */
 OpenGLState *Graphics_GetGlobalContext();
+
+/*
+* Removes a widgetwindow from the global widgetinwdow list.
+*/
+void Graphics_RequestClose(WidgetWindow *w);
 
 /*
 * Pushes a new quad into the current OpenGLState image batch to render a image.
@@ -325,7 +354,7 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
 * into the quad of size (x0, y0) x (x1, y1). This routine queries the editor
 * state to check the cursor format.
 */
-void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
+void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
                              Float y1, vec4f color, uint thickness, int isActive);
 
 /*
@@ -388,9 +417,12 @@ void ActivateViewportAndProjection(OpenGLState *state, View *view, GLViewport ta
 
 /*
 * Sets the active viewport and scissor geometry to the specified geometry, it also
-* updates the target projection for rendering in this viewport.
+* updates the target projection for rendering in this viewport. The value of
+* 'with_scissors' can be used to activate (or not) scissors in the viewport
+* that is currently being activated.
 */
-void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry);
+void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry,
+                                   bool with_scissors=true);
 
 /*
 * Prepares shaders to render text.
@@ -421,10 +453,12 @@ vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view)
 
 /*
 * Computes the coordinates to start rendering the 'text' with size 'len' using 'font'
-* inside 'geometry' such that the text be centered.
+* inside 'geometry' such that the text be centered. The variable 'in_place' can be used
+* if the rendering is considering the lower = vec2ui(0) and the geometry itself should
+* be used to compute the center against [0,0] [w,h].
 */
 vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
-                                     uint len, Geometry *geometry);
+                                     uint len, Geometry *geometry, bool in_place=false);
 
 /*
 * Bind all image units in the quad image buffer using the global rendering state.

@@ -29,7 +29,7 @@ void ControlCommands_YieldKeyboard(){
 
 // Capture keys that were not bounded and generated events
 // these events simply yield the keyboard
-void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size){
+void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size, void *){
     (void)utf8Data; (void)utf8Size;
     // This is generic, but should it be binded?
 
@@ -151,7 +151,7 @@ void ControlCommands_RestoreExpand(){
 void ControlCommands_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
 
-    RegisterKeyboardDefaultEntry(mapping, ControlCmdsDefaultEntry);
+    RegisterKeyboardDefaultEntry(mapping, ControlCmdsDefaultEntry, nullptr);
 
     RegisterRepeatableEvent(mapping, ControlCommands_YieldKeyboard, Key_Escape);
     RegisterRepeatableEvent(mapping, ControlCmdsRenderIndices, Key_Q);

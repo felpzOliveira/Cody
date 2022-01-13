@@ -86,7 +86,7 @@ typedef struct{
 #define ON_MOUSE_RELEASE_CALLBACK(name) void name(void *priv)
 #define ON_MOUSE_DCLICK_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
-#define ON_FOCUS_CHANGE_CALLBACK(name) void name(void *priv)
+#define ON_FOCUS_CHANGE_CALLBACK(name) void name(bool in, long unsigned int id, void *priv)
 #define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y, void *priv)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
@@ -198,6 +198,8 @@ double GetElapsedTime();
 
 const char *ClipboardGetStringX11(unsigned int *size);
 void ClipboardSetStringX11(char *str, unsigned int len);
+
+bool WindowIsHandle(WindowX11 *window, long unsigned int id);
 
 void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv);
 void RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv);

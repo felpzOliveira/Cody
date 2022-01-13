@@ -25,7 +25,7 @@ void AutoComplete_Commit(){
         SelectableList_GetItem(list, id, &buffer);
         if(buffer){
             char *data = &buffer->data[autoComplete.lastSearchLen];
-            AppDefaultEntry(data, buffer->taken - autoComplete.lastSearchLen);
+            AppDefaultEntry(data, buffer->taken - autoComplete.lastSearchLen, nullptr);
             if(autoComplete.lastSearchValue) AllocatorFree(autoComplete.lastSearchValue);
             autoComplete.lastSearchLen = 0;
         }
@@ -44,7 +44,7 @@ BindingMap *AutoComplete_Initialize(){
     autoComplete.lastSearchValue = nullptr;
 
     mapping = KeyboardCreateMapping();
-    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
+    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry, nullptr);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
     RegisterRepeatableEvent(mapping, AutoComplete_Next, Key_Down);

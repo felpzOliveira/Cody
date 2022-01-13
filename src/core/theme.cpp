@@ -62,7 +62,7 @@ Theme themeTerminal = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
-    .mouseSelectionColor = ColorFromHex(0xff5e083a),
+    .mouseSelectionColor = ColorFromHex(0xff2e083a),
     .isLight = false,
 };
 
@@ -244,7 +244,7 @@ Theme themeYavid = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xFF272739),
-    .mouseSelectionColor = ColorFromHex(0xFF858688),
+    .mouseSelectionColor = ColorFromHex(0xFF272729),
     .isLight = false,
 };
 

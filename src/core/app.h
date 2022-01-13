@@ -143,7 +143,7 @@ void AppUpdateViews();
 /*
 * Inserts a UTF-8 string into the current active view.
 */
-void AppDefaultEntry(char *utf8Data, int utf8Size);
+void AppDefaultEntry(char *utf8Data, int utf8Size, void *);
 
 /*
 * Forces the active view to return to its default state.

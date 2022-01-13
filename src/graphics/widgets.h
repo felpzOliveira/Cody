@@ -8,6 +8,8 @@
 #include <keyboard.h>
 #include <shaders.h>
 #include <graphics.h>
+#include <vector>
+#include <sstream>
 
 #define WIDGET_TRANSITION_SCALE 0
 
@@ -133,9 +135,11 @@ class WidgetWindow{
     BindingMap *mapping; // keyboard event handling
     vec2f resolution; // window resolution
     std::vector<Widget *> widgetList; // the list of widgets registered
+    vec2f mouse; // last user mouse event
 
     // utilities for detecting entered/leave events
-    Widget *lastWidget;
+    // as well as send typing events to a unique widget
+    Widget *lastMotion, *lastClicked;
 
     // these rendering components are instancied as references from global context
     // and don't actually hold any memory
@@ -150,6 +154,11 @@ class WidgetWindow{
     */
     WidgetWindow();
     WidgetWindow(int width, int height, const char *name);
+
+    /*
+    * Get the window handler for the widget.
+    */
+    WindowX11 *GetWindowHandler(){ return window; }
 
     /*
     * Opens the window for this component. Note that this is meant to be
@@ -195,6 +204,10 @@ class WidgetWindow{
     virtual ~WidgetWindow();
 };
 
+/*
+* This is the base class all renderable widgets must extend. It provides some defaults
+* for rendering, animating and handling mouse/keyboard events.
+*/
 class Widget{
     public:
     Geometry geometry; // widget's geometry as a reference to where to find it
@@ -202,7 +215,11 @@ class Widget{
     Signal<> signalClicked; // on click signal to be emitted
     Signal<> signalEntered; // on mouse entered signal to be emitted
     Signal<> signalExited; // on mouse exited signal to be emitted
+    Signal<int> signalScrolled; // on mouse scroll
     WidgetTransition transition; // used for animation purposes
+    vec2f mouse; // last user click event address
+    bool selected; // check if the user clicked on the widget, marked by main window
+    Transform wTransform; // apply external transform to widget
 
     // geometry used as reference for aspect computation, usually parent geometry
     Geometry refGeometry;
@@ -211,6 +228,23 @@ class Widget{
     * Basic constructors.
     */
     Widget();
+
+    /*
+    * Sets the selected value for the widget.
+    */
+    virtual void SetSelected(bool val){ selected = val; }
+
+    /*
+    * Sets the mouse coordinates inside the widget.
+    */
+    void SetMouseCoordintes(vec2ui coords){ mouse = coords; }
+
+    /*
+    * Sets the external widget transform. This must be consider in child,
+    * the global rendering dispatch does not apply this transform. It is basically
+    * a storage for childs to interact.
+    */
+    void SetWidgetTransform(const Transform &transform){ wTransform = transform; }
 
     /*
     * Sets the global style of this widget.
@@ -245,12 +279,19 @@ class Widget{
     * and aspects. i.e.: it computes the geometry as a fraction of another
     * geometry.
     */
-    void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY);
+    virtual void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY);
 
     /*
-    * Main routine to render a widget.
+    * Main routine to render a widget. This routine adjusts globals for the widget
+    * i.e.: style stuff. Sets the viewport for rendering and calls 'OnRender'.
     */
     int Render(WidgetRenderContext *wctx);
+
+    /*
+    * Same as 'Render' but does not update projections and viewport. Can be use
+    * to chain rendering routines without touching globals.
+    */
+    int UnprojectedRender(WidgetRenderContext *wctx);
 
     /*
     * Register a new slot to be invoked whenever a click event happens.
@@ -268,9 +309,16 @@ class Widget{
     virtual void OnClick(){ signalClicked.Emit(); }
     virtual void OnExited(){ signalExited.Emit(); }
     virtual void OnEntered(){ signalEntered.Emit(); }
+    virtual void OnScroll(int is_up){ signalScrolled.Emit(is_up); }
 
     /*
-    * Utility calls for updating the widget' content. It gives the new geometry
+    * Base keyboard routines. These routines depend on the widget being active
+    * in the window, i.e.: the widget must be the last one the user clicked on.
+    */
+    virtual void OnDefaultEntry(char *utf8Data, uint utf8Size){}
+
+    /*
+    * Utility calls for updating the widget's content. It gives the new geometry
     * the widget is going to take after the update. The current geometry is kept
     * during this call and can be used for deformations computations. It also
     * informs if after this call the animation sequence is done with the flag
@@ -281,8 +329,12 @@ class Widget{
 
     /*
     * Widgets must be implement a OnRender method that *actually* do rendering.
+    * The rendering routine receives a transform that should be used as a Model
+    * for rendering the components. This value is given by 'wTransform' and is
+    * given here *again* as an stronger indicator that it should be applied to
+    * all components.
     */
-    virtual int OnRender(WidgetRenderContext *wctx) = 0;
+    virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) = 0;
 
     /*
     * If the widget has a preferred geometry makes it take it around center.
@@ -330,7 +382,7 @@ class ButtonWidget : public Widget{
     /*
     * Renders the contents of the button.
     */
-    virtual int OnRender(WidgetRenderContext *) override;
+    virtual int OnRender(WidgetRenderContext *, const Transform &transform) override;
 
     /*
     * Slot implementation for the mouse events.
@@ -358,8 +410,8 @@ class ImageTextureWidget : public Widget{
     /*
     * Basic constructors.
     */
-    ImageTextureWidget(){}
-    ImageTextureWidget(uint texId){ SetTextureId(texId); }
+    ImageTextureWidget() : Widget(){}
+    ImageTextureWidget(uint texId) : Widget(){ SetTextureId(texId); }
 
     /*
     * Sets the texture id for the widget.
@@ -369,12 +421,239 @@ class ImageTextureWidget : public Widget{
     /*
     * Renders the contents of the image.
     */
-    virtual int OnRender(WidgetRenderContext *) override;
+    virtual int OnRender(WidgetRenderContext *, const Transform &transform) override;
+
+    /*
+    * Compute a resolution to render a given texture 'textureId' that preserves
+    * the aspect ratio of the texture that can be used to render inside a quad
+    * of size 'base'.
+    */
+    static vec2f AspectPreservingResolution(vec2f base, uint textureId);
+
+    /*
+    * Computes and pushes a image texture given by 'textureId' into the accumulation
+    * image buffer present in the state 'wctx' considering the size especified in
+    * 'geometry'. This routine basically prepare the texture for rendering but does
+    * trigger the render routine with 'Graphics_ImageFlush'. Only caches it.
+    */
+    static void PushImageIntoState(WidgetRenderContext *wctx, uint textureId,
+                                   Geometry geometry, Transform eTransform);
 };
 
+class TextRow{
+    public:
+    std::vector<std::string> data;
+    std::vector<int> cursor;
+
+    TextRow(uint cols){
+        uint count = Max(1, cols);
+        for(uint i = 0; i < count; i++){
+            data.push_back(std::string());
+            cursor.push_back(0);
+        }
+    }
+
+    void Set(std::string str, uint at){
+        if(at < data.size()){
+            data[at] = str;
+        }
+    }
+
+    std::string At(uint at){
+        if(at < data.size()){
+            return data[at];
+        }
+
+        return nullptr;
+    }
+
+    uint Cursor(uint entry){
+        uint res = 0;
+        if(entry < cursor.size()){
+            res = cursor[entry];
+        }
+        return res;
+    }
+
+    ~TextRow() = default;
+};
+
+class TextTableWidget : public Widget{
+    public:
+    uint columns;
+    std::vector<TextRow> table;
+    std::vector<Float> ext;
+    vec2ui focus;
+
+    /*
+    * Basic constructors.
+    */
+    TextTableWidget(){}
+    TextTableWidget(uint cols){ SetColumns(cols); }
+
+    /*
+    * Set the columns var. Use for static allocations.
+    */
+    void SetColumns(uint cols){ columns = Max(1, cols); }
+
+    /*
+    * Adds empty new rows into the table.
+    */
+    void AddRows(uint n=1){
+        for(uint i = 0; i < n; i++){
+            table.push_back(TextRow(columns));
+        }
+    }
+
+    /*
+    * Set the value at a cell.
+    */
+    void SetItem(std::string str, uint i, uint j){
+        if(table.size() > i && columns > j){
+            table[i].Set(str, j);
+        }
+    }
+
+    /*
+    * Resize the table erasing all of its contents.
+    */
+    void Resize(uint rows, uint cols){
+        columns = cols;
+        table = std::vector<TextRow>();
+        AddRows(rows);
+    }
+
+    /*
+    * Get the number of rows in the table.
+    */
+    uint GetRowCount(){
+        return table.size();
+    }
+
+    /*
+    * Returns the current dimensions of the table.
+    */
+    vec2ui Dimensions(){
+        return vec2ui(table.size(), columns);
+    }
+
+    /*
+    * Sets the geometry of the table, applying custom size for each column.
+    * The length of the extension vector must match the number of columns in
+    * the table and must sum to 1 otherwise rendering will be undefined.
+    */
+    void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY,
+                     std::vector<Float> extensions)
+    {
+        if(columns != extensions.size()) return;
+        // call base class to set global geometry
+        Widget::SetGeometry(geo, aspectX, aspectY);
+
+        ext = extensions;
+    }
+
+    /*
+    * Sets the geometry of the table with uniform sizes for each column.
+    */
+    virtual void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY) override{
+        // call base class to set global geometry
+        Widget::SetGeometry(geo, aspectX, aspectY);
+
+        Float f = 1.0 / (Float)columns;
+        for(uint i = 0; i < columns; i++){
+            ext.push_back(f);
+        }
+    }
+
+    /*
+    * Renders the contents of the table.
+    */
+    virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) override;
+
+    /*
+    * Mouse overrides. Mostly for setting focus.
+    */
+    virtual void OnClick() override;
+
+    ~TextTableWidget() = default;
+};
+
+
+/*
+* I'm going to attempt to implement generic widget scrolling through
+* model transformation. This means the underlying widget should always
+* render itself to the fullest and we scroll by transforming with
+* respect to the global widget transform. It's not really clean but it
+* seems to work.
+*/
+class ScrollableWidget final : public Widget{
+    public:
+    Widget *widget;
+    vec2f motion;
+
+    /*
+    * Basic constructor.
+    */
+    ScrollableWidget() : Widget(), widget(nullptr){}
+    ScrollableWidget(Widget *targetWidget) : Widget(){ SetWidget(targetWidget); }
+
+    ~ScrollableWidget() = default;
+
+    /*
+    * Sets the child widget.
+    */
+    void SetWidget(Widget *w){ widget = w; }
+
+    /*
+    * Override all mouse events because we are going to need to further them ourselves.
+    * Because we only futher the event we don't expect signal bindings for the area itself
+    * but only for the child widget. Trivial handlers.
+    */
+    virtual void OnClick() override{
+        if(widget){
+            widget->SetMouseCoordintes(mouse - motion);
+            widget->SetSelected(true);
+            widget->OnClick();
+        }
+    }
+
+    virtual void OnEntered() override{
+        if(widget){
+            widget->OnEntered();
+        }
+    }
+
+    virtual void OnExited() override{
+        if(widget){
+            widget->OnExited();
+        }
+    }
+
+    virtual void SetSelected(bool val){
+        if(widget){
+            widget->SetSelected(val);
+        }
+
+        Widget::SetSelected(val);
+    }
+
+    /*
+    * Special scroll override so we can compute the transform for the scrollable area.
+    */
+    virtual void OnScroll(int is_up) override;
+
+    /*
+    * Override the rendering routine.
+    */
+    virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) override;
+};
+
+/* Test */
 class PopupWindow : public WidgetWindow{
     public:
-    ButtonWidget b0, b1;
-    ImageTextureWidget image;
+    ButtonWidget b0, b1, tbutton;
+    ImageTextureWidget image, timage;
+    TextTableWidget tt;
+    ScrollableWidget sc;
     PopupWindow();
 };

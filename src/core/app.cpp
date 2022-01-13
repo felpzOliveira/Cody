@@ -187,6 +187,16 @@ QueryBarHistory *AppGetQueryBarHistory(){
     return &appContext.queryBarHistory;
 }
 
+void AppResetBufferViewRangeVisible(BufferView *bview){
+    BufferView_SetRangeVisible(bview, 0);
+    BufferView_SetMousePressed(bview, 0);
+}
+
+void AppResetBufferViewRangeVisible(View *view){
+    BufferView *bv = View_GetBufferView(view);
+    AppResetBufferViewRangeVisible(bv);
+}
+
 void AppSetBindingsForState(ViewState state, ViewType type){
     switch(state){
         case View_SelectableList:
@@ -266,19 +276,24 @@ void AppRestoreCurrentBufferViewState(){
 }
 
 void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
-    View *view = AppGetActiveView();
+    View *oview = AppGetActiveView();
+    View *view = oview;
     vec2ui mouse(x, state->height - y);
     if(press){
         mouse = AppActivateViewAt(x, state->height - y);
         view = AppGetActiveView();
         NullRet(view);
+        if(view != oview){
+            AppResetBufferViewRangeVisible(oview);
+        }
     }else{
         Geometry geo;
         BufferView *bView = View_GetBufferView(view);
+        if(!BufferView_GetMousePressed(bView)) return;
+
         BufferView_GetGeometry(bView, &geo);
-        if(!Geometry_IsPointInside(&geo, mouse) || !BufferView_GetMousePressed(bView)){
-            return;
-        }
+        if(!Geometry_IsPointInside(&geo, mouse)) return;
+
         mouse = mouse - geo.lower;
     }
 
@@ -305,6 +320,7 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
             BufferView_CursorToPosition(bufferView, (uint)lineNo, colNo);
             if(press){
                 BufferView_GhostCursorFollow(bufferView);
+                BufferView_SetRangeVisible(bufferView, 0);
                 BufferView_SetMousePressed(bufferView, 1);
             }else{
                 vec2ui ghost = BufferView_GetGhostCursorPosition(bufferView);
@@ -350,10 +366,15 @@ void AppHandleMouseMotion(int x, int y, OpenGLState *state){
 }
 
 void AppHandleMouseClick(int x, int y, OpenGLState *state){
-    View *view = AppGetActiveView();
+    View *oview = AppGetActiveView();
+    View *view = oview;
     vec2ui mouse = AppActivateViewAt(x, state->height - y);
     view = AppGetActiveView();
     NullRet(view);
+    if(view != oview){
+        AppResetBufferViewRangeVisible(oview);
+    }
+
     ViewState vstate = View_GetState(view);
     uint dy = view->geometry.upper.y - view->geometry.lower.y;
 
@@ -414,6 +435,7 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
                 NullRet(bView->lineBuffer);
                 BufferView_StartScrollViewTransition(bView, scrollRange,
                                                      kTransitionScrollInterval);
+                BufferView_SetRangeVisible(bView, 0);
             } break;
             case View_SelectableList:{
                 //printf("View_SelectableList\n");
@@ -1661,7 +1683,7 @@ void AppCommandSplitVertical(){
     View_SetActive(appContext.activeView, 1);
 }
 
-void AppDefaultEntry(char *utf8Data, int utf8Size){
+void AppDefaultEntry(char *utf8Data, int utf8Size, void *){
     if(utf8Size > 0){
         int off = 0;
         int cp = StringToCodepoint(utf8Data, utf8Size, &off);
@@ -2081,7 +2103,7 @@ void AppInitialize(){
 void AppInitializeQueryBarBindings(){
     BindingMap *mapping = nullptr;
     mapping = KeyboardCreateMapping();
-    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
+    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry, nullptr);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
 
@@ -2117,7 +2139,7 @@ void AppInitializeFreeTypingBindings(){
     BindingMap *mapping = nullptr;
     mapping = KeyboardCreateMapping();
 
-    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry);
+    RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry, nullptr);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
 

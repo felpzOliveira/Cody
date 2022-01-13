@@ -984,17 +984,20 @@ void ProcessEventSelectionRequestX11(XEvent *event, WindowX11 *window, LibHelper
     XSendEvent(x11Helper.display, request->requestor, False, 0, &reply);
 }
 
+bool WindowIsHandle(WindowX11 *window, long unsigned int id){
+    Window win = (Window) id;
+    return window->handle == win;
+}
+
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    //printf("Focus IN\n");
     if(window->onFocusChangeCall){
-        window->onFocusChangeCall(window->privFocus);
+        window->onFocusChangeCall(true, event->xfocus.window, window->privFocus);
     }
 }
 
 void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    //printf("Focus OUT\n");
     if(window->onFocusChangeCall){
-        window->onFocusChangeCall(window->privFocus);
+        window->onFocusChangeCall(false, event->xfocus.window, window->privFocus);
     }
 }
 

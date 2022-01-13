@@ -302,7 +302,7 @@ bool DbgApp_PoolMessages(){
 }
 
 /* Keyboard stuff */
-void DbgApp_DefaultEntry(char *utf8Data, int utf8Size){
+void DbgApp_DefaultEntry(char *utf8Data, int utf8Size, void *){
     (void)utf8Data; (void)utf8Size;
 }
 
@@ -383,7 +383,7 @@ void DbgApp_SwitchBuffer(){
 
 void DbgApp_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
-    RegisterKeyboardDefaultEntry(mapping, DbgApp_DefaultEntry);
+    RegisterKeyboardDefaultEntry(mapping, DbgApp_DefaultEntry, nullptr);
 
     RegisterRepeatableEvent(mapping, DbgApp_Run, Key_R);
     RegisterRepeatableEvent(mapping, DbgApp_Next, Key_N);

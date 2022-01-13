@@ -112,7 +112,7 @@ inline void __gpu_check_binding(int bufferId, long int bindingSize,
 
 
 //TODO: Make allocator
-#define DefaultAllocatorSize 64
+#define DefaultAllocatorSize 32
 #define AllocatorGet(size) _get_memory(size, __FILE__, __LINE__)
 #define AllocatorCalloc(n, size) _get_memory((size) * (n), __FILE__, __LINE__)
 #define AllocatorGetN(type, n) (type *)_get_memory(sizeof(type) * n, __FILE__, __LINE__)
@@ -146,16 +146,60 @@ extern std::mutex debug_memory_mutex;
 
 #endif
 
+inline void _debugger_memory_usage(){
+#if defined(MEMORY_DEBUG)
+    std::lock_guard<std::mutex> locker(debug_memory_mutex);
+    std::map<std::string, long unsigned int> files_usage;
+    long unsigned int totalMem = 0;
+    for(auto it = debug_memory_map.begin(); it != debug_memory_map.end(); it++){
+        MemoryEntry entry = it->second;
+        if(files_usage.find(entry.filename) == files_usage.end()){
+            files_usage[entry.filename] = entry.size;
+        }else{
+            files_usage[entry.filename] += entry.size;
+        }
+        totalMem += entry.size;
+    }
+
+    for(auto it = files_usage.begin(); it != files_usage.end(); it++){
+        std::string file = it->first;
+        long unsigned int u = it->second;
+        double f = (double)u * 0.000001;
+        MEMORY_PRINT("[%s] = %lu ( %g MB )\n",file.c_str(), u, f);
+        std::map<int, long unsigned int> lineMap;
+        for(auto it2 = debug_memory_map.begin(); it2 != debug_memory_map.end(); it2++){
+            int line = it2->second.line;
+            std::string target = it2->second.filename;
+            if(target == file){
+                if(lineMap.find(line) == lineMap.end()){
+                    lineMap[line] = it2->second.size;
+                }else{
+                    lineMap[line] += it2->second.size;
+                }
+            }
+        }
+        for(auto it2 = lineMap.begin(); it2 != lineMap.end(); it2++){
+            u = it2->second;
+            f = (double)u * 0.000001;
+            MEMORY_PRINT(" > Line %d = %lu ( %g )\n", it2->first, u, f);
+        }
+    }
+    double p = (double)totalMem * 0.000001;
+    printf("Total %ld ( %g MB )\n", totalMem, p);
+#endif
+}
+
 inline void _debugger_trace(int sig){
 #if defined(MEMORY_DEBUG)
-    void *array[10];
+    void *array[1024];
     size_t size = 0;
-    size = backtrace(array, 10);
+    size = backtrace(array, 1024);
     if(sig != 0){
         fprintf(stdout, "Error signal %d:\n", sig);
     }
 	__cpu_get_memory_usage(debug_memory_usage);
 	__gpu_gl_get_memory_usage();
+    _debugger_memory_usage();
     backtrace_symbols_fd(array, size, STDOUT_FILENO);
     exit(1);
 #else
@@ -245,7 +289,7 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
             MEMORY_PRINT("FREE %p (%s : %d)...", *ptr, filename, line); fflush(stdout);
             if(debug_memory_map.find(*ptr) != debug_memory_map.end()){
                 MemoryEntry e = debug_memory_map[*ptr];
-				debug_memory_usage -= e.size;
+                debug_memory_usage -= e.size;
                 debug_memory_map.erase(*ptr);
             }else{
                 printf("Freeing pointer outside map %p\n", *ptr);

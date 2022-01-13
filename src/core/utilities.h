@@ -218,6 +218,13 @@ uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len=-1);
 uint StringComputeU8Count(char *s0, uint len);
 
 /*
+* Computes the raw position inside string 's0' with size 'len' that correspondes
+* to the encoded character located at 'u8p'. Optionally can pass a 'size' parameter
+* to return the size in bytes of the encoded character.
+*/
+uint StringComputeRawPosition(char *s0, uint len, uint u8p, int *size);
+
+/*
 * Convert colors.
 */
 vec4i ColorFromHex(uint hex);

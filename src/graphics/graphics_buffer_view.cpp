@@ -19,18 +19,18 @@ static Float ComputeTransformOf(Float x, Transform *transform){
     return p.x;
 }
 
-void OpenGLRenderEmptyCursorRect(OpenGLState *state, vec2f lower, vec2f upper, vec4f color, uint thickness)
+void OpenGLRenderEmptyCursorRect(OpenGLBuffer *quad, vec2f lower,
+                                 vec2f upper, vec4f color, uint thickness)
 {
     Float x0 = lower.x, y0 = lower.y, x1 = upper.x, y1 = upper.y;
-    OpenGLBuffer *quad = &state->glQuadBuffer;
     if(quad->length + 24 > quad->size){
-        Graphics_QuadFlush(state);
+        Graphics_QuadFlush(quad);
     }
     uint w = thickness;
-    Graphics_QuadPush(state, vec2ui(x0+0, y0+0), vec2ui(x0+w, y1+0), color);
-    Graphics_QuadPush(state, vec2ui(x0+0, y1+0), vec2ui(x1+w, y1+w), color);
-    Graphics_QuadPush(state, vec2ui(x1+0, y1+0), vec2ui(x1+w, y0+w), color);
-    Graphics_QuadPush(state, vec2ui(x1+w, y0+w), vec2ui(x0+0, y0+0), color);
+    Graphics_QuadPush(quad, vec2ui(x0+0, y0+0), vec2ui(x0+w, y1+0), color);
+    Graphics_QuadPush(quad, vec2ui(x0+0, y1+0), vec2ui(x1+w, y1+w), color);
+    Graphics_QuadPush(quad, vec2ui(x1+0, y1+0), vec2ui(x1+w, y0+w), color);
+    Graphics_QuadPush(quad, vec2ui(x1+w, y0+w), vec2ui(x0+0, y0+0), color);
 }
 
 void OpenGLComputeCursorProjection(OpenGLState *state, OpenGLCursor *glCursor,
@@ -62,6 +62,36 @@ void OpenGLComputeCursorProjection(OpenGLState *state, OpenGLCursor *glCursor,
     }
 }
 
+void OpenGLComputeCursor(OpenGLFont *font, OpenGLCursor *glCursor, const char *buffer,
+                         uint len, Float x, Float cursorOffset, Float baseHeight)
+{
+    Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    uint rawp = 0;
+    int utf8Len = 1;
+    int pUtf8Len = 1;
+    char *ptr = (char *)buffer;
+    glCursor->valid = 1;
+    if(x > 0){
+        rawp = StringComputeRawPosition(ptr, len, x-1, &utf8Len);
+        x0 = fonsComputeStringAdvance(font->fsContext, ptr, rawp+utf8Len, &glCursor->pGlyph);
+    }
+    rawp = StringComputeRawPosition(ptr, len, x, &pUtf8Len);
+    x1 = x0 + fonsComputeStringAdvance(font->fsContext, &ptr[rawp],
+                                       pUtf8Len, &glCursor->pGlyph);
+
+    y0 = 0;
+    y1 = y0 + font->fontMath.fontSizeAtRenderCall;
+    y0 += baseHeight;
+    y1 += baseHeight;
+
+    x0 += cursorOffset;
+    x1 += cursorOffset;
+
+    glCursor->pMin = vec2f(x0, y0);
+    glCursor->pMax = vec2f(x1, y1);
+}
+
+#define CursorDefaultPadding 2
 void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
                          Buffer *buffer, vec2ui cursor, Float cursorOffset,
                          Float baseHeight, vec2ui visibleLines)
@@ -83,6 +113,7 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
             x0 = fonsComputeStringAdvance(state->font.fsContext, ptr,
                                           rawp+utf8Len, &glCursor->pGlyph);
         }
+        x0 = Max(0, x0-CursorDefaultPadding);
 
         rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &pUtf8Len);
         rawpp = Buffer_PositionTabCompensation(buffer, rawp, 1);
@@ -95,7 +126,8 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
         }
 
         x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[rawp],
-                                           pUtf8Len, &glCursor->pGlyph);
+                                           pUtf8Len, &glCursor->pGlyph) +
+                  CursorDefaultPadding;
 
         y0 = (cursor.x - visibleLines.x) * state->font.fontMath.fontSizeAtRenderCall;
         y1 = y0 + state->font.fontMath.fontSizeAtRenderCall;
@@ -153,15 +185,15 @@ void OpenGLRenderCursorSegment(OpenGLState *state, View *view, vec4f color, uint
     }
 }
 
-void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
+void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
                              Float y1, vec4f color, uint thickness, int isActive)
 {
     if(isActive){
         if(appGlobalConfig.cStyle == CURSOR_RECT){
-            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), color);
+            Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x1, y1), color);
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
-            OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x0+3, y1),
+            OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x0+3, y1),
                                         color, thickness);
             //Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x0+3, y1), color);
         }else if(appGlobalConfig.cStyle == CURSOR_QUAD){
@@ -172,18 +204,18 @@ void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
             Float y11 = y0 + thick;
             Float xh = x0 + (x1 - x0) * 0.6;
             Float xu = x0 + (x1 - x0) * 0.4;
-            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x01, y1), color);
-            Graphics_QuadPush(state, vec2ui(x0, y01), vec2ui(xh, y1), color);
-            Graphics_QuadPush(state, vec2ui(xu, y0), vec2ui(x1, y11), color);
-            Graphics_QuadPush(state, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
+            Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x01, y1), color);
+            Graphics_QuadPush(quad, vec2ui(x0, y01), vec2ui(xh, y1), color);
+            Graphics_QuadPush(quad, vec2ui(xu, y0), vec2ui(x1, y11), color);
+            Graphics_QuadPush(quad, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
         }
     }else{
         if(appGlobalConfig.cStyle == CURSOR_RECT){
-            OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x1, y1),
+            OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x1, y1),
                                         color, 2);
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
-            OpenGLRenderEmptyCursorRect(state, vec2f(x0, y0), vec2f(x0+3, y1),
+            OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x0+3, y1),
                                         color, thickness);
         }else if(appGlobalConfig.cStyle == CURSOR_QUAD){
             Float thick = 3;
@@ -194,10 +226,10 @@ void Graphics_RenderCursorAt(OpenGLState *state, Float x0, Float y0, Float x1,
             Float xh = x0 + (x1 - x0) * 0.6;
             Float xu = x0 + (x1 - x0) * 0.4;
             color.w *= 0.5;
-            Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x01, y1), color);
-            Graphics_QuadPush(state, vec2ui(x0, y01), vec2ui(xh, y1), color);
-            Graphics_QuadPush(state, vec2ui(xu, y0), vec2ui(x1, y11), color);
-            Graphics_QuadPush(state, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
+            Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x01, y1), color);
+            Graphics_QuadPush(quad, vec2ui(x0, y01), vec2ui(xh, y1), color);
+            Graphics_QuadPush(quad, vec2ui(xu, y0), vec2ui(x1, y11), color);
+            Graphics_QuadPush(quad, vec2ui(x1, y0), vec2ui(x1+thick, y01), color);
         }
     }
 }
@@ -207,7 +239,8 @@ void OpenGLRenderCursor(OpenGLState *state, OpenGLCursor *glCursor, vec4f color,
 {
     Float x0 = glCursor->pMin.x, x1 = glCursor->pMax.x;
     Float y0 = glCursor->pMin.y, y1 = glCursor->pMax.y;
-    Graphics_RenderCursorAt(state, x0, y0, x1, y1, color, thickness, isActive);
+    OpenGLBuffer *quad = &state->glQuadBuffer;
+    Graphics_RenderCursorAt(quad, x0, y0, x1, y1, color, thickness, isActive);
 }
 
 static void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
@@ -400,13 +433,17 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
 
     if(vstate == View_FreeTyping){
         vec4f col = Graphics_GetCursorColor(bufferView, defaultTheme);
+        vec4f segCol(1.0,1.0,1.0,0.25);
         uint dashThick = 4;
+        if(CurrentThemeIsLight()){
+            segCol = vec4f(0.3, 0.3, 0.3, 0.25);
+        }
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
         Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
 
         glDisable(GL_BLEND);
-        OpenGLRenderCursorSegment(state, view, vec4f(1.0,1.0,1.0,0.25), 8.0);
+        OpenGLRenderCursorSegment(state, view, segCol, 8.0);
 
         OpenGLRenderCursor(state, &state->glCursor, col,
                            dashThick, bufferView->isActive && vstate == View_FreeTyping);
@@ -610,26 +647,29 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
             Graphics_QuadFlush(state, 0);
         }
 
-        Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
-        vec4f col = GetUIColorf(theme, UICursorLineHighlight);
-        Float cy0 = ((Float)cursor.x - (Float)visibleLines.x) *
-            font->fontMath.fontSizeAtRenderCall;
+        // Only render the line highlight if the mouse has not selected a range
+        if(!BufferView_GetRangeVisible(view)){
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            vec4f col = GetUIColorf(theme, UICursorLineHighlight);
+            Float cy0 = ((Float)cursor.x - (Float)visibleLines.x) *
+                            font->fontMath.fontSizeAtRenderCall;
 
-        if(vview->descLocation == DescriptionTop){
-            cy0 += font->fontMath.fontSizeAtRenderCall;
-        }
+            if(vview->descLocation == DescriptionTop){
+                cy0 += font->fontMath.fontSizeAtRenderCall;
+            }
 
-        Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
-        Graphics_QuadPush(state, vec2ui(0, cy0),
-                          vec2ui(lineSpan, cy1), col);
+            Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
+            Graphics_QuadPush(state, vec2ui(0, cy0),
+            vec2ui(lineSpan, cy1), col);
 
-        Float w = GetLineBorderWidth(theme);
-        if(w > 0){
-            vec4f cc(1);
-            Graphics_QuadPush(state, vec2ui(0, cy0), vec2ui(w, cy1), cc);
-            Graphics_QuadPush(state, vec2ui(0, cy1-w), vec2ui(lineSpan, cy1), cc);
-            Graphics_QuadPush(state, vec2ui(0, cy0), vec2ui(lineSpan, cy0+w), cc);
-            Graphics_QuadPush(state, vec2ui(lineSpan-w, cy0), vec2ui(lineSpan, cy1), cc);
+            Float w = GetLineBorderWidth(theme);
+            if(w > 0){
+                vec4f cc(1);
+                Graphics_QuadPush(state, vec2ui(0, cy0), vec2ui(w, cy1), cc);
+                Graphics_QuadPush(state, vec2ui(0, cy1-w), vec2ui(lineSpan, cy1), cc);
+                Graphics_QuadPush(state, vec2ui(0, cy0), vec2ui(lineSpan, cy0+w), cc);
+                Graphics_QuadPush(state, vec2ui(lineSpan-w, cy0), vec2ui(lineSpan, cy1), cc);
+            }
         }
 
         Graphics_QuadFlush(state, 0);

@@ -106,7 +106,7 @@ void Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, vec4f colo
     Shader_UniformMatrix4(font->cursorShader, "projection", &state->projection.m);
     Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
 
-    Graphics_RenderCursorAt(state, x0, y0, x1, y1, color, 3, 1);
+    Graphics_RenderCursorAt(&state->glQuadBuffer, x0, y0, x1, y1, color, 3, 1);
     //Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), color);
 }
 

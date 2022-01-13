@@ -126,7 +126,9 @@ void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform){
     *transform = Orthographic(0, width, height, 0, zNear, zFar);
 }
 
-void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry){
+void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry,
+                                   bool with_scissors)
+{
     uint x0 = geometry->lower.x;
     uint y0 = geometry->lower.y;
     uint w = geometry->upper.x - geometry->lower.x;
@@ -134,8 +136,10 @@ void ActivateViewportAndProjection(OpenGLState *state, Geometry *geometry){
     OpenGLComputeProjection(vec2ui(x0, y0), vec2ui(x0+w,y0+h), &state->projection);
 
     glViewport(x0, y0, w, h);
-    glScissor(x0, y0, w, h);
-    glEnable(GL_SCISSOR_TEST);
+    if(with_scissors){
+        glScissor(x0, y0, w, h);
+        glEnable(GL_SCISSOR_TEST);
+    }
 }
 
 void ActivateViewportAndProjection(OpenGLState *state, View *vview, GLViewport target){
@@ -209,17 +213,23 @@ Float GLToScreen(Float x, OpenGLState *state){
 }
 
 vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
-                                     uint len, Geometry *geometry)
+                                     uint len, Geometry *geometry, bool in_place)
 {
     int pGlyph = -1;
+    Float x0 = geometry->lower.x * font->fontMath.invReduceScale;
+    Float y0 = geometry->lower.y * font->fontMath.invReduceScale;
     Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
     Float x = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale * 0.5;
     Float dx = fonsComputeStringAdvance(font->fsContext, (char *)text, len, &pGlyph) * 0.5;
 
-    x = x - dx;
+    x -= dx;
     y -= font->fontMath.fontSizeAtRenderCall * 0.5;
 
-    return vec2f(x, y);
+    vec2f xy(x, y);
+    if(!in_place){
+        xy += vec2f(x0, y0);
+    }
+    return Max(vec2f(0,0), xy);
 }
 
 Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
@@ -490,6 +500,10 @@ void OpenGLBufferInitialize(OpenGLImageQuadBuffer *buffer, int n){
     buffer->tex = AllocatorGetN(Float, 2 * n);
     buffer->size = n;
     buffer->length = 0;
+    buffer->units = 0;
+    for(int i = 0; i < MAX_TEXTURES_PER_BATCH; i++){
+        buffer->textureIds[i] = 0;
+    }
 
     glGenVertexArrays(1, &buffer->vertexArray);
     glBindVertexArray(buffer->vertexArray);
@@ -515,6 +529,10 @@ void OpenGLImageBufferInitializeFrom(OpenGLImageQuadBuffer *buffer,
     buffer->length = other->length;
     buffer->vertexBuffer = other->vertexBuffer;
     buffer->texBuffer = other->texBuffer;
+    buffer->units = 0;
+    for(int i = 0; i < MAX_TEXTURES_PER_BATCH; i++){
+        buffer->textureIds[i] = 0;
+    }
     glGenVertexArrays(1, &buffer->vertexArray);
 }
 
@@ -647,7 +665,7 @@ void WindowOnPress(int x, int y, void *){
     AppHandleMousePress(x, y, &GlobalGLState);
 }
 
-void WinOnFocusChange(void *){
+void WinOnFocusChange(bool in, long unsigned int id, void *){
     KeyboardResetState();
 }
 
@@ -701,10 +719,10 @@ void OpenGLFontSetup(OpenGLState *state){
 void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
                              Float x1, Float y1, Float w, vec4f col)
 {
-    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(w, y1), col);
-    Graphics_QuadPush(quadB, vec2ui(x0, y1-w), vec2ui(x1, y1), col);
-    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(x1, y0+w), col);
-    Graphics_QuadPush(quadB, vec2ui(x1-w, y0), vec2ui(x1, y1), col);
+    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(w, y1), col); // left
+    Graphics_QuadPush(quadB, vec2ui(x0, y1-w), vec2ui(x1, y1), col); // bottom
+    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(x1, y0+w), col); // top
+    Graphics_QuadPush(quadB, vec2ui(x1-w, y0), vec2ui(x1, y1), col); // right
 }
 
 void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
@@ -965,6 +983,7 @@ static void _Graphics_InitTexture(OpenGLState *state, uint8 *data,
 }
 
 static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
+    AssertA(tid < MAX_TEXTURES_COUNT, "Invalid texture query");
     OpenGLTexture *tex = &state->textures[tid];
 
     //TODO: glBindTextureUnit is generating SIGSEGV, cannot figure out why
@@ -1189,17 +1208,81 @@ void UpdateEventsAndHandleRequests(int animating){
     }
 }
 
+void Graphics_RequestClose(WidgetWindow *w){
+    OpenGLState *state = &GlobalGLState;
+    std::vector<std::shared_ptr<WidgetWindow>>::iterator it;
+    if(w){
+        for(it = state->widgetWindows.begin(); it != state->widgetWindows.end(); ){
+            WidgetWindow *ptr = it->get();
+            if(w == ptr){
+                it = state->widgetWindows.erase(it);
+                break;
+            }
+        }
+    }
+}
+
 /*
 * TODO: It is interesting to attempt to render 1 +2pages and allow
 *       for a translation matrix. It might allow us to better represent
 *       transitions and the viewing interface? Also it allows us to by-pass
 *       the 'translate at end of file' issue we have right now.
 */
-PopupWindow *popup = nullptr;
+
+int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
+    OpenGLState *state = &GlobalGLState;
+    OpenGLFont *font = &state->font;
+    int animating = 0;
+    AppUpdateViews();
+
+    glUseProgram(font->shader.id);
+    Shader_UniformInteger(font->shader, "enable_contrast",
+                          ThemeNeedsEffect(defaultTheme));
+
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        View *view = iterator.value->view;
+        BufferView *bView = View_GetBufferView(view);
+        RenderList *pipeline = View_GetRenderPipeline(view);
+        BufferView_UpdateCursorNesting(bView);
+
+        // Sets the alpha for the current view rendering stages, makes the dimm effect
+
+        // TODO: quick hack to disable dimm for build buffer
+        int dim = view->isActive ? 0 : 1;
+        if(bView->lineBuffer){
+            if(bView->lineBuffer->filePathSize == 0) dim = 0;
+        }
+
+        SetAlpha(dim);
+        bView->is_transitioning = 0;
+
+        if(BufferView_IsVisible(bView)){
+            OpenGLResetCursors(state);
+            for(uint s = 0; s < pipeline->stageCount; s++){
+                state->model = state->scale; // reset model
+                animating |= pipeline->stages[s].renderer(view, state,
+                                                          defaultTheme, wctx->dt);
+            }
+        }
+
+        // account for chromatic transition
+        animating |= bView->is_transitioning;
+        if(bView->is_transitioning){
+            LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+            LineBuffer_AdvanceCopySection(lineBuffer, wctx->dt);
+        }
+        ViewTree_Next(&iterator);
+    }
+
+    SwapBuffersX11(state->window);
+    return animating;
+}
+
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
-    OpenGLFont *font = &state->font;
 
     _OpenGLStateInitialize(state);
     OpenGLInitialize(state);
@@ -1210,8 +1293,11 @@ void OpenGLEntry(){
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
-    //popup = new PopupWindow;
     WidgetRenderContext wctx = {.state = &GlobalGLState};
+
+    state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
+
+    _debugger_memory_usage();
 
     while(!WindowShouldCloseX11(state->window)){
         MakeContextX11(state->window);
@@ -1221,53 +1307,14 @@ void OpenGLEntry(){
         wctx.dt = dt;
 
         lastTime = currTime;
-        AppUpdateViews();
 
-        //TODO: Move this
-        glUseProgram(font->shader.id);
-        Shader_UniformInteger(font->shader, "enable_contrast",
-                              ThemeNeedsEffect(defaultTheme));
+        // render main window
+        animating |= OpenGLRenderMainWindow(&wctx);
 
-        ViewTreeIterator iterator;
-        ViewTree_Begin(&iterator);
-        while(iterator.value){
-            View *view = iterator.value->view;
-            BufferView *bView = View_GetBufferView(view);
-            RenderList *pipeline = View_GetRenderPipeline(view);
-            BufferView_UpdateCursorNesting(bView);
-
-            // Sets the alpha for the current view rendering stages, makes the dimm effect
-
-            // TODO: quick hack to disable dimm for build buffer
-            int dim = view->isActive ? 0 : 1;
-            if(bView->lineBuffer){
-                if(bView->lineBuffer->filePathSize == 0) dim = 0;
-            }
-
-            SetAlpha(dim);
-            bView->is_transitioning = 0;
-
-            if(BufferView_IsVisible(bView)){
-                OpenGLResetCursors(state);
-                for(uint s = 0; s < pipeline->stageCount; s++){
-                    state->model = state->scale; // reset model
-                    animating |= pipeline->stages[s].renderer(view, state,
-                                                              defaultTheme, dt);
-                }
-            }
-
-            // account for chromatic transition
-            animating |= bView->is_transitioning;
-            if(bView->is_transitioning){
-                LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
-                LineBuffer_AdvanceCopySection(lineBuffer, dt);
-            }
-            ViewTree_Next(&iterator);
+        // render whatever we poped
+        for(std::shared_ptr<WidgetWindow> &sww : state->widgetWindows){
+            animating |= sww.get()->DispatchRender(&wctx);
         }
-
-        SwapBuffersX11(state->window);
-
-        //animating |= popup->DispatchRender(&wctx);
 
         UpdateEventsAndHandleRequests(animating);
     }
@@ -1281,7 +1328,8 @@ void OpenGLEntry(){
         sleep(1);
     }
 
-    //DEBUG_MSG("Finalizing OpenGL graphics\n");
+    state->widgetWindows.clear();
+
     DestroyWindowX11(state->window);
     TerminateX11();
     state->running = 0;

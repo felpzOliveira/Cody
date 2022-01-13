@@ -291,13 +291,18 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
 
     uint r = 0;
     if(buffer->taken > 0){
+        r = StringComputeRawPosition(buffer->data, buffer->taken, u8p, len);
+        return r;
+    #if 0
         char *p = buffer->data;
         int c = 0;
         int of = 0;
 
         if(u8p == 0 && len){
             StringToCodepoint(&p[c], buffer->taken - c, &of);
-            *len = of;
+            if(len){
+                *len = of;
+            }
             return 0;
         }
 
@@ -313,8 +318,10 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
         }
 
         if(r != u8p){
-            printf("oops\n");
-            Buffer_Utf8PositionToRawPosition(buffer, u8p, len);
+            BUG();
+            return 0;
+            //printf("oops\n");
+            //Buffer_Utf8PositionToRawPosition(buffer, u8p, len);
         }
 
         AssertA(r == u8p, "StringToCodepoint failed to decode UTF-8");
@@ -326,6 +333,7 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
             }
         }
         r = (uint)c;
+    #endif
     }else{
         if(len) *len = 1;
     }

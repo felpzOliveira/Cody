@@ -241,6 +241,49 @@ uint StringComputeU8Count(char *s0, uint len){
     return r;
 }
 
+uint StringComputeRawPosition(char *s0, uint len, uint u8p, int *size){
+    uint r = 0;
+    if(len > 0 && s0){
+        char *p = s0;
+        int c = 0;
+        int of = 0;
+        if(u8p == 0){
+            if(size){
+                StringToCodepoint(&p[c], len, &of);
+                *size = of;
+            }
+            return 0;
+        }
+
+        while(r != u8p){
+            of = 0;
+            int rv = StringToCodepoint(&p[c], len - c, &of);
+            if(rv == -1) break;
+            r ++;
+            c += of;
+        }
+
+        if(r != u8p){
+            BUG();
+            printf("Could not compute raw position for %s - %d( u8 = %u )\n",
+                   s0, (int)len, u8p);
+            return 0;
+        }
+
+        if(size){
+            *size = 1;
+            if((int)len > c){
+                (void)StringToCodepoint(&p[c], len - c, &of);
+                *size = of;
+            }
+        }
+        r = (uint)c;
+    }else{
+        if(len) *size = 1;
+    }
+    return r;
+}
+
 uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len){
     char *p = s0;
     int c = 0;

@@ -7,10 +7,10 @@
 #define KEYBOARD_EVENT_PRESS   1
 #define KEYBOARD_EVENT_REPEAT  2
 
-#define KEYSET_MAX_SIZE 6
-#define MAX_BINDINGS_PER_ENTRY 256
+#define KEYSET_MAX_SIZE 4
+#define MAX_BINDINGS_PER_ENTRY 32
 #define KEYSET_EVENT(name) void name()
-#define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size)
+#define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size, void *priv)
 #define KEY_ENTRY_RAW_EVENT(name) void name(int rawKeyCode)
 
 typedef KEYSET_EVENT(KeySetEventCallback);
@@ -117,6 +117,7 @@ typedef struct{
     KeyEntryCallback *entryCallback;
     KeyRawEntryCallback *entryRawCallback;
     void *refWindow;
+    void *userPriv;
 }BindingMap;
 
 /*
@@ -163,7 +164,8 @@ BindingMap *KeyboardGetActiveMapping(void *window);
 /*
 * Register default callback for key entry values for unbinded UTF-8 strings.
 */
-void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback);
+void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback,
+                                  void *userData);
 
 /*
 * Register a raw key event callback. This function (when binded) is called

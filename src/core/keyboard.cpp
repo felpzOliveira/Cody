@@ -140,7 +140,7 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
        && consumed == 0)
     {
         if(mapping->entryCallback){
-            mapping->entryCallback(utf8Data, utf8Size);
+            mapping->entryCallback(utf8Data, utf8Size, mapping->userPriv);
             consumed = 1;
         }
     }
@@ -172,19 +172,17 @@ void RegisterKeyboardEventv(BindingMap *mapping, int repeat, const char *name,
     for(int i = 0; i < size; i++){
         int id = GetKeyID(keySet[i]);
         int count = counts[id];
-        if(count < MAX_BINDINGS_PER_ENTRY){
-            Binding *binding = &binds[GetBindingID(id, count)];
-            if(name){
-                memcpy(binding->bindingname, name, strlen(name));
-            }
-            Memcpy(binding->keySet, keySet, sizeof(keySet));
-            binding->keySetSize = size;
-            binding->callback = callback;
-            binding->supportsRepeat = repeat;
-            counts[id] = count+1;
-        }else{
-            AssertA(0, "Too many bindings for key");
+        AssertA(count < MAX_BINDINGS_PER_ENTRY, "Requested too many binding");
+
+        Binding *binding = &binds[GetBindingID(id, count)];
+        if(name){
+            memcpy(binding->bindingname, name, strlen(name));
         }
+        Memcpy(binding->keySet, keySet, sizeof(keySet));
+        binding->keySetSize = size;
+        binding->callback = callback;
+        binding->supportsRepeat = repeat;
+        counts[id] = count+1;
     }
 }
 
@@ -197,8 +195,11 @@ void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
     va_end(args);
 }
 
-void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback){
+void RegisterKeyboardDefaultEntry(BindingMap *mapping, KeyEntryCallback *callback,
+                                  void *userData)
+{
     mapping->entryCallback = callback;
+    mapping->userPriv = userData;
 }
 
 void RegisterKeyboardRawEntry(BindingMap *mapping, KeyRawEntryCallback *callback){
