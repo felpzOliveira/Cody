@@ -88,6 +88,10 @@ Geometry AppGetScreenGeometry(Float *lineHeight){
     return appContext.currentGeometry;
 }
 
+BindingMap *AppGetFreetypingBinding(){
+    return appContext.freeTypeMapping;
+}
+
 void AppSetDelayedCall(std::function<void(void)> fn){
     appContext.delayedCall = fn;
     appContext.hasDelayedCall = true;
@@ -128,8 +132,10 @@ void AppEarlyInitialize(){
     appGlobalConfig.rootFolder = appContext.cwd;
     appGlobalConfig.configFile = dir + std::string("/.config");
 
-    // TODO: Configurable number of entries?/init funciton?
+    // TODO: Configurable number of entries?/init function?
     appContext.queryBarHistory.history = CircularStack_Create<QueryBarHistoryItem>(64);
+    QueryBarHistory_DetachedLoad(&appContext.queryBarHistory,
+                                 QueryBarHistory_GetPath().c_str());
 
     Git_Initialize();
     Git_OpenRootRepository();
@@ -1443,15 +1449,16 @@ void AppCommandCut(){
     AppHandleRegionCut();
 }
 
-void AppPasteString(const char *p, uint size){
+void AppPasteString(const char *p, uint size, bool force_view){
     View *vview = AppGetActiveView();
     ViewState state = View_GetState(vview);
-    if(state == View_FreeTyping || state == View_AutoComplete){
+    if(state == View_FreeTyping || state == View_AutoComplete || force_view){
         BufferView *view = AppGetActiveBufferView();
-        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
-        SymbolTable *symTable = tokenizer->symbolTable;
         NullRet(view->lineBuffer);
         NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+
+        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
+        SymbolTable *symTable = tokenizer->symbolTable;
         BufferView_SetRangeVisible(view, 0);
 
         if(size > 0 && p){

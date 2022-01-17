@@ -6,12 +6,23 @@
 #include <gl3corefontstash.h>
 #include <timing.h>
 #include <buffers.h>
+#include <iostream>
 
 uint ButtonWidget::kWidth  = 92;
 uint ButtonWidget::kHeight = 32;
 Float ButtonWidget::kScaleUp = 1.1;
 Float ButtonWidget::kScaleDown = 0.9090909090909091;
 Float ButtonWidget::kScaleDuration = 0.1;
+uint ButtonWidget::kLeftEdgeMask   = (1 << 0);
+uint ButtonWidget::kRightEdgeMask  = (1 << 1);
+uint ButtonWidget::kTopEdgeMask    = (1 << 2);
+uint ButtonWidget::kBottonEdgeMask = (1 << 3);
+uint ButtonWidget::kAllEdgesMask   = ButtonWidget::kLeftEdgeMask |
+                                     ButtonWidget::kRightEdgeMask|
+                                     ButtonWidget::kTopEdgeMask  |
+                                     ButtonWidget::kBottonEdgeMask;
+
+
 
 static void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
                                          Transform wTransform = Transform())
@@ -22,9 +33,21 @@ static void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
     Shader_UniformMatrix4(shader, "modelView", &model.m);
 }
 
+void WidgetWindowOnSizeChange(int width, int height, void *priv){
+    WidgetWindow *ww = (WidgetWindow *)priv;
+    ww->Resize(width, height);
+}
+
 void WidgetWindowOnClick(int x, int y, void *priv){
     WidgetWindow *ww = (WidgetWindow *)priv;
-    ww->mouse = vec2f(x, ww->resolution.y - y);
+    Geometry wwGeo = ww->GetGeometry();
+    vec2f mouse = vec2f(x, ww->window->height - y);
+    if(!Geometry_IsPointInside(&wwGeo, mouse)){
+        for(Widget *w : ww->widgetList) w->SetSelected(false);
+        return;
+    }
+
+    ww->mouse = mouse;
     ww->lastClicked = nullptr;
     for(Widget *w : ww->widgetList){
         if(Geometry_IsPointInside(&w->geometry, ww->mouse)){
@@ -51,7 +74,17 @@ void WidgetWindowOnScroll(int is_up, void *priv){
 void WidgetWindowOnMotion(int x, int y, void *priv){
     // This works nicely but how is performance for doing this on motion?
     WidgetWindow *ww = (WidgetWindow *)priv;
-    vec2ui mouse(x, ww->resolution.y - y);
+    Geometry wwGeo = ww->GetGeometry();
+    vec2f mouse = vec2f(x, ww->window->height - y);
+    ww->mouse = mouse;
+    if(!Geometry_IsPointInside(&wwGeo, mouse)){
+        if(ww->lastMotion){
+            ww->lastMotion->OnExited();
+        }
+        ww->lastMotion = nullptr;
+        return;
+    }
+
     Widget *currWidget = nullptr;
     for(Widget *w : ww->widgetList){
         if(Geometry_IsPointInside(&w->geometry, mouse)){
@@ -63,6 +96,7 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
     if(currWidget == nullptr){
         // either we left a widget or we never entered one
         if(ww->lastMotion){
+            ww->lastMotion->SetMouseCoordintes(mouse);
             ww->lastMotion->OnExited();
         }
     }else{
@@ -72,10 +106,13 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
         }else if(ww->lastMotion){
             // if the widgets are different than they are really close
             // and we entered one and left the other
+            ww->lastMotion->SetMouseCoordintes(mouse);
             ww->lastMotion->OnExited();
+            currWidget->SetMouseCoordintes(mouse);
             currWidget->OnEntered();
         }else{
             // there is no last widget, we entered a new one
+            currWidget->SetMouseCoordintes(mouse);
             currWidget->OnEntered();
         }
     }
@@ -84,6 +121,11 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
     ww->lastMotion = currWidget;
     // we need to update the mouse otherwise we can't scroll
     ww->mouse = mouse;
+
+    // forward for childs
+    if(currWidget){
+        currWidget->OnMotion(mouse.x, mouse.y);
+    }
 }
 
 void WidgetWindowDefaultEntry(char *utf8Data, int utf8Size, void *priv){
@@ -100,64 +142,103 @@ void WidgetWindowDefaultEntry(char *utf8Data, int utf8Size, void *priv){
 WidgetWindow::WidgetWindow(){
     window = nullptr;
     mapping = nullptr;
+    detached = true;
+    start = vec2f(0);
+    resolution = vec2f(0);
 }
 WidgetWindow::WidgetWindow(int width, int height, const char *name){
     window = nullptr;
     mapping = nullptr;
-    Open(width, height, name);
+    detached = true;
+    start = vec2f(0);
+    resolution = vec2f((Float)width, (Float)height);
+    Open(width, height, name, nullptr);
 }
 
-// TODO: maybe cache the keyboard mapping?
-void WidgetWindow::Open(int width, int height, const char *name){
-    if(window){
-        DestroyWindowX11(window);
+WidgetWindow::WidgetWindow(WindowX11 *other, BindingMap *bmapping,
+                           vec2f lower, vec2f upper)
+{
+    window = nullptr;
+    mapping = bmapping;
+    detached = false;
+    start = lower;
+    resolution = vec2f(upper.x - lower.x, upper.y - lower.y);
+    Open(resolution.x, resolution.y, NULL, other);
+}
+
+void WidgetWindow::Resize(int width, int height){
+    resolution = vec2f(width, height);
+    for(Widget *widget : widgetList){
+        widget->OnResize(width, height);
     }
+}
 
-    OpenGLState *state = Graphics_GetGlobalContext();
-    WindowX11 *shared = (WindowX11 *)Graphics_GetBaseWindow();
-    OpenGLFont *ofont = &state->font;
-    window = CreateWindowX11Shared(width, height, name, shared);
-    resolution = vec2f((Float)width, (Float)height);
-    lastMotion = nullptr;
-    lastClicked = nullptr;
-    SetNotResizable(window);
-    SwapIntervalX11(window, 0);
-
-    if(!mapping){
-        MakeContext();
-        mapping = KeyboardCreateMapping(window);
-        RegisterKeyboardDefaultEntry(mapping, WidgetWindowDefaultEntry, this);
-        KeyboardSetActiveMapping(mapping);
-
-        RegisterOnMouseLeftClickCallback(window, WidgetWindowOnClick, this);
-        RegisterOnMouseMotionCallback(window, WidgetWindowOnMotion, this);
-        RegisterOnScrollCallback(window, WidgetWindowOnScroll, this);
-
-        OpenGLFontCopy(&font, ofont);
-    }else{
+void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *other){
+    if(window){
         OpenGLBufferContextDelete(&quadBuffer);
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
+
+        if(detached){
+            DestroyWindowX11(window);
+        }else{
+            for(uint handle : eventHandles){
+                UnregisterCallbackByHandle(window, handle);
+            }
+        }
     }
+
+    window = other;
+
+    if(detached && !window){
+        WindowX11 *shared = (WindowX11 *)Graphics_GetBaseWindow();
+        window = CreateWindowX11Shared(width, height, name, shared);
+    }
+
+    AssertA(window != nullptr, "Could not get window handle");
+
+    MakeContext();
+    if(detached){
+        SetNotResizable(window);
+        SwapIntervalX11(window, 0);
+        if(!mapping){
+            mapping = KeyboardCreateMapping(window);
+            RegisterKeyboardDefaultEntry(mapping, WidgetWindowDefaultEntry, this);
+            KeyboardSetActiveMapping(mapping);
+        }
+    }
+
+    // TODO: How to handle default entry when sharing 'other'?
+
+    OpenGLState *state = Graphics_GetGlobalContext();
+    OpenGLFont *ofont = &state->font;
+    lastMotion = nullptr;
+    lastClicked = nullptr;
+
+    eventHandles.push_back(
+        RegisterOnMouseLeftClickCallback(window, WidgetWindowOnClick, this)
+    );
+    eventHandles.push_back(
+        RegisterOnMouseMotionCallback(window, WidgetWindowOnMotion, this)
+    );
+    eventHandles.push_back(
+        RegisterOnScrollCallback(window, WidgetWindowOnScroll, this)
+    );
+    eventHandles.push_back(
+        RegisterOnSizeChangeCallback(window, WidgetWindowOnSizeChange, this)
+    );
+
+    OpenGLFontCopy(&font, ofont);
 
     OpenGLBufferInitializeFrom(&quadBuffer, &state->glQuadBuffer);
     OpenGLImageBufferInitializeFrom(&quadImageBuffer, &state->glQuadImageBuffer);
     font.fsContext = glfonsCreateFrom(ofont->fsContext);
-    if(font.fsContext == nullptr){
-        printf("[Widget] Failed to create font locally\n");
-    }
-
-    // TODO: Set mapping callbacks
-    // TODO: Cache mapping?
-    // TODO: Register inputs
 }
 
 Geometry WidgetWindow::GetGeometry(){
     Geometry geo;
-    geo.lower = vec2ui(0, 0);
-    geo.upper = vec2ui(resolution.x, resolution.y);
-    geo.extensionX = vec2f(0, 1);
-    geo.extensionY = vec2f(0, 1);
+    geo.lower = vec2ui(start.x, start.y);
+    geo.upper = vec2ui(start.x + resolution.x, start.y + resolution.y);
     return geo;
 }
 
@@ -169,14 +250,15 @@ void WidgetWindow::MakeContext(){
 
 int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
     int is_animating = 0;
-    MakeContext();
+    if(detached) MakeContext();
     Geometry geometry = GetGeometry();
     vec4f background = DefaultGetUIColorf(UISelectorBackground);
     ActivateViewportAndProjection(wctx->state, &geometry);
-    Float fcol[] = {background.x, background.y, background.z, background.w};
-
-    glClearBufferfv(GL_COLOR, 0, fcol);
-    glClearBufferfv(GL_DEPTH, 0, kOnes);
+    if(detached){
+        Float fcol[] = {background.x, background.y, background.z, background.w};
+        glClearBufferfv(GL_COLOR, 0, fcol);
+        glClearBufferfv(GL_DEPTH, 0, kOnes);
+    }
 
     // fill in window specifics
     wctx->windowBackground = background;
@@ -188,7 +270,7 @@ int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
     }
 
     glDisable(GL_SCISSOR_TEST);
-    Update();
+    if(detached) Update();
     return is_animating;
 }
 
@@ -212,10 +294,10 @@ WidgetWindow::~WidgetWindow(){
         OpenGLBufferContextDelete(&quadBuffer);
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
-        DestroyWindowX11(window);
+        if(detached){
+            DestroyWindowX11(window);
+        }
     }
-
-    printf("Called destructor\n");
 }
 
 /*********************************/
@@ -254,30 +336,27 @@ void Widget::Animate(const WidgetTransition &wtransition){
 void Widget::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY){
     Float w = geo.upper.x - geo.lower.x;
     Float h = geo.upper.y - geo.lower.y;
-    uint x0 = (uint)(w * aspectX.x);
-    uint x1 = (uint)(w * aspectX.y);
-    uint y0 = (uint)(h * aspectY.x);
-    uint y1 = (uint)(h * aspectY.y);
+    uint x0 = geo.lower.x + (uint)(w * aspectX.x);
+    uint x1 = geo.lower.x + (uint)(w * aspectX.y);
+    uint y0 = geo.lower.y + (uint)(h * aspectY.x);
+    uint y1 = geo.lower.y + (uint)(h * aspectY.y);
 
-    geometry.lower = vec2ui(x0, y0);
-    geometry.upper = vec2ui(x1, y1);
+    geometry.lower = vec2ui(Min(x0, x1), Min(y0, y1));
+    geometry.upper = vec2ui(Max(x0, x1), Max(y0, y1));
     geometry.extensionX = aspectX;
     geometry.extensionY = aspectY;
+    center = geometry.Center();
     refGeometry = geo;
+}
+
+void Widget::OnResize(int width, int height){
+    geometry.lower = center - vec2f(width, height) * 0.5;
+    geometry.upper = center + vec2f(width, height) * 0.5;
 }
 
 Geometry Widget::AdvanceAnimation(Float dt){
     if(!transition.running) return geometry;
     Geometry geo = geometry;
-
-    Float pw = refGeometry.upper.x - refGeometry.lower.x;
-    Float ph = refGeometry.upper.y - refGeometry.lower.y;
-    Float w0 = geo.upper.x - geo.lower.x;
-    Float h0 = geo.upper.y - geo.lower.y;
-    uint cx = (geo.upper.x + geo.lower.x) / 2;
-    uint cy = (geo.upper.y + geo.lower.y) / 2;
-    Float w02 = w0 / 2;
-    Float h02 = h0 / 2;
 
     if(transition.type == WIDGET_TRANSITION_SCALE){
         Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
@@ -291,28 +370,18 @@ Geometry Widget::AdvanceAnimation(Float dt){
         Float remaining = transition.interval - transition.dt;
         Float w = InterpolateValueCubic(dt, remaining, &wc, wf, &vx);
         Float h = InterpolateValueCubic(dt, remaining, &hc, hf, &vy);
+        Float w02 = w * 0.5;
+        Float h02 = h * 0.5;
 
         transition.velocity = vec2f(vx, vy);
         transition.startValues = vec2f(w, h);
-
-        int px = Absf((w - w0) / 2);
-        int py = Absf((h - h0) / 2);
-        if(w > w0){ // expanding
-            x0 = Max(0, (int)cx - w02 - px);
-            x1 = Max(0, (int)cx + w02 + px);
-            y0 = Max(0, (int)cy - h02 - py);
-            y1 = Max(0, (int)cy + h02 + py);
-        }else{ // reducing
-            x0 = Max(0, (int)cx - w02 + px);
-            x1 = Max(0, (int)cx + w02 - px);
-            y0 = Max(0, (int)cy - h02 + py);
-            y1 = Max(0, (int)cy + h02 - py);
-        }
+        x0 = center.x - w02;
+        x1 = center.x + w02;
+        y0 = center.y - h02;
+        y1 = center.y + h02;
 
         geo.lower = vec2ui(x0, y0);
         geo.upper = vec2ui(x1, y1);
-        geo.extensionX = vec2f(x0 / pw, x1 / pw);
-        geo.extensionY = vec2f(y0 / ph, y1 / ph);
     }
     else{
         // not yet supported or a child transition
@@ -377,26 +446,31 @@ ButtonWidget::ButtonWidget() : Widget(){
     baseFontSize = Graphics_GetFontSize();
     a_fontSize = (Float)baseFontSize;
     textureId = -1;
+    buttonColor.w = -1;
+    borderMask = 0;
 }
 ButtonWidget::ButtonWidget(std::string val) : Widget(){
     SetText(val);
     baseFontSize = Graphics_GetFontSize();
     a_fontSize = (Float)baseFontSize;
     textureId = -1;
+    buttonColor.w = -1;
+    borderMask = 0;
 }
 
 void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
     Float w = parentGeo.upper.x - parentGeo.lower.x;
     Float h = parentGeo.upper.y - parentGeo.lower.y;
     Float ux = w * center.x, uy = h * center.y;
-    uint x0 = ux - ButtonWidget::kWidth / 2.0;
-    uint x1 = ux + ButtonWidget::kWidth / 2.0;
-    uint y0 = uy - ButtonWidget::kHeight / 2.0;
-    uint y1 = uy + ButtonWidget::kHeight / 2.0;
-    geometry.lower = vec2ui(x0, y0);
-    geometry.upper = vec2ui(x1, y1);
+    uint x0 = parentGeo.lower.x + ux - ButtonWidget::kWidth / 2.0;
+    uint x1 = parentGeo.lower.x + ux + ButtonWidget::kWidth / 2.0;
+    uint y0 = parentGeo.lower.y + uy - ButtonWidget::kHeight / 2.0;
+    uint y1 = parentGeo.lower.y + uy + ButtonWidget::kHeight / 2.0;
+    geometry.lower = vec2ui(Min(x0, x1), Min(y0, y1));
+    geometry.upper = vec2ui(Max(x0, x1), Max(y0, y1));
     geometry.extensionX = vec2f((Float)x0 / w, (Float)x1 / w);
     geometry.extensionY = vec2f((Float)y0 / h, (Float)y1 / h);
+    center = geometry.Center();
     refGeometry = parentGeo;
 }
 
@@ -464,6 +538,7 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
     Transform model;
     uint xoff = 0;
     vec2f p0, p1;
+    bool has_text = text.size();
 
     Shader shader = gl->buttonShader;
     vec2f upper(geometry.upper.x - geometry.lower.x, geometry.upper.y - geometry.lower.y);
@@ -481,30 +556,75 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
     p1 = transform.Point(vec2f(upper));
     Graphics_QuadPush(&parent->quadBuffer, p0, p1, back * scale);
 
+    // TODO: thickness and color
+    uint thick = 2;
+    if(borderMask & kAllEdgesMask){
+        p0 = transform.Point(vec2f(0, 0));
+        p1 = transform.Point(vec2f(upper.x, upper.y));
+        Graphics_QuadPushBorder(&parent->quadBuffer, p0.x, p0.y,
+                                p1.x, p1.y, thick, vec4f(1.0));
+    }else{
+        if(borderMask & ButtonWidget::kLeftEdgeMask){
+            p0 = transform.Point(vec2f(0, thick));
+            p1 = transform.Point(vec2f(thick, upper.y-thick));
+            Graphics_QuadPush(&parent->quadBuffer, p0, p1, vec4f(1.0));
+        }
+
+        if(borderMask & ButtonWidget::kRightEdgeMask){
+            p0 = transform.Point(vec2f(upper.x-thick, thick));
+            p1 = transform.Point(vec2f(upper.x, upper.y-thick));
+            Graphics_QuadPush(&parent->quadBuffer, p0, p1, vec4f(1.0));
+        }
+
+        if(borderMask & ButtonWidget::kTopEdgeMask){
+            p0 = transform.Point(vec2f(0, upper.y-thick));
+            p1 = transform.Point(vec2f(upper.x, upper.y));
+            Graphics_QuadPush(&parent->quadBuffer, p0, p1, vec4f(1.0));
+        }
+
+        if(borderMask & ButtonWidget::kBottonEdgeMask){
+            p0 = transform.Point(vec2f(0, 0));
+            p1 = transform.Point(vec2f(upper.x, thick));
+            Graphics_QuadPush(&parent->quadBuffer, p0, p1, vec4f(1.0));
+        }
+    }
+
     Graphics_QuadFlush(&parent->quadBuffer);
     if(textureId >= 0){
-        upper.x *= 0.3;
-        xoff = 25;
         vec2f res = ImageTextureWidget::AspectPreservingResolution(upper, textureId);
         Float dy = (upper.y - res.y) * 0.5;
-        upper.y = res.y;
-        upper += vec2ui(xoff, dy);
-        p0 = transform.Point(vec2ui(xoff, dy));
+        Float dx = (upper.x - res.x) * 0.5;
+        if(has_text){
+            upper.x *= 0.3;
+            xoff = 25;
+            upper.y = res.y;
+            upper += vec2ui(xoff, dy);
+            p0 = transform.Point(vec2ui(xoff, dy));
+        }else{
+            p0 = transform.Point(vec2ui(dx, dy));
+            upper = p0 + res;
+        }
         p1 = transform.Point(upper);
         Graphics_ImagePush(&parent->quadImageBuffer, p0, p1, textureId);
         Graphics_ImageFlush(gl, &parent->quadImageBuffer);
     }
 
-    Graphics_ComputeTransformsForFontSize(font, a_fontSize, &model);
-    Graphics_PrepareTextRendering(font, &gl->projection, &model);
-    vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(),
-                                             text.size(), &geometry, true);
+    if(has_text){
+        Graphics_ComputeTransformsForFontSize(font, a_fontSize, &model);
+        Graphics_PrepareTextRendering(font, &gl->projection, &model);
+        vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(),
+                                                 text.size(), &geometry, true);
 
-    p = transform.Point(p);
-    vec4i color(255);
-    int pGlyph = -1;
-    Graphics_PushText(font, p.x, p.y, (char *)text.c_str(), text.size(), color, &pGlyph);
-    Graphics_FlushText(font);
+        p = transform.Point(p + vec2f(xoff, 0));
+        vec4i color(255);
+        if(buttonColor.w > 0){
+            color = ColorFromRGBA(buttonColor);
+        }
+        int pGlyph = -1;
+        Graphics_PushText(font, p.x, p.y, (char *)text.c_str(),
+                          text.size(), color, &pGlyph);
+        Graphics_FlushText(font);
+    }
 
     // restore the font transforms for all other components
     font->fontMath = fMath;
@@ -733,7 +853,9 @@ int ScrollableWidget::OnRender(WidgetRenderContext *wctx, const Transform &){
     return animating;
 }
 
-PopupWindow::PopupWindow() : WidgetWindow(800, 400, "Popup!"){
+PopupWindow::PopupWindow() : WidgetWindow(800, 400, "Popup!")
+ //WidgetWindow((WindowX11 *)Graphics_GetBaseWindow(), AppGetFreetypingBinding(), vec2f(200, 150), vec2f(1000, 550))
+{
     WidgetStyle s0;
     int off = 0;
     OpenGLState *state = Graphics_GetGlobalContext();
@@ -742,7 +864,7 @@ PopupWindow::PopupWindow() : WidgetWindow(800, 400, "Popup!"){
     tid0 = Graphics_FetchTextureFor(state, FILE_EXTENSION_CUDA, &off);
     tid1 = Graphics_FetchTextureFor(state, FILE_EXTENSION_LIT, &off);
 
-    b0.SetText("B0");
+    //b0.SetText("B0");
     b1.SetText("B1");
     b0.SetTextureId(tid0);
 

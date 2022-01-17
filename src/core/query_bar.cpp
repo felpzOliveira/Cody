@@ -2,6 +2,11 @@
 #include <view.h>
 #include <bufferview.h>
 #include <app.h>
+#include <parallel.h>
+#include <fstream>
+#include <utilities.h>
+
+#define QUERY_BAR_HISTORY_PATH ".history"
 
 static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
                                   char *name=nullptr, uint titleLen=0);
@@ -11,6 +16,12 @@ static int QueryBar_EmptySearchReplaceCallback(QueryBar *bar, View *view, int ac
     printf("Warning unconfigured search callback\n");
     //printf("Accepted: %d\n", accepted);
     return 0;
+}
+
+std::string QueryBarHistory_GetPath(){
+    std::string path(AppGetContextDirectory());
+    path += std::string("/.cody/") + QUERY_BAR_HISTORY_PATH;
+    return path;
 }
 
 void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view);
@@ -530,8 +541,11 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                         QueryBar_GetWrittenContent(queryBar, &content, &size);
                         if(content && size > 0){
                             QueryBarHistoryItem item;
+                            std::string path = QueryBarHistory_GetPath();
+
                             item.value = std::string(content, size);
                             CircularStack_Push(qHistory->history, &item);
+                            QueryBarHistory_DetachedStore(qHistory, path.c_str());
                         }
                     }
                 }
@@ -559,4 +573,52 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
     }
 
     return r;
+}
+
+void QueryBarHistory_LineProcessor(char **p, uint size, uint lineNr, uint at,
+                                   uint total, void *priv)
+{
+    QueryBarHistoryItem item;
+    QueryBarHistory *qHistory = (QueryBarHistory *)priv;
+
+    item.value = std::string(*p, size-1);
+    CircularStack_Push(qHistory->history, &item);
+}
+
+void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath){
+    DispatchExecution([&](HostDispatcher *dispatcher){
+        std::string path(basePath);
+        QueryBarHistory *qHistory = history;
+        char *content = nullptr;
+        uint fileSize = 0;
+
+        dispatcher->DispatchHost();
+        content = GetFileContents(basePath, &fileSize);
+        if(content && fileSize > 0){
+            Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
+                            0, qHistory, true);
+        }else if(content){
+            AllocatorFree(content);
+        }
+    });
+}
+
+void QueryBarHistory_DetachedStore(QueryBarHistory *history, const char *basePath){
+    DispatchExecution([&](HostDispatcher *dispatcher){
+        std::string path(basePath);
+        QueryBarHistory *qHistory = history;
+
+        dispatcher->DispatchHost();
+        CircularStack<QueryBarHistoryItem> *history = qHistory->history;
+        FILE *fp = fopen(basePath, "w");
+        if(fp){
+            for(uint i = 0; i < CircularStack_Size(history); i++){
+                QueryBarHistoryItem *item = CircularStack_At(history, i);
+                if(item->value.size() > 0){
+                    fprintf(fp, "%s\n", item->value.c_str());
+                }
+            }
+            fclose(fp);
+        }
+    });
 }

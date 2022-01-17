@@ -14,6 +14,26 @@ typedef enum{
     Next_Stop, Exit_Stop, No_Stop, Signal_Stop
 }DbgStopReason;
 
+typedef enum{
+    Running = 0, Ready, Break, Finished, Exited, Signaled
+}DbgState;
+
+inline const char *DbgStateToString(DbgState state){
+#define STR(val) case val: return #val
+    switch(state){
+        STR(DbgState::Running);
+        STR(DbgState::Ready);
+        STR(DbgState::Break);
+        STR(DbgState::Finished);
+        STR(DbgState::Exited);
+        STR(DbgState::Signaled);
+        default:{
+            return "DbgState::Unknown";
+        }
+    }
+#undef STR
+}
+
 class DbgPackage{
     public:
     DbgPackage(){}
@@ -47,9 +67,11 @@ struct Dbg;
 /* user calls */
 #define DBG_USER_STOP_POINT(name) void name(DbgStop *stop)
 #define DBG_USER_EXIT(name) void name()
+#define DBG_USER_REPORT_STATE(name) void name(DbgState state)
 
 typedef DBG_USER_STOP_POINT(DbgUserStopPoint);
 typedef DBG_USER_EXIT(DbgUserExit);
+typedef DBG_USER_REPORT_STATE(DbgUserReportState);
 
 /* function pointers for platforms */
 #define DBG_START_WITH(name) bool name(Dbg *dbg, const char *binp, const char *args)
@@ -63,6 +85,7 @@ typedef DBG_USER_EXIT(DbgUserExit);
 #define DBG_WAIT_EVENT(name) bool name(Dbg *dbg, uint ms, DbgStop *stop, char *folder)
 #define DBG_INTERRUPT(name) bool name(Dbg *dbg)
 #define DBG_FINISH(name) bool name(Dbg *dbg)
+
 
 typedef DBG_START_WITH(DbgPlatformStartWith);
 typedef DBG_SET_BKPT(DbgPlatformSetBreakpoint);
@@ -80,6 +103,7 @@ struct Dbg{
     /* User calls */
     DbgUserStopPoint *fnUser_stopPoint;
     DbgUserExit *fnUser_exit;
+    DbgUserReportState *fnUser_reportState;
     /* OS-dependent calls for the actual debugger */
     DbgPlatformStartWith *fn_startWith;
     DbgPlatformSetBreakpoint *fn_setBkpt;
@@ -109,6 +133,7 @@ struct Dbg{
 */
 void Dbg_RegisterStopPoint(DbgUserStopPoint *fn);
 void Dbg_RegisterExit(DbgUserExit *fn);
+void Dbg_RegisterReportState(DbgUserReportState *fn);
 
 /*
 * Load the debugger with a specific binary file to be debugged.

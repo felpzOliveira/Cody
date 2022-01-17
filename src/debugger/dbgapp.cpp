@@ -6,12 +6,13 @@
 #define MODULE_NAME "DBG-APP"
 
 typedef enum{
-    SyncStop=0, SyncExit
+    SyncStop=0, SyncExit, SyncState
 }DbgSyncCode;
 
 struct DbgSyncPackage{
     DbgSyncCode code;
     DbgStop sp;
+    DbgState state;
 };
 
 struct DbgLineBufferPair{
@@ -22,6 +23,8 @@ struct DbgLineBufferPair{
 struct DbgSynchronizer{
     View *targetView;
     LineBuffer *dbgLB;
+    DbgApp_UserStateReport *fn_userReport;
+    void *fn_priv;
     bool is_stopped;
     std::vector<LineBuffer *> loadedLBs;
     std::vector<DbgLineBufferPair> lockedLBs;
@@ -35,9 +38,16 @@ struct DbgSynchronizer{
 DbgSynchronizer dbgSync = {
     .targetView = nullptr,
     .dbgLB = nullptr,
+    .fn_userReport = nullptr,
+    .fn_priv = nullptr,
 };
 void DbgApp_AsyncHandleStopPoint(DbgStop *sp){
     dbgSync.inQ.push({.code = DbgSyncCode::SyncStop, .sp = *sp});
+}
+
+void DbgApp_AsyncHandleState(DbgState state){
+    DbgStop empty;
+    dbgSync.inQ.push({.code = DbgSyncCode::SyncState, .sp = empty, .state = state});
 }
 
 void DbgApp_AsyncHandleExit(){
@@ -277,6 +287,13 @@ static void DbgApp_Terminate(){
     DEBUG_MSG("Called termination\n");
 }
 
+void DbgApp_StateReport(DbgState state){
+    std::cout << "Debugger at " << DbgStateToString(state) << std::endl;
+    if(dbgSync.fn_userReport){
+        dbgSync.fn_userReport(state, dbgSync.fn_priv);
+    }
+}
+
 bool DbgApp_PoolMessages(){
     bool exit = false;
     while(dbgSync.inQ.size() > 0){
@@ -287,6 +304,9 @@ bool DbgApp_PoolMessages(){
             } break;
             case DbgSyncCode::SyncExit: {
                 exit = true;
+            } break;
+            case DbgSyncCode::SyncState: {
+                DbgApp_StateReport(pkg.state);
             } break;
             default: {
                 DEBUG_MSG("Unknown header\n");
@@ -429,6 +449,11 @@ bool DbgApp_IsStopped(){
     return dbgSync.is_stopped;
 }
 
+void DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv){
+    dbgSync.fn_userReport = fn;
+    dbgSync.fn_priv = priv;
+}
+
 /* main entry point for calling the debugger */
 void DbgApp_StartDebugger(const char *binaryPath, const char *args){
     if(Dbg_IsRunning()) {
@@ -448,6 +473,7 @@ void DbgApp_StartDebugger(const char *binaryPath, const char *args){
     // register async callbacks
     Dbg_RegisterStopPoint(DbgApp_AsyncHandleStopPoint);
     Dbg_RegisterExit(DbgApp_AsyncHandleExit);
+    Dbg_RegisterReportState(DbgApp_AsyncHandleState);
     // ...
 
     // inform the rendering API that we will start an event handling

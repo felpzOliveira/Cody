@@ -4,6 +4,7 @@
 #define X11_DISPLAY_H
 
 #include <stdint.h>
+#include <utilities.h>
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
@@ -26,6 +27,17 @@
 #define EXTENSION_SUPPORTED(name) int name(const char *ex)
 #define GET_PROC_ADDRESS(name) void *name(const char *value)
 #define DESTROY_CONTEXT(name) void name(void *window)
+
+// lower 16 bits for masking
+#define EventMaskScroll      (1 << 0)
+#define EventMaskLeftClick   (1 << 1)
+#define EventMaskRightClick  (1 << 2)
+#define EventMaskPress       (1 << 3)
+#define EventMaskRelease     (1 << 4)
+#define EventMaskSizeChange  (1 << 5)
+#define EventMaskFocusChange (1 << 6)
+#define EventMaskMotion      (1 << 7)
+#define EventMaskDoubleClick (1 << 8)
 
 typedef XID GLXWindow;
 typedef XID GLXDrawable;
@@ -99,6 +111,23 @@ typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDclickCallback);
 typedef ON_MOUSE_PRESS_CALLBACK(onMousePressedCallback);
 typedef ON_MOUSE_RELEASE_CALLBACK(onMouseReleasedCallback);
 
+template<typename Fn>
+struct CallbackX11{
+    Fn *fn;
+    void *priv;
+    uint handle;
+};
+
+typedef CallbackX11<onScrollCallback> OnScrollCallback;
+typedef CallbackX11<onMouseLClickCallback> OnMouseLClickCallback;
+typedef CallbackX11<onMouseRClickCallback> OnMouseRClickCallback;
+typedef CallbackX11<onMousePressedCallback> OnMousePressedCallback;
+typedef CallbackX11<onMouseReleasedCallback> OnMouseReleasedCallback;
+typedef CallbackX11<onMouseDclickCallback> OnMouseDclickCallback;
+typedef CallbackX11<onMouseMotionCallback> OnMouseMotionCallback;
+typedef CallbackX11<onSizeChangeCallback> OnSizeChangeCallback;
+typedef CallbackX11<onFocusChangeCallback> OnFocusChangeCallback;
+
 typedef struct WindowX11{
     Colormap colormap;
     Window handle;
@@ -112,20 +141,20 @@ typedef struct WindowX11{
     Time lastClickTime;
     GLXContextInfo glx;
 
-    onScrollCallback *onScrollCall;
-    onMouseLClickCallback *onMouseLClickCall;
-    onMouseRClickCallback *onMouseRClickCall;
-    onMousePressedCallback *onMousePressedCall;
-    onMouseReleasedCallback *onMouseReleasedCall;
-    onMouseDclickCallback *onMouseDClickCall;
-    onMouseMotionCallback *onMouseMotionCall;
-    onSizeChangeCallback *onSizeChangeCall;
-    onFocusChangeCallback *onFocusChangeCall;
-    void *privScroll, *privLClick;
-    void *privDclick, *privMotion;
-    void *privSize, *privFocus;
-    void *privPressed, *privRClick;
-    void *privReleased;
+    /*
+    * Update: Let's allow windows to have multiple callbacks for the same events.
+    * this helps the widget sub-system. The reason this is a List and not a std::vector
+    * is because I want to calloc this and not be bound to C++.
+    */
+    List<OnScrollCallback> onScrollCall;
+    List<OnMouseLClickCallback> onMouseLClickCall;
+    List<OnMouseRClickCallback> onMouseRClickCall;
+    List<OnMousePressedCallback> onMousePressedCall;
+    List<OnMouseReleasedCallback> onMouseReleasedCall;
+    List<OnMouseDclickCallback> onMouseDClickCall;
+    List<OnMouseMotionCallback> onMouseMotionCall;
+    List<OnSizeChangeCallback> onSizeChangeCall;
+    List<OnFocusChangeCallback> onFocusChangeCall;
 }WindowX11;
 
 typedef struct{
@@ -201,14 +230,16 @@ void ClipboardSetStringX11(char *str, unsigned int len);
 
 bool WindowIsHandle(WindowX11 *window, long unsigned int id);
 
-void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv);
-void RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv);
-void RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv);
-void RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv);
-void RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv);
-void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv);
-void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
-void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);
-void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv);
+uint RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv);
+uint RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv);
+uint RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv);
+uint RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv);
+uint RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv);
+uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv);
+uint RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
+uint RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);
+uint RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv);
+
+void UnregisterCallbackByHandle(WindowX11 *window, uint handle);
 
 #endif //X11_DISPLAY_H

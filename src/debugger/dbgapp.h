@@ -9,6 +9,8 @@
 //#define DBG_POOL_INTERVAL 0.008333 // 1 / 120
 #define DBG_POOL_INTERVAL 0.0333 // 1 / 30
 
+#define DBG_REPORT_STATE_CB(name) void name(DbgState state, void *priv)
+typedef DBG_REPORT_STATE_CB(DbgApp_UserStateReport);
 
 /*
 * Handles a debugger stop point. This updates the interface accordingly to
@@ -21,6 +23,11 @@ void DbgApp_AsyncHandleStopPoint(DbgStop *sp);
 * or a user requested exit.
 */
 void DbgApp_AsyncHandleExit(void);
+
+/*
+* Sets the callback to inform editor about debugger state change.
+*/
+void DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv);
 
 /*
 * Perform setup of Dbg and start it with the given binary and arguments.

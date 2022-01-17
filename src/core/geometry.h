@@ -969,7 +969,28 @@ class Geometry{
         extensionY = vec2f(0, 0);
     }
 
+    vec2f Center(){
+        Float x = (Float)lower.x + (Float)upper.x;
+        Float y = (Float)lower.y + (Float)upper.y;
+        return vec2f(x, y) * 0.5;
+    }
+
+    Float Width(){
+        return upper.x - lower.x;
+    }
+
+    Float Height(){
+        return upper.y - lower.y;
+    }
+
     void PrintSelf(){
+        Float w = upper.x - lower.x;
+        Float h = upper.y - lower.y;
+        printf("Lower %u %u, Upper: %u %u, Width = %g, Height = %g\n",
+                lower.x, lower.y, upper.x, upper.y, w, h);
+    }
+
+    void PrintSelf() const{
         Float w = upper.x - lower.x;
         Float h = upper.y - lower.y;
         printf("Lower %u %u, Upper: %u %u, Width = %g, Height = %g\n",

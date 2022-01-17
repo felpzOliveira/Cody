@@ -180,4 +180,19 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit);
 */
 void QueryBar_Free(QueryBar *queryBar);
 
+/*
+* Loads the query bar history detached.
+*/
+void QueryBarHistory_DetachedLoad(QueryBarHistory *qHistory, const char *basePath);
+
+/*
+* Store the query bar history detached.
+*/
+void QueryBarHistory_DetachedStore(QueryBarHistory *qHistory, const char *basePath);
+
+/*
+* Gets the path for the history filename.
+*/
+std::string QueryBarHistory_GetPath();
+
 #endif //QUERY_BAR_H

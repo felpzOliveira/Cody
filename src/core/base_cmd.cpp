@@ -291,7 +291,7 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
 
         if(mathSymbolMap.find(symname) != mathSymbolMap.end()){
             std::string value = mathSymbolMap[symname];
-            AppPasteString(value.c_str(), value.size());
+            AppPasteString(value.c_str(), value.size(), true);
         }
     }
 

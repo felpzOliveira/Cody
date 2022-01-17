@@ -46,6 +46,8 @@ void AppInitialize();
 */
 BufferView *AppGetActiveBufferView();
 
+BindingMap *AppGetFreetypingBinding();
+
 /*
 * Gets tab configuration. Returns the tab spacing and 'using_tab' returns
 * 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
@@ -181,9 +183,12 @@ int AppIsStoredFile(std::string path);
 
 /*
 * Inserts string 'p' with size 'size' in the current active view
-* with the modifier for paste.
+* with the modifier for paste. 'force_view' can be used to directly
+* write to the active linebuffer even if the view is not in a typing
+* state. This is helpfull in case the view is in querybar state and
+* we would like to paste to the view instead of the query bar.
 */
-void AppPasteString(const char *p, uint size);
+void AppPasteString(const char *p, uint size, bool force_view=false);
 
 /*
 * Handles a scroll to a new position. x and y hold the new mouse coordinates

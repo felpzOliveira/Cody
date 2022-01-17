@@ -316,12 +316,17 @@ template<typename T> inline uint List_FetchAsArray(List<T> *list, T **array,
     return s;
 }
 
-template<typename T> inline List<T> *List_Create(){
-    List<T> *list = AllocatorGetN(List<T>, 1);
-    AssertA(list != nullptr, "Failed to get list memory");
+template<typename T> inline void List_Init(List<T> *list){
+    AssertA(list != nullptr, "list is not valid");
     list->size = 0;
     list->head = nullptr;
     list->tail = nullptr;
+}
+
+template<typename T> inline List<T> *List_Create(){
+    List<T> *list = AllocatorGetN(List<T>, 1);
+    AssertA(list != nullptr, "Failed to get list memory");
+    List_Init<T>(list);
     return list;
 }
 
@@ -341,6 +346,31 @@ T *List_Find(List<T> *list, std::function<int(T *)> call){
     return ax ? ax->item : nullptr;
 }
 
+/*
+* For lambdas use this.
+*/
+template<typename T, typename Fn> inline
+void List_ForAllItems(List<T> *list, Fn fn){
+    if(!list) return;
+    ListNode<T> *ax = list->head;
+    while(ax != nullptr){
+        fn(ax->item);
+        ax = ax->next;
+    }
+}
+
+template<typename T, typename Fn> inline
+void List_ForAllItemsInterruptable(List<T> *list, Fn fn){
+    if(!list) return;
+    ListNode<T> *ax = list->head;
+    while(ax != nullptr){
+        if(fn(ax->item) == 0){
+            break;
+        }
+        ax = ax->next;
+    }
+}
+
 template<typename T> inline
 void List_Transverse(List<T> *list, std::function<int(T *)> transverse){
     if(!list) return;
@@ -354,8 +384,8 @@ void List_Transverse(List<T> *list, std::function<int(T *)> transverse){
     }
 }
 
-template<typename T> inline
-void List_Erase(List<T> *list, std::function<int(T *)> finder){
+template<typename T, typename Fn> inline
+void List_Erase(List<T> *list, Fn finder){
     if(!list) return;
     ListNode<T> *ax = list->head;
     int ht = list->head == list->tail ? 1 : 0;
@@ -604,7 +634,7 @@ template<typename T> inline void CircularStack_Push(CircularStack<T> *cstack, T 
     cstack->top = pos;
 }
 
-template<typename T> inline void CircularStack_Size(CircularStack<T> *cstack){
+template<typename T> inline uint CircularStack_Size(CircularStack<T> *cstack){
     return cstack->size;
 }
 

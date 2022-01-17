@@ -3,6 +3,8 @@
 #include <stddef.h>
 
 /*
- * Generates crypto compatible random numbers.
- */
+* Generates crypto compatible random numbers.
+*/
 bool Crypto_SecureRNG(void *buffer, size_t size);
+
+

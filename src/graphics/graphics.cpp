@@ -18,6 +18,7 @@
 #include <parallel.h>
 #include <dbgapp.h>
 #include <widgets.h>
+#include <dbgwidget.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -601,6 +602,13 @@ static void _OpenGLBufferPushVertex(OpenGLBuffer *buffer, Float x, Float y, vec4
     buffer->length ++;
 }
 
+static void _OpenGLInitGlobalWidgets(OpenGLState *state){
+    GlobalWidgets *gw = &state->gWidgets;
+    gw->wwindow = new WidgetWindow(state->window, AppGetFreetypingBinding(),
+                                   vec2f(0), vec2f(state->width, state->height));
+    gw->wdbgBt = new DbgWidgetButtons;
+}
+
 static void _OpenGLStateInitialize(OpenGLState *state){
     int targetWidth = 1600;
     int targetHeight = 900;
@@ -1109,6 +1117,10 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){
     return id;
 }
 
+uint Graphics_FetchTextureFor(OpenGLState *state, std::string name, int *off){
+    return _Graphics_FetchTexture(state, name, off, name);
+}
+
 void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad){
     for(uint i = 0; i < quad->units; i++){
         _Graphics_BindTexture(state, (GlTextureId)i, quad->textureIds[i]);
@@ -1275,29 +1287,26 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
         }
         ViewTree_Next(&iterator);
     }
-
-    SwapBuffersX11(state->window);
     return animating;
 }
 
 void OpenGLEntry(){
     BufferView *bufferView = AppGetActiveBufferView();
     OpenGLState *state = &GlobalGLState;
+    WidgetRenderContext wctx = { .state = state };
 
     _OpenGLStateInitialize(state);
     OpenGLInitialize(state);
     OpenGLFontSetup(state);
 
     _OpenGLUpdateProjections(state, state->width, state->height);
+    _OpenGLInitGlobalWidgets(state);
 
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
-    WidgetRenderContext wctx = {.state = &GlobalGLState};
-
-    state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
-
     _debugger_memory_usage();
+    InitializeDbgButtons(state->gWidgets.wwindow, state->gWidgets.wdbgBt);
 
     while(!WindowShouldCloseX11(state->window)){
         MakeContextX11(state->window);
@@ -1310,8 +1319,13 @@ void OpenGLEntry(){
 
         // render main window
         animating |= OpenGLRenderMainWindow(&wctx);
+        if(state->gWidgets.wwindow->WidgetCount() > 0){
+            animating |= state->gWidgets.wwindow->DispatchRender(&wctx);
+        }
 
-        // render whatever we poped
+        SwapBuffersX11(state->window);
+
+        // render popups and other windows
         for(std::shared_ptr<WidgetWindow> &sww : state->widgetWindows){
             animating |= sww.get()->DispatchRender(&wctx);
         }
@@ -1329,6 +1343,8 @@ void OpenGLEntry(){
     }
 
     state->widgetWindows.clear();
+    delete state->gWidgets.wdbgBt;
+    delete state->gWidgets.wwindow;
 
     DestroyWindowX11(state->window);
     TerminateX11();

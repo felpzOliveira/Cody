@@ -127,7 +127,7 @@ Theme themeGruvboxLight = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xff000000),
     .dbgLinehighlightColor = ColorFromHex(0xFFfbdbb2),
-    .mouseSelectionColor = ColorFromHex(0xFFffcbb2),
+    .mouseSelectionColor = ColorFromHex(0xFFebdbb2),
     .isLight = true,
 };
 

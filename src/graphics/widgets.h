@@ -134,8 +134,12 @@ class WidgetWindow{
     WindowX11 *window; // the main window for the widgets
     BindingMap *mapping; // keyboard event handling
     vec2f resolution; // window resolution
+    vec2f start; // lower point of the rendering window
     std::vector<Widget *> widgetList; // the list of widgets registered
     vec2f mouse; // last user mouse event
+    bool detached; // flag indicating if the window is detached from the main window
+    std::vector<uint> eventHandles; // handles from the window
+    bool is_transp;
 
     // utilities for detecting entered/leave events
     // as well as send typing events to a unique widget
@@ -156,6 +160,39 @@ class WidgetWindow{
     WidgetWindow(int width, int height, const char *name);
 
     /*
+    * Returns the number of registered widgets in this window.
+    */
+    uint WidgetCount(){ return widgetList.size(); }
+
+    /*
+    * Construct the widgetwindow as a wrapper inside another window.
+    * Input entries (i.e.: typing) must be carried out outside. We do however
+    * handle mouse events.
+    */
+    WidgetWindow(WindowX11 *other, BindingMap *bmapping, vec2f lower, vec2f upper);
+
+    /*
+    * Triggers a resize of the widget window and all of its widgets.
+    * Calling this does not change the lower point of the window geometry
+    * only its extension.
+    */
+    void Resize(int width, int height);
+
+    /*
+    * Removes a widget from the widget list being rendered in this window.
+    */
+    void RemoveWidget(Widget *widget){
+        for(auto it = widgetList.begin(); it != widgetList.end(); it++){
+            if(*it == widget){
+                widgetList.erase(it);
+                break;
+            }
+        }
+        if(widget == lastMotion) lastMotion = nullptr;
+        if(widget == lastClicked) lastClicked = nullptr;
+    }
+
+    /*
     * Get the window handler for the widget.
     */
     WindowX11 *GetWindowHandler(){ return window; }
@@ -165,7 +202,7 @@ class WidgetWindow{
     * used for components that wish to not initialize the window during
     * declaration.
     */
-    void Open(int width, int height, const char *name);
+    void Open(int width, int height, const char *name, WindowX11 *other);
 
     /*
     * Get a geometry instance reference that describes this window.
@@ -220,6 +257,7 @@ class Widget{
     vec2f mouse; // last user click event address
     bool selected; // check if the user clicked on the widget, marked by main window
     Transform wTransform; // apply external transform to widget
+    vec2f center; // widget center, cached for better animation
 
     // geometry used as reference for aspect computation, usually parent geometry
     Geometry refGeometry;
@@ -310,6 +348,7 @@ class Widget{
     virtual void OnExited(){ signalExited.Emit(); }
     virtual void OnEntered(){ signalEntered.Emit(); }
     virtual void OnScroll(int is_up){ signalScrolled.Emit(is_up); }
+    virtual void OnMotion(int x, int y){}
 
     /*
     * Base keyboard routines. These routines depend on the widget being active
@@ -328,18 +367,36 @@ class Widget{
     virtual void OnAnimationUpdate(Float dt, Geometry newGeometry, bool willFinish){}
 
     /*
-    * Widgets must be implement a OnRender method that *actually* do rendering.
+    * Widgets must implement the OnRender method that *actually* do rendering.
     * The rendering routine receives a transform that should be used as a Model
     * for rendering the components. This value is given by 'wTransform' and is
-    * given here *again* as an stronger indicator that it should be applied to
-    * all components.
+    * given here *again* as a stronger indicator that it should be applied to
+    * all components either as a global shader matrix or a direct transform on
+    * the coordinates being rendered, i.e.: *do not ignore it*. For base primitives
+    * usually applying Transform::Point(...) is enough to perform the transformation.
     */
     virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) = 0;
 
     /*
     * If the widget has a preferred geometry makes it take it around center.
+    * Some widgets like button can have a size that does not depend on the
+    * parent window, calling this routine instead of 'SetGeometry' should
+    * adjust thge widgets geometry to have that size but within the geometry
+    * specified by 'parentGeo' and 'center'.
     */
-    virtual void PreferredGeometry(vec2f center, Geometry parentGeo){}
+    virtual void PreferredGeometry(vec2f center, Geometry parentGeo){
+        AssertA(0, "Called geometry setting for unsupported widget");
+    }
+
+    /*
+    * Widgets can implement the OnResize method that is able to resize the widget.
+    * This means the parent has change geometry and the widget should also change.
+    * The lower point of parents do not change so you may assume the widget as changed
+    * size because of simple scale around its center point. Default implementation
+    * simply changes the base geometry of the component but if your widget require more
+    * than that... you should re-implement it.
+    */
+    virtual void OnResize(int width, int height);
 };
 
 /* Basic implementation */
@@ -350,6 +407,8 @@ class ButtonWidget : public Widget{
     Float a_fontSize, a_vel; // animation purpose variables
     std::string text; // the text written in the button
     int textureId; // texture in case a icon is to also be displayed
+    vec4f buttonColor; // the color of the text on the button
+    uint borderMask; // mask for rendering border segments
 
     // utilities for preferred dimensions and animations
     static uint kWidth;
@@ -357,6 +416,12 @@ class ButtonWidget : public Widget{
     static Float kScaleUp;
     static Float kScaleDown;
     static Float kScaleDuration;
+
+    static uint kLeftEdgeMask;
+    static uint kRightEdgeMask;
+    static uint kTopEdgeMask;
+    static uint kBottonEdgeMask;
+    static uint kAllEdgesMask;
 
     /*
     * Basic constructors.
@@ -373,6 +438,16 @@ class ButtonWidget : public Widget{
     * Sets the textureId for the button icon.
     */
     void SetTextureId(int id){ textureId = id; }
+
+    /*
+    * Sets the border mask for the rendering of button.
+    */
+    void SetBorder(uint mask){ borderMask = mask; }
+
+    /*
+    * Sets the color of the text on the button.
+    */
+    void SetTextColor(vec4f col){ buttonColor = col; }
 
     /*
     * Update the font size for rendering during animation.
@@ -434,7 +509,7 @@ class ImageTextureWidget : public Widget{
     * Computes and pushes a image texture given by 'textureId' into the accumulation
     * image buffer present in the state 'wctx' considering the size especified in
     * 'geometry'. This routine basically prepare the texture for rendering but does
-    * trigger the render routine with 'Graphics_ImageFlush'. Only caches it.
+    * not trigger the render routine with 'Graphics_ImageFlush'. Only caches it.
     */
     static void PushImageIntoState(WidgetRenderContext *wctx, uint textureId,
                                    Geometry geometry, Transform eTransform);
@@ -611,7 +686,7 @@ class ScrollableWidget final : public Widget{
     */
     virtual void OnClick() override{
         if(widget){
-            widget->SetMouseCoordintes(mouse - motion);
+            widget->SetMouseCoordintes(mouse + motion);
             widget->SetSelected(true);
             widget->OnClick();
         }
@@ -629,7 +704,7 @@ class ScrollableWidget final : public Widget{
         }
     }
 
-    virtual void SetSelected(bool val){
+    virtual void SetSelected(bool val) override{
         if(widget){
             widget->SetSelected(val);
         }
@@ -646,6 +721,17 @@ class ScrollableWidget final : public Widget{
     * Override the rendering routine.
     */
     virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) override;
+
+    /*
+    * Geometry resize override.
+    */
+    virtual void OnResize(int width, int height) override{
+        if(widget){
+            widget->OnResize(width, height);
+        }
+        Widget::OnResize(width, height);
+    }
+
 };
 
 /* Test */

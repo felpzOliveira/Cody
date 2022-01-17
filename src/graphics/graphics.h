@@ -14,6 +14,7 @@
 #include <file_provider.h>
 #include <functional>
 #include <vector>
+#include <memory>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -45,6 +46,7 @@
 
 struct View;
 class WidgetWindow;
+class DbgWidgetButtons;
 
 /*
 * OpenGL rendering system for the editor.
@@ -133,6 +135,12 @@ struct Mouse{
     bool isPressed;
 };
 
+// TODO: Widgets that are global to the editor
+struct GlobalWidgets{
+    WidgetWindow *wwindow;
+    DbgWidgetButtons *wdbgBt;
+};
+
 struct OpenGLState{
     WindowX11 *window;
     RenderProps params;
@@ -153,6 +161,7 @@ struct OpenGLState{
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
     Shader buttonShader;
+    GlobalWidgets gWidgets;
 
     // NOTE: We use shared_ptr here because otherwise we would need cyclic
     // dependencies because the signal for closing a widget goes to a widget
@@ -228,10 +237,11 @@ void OpenGLBufferContextDelete(OpenGLImageQuadBuffer *buffer);
 void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
 
 /*
-* Get the id of a texture for a given file.
+* Get the id of a texture for a given file or given by a string.
 */
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
+uint Graphics_FetchTextureFor(OpenGLState *state, std::string name, int *off);
 
 /*
 * Get all information from a texture given its id.

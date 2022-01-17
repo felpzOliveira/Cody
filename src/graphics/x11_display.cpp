@@ -16,9 +16,50 @@ Timer timer;
 Framebuffer x11Framebuffer;
 ContextGL x11GLContext;
 
-std::vector<WindowX11 *> x11ActiveWindows;
+#define SkipEventNoWindow(window) do{ if(!window) return; }while(0)
 
 void ProcessEventX11(XEvent *event);
+
+static uint Bad_RNG16(){
+    static int brng_inited = 0;
+    if(brng_inited == 0){
+        srand(time(0));
+        brng_inited = 1;
+    }
+    return rand() % 0x0000FFFF;
+}
+
+#define CallbackComparator(hnd, field, wnd, type, val) do{\
+    bool __cc_ok = true;\
+    List_ForAllItemsInterruptable(&(wnd)->field, [&](type *__cc_item) -> int{\
+        if(hnd == __cc_item->handle) __cc_ok = false;\
+        return __cc_ok ? 1 : 0;\
+    });\
+    val = __cc_ok;\
+}while(0)
+
+#define RegisterCallback(wnd, cb, priv, field, type, mask) do{\
+    uint __rc_handle = 0;\
+    bool __rc_generated = false;\
+    do{\
+        __rc_handle = Bad_RNG16() | (mask << 8);\
+        CallbackComparator(__rc_handle, field, wnd, type, __rc_generated);\
+    }while(!__rc_generated);\
+    type __rc_cc = {\
+        .fn = cb,\
+        .priv = priv,\
+        .handle = __rc_handle,\
+    };\
+    List_Push(&(wnd)->field, &__rc_cc);\
+    return __rc_handle;\
+}while(0)
+
+#define UnregisterCallback(wnd, hnd, field, type) do{\
+    auto finder = [&](type *item) -> int{\
+        return (item->handle == hnd ? 1 : 0);\
+    };\
+    List_Erase(&(wnd)->field, finder);\
+}while(0)
 
 size_t encodeUTF8(char* s, unsigned int ch){
     size_t count = 0;
@@ -374,71 +415,125 @@ void SetOpenGLVersionX11(int major, int minor){
     x11GLContext.minor = minor;
 }
 
-void RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv){
-    window->onScrollCall = callback;
-    window->privScroll = priv;
+uint RegisterOnScrollCallback(WindowX11 *window, onScrollCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onScrollCall,
+                     OnScrollCallback, EventMaskScroll);
 }
 
-void RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv){
-    window->onMouseLClickCall = callback;
-    window->privLClick = priv;
+uint RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMouseLClickCall,
+                     OnMouseLClickCallback, EventMaskLeftClick);
 }
 
-void RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv){
-    window->onMouseRClickCall = callback;
-    window->privRClick = priv;
+uint RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMouseRClickCall,
+                     OnMouseRClickCallback, EventMaskRightClick);
 }
 
-void RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv){
-    window->onMousePressedCall = callback;
-    window->privPressed = priv;
+uint RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMousePressedCall,
+                     OnMousePressedCallback, EventMaskPress);
 }
 
-void RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv){
-    window->onMouseReleasedCall = callback;
-    window->privReleased = priv;
+uint RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMouseReleasedCall,
+                     OnMouseReleasedCallback, EventMaskRelease);
 }
 
-void RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv){
-    window->onSizeChangeCall = callback;
-    window->privSize = priv;
+uint RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onSizeChangeCall,
+                     OnSizeChangeCallback, EventMaskSizeChange);
 }
 
-void RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv){
-    window->onFocusChangeCall = callback;
-    window->privFocus = priv;
+uint RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onFocusChangeCall,
+                     OnFocusChangeCallback, EventMaskFocusChange);
 }
 
-void RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv){
-    window->onMouseMotionCall = callback;
-    window->privMotion = priv;
+uint RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMouseMotionCall,
+                     OnMouseMotionCallback, EventMaskMotion);
 }
 
-void RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv){
-    window->onMouseDClickCall = callback;
-    window->privDclick = priv;
+uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv){
+    RegisterCallback(window, callback, priv, onMouseDClickCall,
+                     OnMouseDclickCallback, EventMaskDoubleClick);
+}
+
+void UnregisterCallbackByHandle(WindowX11 *wnd, uint hnd){
+    uint bits = hnd >> 8;
+    switch(bits){
+        case EventMaskScroll:{
+            UnregisterCallback(wnd, hnd, onScrollCall, OnScrollCallback);
+        } break;
+        case EventMaskLeftClick:{
+            UnregisterCallback(wnd, hnd, onMouseLClickCall, OnMouseLClickCallback);
+        } break;
+        case EventMaskRightClick:{
+            UnregisterCallback(wnd, hnd, onMouseRClickCall, OnMouseRClickCallback);
+        } break;
+        case EventMaskPress:{
+            UnregisterCallback(wnd, hnd, onMousePressedCall, OnMousePressedCallback);
+        } break;
+        case EventMaskRelease:{
+            UnregisterCallback(wnd, hnd, onMouseReleasedCall, OnMouseReleasedCallback);
+        } break;
+        case EventMaskSizeChange:{
+            UnregisterCallback(wnd, hnd, onSizeChangeCall, OnSizeChangeCallback);
+        } break;
+        case EventMaskFocusChange:{
+            UnregisterCallback(wnd, hnd, onFocusChangeCall, OnFocusChangeCallback);
+        } break;
+        case EventMaskMotion:{
+            UnregisterCallback(wnd, hnd, onMouseMotionCall, OnMouseMotionCallback);
+        } break;
+        case EventMaskDoubleClick:{
+            UnregisterCallback(wnd, hnd, onMouseDClickCall, OnMouseDclickCallback);
+        } break;
+        default:{
+            printf("Unkown mask value %u\n", bits);
+        }
+    }
+}
+
+static void InitWindowCallbackListX11(WindowX11 *window){
+    List_Init(&window->onScrollCall);
+    List_Init(&window->onMouseLClickCall);
+    List_Init(&window->onMouseRClickCall);
+    List_Init(&window->onMousePressedCall);
+    List_Init(&window->onMouseDClickCall);
+    List_Init(&window->onMouseMotionCall);
+    List_Init(&window->onSizeChangeCall);
+    List_Init(&window->onFocusChangeCall);
+}
+
+static void ClearWindowCallbackListX11(WindowX11 *window){
+    List_Clear(&window->onScrollCall);
+    List_Clear(&window->onMouseLClickCall);
+    List_Clear(&window->onMouseRClickCall);
+    List_Clear(&window->onMousePressedCall);
+    List_Clear(&window->onMouseDClickCall);
+    List_Clear(&window->onMouseMotionCall);
+    List_Clear(&window->onSizeChangeCall);
+    List_Clear(&window->onFocusChangeCall);
 }
 
 WindowX11 *CreateWindowX11Shared(int width, int height,
                                  const char *title, WindowX11 *share)
 {
-    WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
+    WindowX11 *window = AllocatorGetN(WindowX11, 1);
     x11GLContext.share = (void *)share;
     _CreateWindowX11(width, height, title, &x11Framebuffer,
                      &x11GLContext, &x11Helper, window);
-    window->onScrollCall = NULL;
-    x11ActiveWindows.push_back(window);
+    InitWindowCallbackListX11(window);
     return window;
 }
 
 WindowX11 *CreateWindowX11(int width, int height, const char *title){
-    WindowX11 *window = (WindowX11 *)calloc(1, sizeof(WindowX11));
+    WindowX11 *window = AllocatorGetN(WindowX11, 1);
     _CreateWindowX11(width, height, title, &x11Framebuffer,
                      &x11GLContext, &x11Helper, window);
-
-    //TODO: Set callbacks to empty
-    window->onScrollCall = NULL;
-    x11ActiveWindows.push_back(window);
+    InitWindowCallbackListX11(window);
     return window;
 }
 
@@ -459,6 +554,8 @@ void DestroyWindowX11(WindowX11 *window){
 
         XFreeColormap(x11Helper.display, window->colormap);
         XFlush(x11Helper.display);
+
+        ClearWindowCallbackListX11(window);
 
         free(window);
     }
@@ -807,10 +904,12 @@ void PoolEventsX11(){
 }
 
 void ProcessEventReparentX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     window->parent = event->xreparent.parent;
 }
 
 void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     int count = 0;
     int code = event->xkey.keycode;
     KeySym keysym = 0;
@@ -836,6 +935,7 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
 }
 
 void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     int code = event->xkey.keycode;
     int mappedKey = TranslateKeyX11(code);
     KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE,
@@ -843,6 +943,7 @@ void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x
 }
 
 void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     int is_scroll = 0;
     int is_scroll_up = 0;
     switch(event->xbutton.button){
@@ -854,33 +955,32 @@ void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *
             is_scroll = 1;
         } break;
         case Button1:{
-            if(window->onMousePressedCall){
-                window->onMousePressedCall(window->lastCursorPosX,
-                                           window->lastCursorPosY,
-                                           window->privPressed);
-            }
+            List_ForAllItems(&window->onMousePressedCall, [=](OnMousePressedCallback *sc){
+                sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
+            });
         } break;
         default:{ }
     }
 
-    if(is_scroll && window->onScrollCall){
-        window->onScrollCall(is_scroll_up, window->privScroll);
+    if(is_scroll){
+        List_ForAllItems(&window->onScrollCall, [=](OnScrollCallback *sc){
+            sc->fn(is_scroll_up, sc->priv);
+        });
     }
 }
 
 void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     switch(event->xbutton.button){
         case Button1:{
-            if(window->onMouseReleasedCall){
-                // TODO: Should we call this
-                window->onMouseReleasedCall(window->privReleased);
-            }
+            List_ForAllItems(&window->onMouseReleasedCall, [=](OnMouseReleasedCallback *sc){
+                sc->fn(sc->priv);
+            });
 
-            if(window->onMouseLClickCall){
-                window->onMouseLClickCall(window->lastCursorPosX,
-                                          window->lastCursorPosY,
-                                          window->privLClick);
-            }
+            List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseLClickCallback *sc){
+                sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
+            });
+
             // I really hate that I have to do this, because all I wanted
             // was to be happy. But aparently linux does not want me
             // to be happy.
@@ -890,22 +990,18 @@ void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11
             Float dist = (vold - vnew).Length();
 
             if(dif < MOUSE_DCLICK_INTERVAL && dist < MOUSE_DCLICK_DISTANCE){
-                if(window->onMouseDClickCall){
-                    window->onMouseDClickCall(window->lastCursorPosX,
-                                              window->lastCursorPosY,
-                                              window->privDclick);
-                }
+                List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseDclickCallback *sc){
+                    sc->fn(window->lastCursorPosX, window->lastCursorPosY,sc->priv);
+                });
             }
             window->lastClickTime = event->xbutton.time;
             window->xpos = window->lastCursorPosX;
             window->ypos = window->lastCursorPosY;
         } break;
         case Button3: {
-            if(window->onMouseRClickCall){
-                window->onMouseRClickCall(window->lastCursorPosX,
-                                          window->lastCursorPosY,
-                                          window->privRClick);
-            }
+            List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseRClickCallback *sc){
+                sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
+            });
         } break;
         default:{ }
     }
@@ -920,30 +1016,33 @@ void ProcessEventLeaveX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
 }
 
 void ProcessEventMotionX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     int x = event->xmotion.x;
     int y = event->xmotion.y;
     window->lastCursorPosX = x;
     window->lastCursorPosY = y;
-    if(window->onMouseMotionCall){
-        window->onMouseMotionCall(x, y, window->privMotion);
-    }
+    List_ForAllItems(&window->onMouseMotionCall, [=](OnMouseMotionCallback *sc){
+        sc->fn(x, y, sc->priv);
+    });
 }
 
 void ProcessEventConfigureX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
+    SkipEventNoWindow(window);
     if(event->xconfigure.width != window->width ||
        event->xconfigure.height != window->height)
     {
         window->width = event->xconfigure.width;
         window->height = event->xconfigure.height;
 
-        if(window->onSizeChangeCall){
-            window->onSizeChangeCall(window->width, window->height, window->privSize);
-        }
+        List_ForAllItems(&window->onSizeChangeCall, [=](OnSizeChangeCallback *sc){
+            sc->fn(window->width, window->height, sc->priv);
+        });
     }
 }
 
 void ProcessEventClientMessageX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     //TODO: Protocols
+    SkipEventNoWindow(window);
     const Atom protocol = event->xclient.data.l[0];
     if(protocol == x11Helper.WM_DELETE_WINDOW){
         window->shouldClose = 1;
@@ -990,15 +1089,17 @@ bool WindowIsHandle(WindowX11 *window, long unsigned int id){
 }
 
 void ProcessEventFocusInX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    if(window->onFocusChangeCall){
-        window->onFocusChangeCall(true, event->xfocus.window, window->privFocus);
-    }
+    SkipEventNoWindow(window);
+    List_ForAllItems(&window->onFocusChangeCall, [=](OnFocusChangeCallback *sc){
+        sc->fn(true, event->xfocus.window, sc->priv);
+    });
 }
 
 void ProcessEventFocusOutX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
-    if(window->onFocusChangeCall){
-        window->onFocusChangeCall(false, event->xfocus.window, window->privFocus);
-    }
+    SkipEventNoWindow(window);
+    List_ForAllItems(&window->onFocusChangeCall, [=](OnFocusChangeCallback *sc){
+        sc->fn(false, event->xfocus.window, sc->priv);
+    });
 }
 
 void ProcessEventExposeX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
@@ -1018,8 +1119,6 @@ void ProcessEventX11(XEvent *event){
     int filtered = XFilterEvent(event, None);
     XFindContext(x11Helper.display, event->xany.window,
                  x11Helper.context, (XPointer *)&window);
-
-    if(window == nullptr) return;
 
     switch(event->type){
         case ReparentNotify:{

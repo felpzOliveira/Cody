@@ -12,6 +12,7 @@ std::mutex runMutex;
 Dbg dbg = {
     .fnUser_stopPoint = nullptr,
     .fnUser_exit = nullptr,
+    .fnUser_reportState = nullptr,
 };
 
 static void Dbg_LockedSetRun(){
@@ -97,6 +98,9 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
     }
 
     DEBUG_MSG("Successfully initialized\n");
+    if(dbg.fnUser_reportState){
+        dbg.fnUser_reportState(DbgState::Ready);
+    }
 
     while(main_loop_run){
         std::optional<DbgPackage> o_pkg = dbg.packageQ.pop();
@@ -106,15 +110,27 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
             switch(package.code){
                 case DbgCode::Run: {
                     rv = dbg.fn_run(&dbg);
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Running);
+                    }
                 } break;
                 case DbgCode::Continue: {
                     rv = dbg.fn_continue(&dbg);
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Running);
+                    }
                 } break;
                 case DbgCode::Step: {
                     rv = dbg.fn_step(&dbg);
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Running);
+                    }
                 } break;
                 case DbgCode::Next: {
                     rv = dbg.fn_next(&dbg);
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Running);
+                    }
                 } break;
                 case DbgCode::Breakpoint: {
                     rv = Dbg_HandleBreakpoint(&dbg, package.file, package.line);
@@ -122,6 +138,9 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                 } break;
                 case DbgCode::Finish: {
                     rv = dbg.fn_finish(&dbg);
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Running);
+                    }
                 } break;
                 case DbgCode::Interrupt: {
                     rv = dbg.fn_interrupt(&dbg);
@@ -130,6 +149,9 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                     rv = dbg.fn_terminate(&dbg);
                     main_loop_run = false;
                     wait_event = 0;
+                    if(rv && dbg.fnUser_reportState){
+                        dbg.fnUser_reportState(DbgState::Exited);
+                    }
                 } break;
                 default:{
                     printf("[DBG] Unknown package code\n");
@@ -156,6 +178,16 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
 
                 if(dbg.fnUser_stopPoint)
                     dbg.fnUser_stopPoint(&stop);
+
+                if(dbg.fnUser_reportState){
+                    if(stop.reason == Exit_Stop){
+                        dbg.fnUser_reportState(DbgState::Exited);
+                    }else if(stop.reason == Signal_Stop){
+                        dbg.fnUser_reportState(DbgState::Signaled);
+                    }else{
+                        dbg.fnUser_reportState(DbgState::Break);
+                    }
+                }
             }
         }
     }
@@ -189,5 +221,9 @@ void Dbg_RegisterStopPoint(DbgUserStopPoint *fn){
 
 void Dbg_RegisterExit(DbgUserExit *fn){
     dbg.fnUser_exit = fn;
+}
+
+void Dbg_RegisterReportState(DbgUserReportState *fn){
+    dbg.fnUser_reportState = fn;
 }
 
