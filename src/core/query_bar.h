@@ -25,6 +25,7 @@ struct QueryBar;
 struct QueryBarInputFilter{
     int digitOnly;
     int allowFreeType;
+    bool toHistory;
 };
 
 struct QueryBarHistoryItem{
@@ -104,6 +105,12 @@ void QueryBar_MoveLeft(QueryBar *queryBar);
 * Move the cursor right.
 */
 void QueryBar_MoveRight(QueryBar *queryBar);
+
+/*
+* Calls that want its content to be cached to the query bar history
+* must do so manually.
+*/
+void QueryBar_EnableInputToHistory(QueryBar *queryBar);
 
 /*
 * Returns a accessor to the data written into a QueryBar after title

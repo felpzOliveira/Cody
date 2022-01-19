@@ -281,6 +281,11 @@ void QueryBar_SetGeometry(QueryBar *queryBar, Geometry *geometry, Float lineHeig
     queryBar->geometry.extensionY = geometry->extensionY;
 }
 
+void QueryBar_EnableInputToHistory(QueryBar *queryBar){
+    AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    queryBar->filter.toHistory = true;
+}
+
 /*
 * Makes the query bar prepare for a new command. Changes its state and sets/resets
 * title and contents.
@@ -304,6 +309,7 @@ void QueryBar_ActiveCustomFull(QueryBar *queryBar, char *title, uint titlelen,
     queryBar->cancelCallback = cancel;
     queryBar->commitCallback = commit;
     if(filter) queryBar->filter = *filter;
+    queryBar->filter.toHistory = false;
 }
 
 void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
@@ -317,6 +323,7 @@ void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
     queryBar->cancelCallback = cancel;
     queryBar->commitCallback = commit;
     if(filter) queryBar->filter = *filter;
+    queryBar->filter.toHistory = false;
 }
 
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len){
@@ -534,18 +541,23 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
             case QUERY_BAR_CMD_CUSTOM:{
                 if(queryBar->commitCallback){
                     r = queryBar->commitCallback(queryBar, view);
-                    if(r != 0){
+                    if(r != 0 && queryBar->filter.toHistory){
                         QueryBarHistory *qHistory = AppGetQueryBarHistory();
                         char *content = nullptr;
                         uint size = 0;
                         QueryBar_GetWrittenContent(queryBar, &content, &size);
                         if(content && size > 0){
-                            QueryBarHistoryItem item;
-                            std::string path = QueryBarHistory_GetPath();
-
-                            item.value = std::string(content, size);
-                            CircularStack_Push(qHistory->history, &item);
-                            QueryBarHistory_DetachedStore(qHistory, path.c_str());
+                            QueryBarHistoryItem *top =
+                                                CircularStack_At(qHistory->history, 0);
+                            std::string data = std::string(content, size);
+                            if(data != top->value){
+                                std::string path = QueryBarHistory_GetPath();
+                                QueryBarHistoryItem item;
+                                item.value = data;
+                                printf("added %s\n", item.value.c_str());
+                                CircularStack_Push(qHistory->history, &item);
+                                QueryBarHistory_DetachedStore(qHistory, path.c_str());
+                            }
                         }
                     }
                 }
@@ -586,39 +598,34 @@ void QueryBarHistory_LineProcessor(char **p, uint size, uint lineNr, uint at,
 }
 
 void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath){
-    DispatchExecution([&](HostDispatcher *dispatcher){
-        std::string path(basePath);
-        QueryBarHistory *qHistory = history;
-        char *content = nullptr;
-        uint fileSize = 0;
+    std::string path(basePath);
+    QueryBarHistory *qHistory = history;
+    char *content = nullptr;
+    uint fileSize = 0;
 
-        dispatcher->DispatchHost();
-        content = GetFileContents(basePath, &fileSize);
-        if(content && fileSize > 0){
-            Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
-                            0, qHistory, true);
-        }else if(content){
-            AllocatorFree(content);
-        }
-    });
+    content = GetFileContents(basePath, &fileSize);
+    if(content && fileSize > 0){
+        Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
+                        0, qHistory, true);
+    }else if(content){
+        AllocatorFree(content);
+    }
 }
 
-void QueryBarHistory_DetachedStore(QueryBarHistory *history, const char *basePath){
-    DispatchExecution([&](HostDispatcher *dispatcher){
-        std::string path(basePath);
-        QueryBarHistory *qHistory = history;
+void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePath){
+    std::string path(basePath);
+    QueryBarHistory *qHistory = _history;
 
-        dispatcher->DispatchHost();
-        CircularStack<QueryBarHistoryItem> *history = qHistory->history;
-        FILE *fp = fopen(basePath, "w");
-        if(fp){
-            for(uint i = 0; i < CircularStack_Size(history); i++){
-                QueryBarHistoryItem *item = CircularStack_At(history, i);
-                if(item->value.size() > 0){
-                    fprintf(fp, "%s\n", item->value.c_str());
-                }
+    CircularStack<QueryBarHistoryItem> *history = qHistory->history;
+    FILE *fp = fopen(basePath, "w");
+    if(fp){
+        for(uint i = 0; i < CircularStack_Size(history); i++){
+            QueryBarHistoryItem *item = CircularStack_At(history, i);
+            if(item->value.size() > 0){
+                fprintf(fp, "%s\n", item->value.c_str());
+                printf(" Writting %s\n", item->value.c_str());
             }
-            fclose(fp);
         }
-    });
+        fclose(fp);
+    }
 }

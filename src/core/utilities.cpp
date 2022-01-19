@@ -12,6 +12,10 @@
 #include <dirent.h>
 #include <sstream>
 
+uint Bad_RNG16(){
+    return rand() % 0x0000FFFF;
+}
+
 Float ColorClamp(Float val){
     return Clamp(val, 0.0f, 0.9999f);
 }

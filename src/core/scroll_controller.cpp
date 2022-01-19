@@ -4,13 +4,6 @@
 int Animation_Finished(AnimationProps *anim);
 void Animation_FinishCallback(){}
 
-Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue,
-                            Float *velocity);
-
-Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
-                             Float initialValue, Float finalValue);
-
 inline void VScroll_UpdateRelativeDistance(VScroll *ss, uint line, uint maxn){
     ss->cursor.relativeDistance.x = line;
     ss->cursor.relativeDistance.y = maxn > line ? maxn - line : 0;

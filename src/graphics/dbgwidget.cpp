@@ -1,0 +1,429 @@
+#include <dbgwidget.h>
+#include <app.h>
+#include <graphics.h>
+#include <sstream>
+#include <glad/glad.h>
+#include <dbgapp.h>
+
+#define kDelta 0.9
+int pauseState = 0;
+
+void DbgStateReport(DbgState state, void *priv){
+    if(priv){
+        DbgWidgetButtons *wd = (DbgWidgetButtons *)priv;
+        wd->OnStateChange(state);
+    }
+}
+
+void DbgButtonOnStepClicked(Widget *){
+    DbgApp_Step();
+}
+
+void DbgButtonOnNextClicked(Widget *){
+    DbgApp_Next();
+}
+
+void DbgButtonOnFinishClicked(Widget *){
+    DbgApp_Finish();
+}
+
+void DbgButtonOnMainButtonClicked(Widget *widget){
+    ButtonWidget *bt = dynamic_cast<ButtonWidget*>(widget);
+    DbgWidgetButtons *dbgBt = (DbgWidgetButtons *)bt->GetPrivate();
+    if(dbgBt->buttonState == DbgButtonStateRun){
+        DbgApp_Run();
+    }else if(dbgBt->buttonState == DbgButtonStatePause){
+        DbgApp_Interrupt();
+    }else if(dbgBt->buttonState == DbgButtonStateContinue){
+        DbgApp_Continue();
+    }
+}
+
+void DbgButtonOnExitClicked(Widget *){
+    DbgApp_Interrupt();
+    DbgApp_Exit();
+}
+
+// We must consider the expansion animation of the button so we can correctly set its
+// geometry otherwise the button might look weird during transitions.
+
+// X-offset dx:
+// w * scaleUp < 0.25 --- ((x1 - dx) - (x0 + dx)) * scaleUp < 0.25
+// (x1-x0)-2dx < 0.25 * scaleDown --- 2dx > (x1-x0)-0.25*scaleDown
+// dx > ((x1-x0)-0.25 * scaleDown)*0.5;
+// w > 0 -- (x1-dx) - (x0+dx) > 0 -- x1-x0-2dx > 0 -- dx < (x1-x0)*0.5
+
+// Y-offset dy:
+// h * scaleUp < 1 --- (1.0 - 2dy) * scaleUp < 1
+// 1.0 - 2dy < scaleDown --- 2dy > 1.0 - scaleDown
+// dy > (1.0 - scaleDown) * 0.5
+// h > 0 -- (1.0 - 2dy) > 0 -- dy > 0.5
+vec4f DbgWidgetButtons::ComputeGeometryFor(uint n, Float scaleDown, uint count,
+                                           int transitionType)
+{
+    if(transitionType == WIDGET_TRANSITION_SCALE){
+        Float factor = 1.0 / (Float)Max(1, count);
+        Float scaleRatio = (1.0 / scaleDown) / scaleDown + Epsilon;
+        Float x0 = (factor * (Float)n);
+        Float x1 = (factor * (Float)(n+1));
+        // start with a guess based on the size of the button
+        Float dx = (x1 - x0) *(1.0 - kDelta) * 0.5;
+        Float dy = (1.0 - kDelta) * 0.5;
+        // apply clamping based on the previous equations
+        dx = Clamp(dx, (x1-x0-factor*scaleDown) * 0.5+Epsilon, (x1-x0)*0.5-Epsilon);
+        dy = Clamp(dy, (1.0 - scaleDown) * 0.5+Epsilon, 0.5-Epsilon);
+        // compute width
+        Float w = (x1 - dx) - (x0 + dx);
+        // offset considering buttons are centered in parent
+        Float p0 = (1.0 - ((Float)count) * w) * 0.5;
+        // one last consideration is required, the offset for dy.
+        // if not done carefully the widgets animation might overlap
+        // border renders and not show. We can add an ε term or slightly
+        // scale the dy value, I'll scale it.
+        //     ______________ 1.0
+        //     --------------   1.0 - dy
+        //        --------   1.0 - dy - ε
+        //
+        //        --------   dy + ε
+        //     --------------   dy
+        //     _______________ 0
+        dy *= scaleRatio;
+        // return value is (x0, y0, x1, y1) as proportional aspects
+        return vec4f(p0 + n * w, dy, p0 + (n + 1.0) * w, 1.0 - dy);
+    }else if(transitionType == WIDGET_TRANSITION_BACKGROUND){
+        Float factor = 1.0 / (Float)Max(1, count);
+        Float x0 = (factor * (Float)n);
+        Float x1 = (factor * (Float)(n+1));
+        Float w = x1 - x0;
+        Float p0 = (1.0 - ((Float)count) * w) * 0.5;
+        return vec4f(p0 + n * w, 0.0, p0 + (n + 1.0) * w, 1.0);
+    }
+    AssertA(0, "Unknown geometry computation\n");
+    return vec4f();
+}
+
+Geometry DbgWidgetButtons::GetGeometryFor(DbgWidgetButtons *wd, Geometry base, uint n){
+    if(n < DbgButtonCount){
+        return wd->buttons[n].GetGeometry();
+    }
+    return Geometry();
+}
+
+void DbgWidgetButtons::SetMainButtonState(int state){
+    buttonState = state;
+    switch(state){
+        case DbgButtonStateRun:{
+            buttons[DbgRunIndex].SetText("●");
+        } break;
+        case DbgButtonStatePause:{
+            buttons[DbgRunIndex].SetText(std::string());
+        } break;
+        case DbgButtonStateContinue:{
+            buttons[DbgRunIndex].SetText("►");
+        } break;
+        default:{
+            AssertA(0, "Unknown state");
+        }
+    }
+}
+
+void DbgWidgetButtons::OnStateChange(DbgState state){
+    std::cout << "Called" << std::endl;
+    if(state == DbgState::Ready){
+        SetMainButtonState(DbgButtonStateRun);
+        GetButton(DbgStepIndex)->SetEnabled(false);
+        GetButton(DbgFinishIndex)->SetEnabled(false);
+        GetButton(DbgNextIndex)->SetEnabled(false);
+    }else if(state == DbgState::Running){
+        SetMainButtonState(DbgButtonStatePause);
+        GetButton(DbgStepIndex)->SetEnabled(false);
+        GetButton(DbgFinishIndex)->SetEnabled(false);
+        GetButton(DbgNextIndex)->SetEnabled(false);
+    }else if(state == DbgState::Signaled){
+        GetButton(DbgStepIndex)->SetEnabled(true);
+        GetButton(DbgFinishIndex)->SetEnabled(true);
+        GetButton(DbgNextIndex)->SetEnabled(true);
+        SetMainButtonState(DbgButtonStateContinue);
+    }else if(state == DbgState::Break){
+        GetButton(DbgStepIndex)->SetEnabled(true);
+        GetButton(DbgFinishIndex)->SetEnabled(true);
+        GetButton(DbgNextIndex)->SetEnabled(true);
+        SetMainButtonState(DbgButtonStateContinue);
+    }
+
+    GetButton(DbgExitIndex)->SetEnabled(true);
+}
+
+void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY){
+    vec4f p;
+    // set the global geoemtry and buttons geometry
+    Widget::SetGeometry(geo, aspectX, aspectY);
+    // TODO: Manually?
+    lastButton = nullptr;
+    staticButtons.n = 0;
+    animatedButtons.n = 0;
+    vec4f colors[] = {
+        ColorFromHexf(0xff87ffaf),
+        ColorFromHexf(0xffff87af),
+        ColorFromHexf(0xff87afff),
+        ColorFromHexf(0xffffffaf)
+    };
+    uint size = sizeof(colors) / sizeof(colors[0]);
+    for(uint i = 0; i < DbgButtonCount; i++){
+        p = ComputeGeometryFor(i, ButtonWidget::kScaleDown, DbgButtonCount,
+                               buttons[i].transitionStyle.type);
+
+        buttons[i].SetGeometry(geometry, vec2f(p.x, p.z), vec2f(p.y, p.w));
+        switch(i){
+            case DbgExitIndex:{
+                buttons[DbgExitIndex].SetPaintFunction(
+                    [&](WidgetRenderContext *wctx, const Transform &transform,
+                        Geometry geo) -> void
+                {
+                    vec4f cc(1,0.6,0,1);
+                    if(!buttons[DbgExitIndex].IsEnabled()) cc = vec4f(0.5);
+                    uint thick = 2;
+                    WidgetWindow *parent = wctx->window;
+                    OpenGLFont *font = &parent->font;
+                    vec2f upper(geo.upper.x - geo.lower.x, geo.upper.y - geo.lower.y);
+                    upper *= font->fontMath.invReduceScale;
+
+                    Float x0 = 0.375 * upper.x;
+                    Float x1 = 0.625 * upper.x;
+                    vec2f p0 = transform.Point(vec2f(x0, 0.3 * upper.y));
+                    Float d = x1 - x0;
+                    vec2f p1 = transform.Point(vec2f(x1, 0.3 * upper.y + d));
+                    Graphics_QuadPushBorder(&parent->quadBuffer, p0.x, p0.y,
+                                            p1.x, p1.y, thick, cc);
+                    Graphics_QuadFlush(&parent->quadBuffer);
+                });
+            } break;
+            case DbgStepIndex:{
+                buttons[DbgStepIndex].SetText("▼");
+            } break;
+            case DbgNextIndex:{
+                buttons[DbgNextIndex].SetPaintFunction(
+                    [&](WidgetRenderContext *wctx, const Transform &transform,
+                        Geometry geo) -> void
+                {
+                    vec4f cc(1,0.6,0,1);
+                    if(!buttons[DbgNextIndex].IsEnabled()) cc = vec4f(0.5);
+                    Transform model;
+                    OpenGLState *gl = wctx->state;
+                    WidgetWindow *parent = wctx->window;
+                    OpenGLFont *font = &parent->font;
+                    FontMath fMath = font->fontMath;
+                    vec2f upper(geo.upper.x - geo.lower.x, geo.upper.y - geo.lower.y);
+                    upper *= font->fontMath.invReduceScale;
+
+                    // TODO: font size
+                    Graphics_ComputeTransformsForFontSize(font, 19, &model);
+                    Graphics_PrepareTextRendering(font, &gl->projection, &model);
+                    int pGlyph = -1;
+                    std::string text("-►");
+                    vec2f p0 = Graphics_ComputeCenteringStart(font, text.c_str(),
+                                                              text.size(), &geo, true);
+                    p0 = transform.Point(p0);
+                    Graphics_PushText(font, p0.x, p0.y, (char *)text.c_str(),
+                                      text.size(), ColorFromRGBA(cc), &pGlyph);
+                    Graphics_FlushText(font);
+                    font->fontMath = fMath;
+                });
+            } break;
+            case DbgFinishIndex:{
+                buttons[DbgFinishIndex].SetText("▲");
+            } break;
+            case DbgRunIndex:{
+                buttons[DbgRunIndex].SetText("●");
+                buttons[DbgRunIndex].SetPaintFunction(
+                    [&](WidgetRenderContext *wctx, const Transform &transform,
+                        Geometry geo) -> void
+                {
+                    vec4f cc(0,0.6,1,1);
+                    if(buttons[DbgRunIndex].text.size() > 0) return;
+                    WidgetWindow *parent = wctx->window;
+                    OpenGLFont *font = &parent->font;
+                    vec2f upper(geo.upper.x - geo.lower.x, geo.upper.y - geo.lower.y);
+                    upper *= font->fontMath.invReduceScale;
+
+                    vec2f p0 = transform.Point(vec2f(0.4 * upper.x, 0.3 * upper.y));
+                    vec2f p1 = transform.Point(vec2f(0.45 * upper.x, 0.6 * upper.y));
+                    Graphics_QuadPush(&parent->quadBuffer, p0, p1, cc);
+
+                    p0 = transform.Point(vec2f(0.55 * upper.x, 0.3 * upper.y));
+                    p1 = transform.Point(vec2f(0.60 * upper.x, 0.6 * upper.y));
+                    Graphics_QuadPush(&parent->quadBuffer, p0, p1, cc);
+                    Graphics_QuadFlush(&parent->quadBuffer);
+                });
+            } break;
+            default:{
+                buttons[i].SetText("●");
+                //AssertA(0, "Don't know how to render");
+            }
+        }
+
+        //buttons[i].SetBorder(ButtonWidget::kAllEdgesMask);
+        vec4f col = colors[i < size ? i : size-1];
+        buttons[i].SetTextColor(col);
+
+        staticButtons.list[staticButtons.n++] = &buttons[i];
+    }
+}
+
+int DbgWidgetButtons::OnRender(WidgetRenderContext *wctx, const Transform &){
+    int animating = 0;
+    vec4f col(0.2,0.2,0.2,1.0);
+    Float fcol[] = {col.x, col.y, col.z, col.w};
+    glClearBufferfv(GL_COLOR, 0, fcol);
+    for(uint i = 0; i < staticButtons.n; i++){
+        animating |= staticButtons.list[i]->UnprojectedRender(wctx);
+    }
+
+    for(uint i = 0; i < animatedButtons.n; i++){
+        animating |= animatedButtons.list[i]->UnprojectedRender(wctx);
+    }
+    return animating;
+}
+
+void DbgWidgetButtons::OnAnimationUpdate(Float dt, Geometry newGeometry, bool willFinish){
+    for(uint i = 0; i < DbgButtonCount; i++){
+        buttons[i].OnAnimationUpdate(dt, GetGeometryFor(this, newGeometry, i), willFinish);
+    }
+}
+
+void DbgWidgetButtons::OnClick(){
+    for(uint i = 0; i < DbgButtonCount; i++){
+        Geometry geo = GetGeometryFor(this, geometry, i);
+        if(Geometry_IsPointInside(&geo, mouse)){
+            buttons[i].SetMouseCoordintes(mouse);
+            buttons[i].SetSelected(true);
+            buttons[i].OnClick();
+        }else{
+            buttons[i].SetSelected(false);
+        }
+    }
+}
+
+void DbgWidgetButtons::OnExited(){
+    if(lastButton) lastButton->OnExited();
+    lastButton = nullptr;
+}
+
+void DbgWidgetButtons::OnEntered(){
+    OnMotion(mouse.x, mouse.y);
+}
+
+void DbgWidgetButtons::OnMotion(int x, int y){
+    ButtonWidget *curr = nullptr;
+    bool changes = true;
+    vec2f m(x, y);
+    for(uint i = 0; i < DbgButtonCount; i++){
+        Geometry geo = GetGeometryFor(this, geometry, i);
+        if(Geometry_IsPointInside(&geo, m)){
+            curr = &buttons[i];
+            break;
+        }
+    }
+
+    if(curr == nullptr){
+        if(lastButton){
+            lastButton->SetMouseCoordintes(m);
+            lastButton->OnExited();
+            ResetOrders();
+            PushRenderOrder(&animatedButtons, lastButton);
+        }else{
+            changes = false;
+        }
+    }else{
+        if(curr == lastButton){
+            changes = false;
+        }else if(lastButton){
+            lastButton->SetMouseCoordintes(m);
+            lastButton->OnExited();
+            curr->SetMouseCoordintes(m);
+            curr->OnEntered();
+            ResetOrders();
+            PushRenderOrder(&animatedButtons, lastButton);
+            PushRenderOrder(&animatedButtons, curr);
+        }else{
+            curr->SetMouseCoordintes(m);
+            curr->OnEntered();
+            ResetOrders();
+            PushRenderOrder(&animatedButtons, curr);
+        }
+    }
+
+    lastButton = curr;
+    mouse = m;
+    if(changes){
+        for(int i = 0; i < DbgButtonCount; i++){
+            if(!InsideRenderOrder(&animatedButtons, &buttons[i])){
+                PushRenderOrder(&staticButtons, &buttons[i]);
+            }
+        }
+    }
+}
+
+void DbgWidgetButtons::OnResize(int width, int height){
+    Geometry geo;
+    geo.lower = vec2ui(0);
+    geo.upper = vec2ui(width, height);
+    SetGeometry(geo, vec2f(0.85, 1.0), vec2f(0.95, 1.0));
+}
+
+void InitializeDbgButtons(WidgetWindow *window, DbgWidgetButtons *dbgBt){
+    // TODO: these values do not adjust when changing theme
+    vec4f back(0.2,0.2,0.2,1.0);
+    vec4f oback = 1.2 * back;
+    if(CurrentThemeIsLight()){
+        oback = back;
+        back = 1.2 * oback;
+    }
+    TransitionStyle tStyle = {
+        .background = oback,
+        .obackground = back,
+        .scaleUp = 1.0,
+        .type = WIDGET_TRANSITION_BACKGROUND,
+    };
+
+    WidgetStyle style = {
+        .background = back,
+        .valid = true,
+    };
+
+    Float aspectX = ((Float)DbgButtonCount) * 0.1 / 4.0;
+    Float endX = 0.95;
+    for(int i = 0; i < DbgButtonCount; i++){
+        dbgBt->buttons[i].SetPrivate(dbgBt);
+        dbgBt->buttons[i].DisconnectClickedSlots();
+        dbgBt->buttons[i].SetStyle(style);
+        dbgBt->buttons[i].SetAnimateStyle(tStyle);
+    }
+    dbgBt->SetGeometry(window->GetGeometry(), vec2f(endX-aspectX, 1.0), vec2f(endX, 1.0));
+
+    if(dbgBt->handle != 0){
+        DbgApp_UnregisterStateChangeCallback(dbgBt->handle);
+        dbgBt->handle = 0;
+    }
+
+    dbgBt->buttons[DbgRunIndex].SetEnabled(true); // run button starts valid
+    dbgBt->buttons[DbgRunIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnMainButtonClicked));
+
+    dbgBt->buttons[DbgExitIndex].SetEnabled(true); // exit button starts valid
+    dbgBt->buttons[DbgExitIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnExitClicked));
+
+    dbgBt->buttons[DbgStepIndex].SetEnabled(false); // step button starts invalid
+    dbgBt->buttons[DbgStepIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnStepClicked));
+
+    dbgBt->buttons[DbgNextIndex].SetEnabled(false); // next button starts invalid
+    dbgBt->buttons[DbgNextIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnNextClicked));
+
+    dbgBt->buttons[DbgFinishIndex].SetEnabled(false); // finish button starts invalid
+    dbgBt->buttons[DbgFinishIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnFinishClicked));
+
+    dbgBt->handle = DbgApp_RegisterStateChangeCallback(DbgStateReport, dbgBt);
+    if(!window->Contains(dbgBt)){
+        window->PushWidget(dbgBt);
+    }
+    dbgBt->SetMainButtonState(DbgButtonStateRun);
+}

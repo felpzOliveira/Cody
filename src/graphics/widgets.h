@@ -11,7 +11,8 @@
 #include <vector>
 #include <sstream>
 
-#define WIDGET_TRANSITION_SCALE 0
+#define WIDGET_TRANSITION_SCALE      0
+#define WIDGET_TRANSITION_BACKGROUND 1
 
 struct OpenGLState;
 class Widget;
@@ -103,15 +104,21 @@ struct WidgetTransition{
     Float scale;
     Float interval;
     Float dt;
-    vec2f velocity;
-    vec2f startValues;
-    vec2f endValues;
+    CubicFloat2 cFloat;
+    CubicFloat4 cFloat4;
     bool running;
+    vec4f background;
+    bool is_out;
 };
 
 // Overall style for things we can generic render
 struct WidgetStyle{
     vec4f background;
+    bool valid;
+};
+
+struct PaintCallback{
+    std::function<void(WidgetRenderContext *, const Transform &, Geometry)> paintFn;
     bool valid;
 };
 
@@ -139,7 +146,6 @@ class WidgetWindow{
     vec2f mouse; // last user mouse event
     bool detached; // flag indicating if the window is detached from the main window
     std::vector<uint> eventHandles; // handles from the window
-    bool is_transp;
 
     // utilities for detecting entered/leave events
     // as well as send typing events to a unique widget
@@ -179,9 +185,19 @@ class WidgetWindow{
     void Resize(int width, int height);
 
     /*
+    * Checks that a widget is within the window.
+    */
+    bool Contains(Widget *widget){
+        for(Widget *w : widgetList){
+            if(widget == w) return true;
+        }
+        return false;
+    }
+
+    /*
     * Removes a widget from the widget list being rendered in this window.
     */
-    void RemoveWidget(Widget *widget){
+    void Erase(Widget *widget){
         for(auto it = widgetList.begin(); it != widgetList.end(); it++){
             if(*it == widget){
                 widgetList.erase(it);
@@ -246,18 +262,22 @@ class WidgetWindow{
 * for rendering, animating and handling mouse/keyboard events.
 */
 class Widget{
+    private:
+    // enabled flag, disabled widgets do not animate and are non-clickable
+    bool enabled;
     public:
     Geometry geometry; // widget's geometry as a reference to where to find it
     WidgetStyle style; // basic global styles
-    Signal<> signalClicked; // on click signal to be emitted
-    Signal<> signalEntered; // on mouse entered signal to be emitted
-    Signal<> signalExited; // on mouse exited signal to be emitted
-    Signal<int> signalScrolled; // on mouse scroll
+    Signal<Widget *> signalClicked; // on click signal to be emitted
+    Signal<Widget *> signalEntered; // on mouse entered signal to be emitted
+    Signal<Widget *> signalExited; // on mouse exited signal to be emitted
+    Signal<Widget *, int> signalScrolled; // on mouse scroll
     WidgetTransition transition; // used for animation purposes
     vec2f mouse; // last user click event address
     bool selected; // check if the user clicked on the widget, marked by main window
     Transform wTransform; // apply external transform to widget
     vec2f center; // widget center, cached for better animation
+    void *priv; // ok lets see how this goes
 
     // geometry used as reference for aspect computation, usually parent geometry
     Geometry refGeometry;
@@ -266,6 +286,34 @@ class Widget{
     * Basic constructors.
     */
     Widget();
+
+    /*
+    * Sets the enabled flag.
+    */
+    void SetEnabled(bool en){
+        bool oen = enabled;
+        enabled = en;
+        if(oen && !en){
+            OnDisabled();
+        }else if(!oen && en){
+            OnEnabled();
+        }
+    }
+
+    /*
+    * Get the enabled state.
+    */
+    bool IsEnabled(){ return enabled; }
+
+    /*
+    * Sets the private storage for the widget.
+    */
+    void SetPrivate(void *_priv){ priv = _priv; }
+
+    /*
+    * Get the private storage data.
+    */
+    void *GetPrivate(){ return priv; }
 
     /*
     * Sets the selected value for the widget.
@@ -320,6 +368,11 @@ class Widget{
     virtual void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY);
 
     /*
+    * Get the widgets geometry.
+    */
+    Geometry GetGeometry(){ return geometry; }
+
+    /*
     * Main routine to render a widget. This routine adjusts globals for the widget
     * i.e.: style stuff. Sets the viewport for rendering and calls 'OnRender'.
     */
@@ -334,7 +387,12 @@ class Widget{
     /*
     * Register a new slot to be invoked whenever a click event happens.
     */
-    void AddClickedSlot(Slot<> slot);
+    void AddClickedSlot(Slot<Widget *> slot);
+
+    /*
+    * Unregister all slots for the click signal.
+    */
+    void DisconnectClickedSlots();
 
     /*
     * Destructor.
@@ -344,10 +402,10 @@ class Widget{
     /*
     * Base mouse routine that triggers signals only.
     */
-    virtual void OnClick(){ signalClicked.Emit(); }
-    virtual void OnExited(){ signalExited.Emit(); }
-    virtual void OnEntered(){ signalEntered.Emit(); }
-    virtual void OnScroll(int is_up){ signalScrolled.Emit(is_up); }
+    virtual void OnClick(){ if(enabled) signalClicked.Emit(this); }
+    virtual void OnExited(){ signalExited.Emit(this); }
+    virtual void OnEntered(){ signalEntered.Emit(this); }
+    virtual void OnScroll(int is_up){ if(enabled) signalScrolled.Emit(this, is_up); }
     virtual void OnMotion(int x, int y){}
 
     /*
@@ -391,24 +449,40 @@ class Widget{
     /*
     * Widgets can implement the OnResize method that is able to resize the widget.
     * This means the parent has change geometry and the widget should also change.
-    * The lower point of parents do not change so you may assume the widget as changed
-    * size because of simple scale around its center point. Default implementation
-    * simply changes the base geometry of the component but if your widget require more
-    * than that... you should re-implement it.
+    * You may assume the widget changed size because of simple scale around its
+    * center point. Default implementation simply changes the base geometry of the
+    * component but if your widget require more than that... you should re-implement it.
     */
     virtual void OnResize(int width, int height);
+
+    /*
+    * Widgets can implement enabled/disabled callback routine that are called whenever
+    * the widget state changes.
+    */
+    virtual void OnDisabled(){}
+    virtual void OnEnabled(){}
 };
 
 /* Basic implementation */
 
+struct TransitionStyle{
+    vec4f background;
+    vec4f obackground;
+    Float scaleUp;
+    int type;
+};
+
 class ButtonWidget : public Widget{
     public:
     Float baseFontSize; // base font size for the system, copy for animation
-    Float a_fontSize, a_vel; // animation purpose variables
+    CubicFloat a_fontSize; // float interpolator for font size
     std::string text; // the text written in the button
     int textureId; // texture in case a icon is to also be displayed
     vec4f buttonColor; // the color of the text on the button
     uint borderMask; // mask for rendering border segments
+    bool isScaledUp; // flag indicating if we are currently scaled up
+    PaintCallback paint; // allow buttons to have custom paint functions
+    TransitionStyle transitionStyle; // behavior during OnEntered/OnExited
 
     // utilities for preferred dimensions and animations
     static uint kWidth;
@@ -433,6 +507,23 @@ class ButtonWidget : public Widget{
     * Sets the label for this button.
     */
     void SetText(std::string val){ text = val; }
+
+    /*
+    * Sets a manual paint function for the button. Be aware that this routine
+    * will be called *after* other components were rendered, you need to have
+    * no text and no image if you wish to handle all the interior yourself.
+    */
+    void SetPaintFunction(std::function<void(WidgetRenderContext *,
+                                    const Transform &, Geometry)> fn)
+    {
+        paint.paintFn = fn;
+        paint.valid = true;
+    }
+
+    /*
+    * Set behavior during OnEntered/OnExited events.
+    */
+    void SetAnimateStyle(TransitionStyle style){ transitionStyle = style; }
 
     /*
     * Sets the textureId for the button icon.

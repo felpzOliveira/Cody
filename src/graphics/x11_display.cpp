@@ -20,15 +20,6 @@ ContextGL x11GLContext;
 
 void ProcessEventX11(XEvent *event);
 
-static uint Bad_RNG16(){
-    static int brng_inited = 0;
-    if(brng_inited == 0){
-        srand(time(0));
-        brng_inited = 1;
-    }
-    return rand() % 0x0000FFFF;
-}
-
 #define CallbackComparator(hnd, field, wnd, type, val) do{\
     bool __cc_ok = true;\
     List_ForAllItemsInterruptable(&(wnd)->field, [&](type *__cc_item) -> int{\

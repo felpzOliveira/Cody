@@ -35,11 +35,18 @@ Float InterpolateValueCubic(Float dt, Float remaining,
     return *initialValue;
 }
 
-Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
-                             Float initialValue, Float finalValue)
+Float InterpolateValueLinear(Float dt, Float remaining,
+                             Float *initialValue, Float finalValue,
+                             Float *velocity)
 {
-    Float intervalFract = currentInterval / durationInterval;
-    return intervalFract * (finalValue - initialValue) + initialValue;
+    if(dt > remaining){
+        *initialValue = finalValue;
+        return finalValue;
+    }
+
+    *velocity = (finalValue - *initialValue) / remaining;
+    *initialValue = dt * (*velocity) + *initialValue;
+    return *initialValue;
 }
 
 int Animation_Finished(AnimationProps *anim){

@@ -126,6 +126,31 @@ inline int GetConcurrency(){
     return Max(1, (int)std::thread::hardware_concurrency());
 }
 
+/*
+* NOTE: Whenever DispatchHost is called by the parallel routine
+*       the host (who called DispatchExecution) is allowed to continue.
+*       If the routine finishes, make sure the variables are still present
+*       within the body of the function that was dispatched otherwise garbage
+*       may be used instead creating some annoying bugs. For this you might
+*       want to do something like:
+*
+*        void my_parallel_dispatcher(var_type1 var0, var_type2 var1){
+*            DispatchExecution([&](HostDispatcher *dispatcher){
+*                var_type1 local_var0 = var0;
+*                var_type2 local_var1 = var1;
+*                    ...
+*               < can use both var0/1 and local_var0/1 here >
+*                    ...
+*                dispatcher->DispatchHost();
+*                    ...
+*               < using var0/1 here might cause a bug because their storage
+*                 might have been requested again in the stack, use local_var0/1 instead >
+*                    ...
+*            });
+*        }
+*
+*      some examples are: QueryBarHistory_DetachedLoad/Store and LineBuffer_Init.
+*/
 class HostDispatcher{
     public:
     std::mutex *mutex;

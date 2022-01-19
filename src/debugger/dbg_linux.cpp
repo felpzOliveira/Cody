@@ -63,8 +63,8 @@ void fill_stop_reason(mi_stop *sr, DbgStop *stop){
         }
     }
 
-    if(sr->frame){
-        mi_frames *frame = sr->frame;
+    mi_frames *frame = sr->frame;
+    if(sr->frame && frame->file && frame->func){
         stop->file = std::string(frame->file);
         stop->line = frame->line;
         stop->func = std::string(frame->func);
@@ -237,8 +237,8 @@ bool Dbg_LinuxWaitEvent(Dbg *dbg, uint timeout_ms, DbgStop *stop, char *baseFold
                 DEBUG_MSG("Got stack at %d - %s\n", ptr->level, ptr->file);
                 break;
             }
-            ptr = ptr->next;
         }
+        ptr = ptr->next;
     }
 
     mi_free_frames(stack);

@@ -137,10 +137,43 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                     wait_event = 0;
                 } break;
                 case DbgCode::Finish: {
-                    rv = dbg.fn_finish(&dbg);
-                    if(rv && dbg.fnUser_reportState){
-                        dbg.fnUser_reportState(DbgState::Running);
-                    }
+                    /*
+                    * For finish to be more usefull we need to go back to a point
+                    * where we can actually do something, it is possible that a pause
+                    * got us into a very bad point so we need to go back all the way
+                    * to a point where we can show code otherwise we might get some
+                    * frustration.
+                    */
+                    bool done = false;
+                    do{
+                        rv = dbg.fn_finish(&dbg);
+                        if(rv){
+                            DbgStop stop;
+                            rv = dbg.fn_waitEvent(&dbg, wait_timeout_ms, &stop, folder);
+                            if(rv && stop.level == 0){
+                                done = true;
+                                if(stop.file.size() > 0){
+                                    stop.file = ExpandFilePath((char *)stop.file.c_str(),
+                                    stop.file.size(), folder);
+                                    DEBUG_MSG("At %s : %s : %d [ %d ]\n", stop.file.c_str(),
+                                               stop.func.c_str(), stop.line, stop.level);
+                                }
+
+                                if(dbg.fnUser_stopPoint) dbg.fnUser_stopPoint(&stop);
+
+                                if(dbg.fnUser_reportState){
+                                    if(stop.reason == Exit_Stop){
+                                        dbg.fnUser_reportState(DbgState::Exited);
+                                    }else if(stop.reason == Signal_Stop){
+                                        dbg.fnUser_reportState(DbgState::Signaled);
+                                    }else{
+                                        dbg.fnUser_reportState(DbgState::Break);
+                                    }
+                                }
+                            }
+                        }
+                    }while(!done || !rv);
+                    wait_event = 0;
                 } break;
                 case DbgCode::Interrupt: {
                     rv = dbg.fn_interrupt(&dbg);

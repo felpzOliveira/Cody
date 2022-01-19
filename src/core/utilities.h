@@ -256,6 +256,11 @@ int StringToCodepoint(char *u, int size, int *off);
 */
 int ExtensionStringContains(const char *string, const char *extensions);
 
+/*
+* Bad 16 bits random numbers.
+*/
+uint Bad_RNG16();
+
 template<typename Fn>
 inline double MeasureInterval(const Fn &fn){
     clock_t start = clock();

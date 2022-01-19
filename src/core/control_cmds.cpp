@@ -15,16 +15,17 @@ typedef struct ControlCmds{
 static ControlCmds controlCmds;
 
 void ControlCmdsRestoreCurrent();
-
-void ControlCmdsTrigger(){
-    controlCmds.lastMapping = KeyboardGetActiveMapping();
-    KeyboardSetActiveMapping(controlCmds.mapping);
-}
+void FinishEvent();
 
 void ControlCommands_YieldKeyboard(){
     if(controlCmds.lastMapping){
         KeyboardSetActiveMapping(controlCmds.lastMapping);
     }
+}
+
+void ControlCmdsTrigger(){
+    controlCmds.lastMapping = KeyboardGetActiveMapping();
+    KeyboardSetActiveMapping(controlCmds.mapping);
 }
 
 // Capture keys that were not bounded and generated events
@@ -81,6 +82,7 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size, void *){
         ControlCommands_YieldKeyboard();
     }
 
+    FinishEvent();
 }
 
 void ControlCmdsClear(){
@@ -91,11 +93,13 @@ void ControlCmdsClear(){
         ViewTree_Next(&iterator);
     }
     ControlCommands_YieldKeyboard();
+    FinishEvent();
 }
 
 void ControlCmdsRestoreCurrent(){
     if(controlCmds.is_expanded){
         ViewTree_ExpandRestore();
+        FinishEvent();
     }
 }
 
@@ -117,10 +121,38 @@ static void ControlCmdsHandleExpandRestore(int yield=1){
 
 void ControlCmdsExpandCurrent(){
     ControlCmdsHandleExpandRestore(1);
+    FinishEvent();
 }
 
 void ControlCommands_SwapExpand(){
     ControlCmdsHandleExpandRestore(0);
+    FinishEvent();
+}
+
+static double startTime;
+static bool finished = true;
+bool IndicesEvent(){
+    double currTime = GetElapsedTime();
+    //printf("Running %g\n", currTime - startTime);
+    if(currTime - startTime > 2 || finished){
+        if(!finished){
+            ControlCmdsClear();
+        }
+        return false;
+    }
+    return true;
+}
+
+void FinishEvent(){
+    finished = true;
+}
+
+void StartEvent(){
+    Float freq = 1.0 / 30.0;
+    finished = false;
+    startTime = GetElapsedTime();
+    Graphics_AddEventHandler(freq, IndicesEvent);
+    Timing_Update();
 }
 
 void ControlCmdsRenderIndices(){
@@ -138,7 +170,7 @@ void ControlCmdsRenderIndices(){
         ViewTree_Next(&iterator);
     }
 
-    Timing_Update();
+    StartEvent();
 }
 
 void ControlCommands_RestoreExpand(){
@@ -146,6 +178,7 @@ void ControlCommands_RestoreExpand(){
         ViewTree_ExpandRestore();
         controlCmds.is_expanded = 0;
     }
+    FinishEvent();
 }
 
 void ControlCommands_Initialize(){

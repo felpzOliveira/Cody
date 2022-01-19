@@ -13,7 +13,7 @@ Theme themeTerminal = {
     .backgroundLineNumbers = ColorFromHex(0xff2C001e),
     .lineNumberColor = ColorFromHex(0xfffce94f),
     .lineNumberHighlitedColor = ColorFromHex(0xfffce94f),
-    .cursorLineHighlight = ColorFromHex(0xff2e083a),
+    .cursorLineHighlight = ColorFromHex(0xff2e084a),
 
     .operatorColor   = ColorFromHex(0xfffce94f),
     .datatypeColor   = ColorFromHex(0xff87ffaf),
@@ -62,7 +62,7 @@ Theme themeTerminal = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xffffffff),
     .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
-    .mouseSelectionColor = ColorFromHex(0xff2e083a),
+    .mouseSelectionColor = ColorFromHex(0xff2e084a),
     .isLight = false,
 };
 

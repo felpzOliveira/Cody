@@ -260,6 +260,16 @@ void Graphics_QuadPush(OpenGLBuffer *quadB, vec2ui left, vec2ui right, vec4f col
 void *Graphics_GetBaseWindow();
 
 /*
+* Retrieves the handler for the global (main) widget window.
+*/
+WidgetWindow *Graphics_GetBaseWidgetWindow();
+
+/*
+* Retrieves the dbg widget.
+*/
+DbgWidgetButtons *Graphics_GetDbgWidget();
+
+/*
 * Retrieves the global gl context.
 */
 OpenGLState *Graphics_GetGlobalContext();

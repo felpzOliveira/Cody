@@ -25,8 +25,6 @@ typedef enum{
 
 struct ControlProps{
     ControlRenderOpts opts;
-    Float executedPassed;
-    Float executedInterval;
 };
 
 struct FileOpener{

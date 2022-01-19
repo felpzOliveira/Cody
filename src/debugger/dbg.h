@@ -80,6 +80,7 @@ typedef DBG_USER_REPORT_STATE(DbgUserReportState);
 #define DBG_STEP(name) bool name(Dbg *dbg)
 #define DBG_NEXT(name) bool name(Dbg *dbg)
 #define DBG_RUN(name) bool name(Dbg *dbg)
+#define DBG_PAUSE(name) bool name(Dbg *dbg)
 #define DBG_TERMINATE(name) bool name(Dbg *dbg)
 #define DBG_CONTINUE(name) bool name(Dbg *dbg)
 #define DBG_WAIT_EVENT(name) bool name(Dbg *dbg, uint ms, DbgStop *stop, char *folder)
@@ -93,6 +94,7 @@ typedef DBG_ENABLE_BKPT(DbgPlatformEnableBreakpoint);
 typedef DBG_STEP(DbgPlatformStep);
 typedef DBG_NEXT(DbgPlatformNext);
 typedef DBG_RUN(DbgPlatformRun);
+typedef DBG_PAUSE(DbgPlatformPause);
 typedef DBG_WAIT_EVENT(DbgPlatformWaitEvent);
 typedef DBG_CONTINUE(DbgPlatformContinue);
 typedef DBG_TERMINATE(DbgPlatformTerminate);
@@ -111,6 +113,7 @@ struct Dbg{
     DbgPlatformStep *fn_step;
     DbgPlatformNext *fn_next;
     DbgPlatformRun *fn_run;
+    DbgPlatformPause *fn_pause;
     DbgPlatformContinue *fn_continue;
     DbgPlatformWaitEvent *fn_waitEvent;
     DbgPlatformTerminate *fn_terminate;

@@ -307,6 +307,7 @@ Widget::Widget(){
     transition.running = false;
     style.valid = false;
     selected = false;
+    enabled = true;
 }
 Widget::~Widget(){
     signalClicked.DisconnectAll();
@@ -319,16 +320,24 @@ void Widget::InterruptAnimation(){
 
 void Widget::Animate(const WidgetTransition &wtransition){
     if(!transition.running){
+        if(wtransition.type == WIDGET_TRANSITION_BACKGROUND && !style.valid){
+            AssertA(0, "Cannot do background transition without valid style");
+        }
+
         Float w0 = geometry.upper.x - geometry.lower.x;
         Float h0 = geometry.upper.y - geometry.lower.y;
-        transition.scale = Max(Epsilon, wtransition.scale);
-        transition.startValues = vec2f(w0, h0);
-        transition.endValues = vec2f(w0 * transition.scale, h0 * transition.scale);
+        Float scale = Max(Epsilon, wtransition.scale);
+
+        transition.scale = scale;
         transition.type = wtransition.type;
         transition.interval = Max(Epsilon, wtransition.interval);
         transition.dt = 0;
-        transition.velocity = vec2f(0);
         transition.running = true;
+        transition.is_out = wtransition.is_out;
+        transition.cFloat.Begin(vec2f(w0 * scale, h0 * scale), transition.interval);
+        transition.cFloat.Set(vec2f(w0, h0));
+        transition.cFloat4.Begin(wtransition.background, transition.interval);
+        transition.cFloat4.Set(style.background);
         Timing_Update();
     }
 }
@@ -359,22 +368,13 @@ Geometry Widget::AdvanceAnimation(Float dt){
     Geometry geo = geometry;
 
     if(transition.type == WIDGET_TRANSITION_SCALE){
+        vec2f res;
         Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
-        Float wf = transition.endValues.x;
-        Float hf = transition.endValues.y;
-        Float wc = transition.startValues.x;
-        Float hc = transition.startValues.y;
 
-        Float vx = transition.velocity.x;
-        Float vy = transition.velocity.y;
-        Float remaining = transition.interval - transition.dt;
-        Float w = InterpolateValueCubic(dt, remaining, &wc, wf, &vx);
-        Float h = InterpolateValueCubic(dt, remaining, &hc, hf, &vy);
-        Float w02 = w * 0.5;
-        Float h02 = h * 0.5;
+        transition.cFloat.Advance(dt, res);
+        Float w02 = res.x * 0.5;
+        Float h02 = res.y * 0.5;
 
-        transition.velocity = vec2f(vx, vy);
-        transition.startValues = vec2f(w, h);
         x0 = center.x - w02;
         x1 = center.x + w02;
         y0 = center.y - h02;
@@ -382,6 +382,10 @@ Geometry Widget::AdvanceAnimation(Float dt){
 
         geo.lower = vec2ui(x0, y0);
         geo.upper = vec2ui(x1, y1);
+    }else if(transition.type == WIDGET_TRANSITION_BACKGROUND){
+        vec4f background;
+        transition.cFloat4.Advance(dt, background);
+        style.background = background;
     }
     else{
         // not yet supported or a child transition
@@ -407,9 +411,9 @@ int Widget::Render(WidgetRenderContext *wctx){
 
     ActivateViewportAndProjection(wctx->state, &geometry);
     if(style.valid){
-        vec4f col = style.background;
-        Float fcol[] = {col.x, col.y, col.z, col.w};
-        glClearBufferfv(GL_COLOR, 0, fcol);
+        //vec4f col = style.background;
+        //Float fcol[] = {col.x, col.y, col.z, col.w};
+        //glClearBufferfv(GL_COLOR, 0, fcol);
     }
 
     animating |= OnRender(wctx, wTransform);
@@ -425,9 +429,9 @@ int Widget::UnprojectedRender(WidgetRenderContext *wctx){
 
     ActivateViewportAndProjection(wctx->state, &geometry, false);
     if(style.valid){
-        vec4f col = style.background;
-        Float fcol[] = {col.x, col.y, col.z, col.w};
-        glClearBufferfv(GL_COLOR, 0, fcol);
+        //vec4f col = style.background;
+        //Float fcol[] = {col.x, col.y, col.z, col.w};
+        //glClearBufferfv(GL_COLOR, 0, fcol);
     }
 
     animating |= OnRender(wctx, wTransform);
@@ -435,8 +439,12 @@ int Widget::UnprojectedRender(WidgetRenderContext *wctx){
     return animating;
 }
 
-void Widget::AddClickedSlot(Slot<> slot){
+void Widget::AddClickedSlot(Slot<Widget *> slot){
     signalClicked.Connect(slot);
+}
+
+void Widget::DisconnectClickedSlots(){
+    signalClicked.DisconnectAll();
 }
 
 /*********************************/
@@ -444,18 +452,28 @@ void Widget::AddClickedSlot(Slot<> slot){
 /*********************************/
 ButtonWidget::ButtonWidget() : Widget(){
     baseFontSize = Graphics_GetFontSize();
-    a_fontSize = (Float)baseFontSize;
+    a_fontSize.Set((Float)baseFontSize);
     textureId = -1;
     buttonColor.w = -1;
     borderMask = 0;
+    paint.valid = false;
+    isScaledUp = false;
+    transitionStyle.background = style.background;
+    transitionStyle.obackground = style.background;
+    transitionStyle.scaleUp = ButtonWidget::kScaleUp;
+    transitionStyle.type = WIDGET_TRANSITION_SCALE;
 }
 ButtonWidget::ButtonWidget(std::string val) : Widget(){
     SetText(val);
     baseFontSize = Graphics_GetFontSize();
-    a_fontSize = (Float)baseFontSize;
+    a_fontSize.Set((Float)baseFontSize);
     textureId = -1;
     buttonColor.w = -1;
     borderMask = 0;
+    transitionStyle.background = style.background;
+    transitionStyle.obackground = style.background;
+    transitionStyle.scaleUp = ButtonWidget::kScaleUp;
+    transitionStyle.type = WIDGET_TRANSITION_SCALE;
 }
 
 void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
@@ -475,42 +493,52 @@ void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
 }
 
 void ButtonWidget::OnClick(){
-    printf("Clicked button with color %g %g %g\n", style.background.x,
-           style.background.y, style.background.z);
+    //printf("Clicked button with color %g %g %g\n", style.background.x,
+           //style.background.y, style.background.z);
     Widget::OnClick();
 }
 
 void ButtonWidget::OnEntered(){
+    if(!IsEnabled()) return;
     WidgetTransition transition = {
-        .type = WIDGET_TRANSITION_SCALE,
-        .scale = ButtonWidget::kScaleUp,
+        .type = transitionStyle.type,
+        .scale = transitionStyle.scaleUp,
         .interval = ButtonWidget::kScaleDuration,
         .dt = 0,
         .running =  true,
+        .background = transitionStyle.background,
+        .is_out = false,
     };
-
-    a_fontSize = (Float)baseFontSize;
-    a_vel = 0;
 
     Widget::OnEntered();
     Widget::InterruptAnimation();
+    Widget::SetSelected(true);
+
+    a_fontSize.Begin(((Float)baseFontSize) * transition.scale, transition.interval);
+    a_fontSize.Set((Float)baseFontSize);
+    isScaledUp = true;
     Widget::Animate(transition);
 }
 
 void ButtonWidget::OnExited(){
+    if(!isScaledUp) return;
+    Float invScale = 1.0 / transitionStyle.scaleUp;
     WidgetTransition transition = {
-        .type = WIDGET_TRANSITION_SCALE,
-        .scale = ButtonWidget::kScaleDown,
+        .type = transitionStyle.type,
+        .scale = invScale,
         .interval = ButtonWidget::kScaleDuration,
         .dt = 0,
         .running =  true,
+        .background = transitionStyle.obackground,
+        .is_out = true,
     };
-
-    a_fontSize = (Float)baseFontSize;
-    a_vel = 0;
 
     Widget::OnExited();
     Widget::InterruptAnimation();
+
+    a_fontSize.Begin(((Float)baseFontSize) * transition.scale, transition.interval);
+    a_fontSize.Set((Float)baseFontSize);
+    isScaledUp = false;
     Widget::Animate(transition);
 }
 
@@ -520,12 +548,15 @@ void ButtonWidget::OnAnimationUpdate(Float dt, Geometry newGeometry, bool willFi
             // we need to make sure the ending point for the font
             // is *exactly* the scaling term otherwise float point
             // precision could kill the view on chained animation
-            baseFontSize *= transition.scale;
-            a_fontSize = (Float)baseFontSize;
+            Float eValue = 0;
+            a_fontSize.Interrupt(eValue);
+            baseFontSize = eValue;
         }else{
-            Float remaining = transition.interval - transition.dt;
-            Float fontSizeFinal = (Float)baseFontSize * transition.scale;
-            InterpolateValueCubic(dt, remaining, &a_fontSize, fontSizeFinal, &a_vel);
+            a_fontSize.Advance(dt);
+        }
+    }else if(transition.type == WIDGET_TRANSITION_BACKGROUND){
+        if(willFinish && transition.is_out){
+            Widget::SetSelected(false);
         }
     }
 }
@@ -546,15 +577,13 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
 
     ActivateShaderAndProjections(shader, gl);
     vec4f back = DefaultGetUIColorf(UISelectorBackground);
-    Float scale = 1.0;
-    if(!CurrentThemeIsLight()){
-        scale = 1.2;
-        back = Clamp(back * 1.4, vec4f(0), vec4f(1));
+    if(style.valid){
+        back = style.background;
     }
 
     p0 = transform.Point(vec2f(0));
     p1 = transform.Point(vec2f(upper));
-    Graphics_QuadPush(&parent->quadBuffer, p0, p1, back * scale);
+    Graphics_QuadPush(&parent->quadBuffer, p0, p1, back);
 
     // TODO: thickness and color
     uint thick = 2;
@@ -610,7 +639,9 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
     }
 
     if(has_text){
-        Graphics_ComputeTransformsForFontSize(font, a_fontSize, &model);
+        Float fSize = 0;
+        a_fontSize.Get(fSize);
+        Graphics_ComputeTransformsForFontSize(font, fSize, &model);
         Graphics_PrepareTextRendering(font, &gl->projection, &model);
         vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(),
                                                  text.size(), &geometry, true);
@@ -620,6 +651,10 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
         if(buttonColor.w > 0){
             color = ColorFromRGBA(buttonColor);
         }
+
+        if(!IsEnabled()){
+            color = vec4i(128);
+        }
         int pGlyph = -1;
         Graphics_PushText(font, p.x, p.y, (char *)text.c_str(),
                           text.size(), color, &pGlyph);
@@ -628,6 +663,9 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
 
     // restore the font transforms for all other components
     font->fontMath = fMath;
+    if(paint.valid){
+        paint.paintFn(wctx, transform, geometry);
+    }
     return 0;
 }
 

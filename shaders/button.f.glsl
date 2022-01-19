@@ -17,7 +17,7 @@ void main(){
     gl_FragColor = vec4(color, 0.4 - fv);
 #else
     vec3 color = interpolatedColor.rgb;
-    gl_FragColor = vec4(color, 1.0);
+    gl_FragColor = vec4(color, interpolatedColor.a);
 #endif
 }
 

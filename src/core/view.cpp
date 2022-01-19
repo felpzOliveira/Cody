@@ -46,8 +46,6 @@ void View_GetControlRenderOpts(View *view, ControlProps **props){
 
 void View_SetControlOpts(View *view, ControlRenderOpts opts, Float inter){
     view->controlProps.opts = opts;
-    view->controlProps.executedInterval = inter;
-    view->controlProps.executedPassed = 0;
 }
 
 QueryBar *View_GetQueryBar(View *view){

@@ -998,6 +998,189 @@ class Geometry{
     }
 };
 
+
+Float InterpolateValueCubic(Float dt, Float remaining,
+                            Float *initialValue, Float finalValue,
+                            Float *velocity);
+
+Float InterpolateValueLinear(Float dt, Float remaining,
+                             Float *initialValue, Float finalValue,
+                             Float *velocity);
+
+typedef Float(*Interpolator)(Float, Float, Float *, Float, Float *);
+
+template<unsigned int N, typename Packed, Interpolator interpolator>
+class AnimatedVecN{
+    public:
+    Float value[N];
+    Float endValues[N];
+    Float velocity[N];
+    Float duration;
+    Float passed;
+    bool running;
+
+    AnimatedVecN(){
+        Reset();
+    }
+
+    void Reset(){
+        for(unsigned int i = 0; i < N; i++){
+            value[i] = 0;
+            endValues[i] = 0;
+            velocity[i] = 0;
+        }
+        passed = 0;
+        duration = 0;
+        running = false;
+    }
+
+    void Set(Packed data, Packed vel=Packed(0)){
+        for(unsigned int i = 0; i < N; i++){
+            value[i] = data[i];
+            velocity[i] = vel[i];
+        }
+    }
+
+    void Get(Packed &data){
+        for(unsigned int i = 0; i < N; i++){
+            data[i] = value[i];
+        }
+    }
+
+    void Begin(Packed end, Float interval){
+        Reset();
+        for(unsigned int i = 0; i < N; i++){
+            endValues[i] = end[i];
+        }
+        duration = Max(Epsilon, interval);
+        running = true;
+    }
+
+    bool Advance(Float dt){
+        Packed pack;
+        return Advance(dt, pack);
+    }
+
+    bool Advance(Float dt, Packed &packed){
+        Float remaining = duration - passed;
+        for(unsigned int i = 0; i < N; i++){
+            Float start = value[i];
+            Float ending = endValues[i];
+            Float vel = velocity[i];
+            packed[i] = interpolator(dt, remaining, &start, ending, &vel);
+            value[i] = packed[i];
+            velocity[i] = vel;
+        }
+        if(passed + dt > duration){
+            for(unsigned int i = 0; i < N; i++){
+                packed[i] = endValues[i];
+            }
+            running = false;
+        }
+
+        passed += dt;
+        return !running;
+    }
+
+    void Interrupt(){
+        Packed pack;
+        Interrupt(pack);
+    }
+
+    void Interrupt(Packed &packed){
+        for(unsigned int i = 0; i < N; i++){
+            packed[i] = endValues[i];
+        }
+        running = false;
+    }
+
+    bool Finished(){
+        return !running;
+    }
+};
+
+template<Interpolator interpolator>
+class AnimatedFloat{
+    public:
+    Float value;
+    Float endValues;
+    Float velocity;
+    Float duration;
+    Float passed;
+    bool running;
+
+    AnimatedFloat(){
+        Reset();
+    }
+
+    void Reset(){
+        value = endValues = velocity = 0;
+        passed = 0;
+        duration = 0;
+        running = false;
+    }
+
+    void Set(Float data, Float vel=0){
+        value = data;
+        velocity = vel;
+    }
+
+    void Get(Float &data){
+        data = value;
+    }
+
+    void Begin(Float end, Float interval){
+        Reset();
+        endValues = end;
+        duration = Max(Epsilon, interval);
+        running = true;
+    }
+
+    bool Advance(Float dt){
+        Float curr = 0;
+        return Advance(dt, curr);
+    }
+
+    bool Advance(Float dt, Float &packed){
+        Float remaining = duration - passed;
+        Float start = value;
+        Float vel = velocity;
+        packed = interpolator(dt, remaining, &start, endValues, &vel);
+        value = packed;
+        velocity = vel;
+        if(passed + dt > duration){
+            packed = endValues;
+            running = false;
+        }
+
+        passed += dt;
+        return !running;
+    }
+
+    void Interrupt(){
+        Float curr = 0;
+        Interrupt(curr);
+    }
+
+    void Interrupt(Float &packed){
+        packed = endValues;
+        running = false;
+    }
+
+    bool Finished(){
+        return !running;
+    }
+};
+
+typedef AnimatedFloat<InterpolateValueCubic> CubicFloat;
+typedef AnimatedVecN<2, vec2f, InterpolateValueCubic> CubicFloat2;
+typedef AnimatedVecN<3, vec3f, InterpolateValueCubic> CubicFloat3;
+typedef AnimatedVecN<4, vec4f, InterpolateValueCubic> CubicFloat4;
+typedef AnimatedFloat<InterpolateValueLinear> LinearFloat;
+typedef AnimatedVecN<2, vec2f, InterpolateValueLinear> LinearFloat2;
+typedef AnimatedVecN<3, vec3f, InterpolateValueLinear> LinearFloat3;
+typedef AnimatedVecN<4, vec4f, InterpolateValueLinear> LinearFloat4;
+
 /*
 * Checks if a point 'p' is inside 'geometry'.
 */

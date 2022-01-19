@@ -93,14 +93,6 @@ inline const char *ViewTypeString(ViewType type){
     }
 }
 
-Float InterpolateValueCubic(Float dt, Float remaining,
-                            Float *initialValue, Float finalValue,
-                            Float *velocity);
-
-Float InterpolateValueLinear(Float currentInterval, Float durationInterval,
-                             Float initialValue, Float finalValue);
-
-
 /*
 * Initializes a bufferview to represent the contents of the given linebuffer.
 */

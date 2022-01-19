@@ -18,6 +18,8 @@
 #include <gitbase.h>
 #include <gitbuffer.h>
 #include <dbgapp.h>
+#include <widgets.h>
+#include <dbgwidget.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -34,6 +36,7 @@ typedef struct{
     BindingMap *autoCompleteMapping;
     View *activeView;
     int activeId;
+    uint dbgHandle;
 
     char cwd[PATH_MAX];
     Geometry currentGeometry;
@@ -103,7 +106,7 @@ void AppSetCursorFormat(CursorStyle style){
 
 void AppEarlyInitialize(){
     View *view = nullptr;
-
+    srand(time(0));
     // TODO: Configuration file
     // NOTE: Configuration must be done first as tab spacing
     //       needs to be defined before the lexer can correctly mount buffers
@@ -2099,12 +2102,28 @@ void AppCommandOpenFile(){
     }
 }
 
+void DbgSupportStateChange(DbgState state, void *priv){
+    printf("Called %s - %s\n", __func__, DbgStateToString(state));
+    WidgetWindow *ww = Graphics_GetBaseWidgetWindow();
+    DbgWidgetButtons *bt = Graphics_GetDbgWidget();
+    if(state == DbgState::Ready){
+        // the debgger just initialized
+        if(!ww->Contains(bt)){
+            InitializeDbgButtons(ww, bt);
+        }
+    }else if(state == DbgState::Exited){
+        ww->Erase(bt);
+    }
+}
+
 void AppInitialize(){
     KeyboardInitMappings();
     AppInitializeFreeTypingBindings();
     AppInitializeQueryBarBindings();
 
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
+    appContext.dbgHandle =
+            DbgApp_RegisterStateChangeCallback(DbgSupportStateChange, nullptr);
 }
 
 void AppInitializeQueryBarBindings(){

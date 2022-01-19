@@ -7,20 +7,39 @@
 * Implementation of the debugger buttons
 */
 
+#define DbgRunIndex      (0)
+#define DbgStepIndex     (DbgRunIndex+1)
+#define DbgFinishIndex   (DbgStepIndex+1)
+#define DbgNextIndex     (DbgFinishIndex+1)
+#define DbgExitIndex     (DbgNextIndex+1)
+
+#define DbgMaxIndex (DbgExitIndex)
+#define DbgButtonCount (DbgMaxIndex+1)
+
+#define DbgButtonStateNone      -1
+#define DbgButtonStateRun        0
+#define DbgButtonStatePause      1
+#define DbgButtonStateContinue   2
+
+template<unsigned int N>
 struct RenderOrder{
-    ButtonWidget *list[4];
+    ButtonWidget *list[N];
     uint n;
 };
 
 class DbgWidgetButtons : public Widget{
     public:
-    ButtonWidget runButton;
-    ButtonWidget pauseButton;
-    ButtonWidget stepButton;
-    ButtonWidget continueButton;
+    // 0 - run;
+    // 1 - pause;
+    // 2 - continue;
+    // 3 - exit
+    ButtonWidget buttons[DbgButtonCount];
+    bool states[DbgButtonCount];
     ButtonWidget *lastButton;
-    RenderOrder animatedButtons;
-    RenderOrder staticButtons;
+    RenderOrder<DbgButtonCount> animatedButtons;
+    RenderOrder<DbgButtonCount> staticButtons;
+    uint handle = 0;
+    int buttonState = DbgButtonStateNone;
 
     DbgWidgetButtons() = default;
     ~DbgWidgetButtons() = default;
@@ -33,11 +52,17 @@ class DbgWidgetButtons : public Widget{
         staticButtons.n = 0;
     }
 
-    void PushRenderOrder(RenderOrder *order, ButtonWidget *bt){
+    /*
+    * Add a button into a specific render order list.
+    */
+    void PushRenderOrder(RenderOrder<DbgButtonCount> *order, ButtonWidget *bt){
         order->list[order->n++] = bt;
     }
 
-    bool InsideRenderOrder(RenderOrder *order, ButtonWidget *bt){
+    /*
+    * Checks if a button is inside a specific render order list.
+    */
+    bool InsideRenderOrder(RenderOrder<DbgButtonCount> *order, ButtonWidget *bt){
         for(uint i = 0; i < order->n; i++){
             if(bt == order->list[i]) return true;
         }
@@ -45,10 +70,23 @@ class DbgWidgetButtons : public Widget{
     }
 
     /*
+    * Get the handle to a specific button.
+    */
+    ButtonWidget *GetButton(uint index){
+        index = Clamp(index, 0, DbgMaxIndex);
+        return &buttons[index];
+    }
+
+    /*
     * Called whenever the debugger changes states. No action is required it is only
     * a centralized way to coordinate states in rendering.
     */
     void OnStateChange(DbgState state);
+
+    /*
+    * Sets the state of the pause button.
+    */
+    void SetMainButtonState(int state);
 
     /*
     * Override geometry settings.
@@ -79,7 +117,8 @@ class DbgWidgetButtons : public Widget{
     * the global base geometry 'base'.
     */
     static Geometry GetGeometryFor(DbgWidgetButtons *wd, Geometry base, uint n);
-    static vec4f ComputeGeometryFor(uint n, Float scaleDown=ButtonWidget::kScaleDown);
+    static vec4f ComputeGeometryFor(uint n, Float scaleDown=ButtonWidget::kScaleDown,
+                                    uint count=4, int transitionType=WIDGET_TRANSITION_SCALE);
 };
 
 /*

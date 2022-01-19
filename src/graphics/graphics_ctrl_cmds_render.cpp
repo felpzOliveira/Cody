@@ -11,9 +11,7 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
 {
     char line[4];
     ViewTreeIterator iterator;
-    int animating = 0;
     uint len = 0;
-    Float remaining = 0;
     int id = -1;
     OpenGLFont *font = &state->font;
     uint currFontSize = font->fontMath.fontSizeAtDisplay;
@@ -24,11 +22,6 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
     if(view->isActive){
         color = vec4i(0, 100, 255, 255);
     }
-
-    props->executedPassed += dt;
-    remaining = props->executedInterval - props->executedPassed;
-
-    animating = remaining > 0 ? 1 : 0;
 
     // Compute the view tree id, can we please make this faster, I don't like to this
     // tree query at render time
@@ -66,18 +59,7 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
     Graphics_SetFontSize(state, currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 
-    // TODO: Can we do this somewhere else?
-    if(animating == 0){
-        // we need to return 1 here because we need 1 more cycle of
-        // rendering to clear what we just rendered
-        View_SetControlOpts(view, Control_Opts_None);
-        animating = 1;
-
-        // TODO: This should be on a timer callback, however we don't support
-        // that yet and theres the hole threading issue
-        ControlCommands_YieldKeyboard();
-    }
-    return animating;
+    return 1;
 }
 
 int Graphics_RenderControlCommands(View *view, OpenGLState *state,
@@ -86,13 +68,9 @@ int Graphics_RenderControlCommands(View *view, OpenGLState *state,
     ControlProps *props = nullptr;
     View_GetControlRenderOpts(view, &props);
     int animating = 0;
-    auto t = std::time(nullptr);
-    auto tm = *std::localtime(&t);
 
     switch(props->opts){
         case Control_Opts_Indices:{
-            std::cout << "[DEBUG] Rendering ctrl ( " << std::put_time(&tm, "%d-%m-%Y %H-%M-%S")
-               << " )" <<  std::endl;
             animating = Graphics_RenderControlCmdsIndices(view, state, theme, dt, props);
         } break;
 

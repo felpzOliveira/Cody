@@ -25,9 +25,14 @@ void DbgApp_AsyncHandleStopPoint(DbgStop *sp);
 void DbgApp_AsyncHandleExit(void);
 
 /*
-* Sets the callback to inform editor about debugger state change.
+* Register a new callback to be called whenever the debugger change states.
 */
-void DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv);
+uint DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv);
+
+/*
+* Unregister a previously registered callback.
+*/
+void DbgApp_UnregisterStateChangeCallback(uint handle);
 
 /*
 * Perform setup of Dbg and start it with the given binary and arguments.
@@ -55,9 +60,29 @@ void DbgApp_Break(const char *file, uint line);
 void DbgApp_Run();
 
 /*
+* Sends the continue command to the debugger.
+*/
+void DbgApp_Continue();
+
+/*
+* Sends the interrupt command to the debugger.
+*/
+void DbgApp_Interrupt();
+
+/*
 * Sends the function fininsh command to the debugger.
 */
 void DbgApp_Finish();
+
+/*
+* Sends the step command to the debugger.
+*/
+void DbgApp_Step();
+
+/*
+* Sends the next command to the debugger.
+*/
+void DbgApp_Next();
 
 /*
 * Terminates the current session.

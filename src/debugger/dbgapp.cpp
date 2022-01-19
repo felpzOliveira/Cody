@@ -20,12 +20,21 @@ struct DbgLineBufferPair{
     bool state;
 };
 
+struct DbgStateChangeCallback{
+    DbgApp_UserStateReport *fn_userReport;
+    void *fn_priv;
+    uint handle;
+};
+
+struct DbgStateChangeList{
+    std::vector<DbgStateChangeCallback> callbacks;
+};
+
 struct DbgSynchronizer{
     View *targetView;
     LineBuffer *dbgLB;
-    DbgApp_UserStateReport *fn_userReport;
-    void *fn_priv;
     bool is_stopped;
+    DbgStateChangeList stateChangeList;
     std::vector<LineBuffer *> loadedLBs;
     std::vector<DbgLineBufferPair> lockedLBs;
     ConcurrentQueue<DbgSyncPackage> inQ;
@@ -38,15 +47,13 @@ struct DbgSynchronizer{
 DbgSynchronizer dbgSync = {
     .targetView = nullptr,
     .dbgLB = nullptr,
-    .fn_userReport = nullptr,
-    .fn_priv = nullptr,
 };
 void DbgApp_AsyncHandleStopPoint(DbgStop *sp){
     dbgSync.inQ.push({.code = DbgSyncCode::SyncStop, .sp = *sp});
 }
 
 void DbgApp_AsyncHandleState(DbgState state){
-    DbgStop empty;
+    DbgStop empty = {.reason = No_Stop};
     dbgSync.inQ.push({.code = DbgSyncCode::SyncState, .sp = empty, .state = state});
 }
 
@@ -289,8 +296,9 @@ static void DbgApp_Terminate(){
 
 void DbgApp_StateReport(DbgState state){
     std::cout << "Debugger at " << DbgStateToString(state) << std::endl;
-    if(dbgSync.fn_userReport){
-        dbgSync.fn_userReport(state, dbgSync.fn_priv);
+    DbgStateChangeList *list = &dbgSync.stateChangeList;
+    for(DbgStateChangeCallback &cb : list->callbacks){
+        cb.fn_userReport(state, cb.fn_priv);
     }
 }
 
@@ -334,6 +342,11 @@ void DbgApp_DefaultEntry(char *utf8Data, int utf8Size, void *){
 void DbgApp_Run(){
     dbgSync.is_stopped = false;
     Dbg_SendPackage(DbgPackage(DbgCode::Run));
+}
+
+void DbgApp_Interrupt(){
+    dbgSync.is_stopped = false;
+    Dbg_SendPackage(DbgPackage(DbgCode::Interrupt));
 }
 
 void DbgApp_Next(){
@@ -449,9 +462,32 @@ bool DbgApp_IsStopped(){
     return dbgSync.is_stopped;
 }
 
-void DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv){
-    dbgSync.fn_userReport = fn;
-    dbgSync.fn_priv = priv;
+uint DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv){
+    DbgStateChangeList *list = &dbgSync.stateChangeList;
+    uint handle = 0;
+    bool done = false;
+    do{
+        handle = Bad_RNG16();
+        done = true;
+        for(DbgStateChangeCallback &cb : list->callbacks){
+            if(handle == cb.handle){
+                done = false;
+                break;
+            }
+        }
+    }while(!done);
+    list->callbacks.push_back({ .fn_userReport = fn, .fn_priv = priv, .handle = handle });
+    return handle;
+}
+
+void DbgApp_UnregisterStateChangeCallback(uint handle){
+    DbgStateChangeList *list = &dbgSync.stateChangeList;
+    for(auto it = list->callbacks.begin(); it != list->callbacks.end(); it++){
+        if(it->handle == handle){
+            list->callbacks.erase(it);
+            break;
+        }
+    }
 }
 
 /* main entry point for calling the debugger */

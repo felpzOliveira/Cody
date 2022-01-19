@@ -560,6 +560,7 @@ int BaseCommand_DbgFinish(char *cmd, uint size, View *view){
 }
 
 int BaseCommand_DbgExit(char *cmd, uint size, View *view){
+    DbgApp_Interrupt();
     DbgApp_Exit();
     return 1;
 }
@@ -666,6 +667,8 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
             std::string val = it->first;
             char *ptr = (char *)val.c_str();
             if(StringStartsWith(cmd, size, ptr, Min(size, val.size()))){
+                /* commands that are explicitly typed should be added to history */
+                QueryBar_EnableInputToHistory(View_GetQueryBar(view));
                 rv = it->second(cmd, size, view);
                 return rv;
             }

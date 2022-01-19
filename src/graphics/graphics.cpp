@@ -54,6 +54,14 @@ void *Graphics_GetBaseWindow(){
     return (void *)GlobalGLState.window;
 }
 
+WidgetWindow *Graphics_GetBaseWidgetWindow(){
+    return GlobalGLState.gWidgets.wwindow;
+}
+
+DbgWidgetButtons *Graphics_GetDbgWidget(){
+    return GlobalGLState.gWidgets.wdbgBt;
+}
+
 OpenGLState *Graphics_GetGlobalContext(){
     return &GlobalGLState;
 }
@@ -650,6 +658,20 @@ void WindowOnSizeChange(int width, int height, void *){
     _OpenGLUpdateProjections(&GlobalGLState, width, height);
 }
 
+static bool MouseEventFilter(int x, int y){
+    OpenGLState *state = &GlobalGLState;
+    WidgetWindow *ww = state->gWidgets.wwindow;
+    if(ww->WidgetCount() == 0) return false;
+    vec2f m(x, state->height - y);
+    for(Widget *widget : ww->widgetList){
+        Geometry geometry = widget->GetGeometry();
+        if(Geometry_IsPointInside(&geometry, m)){
+            return true;
+        }
+    }
+    return false;
+}
+
 // Mouse motion generates a lot of cpu usage...
 void WinOnMouseMotion(int x, int y, void *){
     GlobalGLState.mouse.position = vec2ui((uint)x, (uint)y);
@@ -657,7 +679,9 @@ void WinOnMouseMotion(int x, int y, void *){
 }
 
 void WindowOnMouseClick(int x, int y, void *){
-    AppHandleMouseClick(x, y, &GlobalGLState);
+    if(!MouseEventFilter(x, y)){
+        AppHandleMouseClick(x, y, &GlobalGLState);
+    }
 }
 
 void WindowOnScroll(int is_up, void *){
@@ -665,12 +689,16 @@ void WindowOnScroll(int is_up, void *){
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
     GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
-    AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
+    if(!MouseEventFilter(x, y)){
+        AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
+    }
 }
 
 void WindowOnPress(int x, int y, void *){
-    GlobalGLState.mouse.isPressed = true;
-    AppHandleMousePress(x, y, &GlobalGLState);
+    if(!MouseEventFilter(x, y)){
+        GlobalGLState.mouse.isPressed = true;
+        AppHandleMousePress(x, y, &GlobalGLState);
+    }
 }
 
 void WinOnFocusChange(bool in, long unsigned int id, void *){
@@ -727,7 +755,7 @@ void OpenGLFontSetup(OpenGLState *state){
 void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
                              Float x1, Float y1, Float w, vec4f col)
 {
-    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(w, y1), col); // left
+    Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(x0+w, y1), col); // left
     Graphics_QuadPush(quadB, vec2ui(x0, y1-w), vec2ui(x1, y1), col); // bottom
     Graphics_QuadPush(quadB, vec2ui(x0, y0), vec2ui(x1, y0+w), col); // top
     Graphics_QuadPush(quadB, vec2ui(x1-w, y0), vec2ui(x1, y1), col); // right
@@ -1169,21 +1197,18 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH){
 }
 
 void UpdateEventsAndHandleRequests(int animating){
-    // if the UI is animating than just pool with uncapped fps
-    if(animating){
+    OpenGLState *state = &GlobalGLState;
+    // check if we are handling custom events outside
+    // the UI that require live update, for these we
+    // can pool but they will overconsume our CPU
+    // so cap at specific interval as they don't really need high fps
+    // but without it we would need to integrate x11 pooling
+    // with concurrent events, yikes...
+    if(state->eventHandlers.size() > 0 || animating){
+        // pool the UI first
         PoolEventsX11();
-    }else{
-        OpenGLState *state = &GlobalGLState;
-        // check if we are handling custom events outside
-        // the UI that require live update, for these we
-        // can pool but they will overconsume our CPU
-        // so cap at specific interval as they don't really need high fps
-        // but without it we would need to integrate x11 pooling
-        // with concurrent events, yikes...
         if(state->eventHandlers.size() > 0){
             bool any_rems = false;
-            // pool the UI first
-            PoolEventsX11();
             // pool the events and update next event interval in case anyone bails out
             std::vector<EventHandler>::iterator it;
             double expected_ival = Infinity;
@@ -1212,11 +1237,11 @@ void UpdateEventsAndHandleRequests(int animating){
             if(any_rems && state->eventHandlers.size() > 0){
                 state->eventInterval = expected_ival;
             }
-        }else{
-            // if we are not handling custom events than simply wait for the
-            // next UI event. This is fine because Cody is UI-driven
-            WaitForEventsX11();
         }
+    }else{
+        // if we are not handling custom events than simply wait for the
+        // next UI event. This is fine because Cody is UI-driven
+        WaitForEventsX11();
     }
 }
 
@@ -1305,8 +1330,8 @@ void OpenGLEntry(){
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
 
-    _debugger_memory_usage();
-    InitializeDbgButtons(state->gWidgets.wwindow, state->gWidgets.wdbgBt);
+    //_debugger_memory_usage();
+    //InitializeDbgButtons(state->gWidgets.wwindow, state->gWidgets.wdbgBt);
 
     while(!WindowShouldCloseX11(state->window)){
         MakeContextX11(state->window);
