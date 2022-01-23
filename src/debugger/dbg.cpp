@@ -9,10 +9,12 @@ void Dbg_Free(Dbg *dbg);
 
 bool is_running = false;
 std::mutex runMutex;
+std::mutex bkptQueryMutex;
 Dbg dbg = {
     .fnUser_stopPoint = nullptr,
     .fnUser_exit = nullptr,
     .fnUser_reportState = nullptr,
+    .fnUser_bkptFeedback = nullptr,
 };
 
 static void Dbg_LockedSetRun(){
@@ -34,14 +36,16 @@ void Dbg_SendPackage(DbgPackage package){
     dbg.packageQ.push(package);
 }
 
-static bool Dbg_HandleBreakpoint(Dbg *dbg, std::string file, int line){
+static bool Dbg_HandleBreakpoint(Dbg *dbg, std::string file, int line, DbgBkpt *bkp){
+    std::lock_guard<std::mutex> guard(bkptQueryMutex);
     bool rv = true;
     std::stringstream ss;
     ss << file << ":" << line;
     std::string key = ss.str();
+    DbgBkpt brk;
 
     if(dbg->brkMap.find(key) != dbg->brkMap.end()){
-        DbgBkpt brk = dbg->brkMap[key];
+        brk = dbg->brkMap[key];
         rv = dbg->fn_enableBkpt(dbg, brk.bkpno, !brk.enabled);
         if(rv){
             brk.enabled = !brk.enabled;
@@ -51,17 +55,28 @@ static bool Dbg_HandleBreakpoint(Dbg *dbg, std::string file, int line){
         int bkpno = -1;
         rv = dbg->fn_setBkpt(dbg, file.c_str(), line, &bkpno);
         if(rv){
-            DbgBkpt brk = {
-                .file = file,
-                .line = line,
-                .bkpno = bkpno,
-                .enabled = true,
-            };
+            brk.file = file;
+            brk.line = line;
+            brk.bkpno = bkpno;
+            brk.enabled = true;
             dbg->brkMap[key] = brk;
         }
     }
 
+    if(bkp){
+        *bkp = brk;
+    }
+
     return rv;
+}
+
+void Dbg_GetBreakpointList(std::vector<DbgBkpt> &bkpts){
+    std::lock_guard<std::mutex> guard(bkptQueryMutex);
+    bkpts.resize(dbg.brkMap.size());
+    int counter = 0;
+    for(auto it = dbg.brkMap.begin(); it != dbg.brkMap.end(); it++){
+        bkpts[counter++] = it->second;
+    }
 }
 
 static void Dbg_Cleanup(Dbg *dbg){
@@ -114,6 +129,15 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                         dbg.fnUser_reportState(DbgState::Running);
                     }
                 } break;
+                case DbgCode::Evaluate: {
+                    char *out = nullptr;
+                    rv = dbg.fn_evalExpression(&dbg, (char *)package.data.c_str(), &out);
+                    if(out){
+                        printf("Got %s\n", out);
+                        free(out);
+                    }
+                    wait_event = 0;
+                } break;
                 case DbgCode::Continue: {
                     rv = dbg.fn_continue(&dbg);
                     if(rv && dbg.fnUser_reportState){
@@ -133,7 +157,15 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                     }
                 } break;
                 case DbgCode::Breakpoint: {
-                    rv = Dbg_HandleBreakpoint(&dbg, package.file, package.line);
+                    DbgBkpt bkpt;
+                    rv = Dbg_HandleBreakpoint(&dbg, package.data, package.line, &bkpt);
+                    if(dbg.fnUser_bkptFeedback){
+                        BreakpointFeedback bkptFed = {
+                            .bkpt = bkpt,
+                            .rv = rv,
+                        };
+                        dbg.fnUser_bkptFeedback(bkptFed);
+                    }
                     wait_event = 0;
                 } break;
                 case DbgCode::Finish: {
@@ -171,8 +203,10 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                                     }
                                 }
                             }
+                        }else{
+                            break;
                         }
-                    }while(!done || !rv);
+                    }while(!done);
                     wait_event = 0;
                 } break;
                 case DbgCode::Interrupt: {
@@ -258,5 +292,9 @@ void Dbg_RegisterExit(DbgUserExit *fn){
 
 void Dbg_RegisterReportState(DbgUserReportState *fn){
     dbg.fnUser_reportState = fn;
+}
+
+void Dbg_RegisterBreakpointFeedback(DbgUserBkptFeedback *fn){
+    dbg.fnUser_bkptFeedback = fn;
 }
 

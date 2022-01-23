@@ -681,7 +681,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
 }
 
 void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *projection,
-                                    Transform *model, Theme *theme)
+                                    Theme *theme)
 {
     BufferView *view = View_GetBufferView(vview);
     if(view->isActive){
@@ -730,6 +730,51 @@ void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *
 
             Graphics_QuadFlush(state);
         }
+    }
+}
+
+static void Graphics_RenderDbgBreaks(OpenGLState *state, View *vview, Transform *projection,
+                                     Float lineSpan, Theme *theme)
+{
+    BufferView *view = View_GetBufferView(vview);
+    LineBuffer *lBuffer = BufferView_GetLineBuffer(view);
+    if(view->isActive && Dbg_IsRunning() && lBuffer){
+        OpenGLFont *font = &state->font;
+        vec2ui visibleLines = BufferView_GetViewRange(view);
+        vec4f col(0.3, 0.3, 0.05, 0.3);
+        vec4i cc(255, 0, 0, 255);
+        const char *dbgChar = "●";
+        int n = strlen(dbgChar);
+        int pGlyph = -1;
+
+        if(CurrentThemeIsLight()){
+            col = GetUIColorf(theme, UICursorLineHighlight);
+            cc = vec4i(200, 0, 0, 255);
+            col.w = 0.3;
+        }
+
+        Graphics_PrepareTextRendering(state, projection, &state->model);
+
+        auto fn = [&](DbgBkpt *bkp) -> void{
+            uint line = (uint)(bkp->line > 0 ? bkp->line-1 : 0);
+            if(bkp->enabled && line >= visibleLines.x && line <= visibleLines.y){
+                pGlyph = -1;
+                vec2f y = Graphics_GetLineYPos(state, visibleLines, line, vview);
+                //Graphics_QuadPushBorder(state, 2.0f, y.x, lineSpan, y.y, 2.0, col);
+                Graphics_QuadPush(state, vec2f(2.0f, y.x), vec2f(lineSpan, y.y), col);
+                Float x = 2.0f;
+                Float yx = y.x;
+                Graphics_PushText(state, x, yx, (char *)dbgChar, n, cc, &pGlyph);
+            }
+        };
+        DbgSupport_ForEachBkpt(LineBuffer_GetStoragePath(lBuffer), fn);
+
+        Graphics_FlushText(state);
+
+        glUseProgram(font->cursorShader.id);
+        Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+        Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+        Graphics_QuadFlush(state);
     }
 }
 
@@ -1151,9 +1196,10 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     if(!Graphics_RenderLineHighlight(state, vview, scaledWidth, &state->projection,
                                      &state->model, theme))
     {
-        Graphics_RenderSpacesHighlight(state, vview, &state->projection,
-                                       &state->model, theme);
+        Graphics_RenderSpacesHighlight(state, vview, &state->projection, theme);
     }
+
+    Graphics_RenderDbgBreaks(state, vview, &state->projection, scaledWidth, theme);
 
     if(!BufferView_IsAnimating(view)){
         Graphics_RenderTextBlock(state, view, baseHeight, &state->projection);

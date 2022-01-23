@@ -446,9 +446,9 @@ uint RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *cal
                      OnMouseMotionCallback, EventMaskMotion);
 }
 
-uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv){
+uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDClickCallback *callback, void *priv){
     RegisterCallback(window, callback, priv, onMouseDClickCall,
-                     OnMouseDclickCallback, EventMaskDoubleClick);
+                     OnMouseDClickCallback, EventMaskDoubleClick);
 }
 
 void UnregisterCallbackByHandle(WindowX11 *wnd, uint hnd){
@@ -479,7 +479,7 @@ void UnregisterCallbackByHandle(WindowX11 *wnd, uint hnd){
             UnregisterCallback(wnd, hnd, onMouseMotionCall, OnMouseMotionCallback);
         } break;
         case EventMaskDoubleClick:{
-            UnregisterCallback(wnd, hnd, onMouseDClickCall, OnMouseDclickCallback);
+            UnregisterCallback(wnd, hnd, onMouseDClickCall, OnMouseDClickCallback);
         } break;
         default:{
             printf("Unkown mask value %u\n", bits);
@@ -981,7 +981,7 @@ void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11
             Float dist = (vold - vnew).Length();
 
             if(dif < MOUSE_DCLICK_INTERVAL && dist < MOUSE_DCLICK_DISTANCE){
-                List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseDclickCallback *sc){
+                List_ForAllItems(&window->onMouseDClickCall, [=](OnMouseDClickCallback *sc){
                     sc->fn(window->lastCursorPosX, window->lastCursorPosY,sc->priv);
                 });
             }
@@ -990,7 +990,7 @@ void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11
             window->ypos = window->lastCursorPosY;
         } break;
         case Button3: {
-            List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseRClickCallback *sc){
+            List_ForAllItems(&window->onMouseRClickCall, [=](OnMouseRClickCallback *sc){
                 sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
             });
         } break;

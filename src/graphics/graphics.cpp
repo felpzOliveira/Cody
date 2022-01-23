@@ -705,6 +705,12 @@ void WinOnFocusChange(bool in, long unsigned int id, void *){
     KeyboardResetState();
 }
 
+void WindowOnDoubleClick(int x, int y, void *){
+    if(!MouseEventFilter(x, y)){
+        AppHandleDoubleClick(x, y, &GlobalGLState);
+    }
+}
+
 int Font_SupportsCodepoint(int codepoint){
     int g = fonsGetGlyphIndex(GlobalGLState.font.fsContext, codepoint);
     return g != 0;
@@ -714,6 +720,7 @@ void RegisterInputs(WindowX11 *window){
     RegisterOnScrollCallback(window, WindowOnScroll, nullptr);
     RegisterOnMouseLeftClickCallback(window, WindowOnMouseClick, nullptr);
     RegisterOnMousePressedCallback(window, WindowOnPress, nullptr);
+    RegisterOnMouseDoubleClickCallback(window, WindowOnDoubleClick, nullptr);
     RegisterOnMouseMotionCallback(window, WinOnMouseMotion, nullptr);
     RegisterOnSizeChangeCallback(window, WindowOnSizeChange, nullptr);
     RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);

@@ -50,7 +50,7 @@ BindingMap *KeyboardGetActiveMapping(void *window){
     return mapping;
 }
 
-inline int KeyboardGetKeyState(Key key){
+int KeyboardGetKeyState(Key key){
     return keyStates[GetKeyID(key)];
 }
 

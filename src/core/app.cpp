@@ -37,6 +37,7 @@ typedef struct{
     View *activeView;
     int activeId;
     uint dbgHandle;
+    uint dbgBkptHandle;
 
     char cwd[PATH_MAX];
     Geometry currentGeometry;
@@ -44,6 +45,7 @@ typedef struct{
     bool hasDelayedCall;
     std::function<void(void)> delayedCall;
     QueryBarHistory queryBarHistory;
+    std::vector<DbgBkpt> dbgBreaks;
 }App;
 
 static App appContext = {
@@ -217,7 +219,12 @@ void AppSetBindingsForState(ViewState state, ViewType type){
         }
     }
 
-    if(type == DbgView){
+    // hmmm, checking for Dbg_IsRunning should be reliable but I wish we
+    // could mark the view as in debug mode ... because doing this will
+    // lock all writes even if it is not *in debug* but again, the only
+    // way to check if a file is under debug is by querying dbg and that
+    // might be way to expensive, so for now let's keep it this way.
+    if(type == DbgView || (type == CodeView && Dbg_IsRunning())){
         DbgApp_TakeKeyboard();
     }
 
@@ -372,6 +379,32 @@ void AppHandleMouseMotion(int x, int y, OpenGLState *state){
         }
     }
 #endif
+}
+
+static void AppPushBreakpoint(){
+    View *view = AppGetActiveView();
+    // for now lets handle debugger stuff
+    if(Dbg_IsRunning()){
+        // the debugger is alive, lets add a breakpoint
+        BufferView *bView = View_GetBufferView(view);
+        LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+        NullRet(lineBuffer);
+        vec2ui cursor = BufferView_GetCursorPosition(bView);
+        uint lineno = cursor.x + 1;
+        printf("breaking at %s:%d\n", LineBuffer_GetStoragePath(lineBuffer), lineno);
+
+        DbgApp_Break(LineBuffer_GetStoragePath(lineBuffer), lineno);
+    }
+}
+
+void AppHandleDoubleClick(int x, int y, OpenGLState *state){
+    /*
+    * Double clicks are interesting. Because we do not filter
+    * out the single click the view has already been activate at
+    * coordinates (x, y) for the single click handler, this means
+    * we don't actually have much work to do here.
+    */
+    AppPushBreakpoint();
 }
 
 void AppHandleMouseClick(int x, int y, OpenGLState *state){
@@ -2028,8 +2061,10 @@ void AppDefaultReturn(){
     ViewState state = View_GetDefaultState();
     View *view = AppGetActiveView();
     if(View_GetState(view) != state){
+        BufferView *bView = View_GetBufferView(view);
+        ViewType type = BufferView_GetViewType(bView);
         View_ReturnToState(view, state);
-        AppSetBindingsForState(state);
+        AppSetBindingsForState(state, type);
     }
 }
 
@@ -2038,7 +2073,9 @@ void AppCommandQueryBarCommit(){
     View *view = AppGetActiveView();
     if(View_GetState(view) != state){
         if(View_CommitToState(view, state) != 0){
-            AppSetBindingsForState(state);
+            BufferView *bView = View_GetBufferView(view);
+            ViewType type = BufferView_GetViewType(bView);
+            AppSetBindingsForState(state, type);
         }
     }
 }
@@ -2058,10 +2095,10 @@ void AppCommandSwitchBuffer(){
         AppSetBindingsForState(View_SelectableList);
 }
 
-void AppCommandOpenFile(){
+void AppCommandOpenFileWithViewType(ViewType type){
     AppRestoreCurrentBufferViewState();
     View *view = AppGetActiveView();
-    auto fileOpen = [](View *view, FileEntry *entry) -> void{
+    auto fileOpen = [=](View *view, FileEntry *entry) -> void{
         char targetPath[PATH_MAX];
         Tokenizer *tokenizer = nullptr;
         LineBuffer *lBuffer = nullptr;
@@ -2090,7 +2127,7 @@ void AppCommandOpenFile(){
             if(len > 0){
                 //printf("Creating file %s\n", content);
                 FileProvider_CreateFile(content, len, &lBuffer, &tokenizer);
-                BufferView_SwapBuffer(bView, lBuffer, CodeView);
+                BufferView_SwapBuffer(bView, lBuffer, type);
             }
         }
     };
@@ -2102,8 +2139,11 @@ void AppCommandOpenFile(){
     }
 }
 
-void DbgSupportStateChange(DbgState state, void *priv){
-    printf("Called %s - %s\n", __func__, DbgStateToString(state));
+void AppCommandOpenFile(){
+    AppCommandOpenFileWithViewType(CodeView);
+}
+
+void DbgSupportStateChange(DbgState state, void *){
     WidgetWindow *ww = Graphics_GetBaseWidgetWindow();
     DbgWidgetButtons *bt = Graphics_GetDbgWidget();
     if(state == DbgState::Ready){
@@ -2116,6 +2156,26 @@ void DbgSupportStateChange(DbgState state, void *priv){
     }
 }
 
+void DbgSupport_ForEachBkpt(std::string path, std::function<void(DbgBkpt *)> callback){
+    for(DbgBkpt &bkpt : appContext.dbgBreaks){
+        if(path == bkpt.file){
+            callback(&bkpt);
+        }
+    }
+}
+
+void DbgSupportBreakpointFeedback(BreakpointFeedback feedback, void *){
+    if(feedback.rv){
+        appContext.dbgBreaks.clear();
+        Dbg_GetBreakpointList(appContext.dbgBreaks);
+        printf("Feedback at %s : %d ( %d ) => total : %d\n", feedback.bkpt.file.c_str(),
+                feedback.bkpt.line, (int)feedback.bkpt.enabled,
+                (int)appContext.dbgBreaks.size());
+    }else{
+        printf("Could not set breakpoint\n");
+    }
+}
+
 void AppInitialize(){
     KeyboardInitMappings();
     AppInitializeFreeTypingBindings();
@@ -2123,7 +2183,9 @@ void AppInitialize(){
 
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
     appContext.dbgHandle =
-            DbgApp_RegisterStateChangeCallback(DbgSupportStateChange, nullptr);
+          DbgApp_RegisterStateChangeCallback(DbgSupportStateChange, nullptr);
+    appContext.dbgBkptHandle =
+          DbgApp_RegisterBreakpointFeedbackCallback(DbgSupportBreakpointFeedback, nullptr);
 }
 
 void AppInitializeQueryBarBindings(){

@@ -9,8 +9,13 @@
 //#define DBG_POOL_INTERVAL 0.008333 // 1 / 120
 #define DBG_POOL_INTERVAL 0.0333 // 1 / 30
 
+// TO_THINK: If these things were std::function we could store lambdas and simplify
+//           calling it. Maybe get rid of function pointers and just use std::function
+//           instead.
 #define DBG_REPORT_STATE_CB(name) void name(DbgState state, void *priv)
+#define DBG_BKPT_FEEDBACK_CB(name) void name(BreakpointFeedback feedback, void *priv)
 typedef DBG_REPORT_STATE_CB(DbgApp_UserStateReport);
+typedef DBG_BKPT_FEEDBACK_CB(DbgApp_UserBkptFeedback);
 
 /*
 * Handles a debugger stop point. This updates the interface accordingly to
@@ -30,9 +35,15 @@ void DbgApp_AsyncHandleExit(void);
 uint DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv);
 
 /*
-* Unregister a previously registered callback.
+* Register a new callback for reporting the state of a breakpoint whenever
+* DbgApp_Break is called.
 */
-void DbgApp_UnregisterStateChangeCallback(uint handle);
+uint DbgApp_RegisterBreakpointFeedbackCallback(DbgApp_UserBkptFeedback *fn, void *priv);
+
+/*
+* Unregister a previously registered callback by its handle.
+*/
+void DbgApp_UnregisterCallbackByHandle(uint handle);
 
 /*
 * Perform setup of Dbg and start it with the given binary and arguments.
@@ -53,6 +64,11 @@ bool DbgApp_IsStopped();
 * Sets a breakpoint.
 */
 void DbgApp_Break(const char *file, uint line);
+
+/*
+* Evaluates an expression on the debugger state.
+*/
+void DbgApp_Eval(char *expression);
 
 /*
 * Sends the run command to the debugger.

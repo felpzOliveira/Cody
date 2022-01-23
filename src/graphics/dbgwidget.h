@@ -29,10 +29,6 @@ struct RenderOrder{
 
 class DbgWidgetButtons : public Widget{
     public:
-    // 0 - run;
-    // 1 - pause;
-    // 2 - continue;
-    // 3 - exit
     ButtonWidget buttons[DbgButtonCount];
     bool states[DbgButtonCount];
     ButtonWidget *lastButton;
@@ -40,6 +36,7 @@ class DbgWidgetButtons : public Widget{
     RenderOrder<DbgButtonCount> staticButtons;
     uint handle = 0;
     int buttonState = DbgButtonStateNone;
+    DbgState globalState;
 
     DbgWidgetButtons() = default;
     ~DbgWidgetButtons() = default;

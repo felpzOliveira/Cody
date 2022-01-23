@@ -7,6 +7,7 @@
 #include <file_buffer.h>
 #include <vector>
 #include <view_tree.h>
+#include <dbgapp.h>
 
 struct BufferView;
 struct Buffer;
@@ -176,6 +177,11 @@ bool AppIsPathFromRoot(std::string path);
 void AppAddStoredFile(std::string basePath);
 
 /*
+* Loop each breakpoint of the debugger that is on the given file path.
+*/
+void DbgSupport_ForEachBkpt(std::string path, std::function<void(DbgBkpt *)> callback);
+
+/*
 * Checks if a path given in relation to the root directory is already
 * present in the stored files list.
 */
@@ -210,6 +216,14 @@ void AppHandleMousePress(int x, int y, OpenGLState *state);
 * list mode, i.e.: listing files, buffers, ...
 */
 void AppHandleMouseClick(int x, int y, OpenGLState *state);
+
+/*
+* Handles the mouse double click event. This handler is mostly for external handlers,
+* i.e.: debugger, popups, ... the app itself does not change states based on it. It
+* is mostly for simplifying actions and not requiring a full typed query bar whenever
+* we can deduce what needs to be done.
+*/
+void AppHandleDoubleClick(int x, int y, OpenGLState *state);
 
 /*
 * Handles the mouse motion event. Receives the current mouse coordinates after motion,
@@ -268,6 +282,7 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
 void AppCommandQueryBarSearchAndReplace();
 void AppCommandQueryBarInteractiveCommand();
 void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view);
+void AppCommandOpenFileWithViewType(ViewType type);
 
 /* Base commands for the query bar */
 void AppCommandQueryBarNext();

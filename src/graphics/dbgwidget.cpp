@@ -128,17 +128,16 @@ void DbgWidgetButtons::SetMainButtonState(int state){
 }
 
 void DbgWidgetButtons::OnStateChange(DbgState state){
-    std::cout << "Called" << std::endl;
     if(state == DbgState::Ready){
+        GetButton(DbgStepIndex)->SetEnabled(false);
+        GetButton(DbgFinishIndex)->SetEnabled(false);
+        GetButton(DbgNextIndex)->SetEnabled(false);
         SetMainButtonState(DbgButtonStateRun);
-        GetButton(DbgStepIndex)->SetEnabled(false);
-        GetButton(DbgFinishIndex)->SetEnabled(false);
-        GetButton(DbgNextIndex)->SetEnabled(false);
     }else if(state == DbgState::Running){
-        SetMainButtonState(DbgButtonStatePause);
         GetButton(DbgStepIndex)->SetEnabled(false);
         GetButton(DbgFinishIndex)->SetEnabled(false);
         GetButton(DbgNextIndex)->SetEnabled(false);
+        SetMainButtonState(DbgButtonStatePause);
     }else if(state == DbgState::Signaled){
         GetButton(DbgStepIndex)->SetEnabled(true);
         GetButton(DbgFinishIndex)->SetEnabled(true);
@@ -152,6 +151,7 @@ void DbgWidgetButtons::OnStateChange(DbgState state){
     }
 
     GetButton(DbgExitIndex)->SetEnabled(true);
+    globalState = state;
 }
 
 void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY){
@@ -164,9 +164,9 @@ void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f asp
     animatedButtons.n = 0;
     vec4f colors[] = {
         ColorFromHexf(0xff87ffaf),
-        ColorFromHexf(0xffff87af),
         ColorFromHexf(0xff87afff),
-        ColorFromHexf(0xffffffaf)
+        ColorFromHexf(0xff87afff),
+        ColorFromHexf(0xff87afff),
     };
     uint size = sizeof(colors) / sizeof(colors[0]);
     for(uint i = 0; i < DbgButtonCount; i++){
@@ -206,7 +206,7 @@ void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f asp
                     [&](WidgetRenderContext *wctx, const Transform &transform,
                         Geometry geo) -> void
                 {
-                    vec4f cc(1,0.6,0,1);
+                    vec4f cc = ColorFromHexf(0xff87afff);
                     if(!buttons[DbgNextIndex].IsEnabled()) cc = vec4f(0.5);
                     Transform model;
                     OpenGLState *gl = wctx->state;
@@ -268,6 +268,7 @@ void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f asp
 
         staticButtons.list[staticButtons.n++] = &buttons[i];
     }
+    OnStateChange(globalState);
 }
 
 int DbgWidgetButtons::OnRender(WidgetRenderContext *wctx, const Transform &){
@@ -402,10 +403,11 @@ void InitializeDbgButtons(WidgetWindow *window, DbgWidgetButtons *dbgBt){
     dbgBt->SetGeometry(window->GetGeometry(), vec2f(endX-aspectX, 1.0), vec2f(endX, 1.0));
 
     if(dbgBt->handle != 0){
-        DbgApp_UnregisterStateChangeCallback(dbgBt->handle);
+        DbgApp_UnregisterCallbackByHandle(dbgBt->handle);
         dbgBt->handle = 0;
     }
 
+    dbgBt->globalState = DbgState::Ready;
     dbgBt->buttons[DbgRunIndex].SetEnabled(true); // run button starts valid
     dbgBt->buttons[DbgRunIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnMainButtonClicked));
 

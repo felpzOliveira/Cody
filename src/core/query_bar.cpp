@@ -136,6 +136,7 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
     uint lastp = queryBar->cursor.textPosition.y - queryBar->writePosU8;
     queryBar->searchCmd.valid = 0;
     queryBar->filter.digitOnly = 0;
+    queryBar->filter.toHistory = false;
     queryBar->entryCallback = nullptr;
     queryBar->cancelCallback = nullptr;
     queryBar->commitCallback = nullptr;
@@ -255,6 +256,7 @@ void QueryBar_Initialize(QueryBar *queryBar){
     replace->toLocateLen = 0;
     replace->toReplaceLen = 0;
     replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
+    queryBar->filter.toHistory = false;
     Buffer_Init(&queryBar->buffer, DefaultAllocatorSize);
 }
 
@@ -554,7 +556,6 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                                 std::string path = QueryBarHistory_GetPath();
                                 QueryBarHistoryItem item;
                                 item.value = data;
-                                printf("added %s\n", item.value.c_str());
                                 CircularStack_Push(qHistory->history, &item);
                                 QueryBarHistory_DetachedStore(qHistory, path.c_str());
                             }

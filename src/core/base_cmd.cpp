@@ -28,6 +28,7 @@
 #define CMD_DBG_EXIT_STR "dbg exit"
 #define CMD_DBG_RUN_STR "dbg run"
 #define CMD_DBG_FINISH_STR "dbg finish"
+#define CMD_DBG_EVALUATE_STR "dbg eval "
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
@@ -554,6 +555,20 @@ int BaseCommand_DbgBreak(char *cmd, uint size, View *view){
     return r;
 }
 
+int BaseCommand_DbgEvaluate(char *cmd, uint size, View *view){
+    int r = 1;
+    std::string arg;
+    std::vector<std::string> splits;
+    StringSplit(std::string(cmd), splits);
+    for(uint i = 2; i < splits.size(); i++){
+        arg += std::string(splits[i]);
+        if(i < splits.size() - 1) arg += " ";
+    }
+
+    DbgApp_Eval((char *)arg.c_str());
+    return r;
+}
+
 int BaseCommand_DbgFinish(char *cmd, uint size, View *view){
     DbgApp_Finish();
     return 1;
@@ -648,6 +663,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DBG_EXIT_STR] = BaseCommand_DbgExit;
     cmdMap[CMD_DBG_RUN_STR] = BaseCommand_DbgRun;
     cmdMap[CMD_DBG_FINISH_STR] = BaseCommand_DbgFinish;
+    cmdMap[CMD_DBG_EVALUATE_STR] = BaseCommand_DbgEvaluate;
     cmdMap[CMD_CURSORSEG_STR] = BaseCommand_CursorSegmentToogle;
     cmdMap[CMD_CURSORSET_STR] = BaseCommand_CursorSetFormat;
 }

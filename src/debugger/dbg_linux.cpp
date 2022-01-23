@@ -144,6 +144,16 @@ bool Dbg_LinuxStartWith(Dbg *dbg, const char *binPath, const char *args){
     return true;
 }
 
+bool Dbg_LinuxEvalExpression(Dbg *dbg, char *expression, char **out){
+    DBG_CHECK(dbg);
+    DbgLinux *dbgLinux = (DbgLinux *)dbg->priv;
+    if(!dbgLinux->h) return false;
+    if(!out) return false;
+
+    *out = gmi_data_evaluate_expression(dbgLinux->h, expression);
+    return *out != nullptr;
+}
+
 bool Dbg_LinuxSetBreakpoint(Dbg *dbg, const char *file, int line, int *bkpno){
     DBG_CHECK(dbg);
     DbgLinux *dbgLinux = (DbgLinux *)dbg->priv;
@@ -303,6 +313,7 @@ void Dbg_GetFunctions(Dbg *dbg){
     dbg->fn_enableBkpt = Dbg_LinuxEnableBreakpoint;
     dbg->fn_interrupt = Dbg_LinuxInterrupt;
     dbg->fn_finish = Dbg_LinuxFinish;
+    dbg->fn_evalExpression = Dbg_LinuxEvalExpression;
 
     if(dbg->priv == nullptr){
         dbg->priv = new DbgLinux;

@@ -107,7 +107,7 @@ typedef ON_MOUSE_RCLICK_CALLBACK(onMouseRClickCallback);
 typedef ON_SIZE_CHANGE_CALLBACK(onSizeChangeCallback);
 typedef ON_FOCUS_CHANGE_CALLBACK(onFocusChangeCallback);
 typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
-typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDclickCallback);
+typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDClickCallback);
 typedef ON_MOUSE_PRESS_CALLBACK(onMousePressedCallback);
 typedef ON_MOUSE_RELEASE_CALLBACK(onMouseReleasedCallback);
 
@@ -123,7 +123,7 @@ typedef CallbackX11<onMouseLClickCallback> OnMouseLClickCallback;
 typedef CallbackX11<onMouseRClickCallback> OnMouseRClickCallback;
 typedef CallbackX11<onMousePressedCallback> OnMousePressedCallback;
 typedef CallbackX11<onMouseReleasedCallback> OnMouseReleasedCallback;
-typedef CallbackX11<onMouseDclickCallback> OnMouseDclickCallback;
+typedef CallbackX11<onMouseDClickCallback> OnMouseDClickCallback;
 typedef CallbackX11<onMouseMotionCallback> OnMouseMotionCallback;
 typedef CallbackX11<onSizeChangeCallback> OnSizeChangeCallback;
 typedef CallbackX11<onFocusChangeCallback> OnFocusChangeCallback;
@@ -151,7 +151,7 @@ typedef struct WindowX11{
     List<OnMouseRClickCallback> onMouseRClickCall;
     List<OnMousePressedCallback> onMousePressedCall;
     List<OnMouseReleasedCallback> onMouseReleasedCall;
-    List<OnMouseDclickCallback> onMouseDClickCall;
+    List<OnMouseDClickCallback> onMouseDClickCall;
     List<OnMouseMotionCallback> onMouseMotionCall;
     List<OnSizeChangeCallback> onSizeChangeCall;
     List<OnFocusChangeCallback> onFocusChangeCall;
@@ -235,7 +235,7 @@ uint RegisterOnMousePressedCallback(WindowX11 *window, onMousePressedCallback *c
 uint RegisterOnMouseReleasedCallback(WindowX11 *window, onMouseReleasedCallback *callback, void *priv);
 uint RegisterOnMouseLeftClickCallback(WindowX11 *window, onMouseLClickCallback *callback, void *priv);
 uint RegisterOnMouseRightClickCallback(WindowX11 *window, onMouseRClickCallback *callback, void *priv);
-uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDclickCallback *callback, void *priv);
+uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDClickCallback *callback, void *priv);
 uint RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
 uint RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);
 uint RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv);

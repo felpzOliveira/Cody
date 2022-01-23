@@ -4,15 +4,19 @@
 #include <keyboard.h>
 
 #define MODULE_NAME "DBG-APP"
+#define StateChangeMask  (1 << 0)
+#define BkptFeedbackMask (1 << 1)
 
 typedef enum{
-    SyncStop=0, SyncExit, SyncState
+    SyncStop=0, SyncExit, SyncState, SyncBkptFeedback
 }DbgSyncCode;
 
+/* template this ? */
 struct DbgSyncPackage{
     DbgSyncCode code;
     DbgStop sp;
     DbgState state;
+    BreakpointFeedback bkptFed;
 };
 
 struct DbgLineBufferPair{
@@ -20,21 +24,60 @@ struct DbgLineBufferPair{
     bool state;
 };
 
-struct DbgStateChangeCallback{
-    DbgApp_UserStateReport *fn_userReport;
+template<typename Fn>
+struct DbgUserCallback{
+    Fn *fn;
     void *fn_priv;
     uint handle;
 };
 
-struct DbgStateChangeList{
-    std::vector<DbgStateChangeCallback> callbacks;
+template<typename Fn>
+struct DbgCallbackList{
+    std::vector<Fn> callbacks;
 };
+
+template<typename Fn>
+void DbgApp_UnregisterHandle(DbgCallbackList<DbgUserCallback<Fn>> *list, uint handle){
+    for(auto it = list->callbacks.begin(); it != list->callbacks.end(); it++){
+        if(it->handle == handle){
+            list->callbacks.erase(it);
+            break;
+        }
+    }
+}
+
+template<typename Fn>
+uint DbgApp_RegisterRoutine(DbgCallbackList<DbgUserCallback<Fn>> *list,
+                            Fn fn, void *priv, uint mask)
+{
+    uint handle = 0;
+    bool done = false;
+    do{
+        handle = Bad_RNG16() | (mask << 8);
+        done = true;
+        for(auto cb : list->callbacks){
+            if(handle == cb.handle){
+                done = false;
+                break;
+            }
+        }
+    }while(!done);
+    list->callbacks.push_back({ .fn = fn, .fn_priv = priv, .handle = handle });
+    return handle;
+}
+
+typedef DbgUserCallback<DbgApp_UserStateReport> DbgStateChangeCallback;
+typedef DbgCallbackList<DbgStateChangeCallback> DbgStateChangeList;
+
+typedef DbgUserCallback<DbgApp_UserBkptFeedback> DbgBkptFeedbackCallback;
+typedef DbgCallbackList<DbgBkptFeedbackCallback> DbgBkptFeedbackList;
 
 struct DbgSynchronizer{
     View *targetView;
     LineBuffer *dbgLB;
     bool is_stopped;
     DbgStateChangeList stateChangeList;
+    DbgBkptFeedbackList bkptFeedbackList;
     std::vector<LineBuffer *> loadedLBs;
     std::vector<DbgLineBufferPair> lockedLBs;
     ConcurrentQueue<DbgSyncPackage> inQ;
@@ -59,6 +102,13 @@ void DbgApp_AsyncHandleState(DbgState state){
 
 void DbgApp_AsyncHandleExit(){
     dbgSync.inQ.push({.code = DbgSyncCode::SyncExit,});
+}
+
+void DbgApp_AsyncHandleBkptFeedback(BreakpointFeedback feedback){
+    DbgSyncPackage pkg;
+    pkg.code = DbgSyncCode::SyncBkptFeedback;
+    pkg.bkptFed = feedback;
+    dbgSync.inQ.push(pkg);
 }
 
 /* Synchronous handler */
@@ -294,12 +344,21 @@ static void DbgApp_Terminate(){
     DEBUG_MSG("Called termination\n");
 }
 
-void DbgApp_StateReport(DbgState state){
-    std::cout << "Debugger at " << DbgStateToString(state) << std::endl;
-    DbgStateChangeList *list = &dbgSync.stateChangeList;
-    for(DbgStateChangeCallback &cb : list->callbacks){
-        cb.fn_userReport(state, cb.fn_priv);
+template<typename Fn, typename ...Args>
+void DbgApp_DispatchToUser(Args... args, DbgCallbackList<DbgUserCallback<Fn>> *fns){
+    for(auto fn : fns->callbacks){
+        fn.fn(args..., fn.fn_priv);
     }
+}
+
+void DbgApp_StateReport(DbgState state){
+    DbgStateChangeList *list = &dbgSync.stateChangeList;
+    DbgApp_DispatchToUser<DbgApp_UserStateReport, DbgState>(state, list);
+}
+
+void DbgApp_BkptFeedback(BreakpointFeedback bkptFed){
+    DbgBkptFeedbackList *list = &dbgSync.bkptFeedbackList;
+    DbgApp_DispatchToUser<DbgApp_UserBkptFeedback, BreakpointFeedback>(bkptFed, list);
 }
 
 bool DbgApp_PoolMessages(){
@@ -315,6 +374,9 @@ bool DbgApp_PoolMessages(){
             } break;
             case DbgSyncCode::SyncState: {
                 DbgApp_StateReport(pkg.state);
+            } break;
+            case DbgSyncCode::SyncBkptFeedback: {
+                DbgApp_BkptFeedback(pkg.bkptFed);
             } break;
             default: {
                 DEBUG_MSG("Unknown header\n");
@@ -369,6 +431,11 @@ void DbgApp_Finish(){
     Dbg_SendPackage(DbgPackage(DbgCode::Finish));
 }
 
+void DbgApp_Eval(char *expression){
+    dbgSync.is_stopped = false;
+    Dbg_SendPackage(DbgPackage(std::string(expression), DbgCode::Evaluate));
+}
+
 void DbgApp_SetKeyboard(){
     KeyboardSetActiveMapping(dbgSync.mapping);
 }
@@ -414,6 +481,16 @@ void DbgApp_SwitchBuffer(){
     AppSetDelayedCall(DbgApp_SetKeyboard);
 }
 
+void DbgApp_OpenFile(){
+    AppCommandOpenFileWithViewType(DbgView);
+    AppSetDelayedCall(DbgApp_SetKeyboard);
+}
+
+void DbgApp_Search(){
+    AppCommandQueryBarSearch();
+    AppSetDelayedCall(DbgApp_SetKeyboard);
+}
+
 void DbgApp_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
     RegisterKeyboardDefaultEntry(mapping, DbgApp_DefaultEntry, nullptr);
@@ -428,6 +505,8 @@ void DbgApp_Initialize(){
     RegisterRepeatableEvent(mapping, DbgApp_QueryBarPaste, Key_LeftControl, Key_V);
     RegisterRepeatableEvent(mapping, DbgApp_SwitchTheme, Key_LeftControl, Key_T);
     RegisterRepeatableEvent(mapping, DbgApp_SwitchBuffer, Key_LeftAlt, Key_B);
+    RegisterRepeatableEvent(mapping, DbgApp_OpenFile, Key_LeftAlt, Key_F);
+    RegisterRepeatableEvent(mapping, DbgApp_Search, Key_LeftControl, Key_S);
 
     // get the movement controls from App interface.
     RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
@@ -463,29 +542,28 @@ bool DbgApp_IsStopped(){
 }
 
 uint DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv){
-    DbgStateChangeList *list = &dbgSync.stateChangeList;
-    uint handle = 0;
-    bool done = false;
-    do{
-        handle = Bad_RNG16();
-        done = true;
-        for(DbgStateChangeCallback &cb : list->callbacks){
-            if(handle == cb.handle){
-                done = false;
-                break;
-            }
-        }
-    }while(!done);
-    list->callbacks.push_back({ .fn_userReport = fn, .fn_priv = priv, .handle = handle });
-    return handle;
+    return DbgApp_RegisterRoutine<DbgApp_UserStateReport>(&dbgSync.stateChangeList,
+                                                          fn, priv, StateChangeMask);
 }
 
-void DbgApp_UnregisterStateChangeCallback(uint handle){
-    DbgStateChangeList *list = &dbgSync.stateChangeList;
-    for(auto it = list->callbacks.begin(); it != list->callbacks.end(); it++){
-        if(it->handle == handle){
-            list->callbacks.erase(it);
-            break;
+uint DbgApp_RegisterBreakpointFeedbackCallback(DbgApp_UserBkptFeedback *fn, void *priv){
+    return DbgApp_RegisterRoutine<DbgApp_UserBkptFeedback>(&dbgSync.bkptFeedbackList,
+                                                           fn, priv, BkptFeedbackMask);
+}
+
+void DbgApp_UnregisterCallbackByHandle(uint handle){
+    uint mask = handle >> 8;
+    switch(mask){
+        case StateChangeMask:{
+            DbgApp_UnregisterHandle<DbgApp_UserStateReport>(&dbgSync.stateChangeList,
+                                                            handle);
+        } break;
+        case BkptFeedbackMask:{
+            DbgApp_UnregisterHandle<DbgApp_UserBkptFeedback>(&dbgSync.bkptFeedbackList,
+                                                             handle);
+        } break;
+        default:{
+            printf("Unknow bit mask %d\n", (int)mask);
         }
     }
 }
@@ -510,6 +588,7 @@ void DbgApp_StartDebugger(const char *binaryPath, const char *args){
     Dbg_RegisterStopPoint(DbgApp_AsyncHandleStopPoint);
     Dbg_RegisterExit(DbgApp_AsyncHandleExit);
     Dbg_RegisterReportState(DbgApp_AsyncHandleState);
+    Dbg_RegisterBreakpointFeedback(DbgApp_BkptFeedback);
     // ...
 
     // inform the rendering API that we will start an event handling

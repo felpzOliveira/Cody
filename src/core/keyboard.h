@@ -157,6 +157,11 @@ void KeyboardSetReferenceWindow(BindingMap *mapping, void *window);
 BindingMap *KeyboardGetActiveMapping();
 
 /*
+* Get the state of a given key _right_now_.
+*/
+int KeyboardGetKeyState(Key key);
+
+/*
 * Queries the keyboard API for the current active mapping for a specific window.
 */
 BindingMap *KeyboardGetActiveMapping(void *window);
