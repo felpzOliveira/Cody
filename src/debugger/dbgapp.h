@@ -14,6 +14,7 @@
 //           instead.
 #define DBG_REPORT_STATE_CB(name) void name(DbgState state, void *priv)
 #define DBG_BKPT_FEEDBACK_CB(name) void name(BreakpointFeedback feedback, void *priv)
+
 typedef DBG_REPORT_STATE_CB(DbgApp_UserStateReport);
 typedef DBG_BKPT_FEEDBACK_CB(DbgApp_UserBkptFeedback);
 

@@ -179,6 +179,18 @@ void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end);
 int Buffer_IsBlank(Buffer *buffer);
 
 /*
+* Locates the next valid position for jumping locations in utf-8 positions.
+* This routine computes the next jump point for iterating the buffer based
+* on the terminators given in 'term'.
+*/
+uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len);
+
+/*
+* Locates the previous valid position for jumping locations in utf-8 positions.
+*/
+uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len);
+
+/*
 * Perform cleanup of the entries of the symbol table **and** auto completes
 * ternary search tree relating to tokens inside this buffer.
 */

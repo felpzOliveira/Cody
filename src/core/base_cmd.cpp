@@ -62,6 +62,7 @@ static void InitializeMathSymbolList(){
         mathSymbolMap["epsilon"] = "ε"; mathSymbolMap["Epsilon"] = "E";
         mathSymbolMap["partial"] = "∂"; mathSymbolMap["int"] = "∫";
         mathSymbolMap["inf"] = "∞";
+        mathSymbolMap["or"] = "||";    mathSymbolMap["dash"] = "\\";
         is_math_symbol_inited = true;
     }
 }
@@ -500,11 +501,11 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
     uint len = 0;
     char *arg = StringNextWord(cmd, size, &len);
     if(StringEqual(arg, (char *)"quad", Min(len, 4))){
-        AppSetCursorFormat(CURSOR_QUAD);
+        AppSetCursorStyle(CURSOR_QUAD);
     }else if(StringEqual(arg, (char *)"dash", Min(len, 4))){
-        AppSetCursorFormat(CURSOR_DASH);
+        AppSetCursorStyle(CURSOR_DASH);
     }else if(StringEqual(arg, (char *)"rect", Min(len, 4))){
-        AppSetCursorFormat(CURSOR_RECT);
+        AppSetCursorStyle(CURSOR_RECT);
     }
     return r;
 }
@@ -684,7 +685,8 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
             char *ptr = (char *)val.c_str();
             if(StringStartsWith(cmd, size, ptr, Min(size, val.size()))){
                 /* commands that are explicitly typed should be added to history */
-                QueryBar_EnableInputToHistory(View_GetQueryBar(view));
+                QueryBar *targetBar = View_GetQueryBar(view);
+                QueryBar_EnableInputToHistory(targetBar);
                 rv = it->second(cmd, size, view);
                 return rv;
             }

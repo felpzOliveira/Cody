@@ -2,8 +2,12 @@
 #pragma once
 #include <parallel.h>
 #include <unordered_map>
+#include <utilities.h>
+#include <vector>
 
 #define DBG_CHECK(dbg) do{if(!dbg) return false; if(!dbg->priv) return false; }while(0)
+#define DBG_TREE_EXP_STR "{...}"
+
 
 typedef enum{
     Continue=0, Breakpoint, Step, Run, Next, Exit, Finish, Interrupt, Evaluate
@@ -64,6 +68,21 @@ struct DbgStop{
 };
 
 /*
+* Evaluating expressions returns a tree on GDB and god knows what in msvc,
+* so we need to clearly define it so multiple debuggers have a common interface.
+*/
+struct ExpressionTreeNode{
+    std::string owner;
+    std::string value;
+    std::vector<struct ExpressionTreeNode *> nodes;
+};
+
+struct ExpressionTree{
+    ExpressionTreeNode *root;
+    std::string expression;
+};
+
+/*
 * Groups stuff to return information about success of adding breakpoints.
 */
 struct BreakpointFeedback{
@@ -98,6 +117,7 @@ typedef DBG_USER_BKPT_FEEDBACK(DbgUserBkptFeedback);
 #define DBG_INTERRUPT(name) bool name(Dbg *dbg)
 #define DBG_FINISH(name) bool name(Dbg *dbg)
 #define DBG_EVAL_EXPRESSION(name) bool name(Dbg *dbg, char *expression, char **out)
+#define DBG_EVAL_PARSER(name) bool name(char *data, ExpressionTree &tree)
 
 typedef DBG_START_WITH(DbgPlatformStartWith);
 typedef DBG_SET_BKPT(DbgPlatformSetBreakpoint);
@@ -112,6 +132,7 @@ typedef DBG_TERMINATE(DbgPlatformTerminate);
 typedef DBG_INTERRUPT(DbgPlatformInterrupt);
 typedef DBG_FINISH(DbgPlatformFinish);
 typedef DBG_EVAL_EXPRESSION(DbgPlatformEvalExpression);
+typedef DBG_EVAL_PARSER(DbgPlatformExpressionParser);
 
 struct Dbg{
     /* User calls */
@@ -133,9 +154,21 @@ struct Dbg{
     DbgPlatformInterrupt *fn_interrupt;
     DbgPlatformFinish *fn_finish;
     DbgPlatformEvalExpression *fn_evalExpression;
+    /*
+    * This routine must be non-thread dependent, it must be able to solve parsing
+    * without blocking and locally so that any part of cody can call this.
+    */
+    DbgPlatformExpressionParser *fn_evalParser;
     /* Queue for sending requests to debugger */
     ConcurrentTimedQueue<DbgPackage> packageQ;
-    /* Map of breakpoints, not really required but usefull */
+    /*
+    * Map of breakpoints, not really required but usefull so that other parts
+    * of cody don't need to map what is currently the debugger breakpoint states.
+    * Instead they can simply query the debugger for the breakpoints enalbed/disabled
+    * at any moment, this only have the downside of needind a lock but querying
+    * shouldn't run at the same time as breakpoint modification routines so it
+    * won't be an issue.
+    */
     std::unordered_map<std::string, DbgBkpt> brkMap;
     /* Actual debugger data, OS-dependent */
     void *priv;
@@ -152,6 +185,11 @@ void Dbg_RegisterStopPoint(DbgUserStopPoint *fn);
 void Dbg_RegisterExit(DbgUserExit *fn);
 void Dbg_RegisterReportState(DbgUserReportState *fn);
 void Dbg_RegisterBreakpointFeedback(DbgUserBkptFeedback *fn);
+
+/*
+* Parses a previously obtained expression evaluation into a expression tree.
+*/
+bool Dbg_ParseEvaluation(char *eval, ExpressionTree &tree);
 
 /*
 * Load the debugger with a specific binary file to be debugged.

@@ -58,7 +58,12 @@ int AppGetTabConfiguration(int *using_tab);
 /*
 * Sets the style for rendering the cursor.
 */
-void AppSetCursorFormat(CursorStyle style);
+void AppSetCursorStyle(CursorStyle style);
+
+/*
+* Gets the style for rendering the cursor.
+*/
+CursorStyle AppGetCursorStyle();
 
 /*
 * Triggers the view at (x,y) to be active. Variable force_binding
@@ -180,6 +185,11 @@ void AppAddStoredFile(std::string basePath);
 * Loop each breakpoint of the debugger that is on the given file path.
 */
 void DbgSupport_ForEachBkpt(std::string path, std::function<void(DbgBkpt *)> callback);
+
+/*
+* Clears the breakpoint map that is used for rendering purposes only.
+*/
+void DbgSupport_ResetBreakpointMap();
 
 /*
 * Checks if a path given in relation to the root directory is already

@@ -102,8 +102,12 @@ void AppSetDelayedCall(std::function<void(void)> fn){
     appContext.hasDelayedCall = true;
 }
 
-void AppSetCursorFormat(CursorStyle style){
+void AppSetCursorStyle(CursorStyle style){
     appGlobalConfig.cStyle = style;
+}
+
+CursorStyle AppGetCursorStyle(){
+    return appGlobalConfig.cStyle;
 }
 
 void AppEarlyInitialize(){
@@ -1276,6 +1280,7 @@ void AppCommandQueryBarInteractiveCommand(){
 
         View_ReturnToState(view, View_QueryBar);
         KeyboardSetActiveMapping(appContext.queryBarMapping);
+        QueryBar_EnableCursorJump(qbar);
     }
 }
 
@@ -2041,6 +2046,18 @@ void AppCommandQueryBarRightArrow(){
     QueryBar_MoveRight(bar);
 }
 
+void AppCommandQueryBarJumpNext(){
+    View *view = AppGetActiveView();
+    QueryBar *bar = View_GetQueryBar(view);
+    QueryBar_JumpToNext(bar);
+}
+
+void AppCommandQueryBarJumpPrevious(){
+    View *view = AppGetActiveView();
+    QueryBar *bar = View_GetQueryBar(view);
+    QueryBar_JumpToPrevious(bar);
+}
+
 void AppCommandQueryBarNext(){
     View *view = AppGetActiveView();
     QueryBar *bar = View_GetQueryBar(view);
@@ -2143,6 +2160,10 @@ void AppCommandOpenFile(){
     AppCommandOpenFileWithViewType(CodeView);
 }
 
+void DbgSupport_ResetBreakpointMap(){
+    appContext.dbgBreaks.clear();
+}
+
 void DbgSupportStateChange(DbgState state, void *){
     WidgetWindow *ww = Graphics_GetBaseWidgetWindow();
     DbgWidgetButtons *bt = Graphics_GetDbgWidget();
@@ -2153,6 +2174,7 @@ void DbgSupportStateChange(DbgState state, void *){
         }
     }else if(state == DbgState::Exited){
         ww->Erase(bt);
+        DbgSupport_ResetBreakpointMap();
     }
 }
 
@@ -2166,7 +2188,7 @@ void DbgSupport_ForEachBkpt(std::string path, std::function<void(DbgBkpt *)> cal
 
 void DbgSupportBreakpointFeedback(BreakpointFeedback feedback, void *){
     if(feedback.rv){
-        appContext.dbgBreaks.clear();
+        DbgSupport_ResetBreakpointMap();
         Dbg_GetBreakpointList(appContext.dbgBreaks);
         printf("Feedback at %s : %d ( %d ) => total : %d\n", feedback.bkpt.file.c_str(),
                 feedback.bkpt.line, (int)feedback.bkpt.enabled,
@@ -2198,8 +2220,10 @@ void AppInitializeQueryBarBindings(){
     RegisterRepeatableEvent(mapping, AppCommandQueryBarNext, Key_Down);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarPrevious, Key_Up);
 
-    //RegisterRepeatableEvent(mapping, AppCommandQueryBarRightArrow, Key_Right);
-    //RegisterRepeatableEvent(mapping, AppCommandQueryBarLeftArrow, Key_Left);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarRightArrow, Key_Right);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarLeftArrow, Key_Left);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarJumpNext, Key_LeftControl, Key_Right);
+    RegisterRepeatableEvent(mapping, AppCommandQueryBarJumpPrevious, Key_LeftControl, Key_Left);
 
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_RightAlt, Key_W);

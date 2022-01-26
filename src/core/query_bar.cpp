@@ -137,6 +137,7 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
     queryBar->searchCmd.valid = 0;
     queryBar->filter.digitOnly = 0;
     queryBar->filter.toHistory = false;
+    queryBar->filter.allowCursorJump = false;
     queryBar->entryCallback = nullptr;
     queryBar->cancelCallback = nullptr;
     queryBar->commitCallback = nullptr;
@@ -257,21 +258,46 @@ void QueryBar_Initialize(QueryBar *queryBar){
     replace->toReplaceLen = 0;
     replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
     queryBar->filter.toHistory = false;
+    queryBar->filter.allowCursorJump = false;
     Buffer_Init(&queryBar->buffer, DefaultAllocatorSize);
 }
 
 /* Moves cursor left */
 void QueryBar_MoveLeft(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
-    queryBar->cursor.textPosition.y = Max(queryBar->cursor.textPosition.y - 1,
-                                          queryBar->writePosU8);
+    if(queryBar->filter.allowCursorJump){
+        queryBar->cursor.textPosition.y = Max(queryBar->cursor.textPosition.y - 1,
+                                              queryBar->writePosU8);
+    }
 }
 
 /* Moves cursor right */
 void QueryBar_MoveRight(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
-    queryBar->cursor.textPosition.y = Min(queryBar->cursor.textPosition.y + 1,
-                                          queryBar->buffer.count);
+    if(queryBar->filter.allowCursorJump){
+        queryBar->cursor.textPosition.y = Min(queryBar->cursor.textPosition.y + 1,
+                                              queryBar->buffer.count);
+    }
+}
+
+void QueryBar_JumpToPrevious(QueryBar *queryBar){
+    AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    if(queryBar->filter.allowCursorJump){
+        uint u8 = queryBar->cursor.textPosition.y;
+        u8 = Buffer_FindPreviousWordU8(&queryBar->buffer, u8, QUERY_BAR_DEFAULT_JUMP_STR,
+                                       QUERY_BAR_DEFAULT_JUMP_STR_LEN);
+        queryBar->cursor.textPosition.y = Max(u8, queryBar->writePosU8);
+    }
+}
+
+void QueryBar_JumpToNext(QueryBar *queryBar){
+    AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    if(queryBar->filter.allowCursorJump){
+        uint u8 = queryBar->cursor.textPosition.y;
+        u8 = Buffer_FindNextWord8(&queryBar->buffer, u8, QUERY_BAR_DEFAULT_JUMP_STR,
+                                  QUERY_BAR_DEFAULT_JUMP_STR_LEN);
+        queryBar->cursor.textPosition.y = Min(u8, queryBar->buffer.count);
+    }
 }
 
 /* Sets query bar geometry */
@@ -286,6 +312,11 @@ void QueryBar_SetGeometry(QueryBar *queryBar, Geometry *geometry, Float lineHeig
 void QueryBar_EnableInputToHistory(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
     queryBar->filter.toHistory = true;
+}
+
+void QueryBar_EnableCursorJump(QueryBar *queryBar){
+    AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    queryBar->filter.allowCursorJump = true;
 }
 
 /*
@@ -312,6 +343,7 @@ void QueryBar_ActiveCustomFull(QueryBar *queryBar, char *title, uint titlelen,
     queryBar->commitCallback = commit;
     if(filter) queryBar->filter = *filter;
     queryBar->filter.toHistory = false;
+    queryBar->filter.allowCursorJump = false;
 }
 
 void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
@@ -326,6 +358,7 @@ void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
     queryBar->commitCallback = commit;
     if(filter) queryBar->filter = *filter;
     queryBar->filter.toHistory = false;
+    queryBar->filter.allowCursorJump = false;
 }
 
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len){

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <query_bar.h>
 #include <view.h>
+#include <app.h>
 
 static void _Graphics_RenderTextAt(OpenGLState *state, Float &x, Float &y,
                                    char *string, uint len, vec4i color,
@@ -13,11 +14,12 @@ static void _Graphics_RenderTextAt(OpenGLState *state, Float &x, Float &y,
                                 string, string+len, pGlyph);
 }
 
-static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme){
+static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, vec4f data){
     Float x = 10;
     Float y = 0;
     int pGlyph = -1;
     QueryBar *bar = View_GetQueryBar(view);
+    Buffer *buffer = &bar->buffer;
     OpenGLFont *font = &state->font;
     char *header = nullptr;
     uint headerLen = 0;
@@ -78,9 +80,22 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme){
 
     fonsStashFlush(font->fsContext);
     glDisable(GL_BLEND);
+
+    if(bar->cursor.textPosition.y < buffer->count && AppGetCursorStyle() == CURSOR_RECT){
+        Float x0 = data.x;
+        Float y0 = data.y;
+        uint rawp = (uint)data.z;
+        int baseGlyph = (int)data.w;
+        Graphics_PrepareTextRendering(state, &state->projection, &state->model);
+        vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
+        char *chr = &buffer->data[rawp];
+        fonsStashMultiTextColor(font->fsContext, x0, y0, cc.ToUnsigned(),
+                                chr, chr+1, &baseGlyph);
+        Graphics_FlushText(state);
+    }
 }
 
-void Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, vec4f color){
+static vec4f Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, vec4f color){
     Float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
     uint rawp = 0;
     int pGlyph = -1;
@@ -90,10 +105,13 @@ void Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, vec4f colo
     Buffer *buffer = &bar->buffer;
     char *ptr = buffer->data;
     uint pos = bar->cursor.textPosition.y;
+    int baseGlyph = -1;
 
     rawp = Buffer_Utf8PositionToRawPosition(buffer, pos-1, &utf8Len);
     x0 = fonsComputeStringAdvance(state->font.fsContext, ptr, rawp+utf8Len, &pGlyph);
     x0 += 10;
+
+    baseGlyph = pGlyph;
 
     rawp = Buffer_Utf8PositionToRawPosition(buffer, pos, &pUtf8Len);
     x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[rawp],
@@ -107,7 +125,7 @@ void Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, vec4f colo
     Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
 
     Graphics_RenderCursorAt(&state->glQuadBuffer, x0, y0, x1, y1, color, 3, 1);
-    //Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x1, y1), color);
+    return vec4f(x0, y0, rawp, baseGlyph);
 }
 
 void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *theme){
@@ -229,10 +247,10 @@ int Graphics_RenderQueryBar(View *view, OpenGLState *state,
         }
     }
 
-    Graphics_RenderQueryBarCursor(state, bar, cursorColor);
+    vec4f data = Graphics_RenderQueryBarCursor(state, bar, cursorColor);
     Graphics_QuadFlush(state);
 
-    _Graphics_RenderText(state, view, theme);
+    _Graphics_RenderText(state, view, theme, data);
 
     Graphics_RenderQueryBarSelection(view, state, theme);
 

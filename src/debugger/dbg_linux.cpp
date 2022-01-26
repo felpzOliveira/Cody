@@ -3,6 +3,8 @@
 #include <types.h>
 #include <dbg.h>
 #include <chrono>
+#include <stack>
+#include <utilities.h>
 
 #define MODULE_NAME "DBG-LINUX"
 
@@ -105,6 +107,161 @@ struct DbgLinux{
     mi_h *h;
     mi_aux_term *child_vt;
 };
+
+inline std::string Trim(std::string s){
+    uint n = 0;
+    for(int i = s.size()-1; i >= 0; i--){
+        if(s[i] != ' '){
+            n = i;
+            break;
+        }
+    }
+    return s.substr(0, n+1);
+}
+
+inline ExpressionTreeNode *Dbg_LinuxMakeNode(std::string owner, std::string value){
+    ExpressionTreeNode *node = new ExpressionTreeNode;
+    node->owner = Trim(owner);
+    node->value = Trim(value);
+    return node;
+}
+
+uint FindOwner(char **p){
+    int start = 0;
+    uint len = 0;
+    char *s = nullptr;
+    int depth = 0;
+    while(**p){
+        if(start == 0){
+            if(!(**p == ' ' || **p == '=' || **p == ',')){
+                start = 1;
+                s = *p;
+            }else{
+                (*p)++;
+            }
+        }else{
+            if(**p == '<'){
+                depth++;
+            }else if(**p == '>'){
+                depth--;
+            }else if(depth == 0 && (**p == '=')){
+                break;
+            }
+            len++;
+            (*p)++;
+        }
+    }
+    *p = s;
+    return len;
+}
+
+int FindValue(char **p, int *out){
+    int start = 0;
+    int state = -1;
+    int len = 0;
+    *out = 0;
+    char *s = nullptr;
+    while(**p){
+        if(start == 0){
+            if(!(**p == '=' || **p == ' ')){
+                start = 1;
+                s = *p;
+            }else{
+                (*p)++;
+            }
+        }else{
+            if(**p == '{'){
+                *out = 1;
+                (*p)++;
+                break;
+            }else if(**p == '}'){
+                *out = 2;
+                state = len;
+                (*p)++;
+                break;
+            }else if(**p == ','){
+                state = len;
+                (*p)++;
+                break;
+            }
+            else{
+                len++;
+                (*p)++;
+            }
+        }
+    }
+    if(state > 0){
+        *p = s;
+    }
+    return state;
+}
+
+bool Dbg_LinuxMountTree(char *p, ExpressionTree &tree){
+    char *s = p;
+    int wsize = 0;
+    std::stack<ExpressionTreeNode *> stack;
+    if(*s != '{') return false;
+
+    //DEBUG_MSG("Source %s\n", p);
+    s++;
+    tree.root = Dbg_LinuxMakeNode(tree.expression, DBG_TREE_EXP_STR);
+    stack.push(tree.root);
+
+    std::string owner, value;
+    while(!stack.empty() && *s){
+        ExpressionTreeNode *parent = stack.top();
+        stack.pop();
+        bool done = false;
+        while(!done && *s){
+            wsize = FindOwner(&s);
+            owner = std::string(s, wsize);
+            //DEBUG_MSG("Word %s\n", owner.c_str());
+            s += wsize;
+
+            int out = 0;
+            int state = FindValue(&s, &out);
+            ExpressionTreeNode *node = nullptr;
+            if(state > 0){
+                value = std::string(s, state);
+                node = Dbg_LinuxMakeNode(owner, value);
+                //DEBUG_MSG(" ( %p ) Value %s\n", parent, value.c_str());
+                s += state;
+                parent->nodes.push_back(node);
+            }
+
+            if(out == 1){
+                //DEBUG_MSG("{IN}\n");
+                AssertA(node == nullptr, "Invalid node");
+                node = Dbg_LinuxMakeNode(owner, DBG_TREE_EXP_STR);
+                parent->nodes.push_back(node);
+                stack.push(parent);
+                stack.push(node);
+                done = true;
+            }else if(out == 2){
+                //DEBUG_MSG("{OUT}\n");
+                s += 1;
+                done = true;
+            }
+        }
+    }
+
+    return true;
+}
+
+bool Dbg_LinuxExpressionParser(char *data, ExpressionTree &tree){
+    if(!data || tree.root) return false;
+
+    char *p = data;
+
+    if(*p == '{'){
+        Dbg_LinuxMountTree(p, tree);
+    }else{
+        // raw value
+        //DEBUG_MSG("Got raw value %s\n", p);
+        tree.root = Dbg_LinuxMakeNode(tree.expression, p);
+    }
+    return true;
+}
 
 bool Dbg_LinuxStartWith(Dbg *dbg, const char *binPath, const char *args){
     DBG_CHECK(dbg);
@@ -314,6 +471,7 @@ void Dbg_GetFunctions(Dbg *dbg){
     dbg->fn_interrupt = Dbg_LinuxInterrupt;
     dbg->fn_finish = Dbg_LinuxFinish;
     dbg->fn_evalExpression = Dbg_LinuxEvalExpression;
+    dbg->fn_evalParser = Dbg_LinuxExpressionParser;
 
     if(dbg->priv == nullptr){
         dbg->priv = new DbgLinux;

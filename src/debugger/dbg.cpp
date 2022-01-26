@@ -1,6 +1,8 @@
 #include <dbg.h>
 #include <sstream>
 #include <iostream>
+#include <queue>
+#include <stack>
 
 #define MODULE_NAME "DBG"
 
@@ -84,6 +86,125 @@ static void Dbg_Cleanup(Dbg *dbg){
     Dbg_Free(dbg);
 }
 
+static void Dbg_PrintTree(ExpressionTree *tree){
+    struct node_value{
+        ExpressionTreeNode *node;
+        int depth;
+    };
+    std::stack<node_value> nodeQ;
+    ExpressionTreeNode *root = tree->root;
+    nodeQ.push({ .node = root, .depth = 0, });
+    int currDepth = 0;
+    std::stack<std::string> depthOwner;
+    std::string currOwner = root->owner;
+    while(!nodeQ.empty()){
+        node_value val = nodeQ.top();
+        ExpressionTreeNode *node = val.node;
+        int depth = val.depth;
+        nodeQ.pop();
+
+        if(node != root){
+            if(currDepth > depth){
+                printf("} ( %s ) ", currOwner.c_str());
+                currOwner = std::string();
+                if(!depthOwner.empty()){
+                    currOwner = depthOwner.top();
+                    depthOwner.pop();
+                }else{
+                    printf(" -- Finished ");
+                }
+            }else if(currDepth == depth){
+                printf(", ");
+            }
+        }
+
+        printf("%s = ", node->owner.c_str());
+        if(node->value == DBG_TREE_EXP_STR){
+            printf("{ ");
+            depthOwner.push(currOwner);
+            currOwner = node->owner;
+        }else{
+            printf("%s", node->value.c_str());
+        }
+        currDepth = depth;
+        for(uint i = 0; i < node->nodes.size(); i++){
+            nodeQ.push({ .node = node->nodes[i], .depth = depth+1 });
+        }
+        if(nodeQ.empty()){
+            for(int i = 0; i < currDepth; i++){
+                printf("} ( %s )", currOwner.c_str());
+                currOwner = std::string();
+                if(!depthOwner.empty()){
+                    currOwner = depthOwner.top();
+                    depthOwner.pop();
+                }
+            }
+        }
+    }
+    printf("\n");
+}
+
+static void Dbg_PrintTree2(ExpressionTree *tree){
+    struct node_value{
+        ExpressionTreeNode *node;
+        int depth;
+    };
+
+    std::queue<node_value> nodeQ;
+    ExpressionTreeNode *root = tree->root;
+    nodeQ.push({ .node = root, .depth = 0, });
+    std::map<ExpressionTreeNode *,
+            std::map<int, std::vector<ExpressionTreeNode *>>> nodeMap;
+    while(!nodeQ.empty()){
+        node_value val = nodeQ.front();
+        ExpressionTreeNode *node = val.node;
+        int depth = val.depth;
+
+        nodeQ.pop();
+
+        if(node != root){
+            std::map<int, std::vector<ExpressionTreeNode *>> targetMap;
+            std::vector<ExpressionTreeNode *> data;
+            if(nodeMap.find(node) != nodeMap.end()){
+                targetMap = nodeMap[node];
+            }
+
+            if(targetMap.find(depth) != targetMap.end()){
+                data = targetMap[depth];
+            }
+
+            data.push_back(node);
+            targetMap[depth] = data;
+            nodeMap[node] = targetMap;
+        }
+
+        for(uint i = 0; i < node->nodes.size(); i++){
+            nodeQ.push({ .node = node->nodes[i], .depth = depth+1 });
+        }
+    }
+
+    printf("> %s = %s\n", root->owner.c_str(), root->value.c_str());
+    for(auto it = nodeMap.begin(); it != nodeMap.end(); it++){
+        std::map<int, std::vector<ExpressionTreeNode *>> targetMap = it->second;
+        int n = 0;
+        for(uint d = 0; d < targetMap.size(); ){
+            if(targetMap.find(n) == targetMap.end()){
+                n += 1;
+            }else{
+                std::vector<ExpressionTreeNode *> v = targetMap[n];
+                for(ExpressionTreeNode *nd : v){
+                    for(int i = 0; i < n; i++){
+                        printf(" ");
+                    }
+                    printf("> %s = %s\n", nd->owner.c_str(), nd->value.c_str());
+                }
+                d++;
+                n += 1;
+            }
+        }
+    }
+}
+
 static void Dbg_Entry(std::string binaryPath, std::string args){
     bool main_loop_run = true;
     FileEntry entry;
@@ -133,8 +254,13 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                     char *out = nullptr;
                     rv = dbg.fn_evalExpression(&dbg, (char *)package.data.c_str(), &out);
                     if(out){
-                        printf("Got %s\n", out);
+                        ExpressionTree tree = {
+                            .root = nullptr,
+                            .expression = package.data,
+                        };
+                        rv = Dbg_ParseEvaluation(out, tree);
                         free(out);
+                        Dbg_PrintTree(&tree);
                     }
                     wait_event = 0;
                 } break;
@@ -278,8 +404,13 @@ bool Dbg_Start(const char *binaryPath, const char *args){
     }
 
     dbg.packageQ.clear();
+    dbg.brkMap.clear();
     std::thread(Dbg_Entry, e, a).detach();
     return true;
+}
+
+bool Dbg_ParseEvaluation(char *eval, ExpressionTree &tree){
+    return dbg.fn_evalParser(eval, tree);
 }
 
 void Dbg_RegisterStopPoint(DbgUserStopPoint *fn){

@@ -6,7 +6,6 @@
 #include <buffers.h>
 #include <geometry.h>
 #include <keyboard.h>
-#include <base_cmd.h>
 #include <functional>
 #include <vector>
 
@@ -14,7 +13,10 @@
 #define OnQueryBarCancel std::function<int(QueryBar *, View*)>
 #define OnQueryBarCommit std::function<int(QueryBar *, View*)>
 
-#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, .allowFreeType = 1, }
+#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, .allowFreeType = 1, .allowCursorJump = false, }
+
+#define QUERY_BAR_DEFAULT_JUMP_STR     " ,/"
+#define QUERY_BAR_DEFAULT_JUMP_STR_LEN 3
 
 /* Query bar is also the logical FileBar */
 
@@ -25,6 +27,7 @@ struct QueryBar;
 struct QueryBarInputFilter{
     int digitOnly;
     int allowFreeType;
+    bool allowCursorJump;
     bool toHistory;
 };
 
@@ -107,10 +110,28 @@ void QueryBar_MoveLeft(QueryBar *queryBar);
 void QueryBar_MoveRight(QueryBar *queryBar);
 
 /*
+* Move the cursor to the previous default character similarly to the editor cursor
+* auto jumping.
+*/
+void QueryBar_JumpToPrevious(QueryBar *queryBar);
+
+/*
+* Move the cursor to the next default character similarly to the editor cursor
+* auto jumping.
+*/
+void QueryBar_JumpToNext(QueryBar *queryBar);
+
+/*
 * Calls that want its content to be cached to the query bar history
 * must do so manually.
 */
 void QueryBar_EnableInputToHistory(QueryBar *queryBar);
+
+/*
+* Calls that want the cursor to be dynamic and change locations must
+* call this routine.
+*/
+void QueryBar_EnableCursorJump(QueryBar *queryBar);
 
 /*
 * Returns a accessor to the data written into a QueryBar after title

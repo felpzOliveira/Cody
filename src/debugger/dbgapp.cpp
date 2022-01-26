@@ -370,6 +370,7 @@ bool DbgApp_PoolMessages(){
                 exit |= DbgApp_HandleStopPoint(&pkg);
             } break;
             case DbgSyncCode::SyncExit: {
+                DbgApp_StateReport(DbgState::Exited);
                 exit = true;
             } break;
             case DbgSyncCode::SyncState: {

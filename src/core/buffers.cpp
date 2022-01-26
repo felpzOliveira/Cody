@@ -490,6 +490,54 @@ int Buffer_IsBlank(Buffer *buffer){
     return 1;
 }
 
+uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len){
+    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
+    if(raw > buffer->taken){
+        BUG();
+        printf("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
+                raw, buffer->taken);
+        return u8;
+    }
+
+    if(raw == 0) return u8;
+    uint res = 0;
+    bool done = false;
+    for(int i = (int)raw-1; i >= 0 && !done; i--){
+        for(uint k = 0; k < len && !done; k++){
+            if(buffer->data[i] == term[k]){
+                res = Buffer_Utf8RawPositionToPosition(buffer, i);
+                done = true;
+                break;
+            }
+        }
+    }
+    return res;
+}
+
+uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len){
+    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
+    if(raw > buffer->taken){
+        BUG();
+        printf("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
+                raw, buffer->taken);
+        return u8;
+    }
+
+    if(raw == buffer->taken) return u8;
+    uint res = buffer->taken;
+    bool done = false;
+    for(uint i = raw+1; i < buffer->taken && !done; i++){
+        for(uint k = 0; k < len && !done; k++){
+            if(buffer->data[i] == term[k]){
+                res = i;
+                done = true;
+                break;
+            }
+        }
+    }
+    return Buffer_Utf8RawPositionToPosition(buffer, res);
+}
+
 void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end){
     if(end > start){
         uint endLoc = Min(buffer->taken, end);
