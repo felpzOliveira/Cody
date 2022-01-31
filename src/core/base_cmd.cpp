@@ -119,7 +119,7 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
 }
 
 struct QueriableSearchResult{
-    GlobalSearchResult res[MAX_SEARCH_ENTRIES * MAX_THREADS];
+    std::vector<GlobalSearchResult> res;
     int count;
 };
 
@@ -141,7 +141,7 @@ void BaseCommand_JumpViewToBuffer(View *view, LineBuffer *lineBuffer, vec2i p){
 
     uint s = BufferView_GetMaximumLineView(bView);
     int in = p.x + s;
-    s = Clamp(in - 2, 0, BufferView_GetLineCount(bView)-1);
+    s = Clamp(in - 8, 0, BufferView_GetLineCount(bView)-1);
     BufferView_CursorToPosition(bView, s, p.y);
 
     BufferView_CursorToPosition(bView, p.x, p.y);
@@ -168,6 +168,12 @@ int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
                                  vec2i(result->line, result->col));
 
     SelectableListFreeLineBuffer(view);
+    linearResults.res.clear();
+    linearResults.count = 0;
+    for(int i = 0; i < MAX_THREADS; i++){
+        results[i].results.clear();
+        results[i].count = 0;
+    }
     return 1;
 }
 
@@ -183,6 +189,8 @@ int SearchAllFilesCommandStart(View *view, std::string title){
     uint rootLen = root.size();
 
     linearResults.count = 0;
+    linearResults.res.clear();
+
     uint max_written_len = 60;
     for(int tid = 0; tid < MAX_THREADS; tid++){
         GlobalSearch *res = &results[tid];
@@ -256,7 +264,8 @@ int SearchAllFilesCommandStart(View *view, std::string title){
 
             buffer->data[end_loc] = ss;
 
-            linearResults.res[linearResults.count++] = res->results[i];
+            linearResults.res.push_back(res->results[i]);
+            linearResults.count++;
 
             LineBuffer_InsertLine(lineBuffer, (char *)m, len, 0);
         }
@@ -330,28 +339,28 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
     std::string searchStr(&cmd[e]);
 
     FileBufferList *bufferList = FileProvider_GetBufferList();
-    FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
-    size = List_FetchAsArray(bufferList->fList, bufferArray,
-                             MAX_QUERIABLE_BUFFERS, 0);
+    uint maxlen = List_Size(bufferList->fList);
 
-    for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
+    std::unique_ptr<FileBuffer *[]> bufferptr(new FileBuffer*[maxlen]);
+    FileBuffer **bufferArray = bufferptr.get();
+    size = List_FetchAsArray(bufferList->fList, bufferArray, maxlen, 0);
+
+    for(int i = 0; i < MAX_THREADS; i++){
+        results[i].results.clear();
+        results[i].count = 0;
+    }
 
     const char *strPtr = searchStr.c_str();
     uint stringLen = searchStr.size();
 
     ParallelFor("String Seach", 0, size, [&](int i, int tid){
         LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
-        //printf("[%d] ==> %s\n", tid, lineBuffer->filePath);
         if(tid > MAX_THREADS-1){
             printf("Ooops cannot query, too many threads\n");
             return;
         }
 
         GlobalSearch *threadResult = &results[tid];
-        if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
-            //printf("Too many results\n");
-            return;
-        }
 
         for(uint j = 0; j < lineBuffer->lineCount; j++){
             Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, j);
@@ -362,15 +371,11 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
                     at = StringSearch((char *)strPtr, &buffer->data[start],
                                       stringLen, buffer->taken - start);
                     if(at >= 0){
-                        uint loc = threadResult->count;
-                        if(loc >= MAX_SEARCH_ENTRIES-1){
-                            //printf("Too many results\n");
-                            return;
-                        }
-
-                        threadResult->results[loc].line = j;
-                        threadResult->results[loc].col = at + start;
-                        threadResult->results[loc].lineBuffer = lineBuffer;
+                        threadResult->results.push_back({
+                            .lineBuffer = lineBuffer,
+                            .line = j,
+                            .col = at + start,
+                        });
                         start += at + stringLen;
                         threadResult->count++;
                     }
@@ -378,23 +383,20 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
             }
         }
     });
-#if 0
-    for(int tid = 0; tid < MAX_THREADS; tid++){
-        GlobalSearch *threadResult = &results[tid];
-        for(uint i = 0; i < threadResult->count; i++){
-            printf("[%s] = line (%d) col (%d)\n",
-            threadResult->results[i].lineBuffer->filePath,
-            threadResult->results[i].line,
-            threadResult->results[i].col);
-        }
-    }
-#endif
 
     View *view = AppGetActiveView();
-    if(SearchAllFilesCommandStart(view, "Search Files") >= 0){
+    uint count = 0;
+    for(uint i = 0; i < MAX_THREADS; i++){
+        count += results[i].count;
+    }
+
+    std::stringstream ss;
+    ss << "Search Files ( " << count << " )";
+    if(SearchAllFilesCommandStart(view, ss.str().c_str()) >= 0){
         AppSetBindingsForState(View_SelectableList);
         r = 2;
     }
+
     return r;
 }
 
@@ -406,11 +408,16 @@ int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
     std::vector<std::string> splits;
     StringSplit(std::string(cmd), splits);
     FileBufferList *bufferList = FileProvider_GetBufferList();
-    FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
-    size = List_FetchAsArray(bufferList->fList, bufferArray,
-                             MAX_QUERIABLE_BUFFERS, 0);
+    uint maxlen = List_Size(bufferList->fList);
 
-    for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
+    std::unique_ptr<FileBuffer *[]> bufferptr(new FileBuffer*[maxlen]);
+    FileBuffer **bufferArray = bufferptr.get();
+    size = List_FetchAsArray(bufferList->fList, bufferArray, maxlen, 0);
+
+    for(int i = 0; i < MAX_THREADS; i++){
+        results[i].results.clear();
+        results[i].count = 0;
+    }
 
     if(splits.size() > 1){
         strPtr = (char *)splits[1].c_str();
@@ -425,11 +432,6 @@ int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
         }
 
         GlobalSearch *threadResult = &results[tid];
-        if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
-            printf("Too many results\n");
-            return;
-        }
-
         for(uint j = 0; j < lineBuffer->lineCount; j++){
             Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, j);
             for(uint k = 0; k < buffer->tokenCount; k++){
@@ -444,14 +446,11 @@ int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
                 }
 
                 if(found){
-                    uint loc = threadResult->count;
-                    if(loc >= MAX_SEARCH_ENTRIES-1){
-                        return;
-                    }
-
-                    threadResult->results[loc].line = j;
-                    threadResult->results[loc].col = token->position;
-                    threadResult->results[loc].lineBuffer = lineBuffer;
+                    threadResult->results.push_back({
+                        .lineBuffer = lineBuffer,
+                        .line = j,
+                        .col = (uint)(token->position < 0 ? 0 : token->position),
+                    });
                     threadResult->count++;
                 }
             }
@@ -459,7 +458,14 @@ int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
     });
 
     View *view = AppGetActiveView();
-    if(SearchAllFilesCommandStart(view, "Functions") >= 0){
+    uint count = 0;
+    for(uint i = 0; i < MAX_THREADS; i++){
+        count += results[i].count;
+    }
+
+    std::stringstream ss;
+    ss << "Functions ( " << count << " )";
+    if(SearchAllFilesCommandStart(view, ss.str().c_str()) >= 0){
         AppSetBindingsForState(View_SelectableList);
         r = 2;
     }

@@ -339,6 +339,10 @@ template<typename T> inline T *List_GetTail(List<T> *list){
     return list->tail->item;
 }
 
+template<typename T> inline uint List_Size(List<T> *list){
+    return list->size;
+}
+
 template<typename T> inline
 T *List_Find(List<T> *list, std::function<int(T *)> call){
     if(!list) return nullptr;

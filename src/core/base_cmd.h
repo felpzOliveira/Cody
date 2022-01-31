@@ -6,6 +6,7 @@
 #include <geometry.h>
 #include <functional>
 #include <string>
+#include <vector>
 
 struct QueryBar;
 struct LineBuffer;
@@ -36,16 +37,14 @@ struct FileEntry;
 #define CMD_DBG_EVALUATE_STR "dbg eval "
 
 #define MAX_THREADS 16
-#define MAX_SEARCH_ENTRIES 2048
-#define MAX_QUERIABLE_BUFFERS 256
 struct GlobalSearchResult{
     LineBuffer *lineBuffer;
-    int line;
-    int col;
+    uint line;
+    uint col;
 };
 
 struct GlobalSearch{
-    GlobalSearchResult results[MAX_SEARCH_ENTRIES];
+    std::vector<GlobalSearchResult> results;
     uint count;
 };
 
