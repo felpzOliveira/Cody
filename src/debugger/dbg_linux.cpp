@@ -121,9 +121,19 @@ inline std::string Trim(std::string s){
 
 inline ExpressionTreeNode *Dbg_LinuxMakeNode(std::string owner, std::string value){
     ExpressionTreeNode *node = new ExpressionTreeNode;
-    node->owner = Trim(owner);
-    node->value = Trim(value);
+    node->values.owner = Trim(owner);
+    node->values.value = Trim(value);
     return node;
+}
+
+int CheckForEqualFirst(char *p){
+    char *s = p;
+    while(*s){
+        if(*s == '=') return 1;
+        if(*s == ',') return 0;
+        s++;
+    }
+    return 0;
 }
 
 uint FindOwner(char **p){
@@ -171,8 +181,18 @@ int FindValue(char **p, int *out){
             }
         }else{
             if(**p == '{'){
-                *out = 1;
-                (*p)++;
+                if(CheckForEqualFirst(*p) == 1){
+                    *out = 1;
+                    (*p)++;
+                }else{
+                    while(**p != '}'){
+                        len++;
+                        (*p)++;
+                    }
+                    state = len;
+                    *out = 2;
+                    (*p)++;
+                }
                 break;
             }else if(**p == '}'){
                 *out = 2;

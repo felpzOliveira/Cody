@@ -1731,6 +1731,11 @@ void AppCommandSplitVertical(){
     View_SetActive(appContext.activeView, 1);
 }
 
+void AppCommandListFunctions(){
+    (void)BaseCommand_SearchFunctions((char *)CMD_FUNCTIONS_STR, strlen(CMD_FUNCTIONS_STR),
+                                      AppGetActiveView());
+}
+
 void AppDefaultEntry(char *utf8Data, int utf8Size, void *){
     if(utf8Size > 0){
         int off = 0;
@@ -1898,10 +1903,6 @@ void AppCommandGitStatus(){
 }
 
 void AppCommandGitDiffCurrent(){
-    //DbgApp_StartDebugger("/home/felipe/Documents/entry", nullptr);
-    //DbgPackage package("entry.cpp", 2);
-    //Dbg_SendPackage(package);
-    //return;
     BufferView *bView = AppGetActiveBufferView();
     bool allow_write = true;
     NullRet(bView->lineBuffer);
@@ -2268,6 +2269,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSwitchTheme, Key_LeftControl, Key_T);
 
     RegisterRepeatableEvent(mapping, AppCommandOpenFile, Key_LeftAlt, Key_F);
+    RegisterRepeatableEvent(mapping, AppCommandListFunctions, Key_LeftControl, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftControl);

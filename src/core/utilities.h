@@ -20,7 +20,7 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
-#define BUG() printf("=========== BUG ===========\nLine:%d\n", __LINE__)
+#define BUG() printf("\n=========== BUG ===========\nLocation %s:%d Func: %s\n", __FILE__, __LINE__, __func__)
 #define NullRet(x) if(!(x)) return
 
 const Float kInv255 = 0.003921569;

@@ -6,9 +6,10 @@
 #define MODULE_NAME "DBG-APP"
 #define StateChangeMask  (1 << 0)
 #define BkptFeedbackMask (1 << 1)
+#define ExpFeedbackMask  (1 << 2)
 
 typedef enum{
-    SyncStop=0, SyncExit, SyncState, SyncBkptFeedback
+    SyncStop=0, SyncExit, SyncState, SyncBkptFeedback, SyncExpFeedback
 }DbgSyncCode;
 
 /* template this ? */
@@ -17,6 +18,7 @@ struct DbgSyncPackage{
     DbgStop sp;
     DbgState state;
     BreakpointFeedback bkptFed;
+    ExpressionFeedback expFed;
 };
 
 struct DbgLineBufferPair{
@@ -72,12 +74,16 @@ typedef DbgCallbackList<DbgStateChangeCallback> DbgStateChangeList;
 typedef DbgUserCallback<DbgApp_UserBkptFeedback> DbgBkptFeedbackCallback;
 typedef DbgCallbackList<DbgBkptFeedbackCallback> DbgBkptFeedbackList;
 
+typedef DbgUserCallback<DbgApp_UserExpressionFeedback> DbgExpFeedbackCallback;
+typedef DbgCallbackList<DbgExpFeedbackCallback> DbgExpFeedbackList;
+
 struct DbgSynchronizer{
     View *targetView;
     LineBuffer *dbgLB;
     bool is_stopped;
     DbgStateChangeList stateChangeList;
     DbgBkptFeedbackList bkptFeedbackList;
+    DbgExpFeedbackList expFeedbackList;
     std::vector<LineBuffer *> loadedLBs;
     std::vector<DbgLineBufferPair> lockedLBs;
     ConcurrentQueue<DbgSyncPackage> inQ;
@@ -108,6 +114,13 @@ void DbgApp_AsyncHandleBkptFeedback(BreakpointFeedback feedback){
     DbgSyncPackage pkg;
     pkg.code = DbgSyncCode::SyncBkptFeedback;
     pkg.bkptFed = feedback;
+    dbgSync.inQ.push(pkg);
+}
+
+void DbgApp_AsyncHandleExpFeedback(ExpressionFeedback feedback){
+    DbgSyncPackage pkg;
+    pkg.code = DbgSyncCode::SyncExpFeedback;
+    pkg.expFed = feedback;
     dbgSync.inQ.push(pkg);
 }
 
@@ -361,6 +374,11 @@ void DbgApp_BkptFeedback(BreakpointFeedback bkptFed){
     DbgApp_DispatchToUser<DbgApp_UserBkptFeedback, BreakpointFeedback>(bkptFed, list);
 }
 
+void DbgApp_ExpressionFeedback(ExpressionFeedback expFed){
+    DbgExpFeedbackList *list = &dbgSync.expFeedbackList;
+    DbgApp_DispatchToUser<DbgApp_UserExpressionFeedback, ExpressionFeedback>(expFed, list);
+}
+
 bool DbgApp_PoolMessages(){
     bool exit = false;
     while(dbgSync.inQ.size() > 0){
@@ -375,6 +393,9 @@ bool DbgApp_PoolMessages(){
             } break;
             case DbgSyncCode::SyncState: {
                 DbgApp_StateReport(pkg.state);
+            } break;
+            case DbgSyncCode::SyncExpFeedback: {
+                DbgApp_ExpressionFeedback(pkg.expFed);
             } break;
             case DbgSyncCode::SyncBkptFeedback: {
                 DbgApp_BkptFeedback(pkg.bkptFed);
@@ -432,9 +453,9 @@ void DbgApp_Finish(){
     Dbg_SendPackage(DbgPackage(DbgCode::Finish));
 }
 
-void DbgApp_Eval(char *expression){
+void DbgApp_Eval(char *expression, uint handle){
     dbgSync.is_stopped = false;
-    Dbg_SendPackage(DbgPackage(std::string(expression), DbgCode::Evaluate));
+    Dbg_SendPackage(DbgPackage(std::string(expression), (int)handle, DbgCode::Evaluate));
 }
 
 void DbgApp_SetKeyboard(){
@@ -552,6 +573,11 @@ uint DbgApp_RegisterBreakpointFeedbackCallback(DbgApp_UserBkptFeedback *fn, void
                                                            fn, priv, BkptFeedbackMask);
 }
 
+uint DbgApp_RegisterExpressionFeedbackCallback(DbgApp_UserExpressionFeedback *fn, void *priv){
+    return DbgApp_RegisterRoutine<DbgApp_UserExpressionFeedback>(&dbgSync.expFeedbackList,
+                                                                 fn, priv, ExpFeedbackMask);
+}
+
 void DbgApp_UnregisterCallbackByHandle(uint handle){
     uint mask = handle >> 8;
     switch(mask){
@@ -562,6 +588,10 @@ void DbgApp_UnregisterCallbackByHandle(uint handle){
         case BkptFeedbackMask:{
             DbgApp_UnregisterHandle<DbgApp_UserBkptFeedback>(&dbgSync.bkptFeedbackList,
                                                              handle);
+        } break;
+        case ExpFeedbackMask:{
+            DbgApp_UnregisterHandle<DbgApp_UserExpressionFeedback>(&dbgSync.expFeedbackList,
+                                                                   handle);
         } break;
         default:{
             printf("Unknow bit mask %d\n", (int)mask);
@@ -589,7 +619,8 @@ void DbgApp_StartDebugger(const char *binaryPath, const char *args){
     Dbg_RegisterStopPoint(DbgApp_AsyncHandleStopPoint);
     Dbg_RegisterExit(DbgApp_AsyncHandleExit);
     Dbg_RegisterReportState(DbgApp_AsyncHandleState);
-    Dbg_RegisterBreakpointFeedback(DbgApp_BkptFeedback);
+    Dbg_RegisterBreakpointFeedback(DbgApp_AsyncHandleBkptFeedback);
+    Dbg_RegisterExpressionFeedback(DbgApp_AsyncHandleExpFeedback);
     // ...
 
     // inform the rendering API that we will start an event handling

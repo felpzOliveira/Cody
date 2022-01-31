@@ -17,6 +17,7 @@ Dbg dbg = {
     .fnUser_exit = nullptr,
     .fnUser_reportState = nullptr,
     .fnUser_bkptFeedback = nullptr,
+    .fnUser_expFeedback = nullptr,
 };
 
 static void Dbg_LockedSetRun(){
@@ -96,7 +97,7 @@ static void Dbg_PrintTree(ExpressionTree *tree){
     nodeQ.push({ .node = root, .depth = 0, });
     int currDepth = 0;
     std::stack<std::string> depthOwner;
-    std::string currOwner = root->owner;
+    std::string currOwner = root->values.owner;
     while(!nodeQ.empty()){
         node_value val = nodeQ.top();
         ExpressionTreeNode *node = val.node;
@@ -118,13 +119,13 @@ static void Dbg_PrintTree(ExpressionTree *tree){
             }
         }
 
-        printf("%s = ", node->owner.c_str());
-        if(node->value == DBG_TREE_EXP_STR){
+        printf("%s = ", node->values.owner.c_str());
+        if(node->nodes.size() > 0){
             printf("{ ");
             depthOwner.push(currOwner);
-            currOwner = node->owner;
+            currOwner = node->values.owner;
         }else{
-            printf("%s", node->value.c_str());
+            printf("%s", node->values.value.c_str());
         }
         currDepth = depth;
         for(uint i = 0; i < node->nodes.size(); i++){
@@ -144,63 +145,23 @@ static void Dbg_PrintTree(ExpressionTree *tree){
     printf("\n");
 }
 
-static void Dbg_PrintTree2(ExpressionTree *tree){
-    struct node_value{
-        ExpressionTreeNode *node;
-        int depth;
-    };
-
-    std::queue<node_value> nodeQ;
-    ExpressionTreeNode *root = tree->root;
-    nodeQ.push({ .node = root, .depth = 0, });
-    std::map<ExpressionTreeNode *,
-            std::map<int, std::vector<ExpressionTreeNode *>>> nodeMap;
+static void Dbg_PrintTreeByLevel(ExpressionTree *tree){
+    std::queue<ExpressionTreeNode *> nodeQ;
+    nodeQ.push(tree->root);
     while(!nodeQ.empty()){
-        node_value val = nodeQ.front();
-        ExpressionTreeNode *node = val.node;
-        int depth = val.depth;
-
+        ExpressionTreeNode *node = nodeQ.front();
         nodeQ.pop();
 
-        if(node != root){
-            std::map<int, std::vector<ExpressionTreeNode *>> targetMap;
-            std::vector<ExpressionTreeNode *> data;
-            if(nodeMap.find(node) != nodeMap.end()){
-                targetMap = nodeMap[node];
+        if(node->nodes.size() > 0){
+            printf("%s = ", node->values.owner.c_str());
+            for(ExpressionTreeNode *nd : node->nodes){
+                printf("%s ", nd->values.owner.c_str());
+                nodeQ.push(nd);
             }
-
-            if(targetMap.find(depth) != targetMap.end()){
-                data = targetMap[depth];
-            }
-
-            data.push_back(node);
-            targetMap[depth] = data;
-            nodeMap[node] = targetMap;
-        }
-
-        for(uint i = 0; i < node->nodes.size(); i++){
-            nodeQ.push({ .node = node->nodes[i], .depth = depth+1 });
-        }
-    }
-
-    printf("> %s = %s\n", root->owner.c_str(), root->value.c_str());
-    for(auto it = nodeMap.begin(); it != nodeMap.end(); it++){
-        std::map<int, std::vector<ExpressionTreeNode *>> targetMap = it->second;
-        int n = 0;
-        for(uint d = 0; d < targetMap.size(); ){
-            if(targetMap.find(n) == targetMap.end()){
-                n += 1;
-            }else{
-                std::vector<ExpressionTreeNode *> v = targetMap[n];
-                for(ExpressionTreeNode *nd : v){
-                    for(int i = 0; i < n; i++){
-                        printf(" ");
-                    }
-                    printf("> %s = %s\n", nd->owner.c_str(), nd->value.c_str());
-                }
-                d++;
-                n += 1;
-            }
+            printf(DASH_N);
+        }else{
+            PRINT("%s = %s", node->values.owner.c_str(),
+                  node->values.value.c_str());
         }
     }
 }
@@ -251,16 +212,19 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                     }
                 } break;
                 case DbgCode::Evaluate: {
+                    ExpressionFeedback expFed;
                     char *out = nullptr;
                     rv = dbg.fn_evalExpression(&dbg, (char *)package.data.c_str(), &out);
+                    expFed.expression = package.data;
+                    expFed.rv = rv;
+                    expFed.handle = (uint)package.idata;
                     if(out){
-                        ExpressionTree tree = {
-                            .root = nullptr,
-                            .expression = package.data,
-                        };
-                        rv = Dbg_ParseEvaluation(out, tree);
+                        expFed.value = std::string(out);
                         free(out);
-                        Dbg_PrintTree(&tree);
+                    }
+
+                    if(dbg.fnUser_expFeedback){
+                        dbg.fnUser_expFeedback(expFed);
                     }
                     wait_event = 0;
                 } break;
@@ -284,7 +248,8 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
                 } break;
                 case DbgCode::Breakpoint: {
                     DbgBkpt bkpt;
-                    rv = Dbg_HandleBreakpoint(&dbg, package.data, package.line, &bkpt);
+                    rv = Dbg_HandleBreakpoint(&dbg, package.data,
+                                              package.idata, &bkpt);
                     if(dbg.fnUser_bkptFeedback){
                         BreakpointFeedback bkptFed = {
                             .bkpt = bkpt,
@@ -409,6 +374,22 @@ bool Dbg_Start(const char *binaryPath, const char *args){
     return true;
 }
 
+static void Dbg_RecursiveFreeExpressionTreeNode(ExpressionTreeNode *node){
+    if(node != nullptr){
+        for(uint i = 0; i < node->nodes.size(); i++){
+            Dbg_RecursiveFreeExpressionTreeNode(node->nodes[i]);
+        }
+        node->nodes.clear();
+        delete node;
+    }
+}
+
+void Dbg_FreeExpressionTree(ExpressionTree &tree){
+    Dbg_RecursiveFreeExpressionTreeNode(tree.root);
+    tree.root = nullptr;
+    tree.expression = std::string();
+}
+
 bool Dbg_ParseEvaluation(char *eval, ExpressionTree &tree){
     return dbg.fn_evalParser(eval, tree);
 }
@@ -429,3 +410,6 @@ void Dbg_RegisterBreakpointFeedback(DbgUserBkptFeedback *fn){
     dbg.fnUser_bkptFeedback = fn;
 }
 
+void Dbg_RegisterExpressionFeedback(DbgUserExpressionFeedback *fn){
+    dbg.fnUser_expFeedback = fn;
+}

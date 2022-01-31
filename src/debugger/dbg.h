@@ -41,13 +41,14 @@ inline const char *DbgStateToString(DbgState state){
 class DbgPackage{
     public:
     DbgPackage(){}
-    DbgPackage(DbgCode c) : data(std::string()), line(-1), code(c){}
-    DbgPackage(std::string _file, int _line) : data(_file), line(_line),
+    DbgPackage(DbgCode c) : data(std::string()), idata(-1), code(c){}
+    DbgPackage(std::string _file, int _line) : data(_file), idata(_line),
         code(DbgCode::Breakpoint){}
     DbgPackage(std::string d, DbgCode c) : data(d), code(c){}
+    DbgPackage(std::string d, int n, DbgCode c) : data(d), idata(n), code(c){}
 
     std::string data;
-    int line;
+    int idata;
     DbgCode code;
 };
 
@@ -71,9 +72,13 @@ struct DbgStop{
 * Evaluating expressions returns a tree on GDB and god knows what in msvc,
 * so we need to clearly define it so multiple debuggers have a common interface.
 */
-struct ExpressionTreeNode{
+struct ExpressionPair{
     std::string owner;
     std::string value;
+};
+
+struct ExpressionTreeNode{
+    ExpressionPair values;
     std::vector<struct ExpressionTreeNode *> nodes;
 };
 
@@ -83,10 +88,17 @@ struct ExpressionTree{
 };
 
 /*
-* Groups stuff to return information about success of adding breakpoints.
+* Groups stuff to return request information.
 */
 struct BreakpointFeedback{
     DbgBkpt bkpt;
+    bool rv;
+};
+
+struct ExpressionFeedback{
+    std::string expression;
+    std::string value;
+    uint handle;
     bool rv;
 };
 
@@ -97,11 +109,13 @@ struct Dbg;
 #define DBG_USER_EXIT(name) void name()
 #define DBG_USER_REPORT_STATE(name) void name(DbgState state)
 #define DBG_USER_BKPT_FEEDBACK(name) void name(BreakpointFeedback bkptFed)
+#define DBG_USER_EXP_FEEDBACK(name) void name(ExpressionFeedback expFed)
 
 typedef DBG_USER_STOP_POINT(DbgUserStopPoint);
 typedef DBG_USER_EXIT(DbgUserExit);
 typedef DBG_USER_REPORT_STATE(DbgUserReportState);
 typedef DBG_USER_BKPT_FEEDBACK(DbgUserBkptFeedback);
+typedef DBG_USER_EXP_FEEDBACK(DbgUserExpressionFeedback);
 
 /* function pointers for platforms */
 #define DBG_START_WITH(name) bool name(Dbg *dbg, const char *binp, const char *args)
@@ -140,6 +154,7 @@ struct Dbg{
     DbgUserExit *fnUser_exit;
     DbgUserReportState *fnUser_reportState;
     DbgUserBkptFeedback *fnUser_bkptFeedback;
+    DbgUserExpressionFeedback *fnUser_expFeedback;
     /* OS-dependent calls for the actual debugger */
     DbgPlatformStartWith *fn_startWith;
     DbgPlatformSetBreakpoint *fn_setBkpt;
@@ -164,8 +179,8 @@ struct Dbg{
     /*
     * Map of breakpoints, not really required but usefull so that other parts
     * of cody don't need to map what is currently the debugger breakpoint states.
-    * Instead they can simply query the debugger for the breakpoints enalbed/disabled
-    * at any moment, this only have the downside of needind a lock but querying
+    * Instead they can simply query the debugger for the breakpoints enabled/disabled
+    * at any moment, this only have the downside of needing a lock but querying
     * shouldn't run at the same time as breakpoint modification routines so it
     * won't be an issue.
     */
@@ -185,11 +200,17 @@ void Dbg_RegisterStopPoint(DbgUserStopPoint *fn);
 void Dbg_RegisterExit(DbgUserExit *fn);
 void Dbg_RegisterReportState(DbgUserReportState *fn);
 void Dbg_RegisterBreakpointFeedback(DbgUserBkptFeedback *fn);
+void Dbg_RegisterExpressionFeedback(DbgUserExpressionFeedback *fn);
 
 /*
 * Parses a previously obtained expression evaluation into a expression tree.
 */
 bool Dbg_ParseEvaluation(char *eval, ExpressionTree &tree);
+
+/*
+* Release the resources taken from a expression tree.
+*/
+void Dbg_FreeExpressionTree(ExpressionTree &tree);
 
 /*
 * Load the debugger with a specific binary file to be debugged.

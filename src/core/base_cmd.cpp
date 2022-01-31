@@ -12,24 +12,6 @@
 #include <dbgapp.h>
 #include <graphics.h>
 
-#define CMD_CURSORSET_STR "cursor-format "
-#define CMD_DIMM_STR "dimm "
-#define CMD_KILLSPACES_STR "kill-spaces"
-#define CMD_SEARCH_STR "search "
-#define CMD_GIT_STR "git "
-#define CMD_HSPLIT_STR "hsplit"
-#define CMD_VSPLIT_STR "vsplit"
-#define CMD_EXPAND_STR "expand"
-#define CMD_KILLVIEW_STR "kill-view"
-#define CMD_KILLBUFFER_STR "kill-buffer"
-#define CMD_CURSORSEG_STR "cursor-seg "
-#define CMD_DBG_START_STR "dbg start "
-#define CMD_DBG_BREAK_STR "dbg break "
-#define CMD_DBG_EXIT_STR "dbg exit"
-#define CMD_DBG_RUN_STR "dbg run"
-#define CMD_DBG_FINISH_STR "dbg finish"
-#define CMD_DBG_EVALUATE_STR "dbg eval "
-
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
 static std::map<std::string, std::string> mathSymbolMap;
@@ -156,6 +138,12 @@ uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch){
 void BaseCommand_JumpViewToBuffer(View *view, LineBuffer *lineBuffer, vec2i p){
     BufferView *bView = View_GetBufferView(view);
     BufferView_SwapBuffer(bView, lineBuffer, CodeView); // is this always CodeView?
+
+    uint s = BufferView_GetMaximumLineView(bView);
+    int in = p.x + s;
+    s = Clamp(in - 2, 0, BufferView_GetLineCount(bView)-1);
+    BufferView_CursorToPosition(bView, s, p.y);
+
     BufferView_CursorToPosition(bView, p.x, p.y);
     BufferView_GhostCursorFollow(bView);
 }
@@ -165,6 +153,8 @@ int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
     if(active == -1){
         return 0;
     }
+
+    active = View_SelectableListGetRealIndex(view, active);
 
     GlobalSearchResult *result = &linearResults.res[active];
     LineBuffer *targetLineBuffer = result->lineBuffer;
@@ -181,9 +171,9 @@ int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
     return 1;
 }
 
-int SearchAllFilesCommandStart(View *view){
+int SearchAllFilesCommandStart(View *view, std::string title){
     AssertA(view != nullptr, "Invalid view pointer");
-    const char *header = "Search Files";
+    const char *header = title.c_str();
     uint hlen = strlen(header);
     LineBuffer *lineBuffer = AllocatorGetN(LineBuffer, 1);
     LineBuffer_InitBlank(lineBuffer);
@@ -282,7 +272,7 @@ int SearchAllFilesCommandStart(View *view){
 
 int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
     int r = 0;
-    if(cmd[0] == '\\'){
+    if(cmd[0] == '\\' || cmd[0] == '/'){
         r = 1;
         int e = StringFirstNonEmpty(&cmd[1], size - 1);
         if(e < 0) return r;
@@ -363,8 +353,8 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
             return;
         }
 
-        for(uint i = 0; i < lineBuffer->lineCount; i++){
-            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        for(uint j = 0; j < lineBuffer->lineCount; j++){
+            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, j);
             if(buffer->taken > 0){
                 int at = 0;
                 uint start = 0;
@@ -378,7 +368,7 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
                             return;
                         }
 
-                        threadResult->results[loc].line = i;
+                        threadResult->results[loc].line = j;
                         threadResult->results[loc].col = at + start;
                         threadResult->results[loc].lineBuffer = lineBuffer;
                         start += at + stringLen;
@@ -401,7 +391,75 @@ int BaseCommand_SearchAllFiles(char *cmd, uint size, View *){
 #endif
 
     View *view = AppGetActiveView();
-    if(SearchAllFilesCommandStart(view) >= 0){
+    if(SearchAllFilesCommandStart(view, "Search Files") >= 0){
+        AppSetBindingsForState(View_SelectableList);
+        r = 2;
+    }
+    return r;
+}
+
+int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
+    int r = 1;
+    char *strPtr = nullptr;
+    uint stringLen = 0;
+
+    std::vector<std::string> splits;
+    StringSplit(std::string(cmd), splits);
+    FileBufferList *bufferList = FileProvider_GetBufferList();
+    FileBuffer *bufferArray[MAX_QUERIABLE_BUFFERS];
+    size = List_FetchAsArray(bufferList->fList, bufferArray,
+                             MAX_QUERIABLE_BUFFERS, 0);
+
+    for(int i = 0; i < MAX_THREADS; i++) results[i].count = 0;
+
+    if(splits.size() > 1){
+        strPtr = (char *)splits[1].c_str();
+        stringLen = splits[1].size();
+    }
+
+    ParallelFor("Functions Search", 0, size, [&](int i, int tid){
+        LineBuffer *lineBuffer = bufferArray[i]->lineBuffer;
+        if(tid > MAX_THREADS-1){
+            printf("Ooops cannot query, too many threads\n");
+            return;
+        }
+
+        GlobalSearch *threadResult = &results[tid];
+        if(threadResult->count >= MAX_SEARCH_ENTRIES-1){
+            printf("Too many results\n");
+            return;
+        }
+
+        for(uint j = 0; j < lineBuffer->lineCount; j++){
+            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, j);
+            for(uint k = 0; k < buffer->tokenCount; k++){
+                Token *token = &buffer->tokens[k];
+                int found = 0;
+                if(token->identifier == TOKEN_ID_FUNCTION_DECLARATION){
+                    found = 1;
+                    if(strPtr){
+                        char *s = &buffer->data[token->position];
+                        found = StringEqual(strPtr, s, Min(token->size, stringLen));
+                    }
+                }
+
+                if(found){
+                    uint loc = threadResult->count;
+                    if(loc >= MAX_SEARCH_ENTRIES-1){
+                        return;
+                    }
+
+                    threadResult->results[loc].line = j;
+                    threadResult->results[loc].col = token->position;
+                    threadResult->results[loc].lineBuffer = lineBuffer;
+                    threadResult->count++;
+                }
+            }
+        }
+    });
+
+    View *view = AppGetActiveView();
+    if(SearchAllFilesCommandStart(view, "Functions") >= 0){
         AppSetBindingsForState(View_SelectableList);
         r = 2;
     }
@@ -566,7 +624,7 @@ int BaseCommand_DbgEvaluate(char *cmd, uint size, View *view){
         if(i < splits.size() - 1) arg += " ";
     }
 
-    DbgApp_Eval((char *)arg.c_str());
+    DbgApp_Eval((char *)arg.c_str(), 0);
     return r;
 }
 
@@ -653,6 +711,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = BaseCommand_SetDimm;
     cmdMap[CMD_KILLSPACES_STR] = BaseCommand_KillSpaces;
     cmdMap[CMD_SEARCH_STR] = BaseCommand_SearchAllFiles;
+    cmdMap[CMD_FUNCTIONS_STR] = BaseCommand_SearchFunctions;
     cmdMap[CMD_GIT_STR] = BaseCommand_Git;
     cmdMap[CMD_HSPLIT_STR] = BaseCommand_Hsplit;
     cmdMap[CMD_VSPLIT_STR] = BaseCommand_Vsplit;

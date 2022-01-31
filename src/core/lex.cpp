@@ -7,15 +7,15 @@
 #include <buffers.h>
 
 #if 0
-#define PRINT_SAFE(head, ptr, len)do{\
-    char __mem[128], __n[64];\
-    memcpy(__n, ptr, len);\
-    __n[len] = 0;\
-    snprintf(__mem, sizeof(__mem), head "%s", __n);\
-    printf("%s\n", __mem);\
-}while(0)
+    #define PRINT_SAFE(head, ptr, len)do{\
+        char __mem[128], __n[64];\
+        memcpy(__n, ptr, len);\
+        __n[len] = 0;\
+        snprintf(__mem, sizeof(__mem), head "%s", __n);\
+        printf("%s\n", __mem);\
+    }while(0)
 #else
-#define PRINT_SAFE(...)
+    #define PRINT_SAFE(...)
 #endif
 
 #define MODULE_NAME "Lex"
@@ -61,18 +61,38 @@ inline int Lex_IsAnyNumber(char v){
     return Lex_IsDecimalValue(v) || Lex_IsHexValue(v);
 }
 
-static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback *fetcher)
+static char Lex_LookAhead(char *p, uint start, uint maxn, TokenizerFetchCallback *fetcher,
+                          bool skip_ctxs=false)
 {
     char *s = p;
     uint runLen = maxn;
     uint n = 0;
     uint fetched = start;
+    // TODO: Context aware operators, this works only for C++ templating
+    int ctx_chars_vals = 0;
+    auto ctx_apply_char = [&](char *s)->bool{
+        if(*s == '<') ctx_chars_vals++;
+        if(*s == '>') ctx_chars_vals--;
+        return *s == '<' || *s == '>';
+    };
 
+    bool skippable = false;
     while(s != NULL){
-        while((*s == ' ' || *s == '\n' || *s == '\t' || *s == '\r') && n < runLen){
-            s++;
-            n++;
-        }
+        do{
+            skippable = (*s == ' ' || *s == '\n' || *s == '\t' || *s == '\r');
+            if(!skippable && skip_ctxs){
+                skippable = ctx_apply_char(s);
+            }
+
+            if(!skippable){
+                skippable = ctx_chars_vals != 0;
+            }
+
+            if(skippable && n < runLen){
+                s++;
+                n++;
+            }
+        }while(skippable && n < runLen);
 
         if(n < runLen) return *s;
 
@@ -860,13 +880,18 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
 
             }else if(!(length == 1 && TerminatorChar(**p))){
                 uint maxn = n - length;
-                char nextC = Lex_LookAhead(*p, length, maxn, fetcher);
+                char nextC = Lex_LookAhead(*p, length, maxn, fetcher, true);
                 if(nextC == '('){
                     if(tokenizer->runningIndentLevel > 0){
                         token->identifier = TOKEN_ID_FUNCTION;
                     }else{
                         token->identifier = TOKEN_ID_FUNCTION_DECLARATION;
 #if 0
+                        // NOTE: In here we don't actually want to push the content to
+                        // the symbol table because this will apply to all files.
+                        // What we actually want is to cache these inside a map or list
+                        // so that we can list functions faster, without needing to
+                        // tokenize anything.
                         SymbolTable_Insert(tokenizer->symbolTable, h, length,
                                            TOKEN_ID_FUNCTION_DECLARATION);
 #endif

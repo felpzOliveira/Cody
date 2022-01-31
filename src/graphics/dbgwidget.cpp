@@ -4,9 +4,84 @@
 #include <sstream>
 #include <glad/glad.h>
 #include <dbgapp.h>
+#include <queue>
+
+void DbgExpression(ExpressionFeedback feedback, void *priv){
+    PRINT("%s ==> %s", feedback.expression.c_str(),
+           feedback.value.c_str());
+}
+
+template<typename Fn, typename ...Args>
+void TransverseExpressionTreeNode(ExpressionTreeNode *root, Fn fn, Args... args){
+    std::queue<ExpressionTreeNode *> nodeQ;
+    nodeQ.push(root);
+    while(!nodeQ.empty()){
+        ExpressionTreeNode *node = nodeQ.front();
+        nodeQ.pop();
+
+        if(fn(node, args...) == 0){
+            break;
+        }
+
+        for(ExpressionTreeNode *nd : node->nodes){
+            nodeQ.push(nd);
+        }
+    }
+}
+
+DbgWidgetExpressionViewer::DbgWidgetExpressionViewer(){
+    state = ExpressionNone;
+    expTree.root = nullptr;
+}
+
+DbgWidgetExpressionViewer::~DbgWidgetExpressionViewer(){
+    if(expTree.root) Dbg_FreeExpressionTree(expTree);
+}
+
+void DbgWidgetExpressionViewer::Clear(){
+    state = ExpressionNone;
+    expression = std::string();
+    if(expTree.root) Dbg_FreeExpressionTree(expTree);
+}
+
+void DbgWidgetExpressionViewer::SetExpression(ExpressionFeedback *feedback){
+    states.clear();
+    auto fn = [&](ExpressionTreeNode *node) -> int{
+        if(node->nodes.size() > 0){
+            printf("%s = ", node->values.owner.c_str());
+            for(ExpressionTreeNode *nd : node->nodes){
+                printf("%s ", nd->values.owner.c_str());
+            }
+            printf(DASH_N);
+            states.push_back(false);
+        }else{
+            PRINT("%s = %s", node->values.owner.c_str(),
+                  node->values.value.c_str());
+        }
+
+        return 1;
+    };
+
+    if(expTree.root) Dbg_FreeExpressionTree(expTree);
+    if(feedback->rv){
+        Dbg_ParseEvaluation((char *)feedback->value.c_str(), expTree);
+        state = ExpressionValid;
+        TransverseExpressionTreeNode(expTree.root, fn);
+    }else{
+        state = ExpressionInvalid;
+    }
+
+    expression = feedback->expression;
+}
+
+int DbgWidgetExpressionViewer::OnRender(WidgetRenderContext *wctx,
+                                        const Transform &transform)
+{
+    if(!expTree.root) return 0;
+    return 0;
+}
 
 #define kDelta 0.9
-int pauseState = 0;
 
 void DbgStateReport(DbgState state, void *priv){
     if(priv){
@@ -424,6 +499,7 @@ void InitializeDbgButtons(WidgetWindow *window, DbgWidgetButtons *dbgBt){
     dbgBt->buttons[DbgFinishIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnFinishClicked));
 
     dbgBt->handle = DbgApp_RegisterStateChangeCallback(DbgStateReport, dbgBt);
+    DbgApp_RegisterExpressionFeedbackCallback(DbgExpression, dbgBt);
     if(!window->Contains(dbgBt)){
         window->PushWidget(dbgBt);
     }

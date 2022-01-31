@@ -2,9 +2,33 @@
 #pragma once
 #include <widgets.h>
 #include <dbgapp.h>
+#include <vector>
+
+typedef enum{
+    ExpressionNone=0,
+    ExpressionValid,
+    ExpressionInvalid,
+}ExpressionViewerState;
+
+class DbgWidgetExpressionViewer : public Widget{
+    public:
+    ExpressionTree expTree;
+    ExpressionViewerState state;
+    std::string expression;
+    std::vector<bool> states;
+
+    DbgWidgetExpressionViewer();
+    ~DbgWidgetExpressionViewer();
+
+    void SetExpression(ExpressionFeedback *feedback);
+
+    void Clear();
+
+    virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) override;
+};
 
 /*
-* Implementation of the debugger buttons
+* Implementation of the debugger buttons that control run/step/continue/pause/exit
 */
 
 #define DbgRunIndex      (0)

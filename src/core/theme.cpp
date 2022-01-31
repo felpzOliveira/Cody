@@ -529,6 +529,7 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_NUMBER, numberColor);
         COLOR_RET(TOKEN_ID_RESERVED, reservedColor);
         COLOR_RET(TOKEN_ID_FUNCTION, functionColor);
+        // TODO: Customize the function declaration
         COLOR_RET(TOKEN_ID_FUNCTION_DECLARATION, functionColor);
         COLOR_RET(TOKEN_ID_INCLUDE, includeColor);
         COLOR_RET(TOKEN_ID_MATH, mathColor);

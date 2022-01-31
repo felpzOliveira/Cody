@@ -14,9 +14,11 @@
 //           instead.
 #define DBG_REPORT_STATE_CB(name) void name(DbgState state, void *priv)
 #define DBG_BKPT_FEEDBACK_CB(name) void name(BreakpointFeedback feedback, void *priv)
+#define DBG_EXPRESSION_FEEDBACK_CB(name) void name(ExpressionFeedback feedback, void *priv)
 
 typedef DBG_REPORT_STATE_CB(DbgApp_UserStateReport);
 typedef DBG_BKPT_FEEDBACK_CB(DbgApp_UserBkptFeedback);
+typedef DBG_EXPRESSION_FEEDBACK_CB(DbgApp_UserExpressionFeedback);
 
 /*
 * Handles a debugger stop point. This updates the interface accordingly to
@@ -40,6 +42,12 @@ uint DbgApp_RegisterStateChangeCallback(DbgApp_UserStateReport *fn, void *priv);
 * DbgApp_Break is called.
 */
 uint DbgApp_RegisterBreakpointFeedbackCallback(DbgApp_UserBkptFeedback *fn, void *priv);
+
+/*
+* Register a new callback for reporting the state of an expression that was evaluated
+* by the debugger with a call to DbgApp_Eval.
+*/
+uint DbgApp_RegisterExpressionFeedbackCallback(DbgApp_UserExpressionFeedback *fn, void *priv);
 
 /*
 * Unregister a previously registered callback by its handle.
@@ -67,9 +75,11 @@ bool DbgApp_IsStopped();
 void DbgApp_Break(const char *file, uint line);
 
 /*
-* Evaluates an expression on the debugger state.
+* Evaluates an expression on the debugger state. The handle is required
+* because dbg calls are asynchronous so you can use this id to process
+* the response.
 */
-void DbgApp_Eval(char *expression);
+void DbgApp_Eval(char *expression, uint handle);
 
 /*
 * Sends the run command to the debugger.

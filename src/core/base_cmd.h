@@ -16,8 +16,27 @@ struct FileEntry;
 #define OnFileOpenCallback std::function<void(View *view, FileEntry *entry)>
 #define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
 
+#define CMD_CURSORSET_STR "cursor-format "
+#define CMD_DIMM_STR "dimm "
+#define CMD_KILLSPACES_STR "kill-spaces"
+#define CMD_SEARCH_STR "search "
+#define CMD_FUNCTIONS_STR "functions"
+#define CMD_GIT_STR "git "
+#define CMD_HSPLIT_STR "hsplit"
+#define CMD_VSPLIT_STR "vsplit"
+#define CMD_EXPAND_STR "expand"
+#define CMD_KILLVIEW_STR "kill-view"
+#define CMD_KILLBUFFER_STR "kill-buffer"
+#define CMD_CURSORSEG_STR "cursor-seg "
+#define CMD_DBG_START_STR "dbg start "
+#define CMD_DBG_BREAK_STR "dbg break "
+#define CMD_DBG_EXIT_STR "dbg exit"
+#define CMD_DBG_RUN_STR "dbg run"
+#define CMD_DBG_FINISH_STR "dbg finish"
+#define CMD_DBG_EVALUATE_STR "dbg eval "
+
 #define MAX_THREADS 16
-#define MAX_SEARCH_ENTRIES 256
+#define MAX_SEARCH_ENTRIES 2048
 #define MAX_QUERIABLE_BUFFERS 256
 struct GlobalSearchResult{
     LineBuffer *lineBuffer;
@@ -115,5 +134,11 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size);
 * is required to loop the list and check each individual 'count' value.
 */
 uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch);
+
+/*
+* Searches for a functions, exposing for app to be able
+* to implement 'AppCommandListFunctions'.
+*/
+int BaseCommand_SearchFunctions(char *cmd, uint size, View *);
 
 #endif //BASE_CMD_H

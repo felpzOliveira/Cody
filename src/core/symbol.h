@@ -4,6 +4,7 @@
 #define SYMBOL_H
 #include <types.h>
 #include <geometry.h>
+#include <utilities.h>
 
 #define TOKEN_MAX_LENGTH 64
 #define SYMBOL_TABLE_SIZE 50000
@@ -193,7 +194,7 @@ SymbolNode *SymbolTable_GetEntry(SymbolTable *symTable, char *label, uint labelL
 * the literal 'next' node. Passing label as null or n = 0 makes this routine returns
 * the next node.
 */
-SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode, char *label, uint len);
+SymbolNode *SymbolTable_SymNodeNext(SymbolNode *symNode, char *label, uint n);
 
 /*
 * Debug routines.
