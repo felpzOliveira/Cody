@@ -21,7 +21,7 @@ else()
     set(MH_FLAGS "-Ofast -Wall -std=c++17 -fshort-enums")
 endif()
 
-find_library(PCRE_LIB NAMES pcre libpcre)
+#find_library(PCRE_LIB NAMES pcre libpcre)
 find_library(X11_LIB NAMES X11)
 find_library(Z_LIB NAMES z)
 find_library(PTHREAD_LIB NAMES pthread)
@@ -85,8 +85,8 @@ set (CODY_LIBRARIES
         ${X11_LIB}
         ${PTHREAD_LIB}
         ${LIB_GIT2_LIBRARIES}
-        ${Z_LIB}
-        ${PCRE_LIB})
+        ${Z_LIB})
+ #       ${PCRE_LIB})
 
 target_link_directories(${CODY} PRIVATE
                         ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2

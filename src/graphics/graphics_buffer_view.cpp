@@ -420,13 +420,13 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
     if(!buffer){
         // This is a bug
         BUG();
-        printf("Warning: Attempting to render cursor at position {%d %d} "
-               "but linebuffer has {%d}\n", cursor->textPos.x, cursor->textPos.y,
-                bufferView->lineBuffer->lineCount);
+        BUG_PRINT("Warning: Attempting to render cursor at position {%d %d} "
+                  "but linebuffer has {%d}\n", cursor->textPos.x, cursor->textPos.y,
+                  bufferView->lineBuffer->lineCount);
         cursor->textPos.x = Max(0, bufferView->lineBuffer->lineCount-1);
         buffer = BufferView_GetBufferAt(bufferView, cursor->textPos.x);
         if(!buffer){
-            printf("Error: Bufferview is inconsistent, not locked?\n");
+            BUG_PRINT("Error: Bufferview is inconsistent, not locked?\n");
             return;
         }
     }
@@ -787,6 +787,107 @@ static vec4f Graphics_GetLineHighlightColor(uint utypes){
     }
 }
 
+void Graphics_RenderBuildErrors(OpenGLState *state, View *view, Float lineSpan,
+                                Transform *projection, Transform *model, Theme *theme)
+{
+    BufferView *bufferView = View_GetBufferView(view);
+    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bufferView);
+    OpenGLFont *font = &state->font;
+    if(!lineBuffer) return;
+
+    char *str = LineBuffer_GetStoragePath(lineBuffer);
+    std::string path(str);
+    if(path.size() == 0) return;
+
+    vec2ui visibleLines = BufferView_GetViewRange(bufferView);
+    vec4f col_err(0.8, 0.0, 0.0, 0.25);
+    vec4f col_war(0.8, 0.8, 0.2, 0.25);
+    vec4f col_over_errf(0.8, 0.0, 0.0, 1.0);
+    vec4f col_over_warf(0.8, 0.8, 0.2, 1.0);
+    vec4i col_over_err = ColorFromRGBA(col_over_errf);
+    vec4i col_over_war = ColorFromRGBA(col_over_warf);
+
+    Float currFontSize = state->font.fontMath.fontSizeAtDisplay;
+    Float fontSize = currFontSize * 0.85;
+    Float scale = currFontSize / fontSize;
+    std::vector<vec3f> render_pts;
+    int counter = 0;
+
+    auto compute_render_pts = [&](BuildError &err) -> void{
+        int pGlyph = -1;
+        if(path != err.file) return;
+
+        uint line = (uint)err.line > 0 ? err.line - 1 : 0;
+        if(visibleLines.x > line || visibleLines.y < line) return;
+        Buffer *buf = LineBuffer_GetBufferAt(lineBuffer, line);
+        std::string str(buf->data, buf->taken);
+        str += " ";
+        Float x = fonsComputeStringAdvance(font->fsContext, (char *)str.c_str(),
+                                           str.size(), &pGlyph);
+
+        vec2f y = Graphics_GetLineYPos(state, visibleLines, line, view);
+        render_pts.push_back(vec3f(x, y.x, y.y));
+    };
+
+    auto render_lines_rects = [&](BuildError &err) -> void{
+        int pGlyph = -1;
+        if(path != err.file) return;
+
+        uint line = (uint)err.line > 0 ? err.line - 1 : 0;
+        if(visibleLines.x > line || visibleLines.y < line) return;
+        vec3f p = render_pts[counter++];
+        vec2f y = vec2f(p.y, p.z);
+        Float x = p.x * scale;
+        Float yx = y.x * scale + fontSize * 0.25;
+
+        vec4f col = col_war;
+        vec4i tcol = col_over_war;
+        if(err.is_error){
+            col = col_err;
+            tcol = col_over_err;
+        }
+
+        int where = 0, start = 0;
+        for(int i = 0; i < (int)err.message.size(); i++){
+            if(err.message[i] == '\n'){
+                break;
+            }
+            where = i;
+        }
+        std::string msg = err.message.substr(0, where+1);
+        if(StringStartsWith((char *)msg.c_str(), msg.size(), (char *)": ", 2)){
+            start = 2;
+        }
+        // Search next/previous
+        const char *pp = msg.c_str();
+        Graphics_PushText(state, x, yx, (char *)"- ", 2, tcol, &pGlyph);
+        Graphics_PushText(state, x, yx, (char *)&pp[start],
+                          msg.size()-start, tcol, &pGlyph);
+
+        Graphics_QuadPush(state, vec2f(2.0f, y.x), vec2f(lineSpan, y.y), col);
+    };
+
+    for(BuildError &err : state->bErrors){
+        compute_render_pts(err);
+    }
+
+    Graphics_SetFontSize(state, fontSize);
+    Graphics_PrepareTextRendering(state, projection, &state->scale);
+
+    for(BuildError &err : state->bErrors){
+        render_lines_rects(err);
+    }
+
+    Graphics_FlushText(state);
+
+    Graphics_SetFontSize(state, currFontSize);
+
+    glUseProgram(font->cursorShader.id);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+    Graphics_QuadFlush(state, 1);
+}
+
 bool Graphics_RenderLineHighlight(OpenGLState *state, View *vview, Float lineSpan,
                                   Transform *projection, Transform *model, Theme *theme)
 {
@@ -1098,12 +1199,14 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         int r =  Graphics_RenderBufferView(view, state, theme, dt);
 
         if(is_locked){
-            r = 1;
             if(lockedBuffer->render_state == 1){
-                lockedBuffer->render_state = -1;
-                r = 0;
+                if(r == 0){
+                    lockedBuffer->render_state = -1;
+                }
             }else if(lockedBuffer->render_state == -1){
-                r = 0;
+
+            }else{
+                r = 1;
             }
 
             lockedBuffer->mutex.unlock();
@@ -1200,6 +1303,11 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     }
 
     Graphics_RenderDbgBreaks(state, vview, &state->projection, scaledWidth, theme);
+
+    if(state->bErrors.size() > 0){
+        Graphics_RenderBuildErrors(state, vview, scaledWidth, &state->projection,
+                                   &state->model, theme);
+    }
 
     if(!BufferView_IsAnimating(view)){
         Graphics_RenderTextBlock(state, view, baseHeight, &state->projection);

@@ -8,9 +8,13 @@
 #include <vector>
 #include <view_tree.h>
 #include <dbgapp.h>
+#include <optional>
 
 struct BufferView;
 struct Buffer;
+
+#define OPEN_FILE_FLAGS_NO_CREATION    (0 << 1)
+#define OPEN_FILE_FLAGS_ALLOW_CREATION (1 << 1)
 
 typedef enum{
     CURSOR_RECT,
@@ -192,6 +196,11 @@ void DbgSupport_ForEachBkpt(std::string path, std::function<void(DbgBkpt *)> cal
 void DbgSupport_ResetBreakpointMap();
 
 /*
+* Reset the widgets geometry present in the app.
+*/
+void DbgSupport_ResetWidgetsGeometry();
+
+/*
 * Checks if a path given in relation to the root directory is already
 * present in the stored files list.
 */
@@ -240,6 +249,14 @@ void AppHandleDoubleClick(int x, int y, OpenGLState *state);
 * this coordinates are in **global** values.
 */
 void AppHandleMouseMotion(int x, int y, OpenGLState *state);
+
+/*
+* Gets the address of text inside the given view's linebuffer where the
+* graphical coordinates 'x' and 'y' lie, i.e.: fetches the pair (line, col)
+* where a given pair of coordinates (x, y) lie for the given view.
+*/
+std::optional<vec2ui> AppGetTextPosition(int x, int y, View *view,
+                                         OpenGLState *state);
 
 /*
 * Sets a call to be performed after a sequence of view restoration is made.
@@ -292,7 +309,7 @@ void AppCommandRemoveTextBlock(BufferView *bufferView, vec2ui start, vec2ui end)
 void AppCommandQueryBarSearchAndReplace();
 void AppCommandQueryBarInteractiveCommand();
 void AppQueryBarSearchJumpToResult(QueryBar *bar, View *view);
-void AppCommandOpenFileWithViewType(ViewType type);
+void AppCommandOpenFileWithViewType(ViewType type, int creationFlags);
 
 /* Base commands for the query bar */
 void AppCommandQueryBarNext();

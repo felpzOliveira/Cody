@@ -123,6 +123,7 @@ inline ExpressionTreeNode *Dbg_LinuxMakeNode(std::string owner, std::string valu
     ExpressionTreeNode *node = new ExpressionTreeNode;
     node->values.owner = Trim(owner);
     node->values.value = Trim(value);
+    node->identifier = 0;
     return node;
 }
 

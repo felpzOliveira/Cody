@@ -24,8 +24,8 @@ uint ButtonWidget::kAllEdgesMask   = ButtonWidget::kLeftEdgeMask |
 
 
 
-static void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
-                                         Transform wTransform = Transform())
+void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
+                                  Transform wTransform)
 {
     Transform model = state->scale * wTransform;
     OpenGLCHK(glUseProgram(shader.id));
@@ -42,6 +42,10 @@ void WidgetWindowOnClick(int x, int y, void *priv){
     WidgetWindow *ww = (WidgetWindow *)priv;
     Geometry wwGeo = ww->GetGeometry();
     vec2f mouse = vec2f(x, ww->window->height - y);
+    if(ww->lastMotion){
+        ww->lastMotion->isDragging = false;
+    }
+
     if(!Geometry_IsPointInside(&wwGeo, mouse)){
         for(Widget *w : ww->widgetList) w->SetSelected(false);
         return;
@@ -57,6 +61,27 @@ void WidgetWindowOnClick(int x, int y, void *priv){
             ww->lastClicked = w;
         }else{
             w->SetSelected(false);
+        }
+    }
+}
+
+void WidgetWindowOnPress(int x, int y, void *priv){
+    /* since we already handle the on motion we don't actually need to compute widget */
+    WidgetWindow *ww = (WidgetWindow *)priv;
+    if(ww->lastMotion && ww->lastMotion->isDraggable){
+        Geometry geo = ww->lastMotion->GetGeometry();
+        vec2f dragRegionX = ww->lastMotion->dragRegionX;
+        vec2f dragRegionY = ww->lastMotion->dragRegionY;
+        y = ww->window->height - y;
+        Float w = geo.upper.x - geo.lower.x;
+        Float h = geo.upper.y - geo.lower.y;
+        Float xs = ((Float)(x - geo.lower.x)) / w;
+        Float ys = ((Float)(y - geo.lower.y)) / h;
+        bool inside = ((xs >= dragRegionX.x && xs <= dragRegionX.y) &&
+                       (ys >= dragRegionY.x && ys <= dragRegionY.y));
+        if(inside){
+            ww->lastMotion->isDragging = true;
+            ww->lastMotion->dragStart = vec2ui(x, y);
         }
     }
 }
@@ -77,6 +102,45 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
     Geometry wwGeo = ww->GetGeometry();
     vec2f mouse = vec2f(x, ww->window->height - y);
     ww->mouse = mouse;
+    if(ww->lastMotion && ww->lastMotion->isDragging){
+        Geometry geo = ww->lastMotion->GetGeometry();
+        Float w = geo.Width();
+        Float h = geo.Height();
+        Float mw = wwGeo.Width();
+        Float mh = wwGeo.Height();
+        Float ox = geo.lower.x;
+        Float oy = geo.lower.y;
+        Float dx = mouse.x - ww->lastMotion->dragStart.x;
+        Float dy = mouse.y - ww->lastMotion->dragStart.y;
+
+        Float nx = ox + dx, ux = nx + w;
+        Float ny = oy + dy, uy = ny + h;
+        if(((nx >= 0 && nx <= mw) && (ux >= 0 && ux <= mw) &&
+           (ny >= 0 && ny <= mh) && (uy >= 0 && uy <= mh)) || true)
+        {
+            bool overlaps = false;
+            geo.lower = vec2ui(nx, ny);
+            geo.upper = geo.lower + vec2ui(w, h);
+            for(Widget *w : ww->widgetList){
+                if(w == ww->lastMotion) continue;
+
+                if(w->GetGeometry().Overlaps(geo)){
+                    overlaps = true;
+                    break;
+                }
+            }
+
+            if(!overlaps){
+                ww->lastMotion->geometry = geo;
+            }
+        }
+
+        ww->lastMotion->dragStart = vec2f(mouse.x, mouse.y);
+        return;
+    }else if(ww->lastMotion){
+        ww->lastMotion->isDragging = false;
+    }
+
     if(!Geometry_IsPointInside(&wwGeo, mouse)){
         if(ww->lastMotion){
             ww->lastMotion->OnExited();
@@ -110,10 +174,12 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
             ww->lastMotion->OnExited();
             currWidget->SetMouseCoordintes(mouse);
             currWidget->OnEntered();
+            currWidget->isDragging = false;
         }else{
             // there is no last widget, we entered a new one
             currWidget->SetMouseCoordintes(mouse);
             currWidget->OnEntered();
+            currWidget->isDragging = false;
         }
     }
 
@@ -166,10 +232,31 @@ WidgetWindow::WidgetWindow(WindowX11 *other, BindingMap *bmapping,
     Open(resolution.x, resolution.y, NULL, other);
 }
 
+void WidgetWindow::ResetGeometry(){
+    for(Widget *w : widgetList){
+        w->ResetGeometry();
+    }
+}
+
 void WidgetWindow::Resize(int width, int height){
+    Float ow = resolution.x, oh = resolution.y;
     resolution = vec2f(width, height);
     for(Widget *widget : widgetList){
+        Geometry geo = widget->GetGeometry();
+        Float x0 = (Float)geo.lower.x / ow;
+        Float y0 = (Float)geo.lower.y / oh;
+
         widget->OnResize(width, height);
+
+        if(widget->isDraggable){
+            geo = widget->GetGeometry();
+            Float w = geo.Width(), h = geo.Height();
+            Float x = x0 * resolution.x;
+            Float y = y0 * resolution.y;
+            geo.lower = vec2ui(x, y);
+            geo.upper = geo.lower + vec2ui(w, h);
+            widget->geometry = geo;
+        }
     }
 }
 
@@ -223,6 +310,9 @@ void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *othe
     );
     eventHandles.push_back(
         RegisterOnScrollCallback(window, WidgetWindowOnScroll, this)
+    );
+    eventHandles.push_back(
+        RegisterOnMousePressedCallback(window, WidgetWindowOnPress, this)
     );
     eventHandles.push_back(
         RegisterOnSizeChangeCallback(window, WidgetWindowOnSizeChange, this)
@@ -308,6 +398,7 @@ Widget::Widget(){
     style.valid = false;
     selected = false;
     enabled = true;
+    isDraggable = false;
 }
 Widget::~Widget(){
     signalClicked.DisconnectAll();
@@ -356,6 +447,7 @@ void Widget::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY){
     geometry.extensionY = aspectY;
     center = geometry.Center();
     refGeometry = geo;
+    baseLower = geometry.lower;
 }
 
 void Widget::OnResize(int width, int height){
@@ -490,6 +582,7 @@ void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
     geometry.extensionY = vec2f((Float)y0 / h, (Float)y1 / h);
     center = geometry.Center();
     refGeometry = parentGeo;
+    baseLower = geometry.lower;
 }
 
 void ButtonWidget::OnClick(){

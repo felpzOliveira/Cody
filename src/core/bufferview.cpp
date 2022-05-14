@@ -78,14 +78,32 @@ void BufferView_FitCursorToRange(BufferView *view, vec2ui range){
 void BufferView_Synchronize(BufferView *view){
     if(view->lineBuffer){
         VScroll *ss = &view->sController;
+        // 0 - check for locks
+        int is_locked = 0;
+        LockedLineBuffer *lockedBuffer = nullptr;
+        GetExecutorLockedLineBuffer(&lockedBuffer);
+        if(lockedBuffer->lineBuffer == view->lineBuffer){
+            lockedBuffer->mutex.lock();
+            is_locked = 1;
+        }
         // 1- Check if our cursor is within allowed limits
         vec2ui cursor = ss->cursor.textPosition;
         cursor.x = Clamp(cursor.x, (uint)0, view->lineBuffer->lineCount-1);
         Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer, cursor.x);
         if(buffer == nullptr){
-            BUG();
-            printf("Null buffer inside a valid linebuffer line %p\n", view->lineBuffer);
+            // internal buffers can be dynamically updated and might have a 0
+            // line size. File linebuffer however can't.
+            if(!LineBuffer_IsInternal(view->lineBuffer)){
+                BUG();
+                printf("Null buffer inside a valid linebuffer line %p\n", view->lineBuffer);
+                printf("Cursor is located at %u, but buffer does not exists\n", cursor.x);
+                printf("Linebuffer claims to have %d line(s)\n",
+                        (int)view->lineBuffer->lineCount);
+            }
             ss->cursor.textPosition = vec2ui(0);
+            if(is_locked){
+                lockedBuffer->mutex.unlock();
+            }
             return;
         }
 
@@ -96,6 +114,9 @@ void BufferView_Synchronize(BufferView *view){
 
         // adjust ghost cursor if needed
         VScroll_AdjustGhostIfNeeded(ss, view->lineBuffer);
+        if(is_locked){
+            lockedBuffer->mutex.unlock();
+        }
     }else{ // our buffer got killed
         // TODO: do we need this?
         //BufferView_SwapBuffer(view, nullptr, EmptyView);
@@ -419,6 +440,7 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
                                 TokenId *cids, uint nIds, NestPoint *out, uint maxN,
                                 int *n)
 {
+    if(LineBuffer_IsInternal(view->lineBuffer)) return 0;
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
 
@@ -482,6 +504,7 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
                                   TokenId *cids, uint nIds, NestPoint *out, uint maxN,
                                   int *n)
 {
+    if(LineBuffer_IsInternal(view->lineBuffer)) return 0;
     Buffer *buffer = BufferView_GetBufferAt(view, start.x);
     if(buffer == nullptr){ return 0; }
 

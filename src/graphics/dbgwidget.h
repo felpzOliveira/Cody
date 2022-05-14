@@ -10,21 +10,48 @@ typedef enum{
     ExpressionInvalid,
 }ExpressionViewerState;
 
+typedef enum{
+    Contracted=0, Expanded, Static
+}ExpViewState;
+
 class DbgWidgetExpressionViewer : public Widget{
     public:
     ExpressionTree expTree;
     ExpressionViewerState state;
     std::string expression;
-    std::vector<bool> states;
+    std::vector<ExpViewState> states;
+    uint handle = 0;
+    bool processClick;
+    const Float cellWidth = 684;// 192;
+    const Float cellHeight = 22; // 92;
 
     DbgWidgetExpressionViewer();
     ~DbgWidgetExpressionViewer();
 
     void SetExpression(ExpressionFeedback *feedback);
 
+    Geometry ComputeRenderGeometry(WidgetRenderContext *wctx, const Transform &transform);
+
+    /*
+    * Clears the current expression.
+    */
     void Clear();
 
+    /*
+    * Render override.
+    */
     virtual int OnRender(WidgetRenderContext *wctx, const Transform &transform) override;
+
+    /*
+    * Resize override.
+    */
+    virtual void OnResize(int width, int height) override;
+
+    /*
+    * Mouse overrides.
+    */
+    virtual void OnClick() override;
+    void ProcessClickEvent(WidgetRenderContext *wctx, const Transform &transform);
 };
 
 /*
@@ -143,7 +170,8 @@ class DbgWidgetButtons : public Widget{
 };
 
 /*
-* Initializes the debugger buttons for a given window.
+* Initializes the debugger different widgets.
 */
 void InitializeDbgButtons(WidgetWindow *window, DbgWidgetButtons *dbgBt);
+void InitializeDbgExpressionViewer(WidgetWindow *window, DbgWidgetExpressionViewer *dbgVw);
 

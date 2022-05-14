@@ -21,7 +21,6 @@ typedef enum{
 
 typedef enum{
     CodeView,
-    BuildView,
     GitStatusView,
     GitDiffView,
     DbgView,
@@ -84,7 +83,6 @@ struct BufferViewFileLocation{
 inline const char *ViewTypeString(ViewType type){
     switch(type){
         case CodeView : return "CodeView";
-        case BuildView : return "BuildView";
         case GitDiffView : return "GitDiffView";
         case GitStatusView: return "GitStatusView";
         case DbgView: return "DbgView";

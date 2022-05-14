@@ -17,6 +17,15 @@ static std::string envDir;
 static std::map<std::string, std::string> mathSymbolMap;
 static std::map<std::string, std::function<int(char *, uint, View *)>> cmdMap;
 
+struct QueriableSearchResult{
+    std::vector<GlobalSearchResult> res;
+    int count;
+};
+
+GlobalSearch results[MAX_THREADS];
+QueriableSearchResult linearResults;
+
+
 static void InitializeMathSymbolList(){
     static bool is_math_symbol_inited = false;
     if(!is_math_symbol_inited){
@@ -75,6 +84,12 @@ static int SelectableListDefaultEntry(QueryBar *queryBar, View *view){
 
 static int SelectableListDefaultCancel(QueryBar *queryBar, View *view){
     SelectableListFreeLineBuffer(view);
+    linearResults.res.clear();
+    linearResults.count = 0;
+    for(int i = 0; i < MAX_THREADS; i++){
+        results[i].results.clear();
+        results[i].count = 0;
+    }
     return 1;
 }
 
@@ -117,14 +132,6 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
 
     return 0;
 }
-
-struct QueriableSearchResult{
-    std::vector<GlobalSearchResult> res;
-    int count;
-};
-
-GlobalSearch results[MAX_THREADS];
-QueriableSearchResult linearResults;
 
 uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch){
     if(gSearch){
@@ -775,7 +782,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
         }
     }
 
-    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, BuildView);
+    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, CodeView);
     // because the parallel thread will reset the linebuffer we need
     // to make sure the cursor is located in a valid range for rendering
     // otherwise in case the build buffer does updates too fast it can

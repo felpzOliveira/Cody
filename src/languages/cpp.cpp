@@ -156,6 +156,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "__inline__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
+        { .value = "OptixResult", .identifier = TOKEN_ID_DATATYPE },
         { .value = "CUdeviceptr", .identifier = TOKEN_ID_DATATYPE },
         { .value = "CUlinkState", .identifier = TOKEN_ID_DATATYPE },
         { .value = "cudaSuccess", .identifier = TOKEN_ID_RESERVED },
@@ -163,6 +164,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
         { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__FUNCTION__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__constant__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },
@@ -337,6 +339,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "__inline__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__shared__", .identifier = TOKEN_ID_RESERVED }, },
     {
+        { .value = "OptixResult", .identifier = TOKEN_ID_DATATYPE },
         { .value = "CUdeviceptr", .identifier = TOKEN_ID_DATATYPE },
         { .value = "CUlinkState", .identifier = TOKEN_ID_DATATYPE },
         { .value = "cudaSuccess", .identifier = TOKEN_ID_RESERVED },
@@ -344,6 +347,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
         { .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "__FUNCTION__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__constant__", .identifier = TOKEN_ID_RESERVED },
         { .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
         { .value = "dynamic_cast", .identifier = TOKEN_ID_OPERATOR },

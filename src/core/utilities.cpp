@@ -26,6 +26,72 @@ void GetCurrentWorkingDirectory(char *dir, uint len){
     }
 }
 
+std::string StringReplace(std::string str, const std::string& from, const std::string& to){
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos){
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length();
+    }
+    return str;
+}
+
+bool StringStartsWithInteger(std::string str){
+    bool rv = true;
+    for(uint i = 0; i < str.size(); i++){
+        char v = str[i] - '0';
+        if(str[i] == ' ' || str[i] == '\n' || str[i] == ')'){
+            break;
+        }
+
+        if(!(v >= 0 && v <= 9)){
+            rv = false;
+            break;
+        }
+    }
+
+    return rv;
+}
+
+std::string FetchSecondLine(std::string s){
+    std::string res;
+    int where = -1;
+    for(uint i = 0; i < s.size(); i++){
+        if(s[i] == '\n'){
+            where = i+1;
+            break;
+        }
+    }
+
+    if(where > 0){
+        res = StringTrim(s.substr(where));
+    }
+
+    return res;
+}
+
+std::string StringTrim(std::string s){
+    uint ns = 0, ne = s.size();
+    for(uint i = 0; i < s.size(); i++){
+        if(s[i] != ' ' && s[i] != '\n' && s[i] != '\t'){
+            ns = i;
+            break;
+        }
+    }
+
+    for(uint i = s.size()-1; i > ns; i--){
+        if(s[i] != ' ' && s[i] != '\n' && s[i] != '\t'){
+            ne = i+1;
+            break;
+        }
+    }
+
+    if(ns != ne){
+        return s.substr(ns, ne);
+    }
+
+    return s;
+}
+
 std::string ExpandFilePath(char *path, uint size, char *folder){
     // for now a soft test solves our problems
     // TODO: PathCchCanonicalize

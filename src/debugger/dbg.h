@@ -79,6 +79,7 @@ struct ExpressionPair{
 
 struct ExpressionTreeNode{
     ExpressionPair values;
+    int identifier;
     std::vector<struct ExpressionTreeNode *> nodes;
 };
 

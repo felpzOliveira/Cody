@@ -983,6 +983,12 @@ class Geometry{
         return upper.y - lower.y;
     }
 
+    bool Overlaps(const Geometry &g2){
+        bool x = (upper.x >= g2.lower.x) && (lower.x <= g2.upper.x);
+        bool y = (upper.y >= g2.lower.y) && (lower.y <= g2.upper.y);
+        return (x && y);
+    }
+
     void PrintSelf(){
         Float w = upper.x - lower.x;
         Float h = upper.y - lower.y;

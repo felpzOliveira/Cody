@@ -21,6 +21,36 @@ struct LockedLineBuffer{
     int render_state;
 };
 
+struct BuildError{
+    std::string file;
+    int line;
+    int is_error;
+    std::string message;
+};
+
+///////////// Out of place routines ///////////////////
+/*
+* Returns the list of build errors for the last build command.
+*/
+void FetchBuildErrors(std::vector<BuildError> &errors);
+
+/*
+* Get the next build error.
+*/
+std::optional<BuildError> NextBuildError();
+
+/*
+* Get the previous build error.
+*/
+std::optional<BuildError> PreviousBuildError();
+
+
+/*
+* Clears the current build errors.
+*/
+void ClearBuildErrors();
+///////////////////////////////////////////////////////
+
 /*
 * Blocking Queue with timeout. Calling pop() blocks for 'max_timeout_ms'
 * if an item is detected than it is returned otherwise an empty std::optional<T>

@@ -197,7 +197,7 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
     if(!(rawp <= buffer->taken)){
         BUG();
         Buffer_DebugStdoutData(buffer);
-        printf("Queried for tab compensation at %u\n", rawp);
+        BUG_PRINT("Queried for tab compensation at %u\n", rawp);
         return 0;
     }
 
@@ -219,15 +219,15 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     if(!(rawp <= buffer->taken)){
         BUG();
-        printf("BUG tracked:\n");
+        BUG_PRINT("BUG tracked:\n");
         if(buffer->data == nullptr){
-            printf("Buffer is empty (nullptr), recovering\n");
+            BUG_PRINT("Buffer is empty (nullptr), recovering\n");
             // attempt a recover
             Buffer_Init(buffer, DefaultAllocatorSize);
             return 0;
         }
         Buffer_DebugStdoutData(buffer);
-        printf("Queried for UTF-8 location at %u\n", rawp);
+        BUG_PRINT("Queried for UTF-8 location at %u\n", rawp);
         rawp = buffer->taken;
     }
 
@@ -244,7 +244,12 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
             r++;
         }
 
-        AssertA(c == (int)rawp, "StringToCodepoint failed to decode UTF-8");
+        if(c != (int)rawp){
+            BUG();
+            BUG_PRINT("Failed UTF-8 decode at %u for the following buffer:\n"
+                      "***************************\n", rawp);
+            Buffer_DebugStdoutData(buffer);
+        }
     }
 
     return r;
@@ -263,8 +268,7 @@ void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
                 if(Lex_IsUserToken(token) && symTable){
                     if(token->reserved != nullptr){
                         char *label = (char *)token->reserved;
-                        SymbolTable_Remove(symTable, label, token->size,
-                                           token->identifier);
+                        SymbolTable_Remove(symTable, label, token->size, token->identifier);
                         AllocatorFree(token->reserved);
                         token->reserved = nullptr;
                     }
@@ -280,60 +284,18 @@ void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
 uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
     if(!(u8p <= buffer->taken)){
         BUG();
-        printf("BUG tracked:\n");
+        BUG_PRINT("BUG tracked:\n");
         if(buffer->data == nullptr){
-            printf("Buffer is empty (nullptr)\n");
+            BUG_PRINT("Buffer is empty (nullptr)\n");
         }
         Buffer_DebugStdoutData(buffer);
-        printf("Queried for UTF-8 translation at %u\n", u8p);
+        BUG_PRINT("Queried for UTF-8 translation at %u\n", u8p);
         u8p = buffer->count;
     }
 
     uint r = 0;
     if(buffer->taken > 0){
         r = StringComputeRawPosition(buffer->data, buffer->taken, u8p, len);
-        return r;
-    #if 0
-        char *p = buffer->data;
-        int c = 0;
-        int of = 0;
-
-        if(u8p == 0 && len){
-            StringToCodepoint(&p[c], buffer->taken - c, &of);
-            if(len){
-                *len = of;
-            }
-            return 0;
-        }
-
-        while(r != u8p){
-            of = 0;
-            int rv = StringToCodepoint(&p[c], buffer->taken - c, &of);
-            if(rv == -1){
-                break;
-            }
-
-            r++;
-            c += of;
-        }
-
-        if(r != u8p){
-            BUG();
-            return 0;
-            //printf("oops\n");
-            //Buffer_Utf8PositionToRawPosition(buffer, u8p, len);
-        }
-
-        AssertA(r == u8p, "StringToCodepoint failed to decode UTF-8");
-        if(len){
-            *len = 1;
-            if((int)buffer->taken > c){
-                (void)StringToCodepoint(&p[c], buffer->taken - c, &of);
-                *len = of;
-            }
-        }
-        r = (uint)c;
-    #endif
     }else{
         if(len) *len = 1;
     }
@@ -490,12 +452,54 @@ int Buffer_IsBlank(Buffer *buffer){
     return 1;
 }
 
+uint Buffer_FindPreviousSeparator(Buffer *buffer, uint rawp){
+    if(buffer->taken == 0 || rawp == 0) return 0;
+    if(rawp > buffer->taken){
+        BUG();
+        BUG_PRINT("BUG tracked: Attempted to compute previous location for a"
+                  " position outside buffer (%u > %u)\n", rawp, buffer->taken);
+        return 0;
+    }
+
+    uint n = rawp-1;
+    // skip empty chars
+    while(TerminatorChar(buffer->data[n]) && n > 0) n--;
+
+    for(; n > 0; n--){
+        if(TerminatorChar(buffer->data[n])){ // TODO: use TerminatorChar?
+            return n+1;
+        }
+    }
+    return n;
+}
+
+uint Buffer_FindNextSeparator(Buffer *buffer, uint rawp){
+    if(buffer->taken == 0) return 0;
+    if(rawp > buffer->taken){
+        BUG();
+        BUG_PRINT("BUG tracked: Attempted to compute next location for a"
+                  " position outside buffer (%u > %u)\n", rawp, buffer->taken);
+        return 0;
+    }
+
+    uint n = rawp+1;
+    // skip empty chars
+    while(TerminatorChar(buffer->data[n]) && n < buffer->taken) n++;
+
+    for(; n < buffer->taken; n++){
+        if(TerminatorChar(buffer->data[n])){ // TODO: use TerminatorChar?
+            return n;
+        }
+    }
+    return n;
+}
+
 uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len){
     uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
     if(raw > buffer->taken){
         BUG();
-        printf("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
-                raw, buffer->taken);
+        BUG_PRINT("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
+                  raw, buffer->taken);
         return u8;
     }
 
@@ -518,7 +522,7 @@ uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len){
     uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
     if(raw > buffer->taken){
         BUG();
-        printf("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
+        BUG_PRINT("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
                 raw, buffer->taken);
         return u8;
     }
@@ -868,6 +872,7 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     };
 
     lineBuffer->props.isWrittable = true;
+    lineBuffer->props.isInternal = false;
 
     for(uint i = 0; i < DefaultAllocatorSize; i++){
         lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -1372,8 +1377,10 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     //LineBuffer_DebugPrintRange(lineBuffer, vec2i((int)base-2, nLines+2));
 
     // 2 - Create nLines buffers for the file
-    if(!(lineBuffer->lineCount + nLines < lineBuffer->size)){
-        uint newsize = lineBuffer->lineCount + nLines + DefaultAllocatorSize;
+    if(!(lineBuffer->lineCount + nLines < lineBuffer->size && lineBuffer->size > base)){
+        uint newsize = lineBuffer->lineCount + nLines;
+        uint offset = (lineBuffer->size > base ? 0 : base - lineBuffer->size) + lineBuffer->size;
+        newsize = Max(offset, newsize) + DefaultAllocatorSize;
         lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines,
                                             newsize, lineBuffer->size);
 
@@ -1409,6 +1416,8 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     lastBuffer = lineBuffer->lines[base];
     uint firstP = 0;
     uint toCopy = lastBuffer->taken;
+
+    //TODO: debug mode registered a calloc here with size 0!
     firstLine = (char *)AllocatorGet(sizeof(char) * lastBuffer->taken);
     Memcpy(firstLine, lastBuffer->data, lastBuffer->taken * sizeof(char));
 
@@ -1789,13 +1798,17 @@ void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt){
     }
 }
 
-LineBuffer *LineBuffer_AllocateInternal(){
-    LineBuffer *lineBuffer = AllocatorGetN(LineBuffer, 1);
+LineBuffer *LineBuffer_AllocateInternal(LineBuffer *lBuffer){
+    LineBuffer *lineBuffer = lBuffer;
+    if(!lineBuffer){
+        lineBuffer = AllocatorGetN(LineBuffer, 1);
+    }
     LineBuffer_InitEmpty(lineBuffer);
     LineBuffer_SetStoragePath(lineBuffer, nullptr, 0);
     LineBuffer_SetWrittable(lineBuffer, false);
     LineBuffer_SetType(lineBuffer, 2); // 2 = Empty tokenizer
     LineBuffer_SetExtension(lineBuffer, FILE_EXTENSION_NONE);
+    LineBuffer_SetInternal(lineBuffer);
     return lineBuffer;
 }
 
@@ -1815,6 +1828,20 @@ void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section){
     if(lineBuffer){
         lineBuffer->props.cpSection = section;
     }
+}
+
+void LineBuffer_SetInternal(LineBuffer *lineBuffer){
+    if(lineBuffer){
+        lineBuffer->props.isInternal = true;
+    }
+}
+
+bool LineBuffer_IsInternal(LineBuffer *lineBuffer){
+    bool rv = false;
+    if(lineBuffer){
+        rv = lineBuffer->props.isInternal;
+    }
+    return rv;
 }
 
 FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer){
@@ -1841,6 +1868,7 @@ void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section){
 
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer){
+#if defined(BUG_HUNT)
     printf("Current UTF-8 size: %u\n", buffer->count);
     printf("Current Size: %u\n", buffer->size);
     for(uint j = 0; j < buffer->taken; j++){
@@ -1862,17 +1890,21 @@ void Buffer_DebugStdoutData(Buffer *buffer){
         printf("\x1B[34m( %d/%d \x1B[37m" "%s" "\x1B[34m )\x1B[37m",t->position, t->size,s);
         s[t->size] = x;
     }
+#endif
 }
 
 void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo){
+#if defined(BUG_HUNT)
     if(lineNo < lineBuffer->lineCount){
         Buffer *buffer = lineBuffer->lines[lineNo];
         printf("[ %d ] : ", lineNo+1);
         Buffer_DebugStdoutData(buffer);
     }
+#endif
 }
 
 void LineBuffer_DebugPrintRange(LineBuffer *lineBuffer, vec2i range){
+#if defined(BUG_HUNT)
     int start = Max(0, range.x);
     uint end = Min(range.x + range.y+1, lineBuffer->lineCount);
 
@@ -1889,9 +1921,11 @@ void LineBuffer_DebugPrintRange(LineBuffer *lineBuffer, vec2i range){
     if(end < lineBuffer->lineCount){
         printf(" ( ... )\n");
     }
+#endif
 }
 
 uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint size){
+#if defined(BUG_HUNT)
     uint n = lineBuffer->lineCount;
     uint count = 0;
     for(uint i = 0; i < n; i++){
@@ -1909,4 +1943,7 @@ uint LineBuffer_DebugLoopAllTokens(LineBuffer *lineBuffer, const char *m, uint s
     }
 
     return count;
+#else
+    return 0;
+#endif
 }

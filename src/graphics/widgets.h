@@ -122,6 +122,9 @@ struct PaintCallback{
     bool valid;
 };
 
+void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
+                                  Transform wTransform = Transform());
+
 /*
 * The design will be very simple. Components that require a specific window,
 * i.e.: popup windows, error windows, specific windows for opening files, etc...
@@ -183,6 +186,11 @@ class WidgetWindow{
     * only its extension.
     */
     void Resize(int width, int height);
+
+    /*
+    * Resets the widgets geometry inside this window.
+    */
+    void ResetGeometry();
 
     /*
     * Checks that a widget is within the window.
@@ -277,10 +285,19 @@ class Widget{
     bool selected; // check if the user clicked on the widget, marked by main window
     Transform wTransform; // apply external transform to widget
     vec2f center; // widget center, cached for better animation
-    void *priv; // ok lets see how this goes
+    void *priv; // allow widgets to hold private data when cross-referencing
 
     // geometry used as reference for aspect computation, usually parent geometry
     Geometry refGeometry;
+
+    // draggable information, all widgets start as non-draggable and must
+    // be configured to be. Whenever SetGeometry is called the baseLower
+    // for dragging is updated.
+    bool isDraggable;
+    vec2ui baseLower;
+    bool isDragging;
+    vec2f dragRegionX, dragRegionY;
+    vec2ui dragStart;
 
     /*
     * Basic constructors.
@@ -298,6 +315,33 @@ class Widget{
         }else if(!oen && en){
             OnEnabled();
         }
+    }
+
+    /*
+    * Sets the widget to be draggable.
+    */
+    void SetDraggable(bool drag){
+        isDraggable = drag;
+    }
+
+    /*
+    * Reset the geometry.
+    */
+    void ResetGeometry(){
+        // TODO: scale? rotation?
+        Float w = geometry.Width();
+        Float h = geometry.Height();
+        geometry.lower = baseLower;
+        geometry.upper = baseLower + vec2ui(w, h);
+    }
+
+    /*
+    * Sets the region inside the geometry that should be considered
+    * as valid for dragging. These values are in the range (0,1).
+    */
+    void SetDragRegion(vec2f _X, vec2f _Y){
+        dragRegionX = _X;
+        dragRegionY = _Y;
     }
 
     /*
@@ -363,7 +407,9 @@ class Widget{
     /*
     * Sets the geometry of this widget as a reference to another geometry
     * and aspects. i.e.: it computes the geometry as a fraction of another
-    * geometry.
+    * geometry. If you are going to override this routine be aware that you
+    * need to set the reference geometry 'refGeometry' and the base lower point
+    * for dragging in 'baseLower'.
     */
     virtual void SetGeometry(const Geometry &geo, vec2f aspectX, vec2f aspectY);
 

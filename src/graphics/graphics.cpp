@@ -62,6 +62,10 @@ DbgWidgetButtons *Graphics_GetDbgWidget(){
     return GlobalGLState.gWidgets.wdbgBt;
 }
 
+DbgWidgetExpressionViewer *Graphics_GetDbgExpressionViewer(){
+    return GlobalGLState.gWidgets.wdbgVw;
+}
+
 OpenGLState *Graphics_GetGlobalContext(){
     return &GlobalGLState;
 }
@@ -395,7 +399,7 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
             col = vec4i((uint)interp.x, (uint)interp.y, (uint)interp.z, (uint)alpha);
 
             // hacky way to inform the main rendering loop that even if this view
-            // is not jumping it is transitioning by alpha interpolation
+            // is not jumping it is transitioning by chromatic interpolation
             bView->is_transitioning = 1;
         }
     }
@@ -615,6 +619,7 @@ static void _OpenGLInitGlobalWidgets(OpenGLState *state){
     gw->wwindow = new WidgetWindow(state->window, AppGetFreetypingBinding(),
                                    vec2f(0), vec2f(state->width, state->height));
     gw->wdbgBt = new DbgWidgetButtons;
+    gw->wdbgVw = new DbgWidgetExpressionViewer;
 }
 
 static void _OpenGLStateInitialize(OpenGLState *state){
@@ -1311,7 +1316,7 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
             }
         }
 
-        // account for chromatic transition
+        // acount for chromatic transition
         animating |= bView->is_transitioning;
         if(bView->is_transitioning){
             LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
@@ -1338,7 +1343,6 @@ void OpenGLEntry(){
     Timing_Update();
 
     //_debugger_memory_usage();
-    //InitializeDbgButtons(state->gWidgets.wwindow, state->gWidgets.wdbgBt);
 
     while(!WindowShouldCloseX11(state->window)){
         MakeContextX11(state->window);
@@ -1348,6 +1352,8 @@ void OpenGLEntry(){
         wctx.dt = dt;
 
         lastTime = currTime;
+        state->bErrors.clear();
+        FetchBuildErrors(state->bErrors);
 
         // render main window
         animating |= OpenGLRenderMainWindow(&wctx);
@@ -1377,6 +1383,7 @@ void OpenGLEntry(){
     state->widgetWindows.clear();
     delete state->gWidgets.wdbgBt;
     delete state->gWidgets.wwindow;
+    delete state->gWidgets.wdbgVw;
 
     DestroyWindowX11(state->window);
     TerminateX11();

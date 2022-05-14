@@ -118,7 +118,7 @@ static bool Git_TryOpenRepo(git_repository **repo, git_reference **head, std::st
         git_error_clear();
         return false;
     }else{
-        DEBUG_MSG("Opened repository at [%s]\n", root.c_str());
+        //DEBUG_MSG("Opened repository at [%s]\n", root.c_str());
     }
 
     rv = git_repository_head(head, *repo);
@@ -576,7 +576,7 @@ std::string Git_GetRepositoryRoot(){
 
 void Git_Initialize(){
     git_libgit2_init();
-    DEBUG_MSG("Initialized\n");
+    //DEBUG_MSG("Initialized\n");
 }
 
 void Git_Finalize(){

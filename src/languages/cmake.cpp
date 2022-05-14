@@ -39,11 +39,16 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
         { .value = "project", .identifier = TOKEN_ID_OPERATOR },
         { .value = "message", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "STREQUAL", .identifier = TOKEN_ID_PREPROCESSOR },
         { .value = "function", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "find_path", .identifier = TOKEN_ID_OPERATOR }, },
     {
         { .value = "add_library", .identifier = TOKEN_ID_OPERATOR },
         { .value = "endfunction", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "find_package", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "find_library", .identifier = TOKEN_ID_OPERATOR },
         { .value = "source_group", .identifier = TOKEN_ID_OPERATOR },
         { .value = "find_package", .identifier = TOKEN_ID_OPERATOR },
         { .value = "get_property", .identifier = TOKEN_ID_OPERATOR },

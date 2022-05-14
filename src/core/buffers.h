@@ -64,6 +64,7 @@ struct LineBufferProps{
     bool isWrittable;
     std::vector<LineHighlightInfo> diffs;
     std::vector<vec2ui> diffLines;
+    bool isInternal;
 };
 
 /*
@@ -189,6 +190,16 @@ uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len);
 * Locates the previous valid position for jumping locations in utf-8 positions.
 */
 uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len);
+
+/*
+* Locates the previous valid position for jumping separators.
+*/
+uint Buffer_FindPreviousSeparator(Buffer *buffer, uint rawp);
+
+/*
+* Locates the next valid position for jumping separators.
+*/
+uint Buffer_FindNextSeparator(Buffer *buffer, uint rawp);
 
 /*
 * Perform cleanup of the entries of the symbol table **and** auto completes
@@ -420,6 +431,7 @@ Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint 
 void LineBuffer_SetType(LineBuffer *lineBuffer, uint type);
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext);
 void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section);
+void LineBuffer_SetInternal(LineBuffer *lineBuffer);
 
 /*
 * Generic getter for the linebuffer properties.
@@ -427,6 +439,7 @@ void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section);
 uint LineBuffer_GetType(LineBuffer *lineBuffer);
 FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer);
 void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section);
+bool LineBuffer_IsInternal(LineBuffer *lineBuffer);
 
 /*
 * Checks if a token inside a buffer in the given linebuffer is inside the
@@ -445,7 +458,14 @@ void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt);
 void LineBuffer_Free(LineBuffer *lineBuffer);
 
 /* Helpers */
-LineBuffer *LineBuffer_AllocateInternal();
+
+/*
+* Allocates a linebuffer for internal usage. It is marked with proper
+* flags indicating it does not represent a file. Optionally can receive an
+* already allocated linebuffer to initialize instead of allocating.
+* Returns the resulting linebuffer.
+*/
+LineBuffer *LineBuffer_AllocateInternal(LineBuffer *lBuffer);
 
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer);

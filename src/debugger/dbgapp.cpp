@@ -40,11 +40,18 @@ struct DbgCallbackList{
 
 template<typename Fn>
 void DbgApp_UnregisterHandle(DbgCallbackList<DbgUserCallback<Fn>> *list, uint handle){
+    bool found = false;
     for(auto it = list->callbacks.begin(); it != list->callbacks.end(); it++){
         if(it->handle == handle){
             list->callbacks.erase(it);
+            found = true;
             break;
         }
+    }
+
+    if(!found){
+        BUG();
+        printf("Did not find corresponding handle for %u\n", handle);
     }
 }
 
@@ -55,7 +62,7 @@ uint DbgApp_RegisterRoutine(DbgCallbackList<DbgUserCallback<Fn>> *list,
     uint handle = 0;
     bool done = false;
     do{
-        handle = Bad_RNG16() | (mask << 8);
+        handle = Bad_RNG16() | (mask << 16);
         done = true;
         for(auto cb : list->callbacks){
             if(handle == cb.handle){
@@ -498,13 +505,17 @@ void DbgApp_SwitchTheme(){
     AppSetDelayedCall(DbgApp_SetKeyboard);
 }
 
+void DbgApp_RestoreWidgets(){
+    DbgSupport_ResetWidgetsGeometry();
+}
+
 void DbgApp_SwitchBuffer(){
     AppCommandSwitchBuffer();
     AppSetDelayedCall(DbgApp_SetKeyboard);
 }
 
 void DbgApp_OpenFile(){
-    AppCommandOpenFileWithViewType(DbgView);
+    AppCommandOpenFileWithViewType(DbgView, OPEN_FILE_FLAGS_NO_CREATION);
     AppSetDelayedCall(DbgApp_SetKeyboard);
 }
 
@@ -529,6 +540,7 @@ void DbgApp_Initialize(){
     RegisterRepeatableEvent(mapping, DbgApp_SwitchBuffer, Key_LeftAlt, Key_B);
     RegisterRepeatableEvent(mapping, DbgApp_OpenFile, Key_LeftAlt, Key_F);
     RegisterRepeatableEvent(mapping, DbgApp_Search, Key_LeftControl, Key_S);
+    RegisterRepeatableEvent(mapping, DbgApp_RestoreWidgets, Key_LeftControl, Key_R);
 
     // get the movement controls from App interface.
     RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
@@ -579,7 +591,7 @@ uint DbgApp_RegisterExpressionFeedbackCallback(DbgApp_UserExpressionFeedback *fn
 }
 
 void DbgApp_UnregisterCallbackByHandle(uint handle){
-    uint mask = handle >> 8;
+    uint mask = handle >> 16;
     switch(mask){
         case StateChangeMask:{
             DbgApp_UnregisterHandle<DbgApp_UserStateReport>(&dbgSync.stateChangeList,
@@ -594,6 +606,7 @@ void DbgApp_UnregisterCallbackByHandle(uint handle){
                                                                    handle);
         } break;
         default:{
+            BUG();
             printf("Unknow bit mask %d\n", (int)mask);
         }
     }
@@ -601,7 +614,7 @@ void DbgApp_UnregisterCallbackByHandle(uint handle){
 
 /* main entry point for calling the debugger */
 void DbgApp_StartDebugger(const char *binaryPath, const char *args){
-    if(Dbg_IsRunning()) {
+    if(Dbg_IsRunning()){
         DEBUG_MSG("Already running\n");
         return;
     }

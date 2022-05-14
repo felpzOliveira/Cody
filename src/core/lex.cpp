@@ -553,7 +553,7 @@ LEX_PROCESSOR(Lex_Number){
             (*p)++;
             goto _number_start;
         }else if(**p == 'f' && xCount == 0){
-            if(dotCount < 1){
+            if(dotCount < 1 && eCount == 0){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
             }

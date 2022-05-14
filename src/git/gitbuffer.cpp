@@ -7,9 +7,8 @@ struct GitLineBuffer{
 GitLineBuffer gitBuffer = { .base = nullptr };
 
 void GitBuffer_InitializeInternalBuffer(){
-    if(gitBuffer.base == nullptr){
-        gitBuffer.base = LineBuffer_AllocateInternal();
-    }
+    LineBuffer *ptr = gitBuffer.base;
+    gitBuffer.base = LineBuffer_AllocateInternal(ptr);
 }
 
 LineBuffer *GitBuffer_GetLineBuffer(){
@@ -26,6 +25,7 @@ void GitBuffer_PushLine(char *line, uint size){
 
 void GitBuffer_Clear(){
     if(gitBuffer.base){
-        LineBuffer_SoftClear(gitBuffer.base);
+        LineBuffer_Free(gitBuffer.base);
+        LineBuffer_AllocateInternal(gitBuffer.base);
     }
 }

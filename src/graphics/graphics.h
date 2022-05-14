@@ -15,6 +15,7 @@
 #include <functional>
 #include <vector>
 #include <memory>
+#include <parallel.h>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -47,6 +48,7 @@
 struct View;
 class WidgetWindow;
 class DbgWidgetButtons;
+class DbgWidgetExpressionViewer;
 
 /*
 * OpenGL rendering system for the editor.
@@ -139,6 +141,7 @@ struct Mouse{
 struct GlobalWidgets{
     WidgetWindow *wwindow;
     DbgWidgetButtons *wdbgBt;
+    DbgWidgetExpressionViewer *wdbgVw;
 };
 
 struct OpenGLState{
@@ -172,6 +175,8 @@ struct OpenGLState{
     // don't actually need to explicitly handle. While it is kinda ugly it
     // does work really well.
     std::vector<std::shared_ptr<WidgetWindow>> widgetWindows;
+
+    std::vector<BuildError> bErrors;
 
     // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
@@ -265,9 +270,10 @@ void *Graphics_GetBaseWindow();
 WidgetWindow *Graphics_GetBaseWidgetWindow();
 
 /*
-* Retrieves the dbg widget.
+* Retrieves the dbg widget components.
 */
 DbgWidgetButtons *Graphics_GetDbgWidget();
+DbgWidgetExpressionViewer *Graphics_GetDbgExpressionViewer();
 
 /*
 * Retrieves the global gl context.

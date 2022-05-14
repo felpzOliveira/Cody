@@ -24,12 +24,17 @@ std::vector<std::vector<GToken>> litReservedTable = {
     {
         { .value = "uv", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "max", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sky", .identifier = TOKEN_ID_OPERATOR },
         { .value = "ray", .identifier = TOKEN_ID_OPERATOR },
         { .value = "set", .identifier = TOKEN_ID_OPERATOR },
         { .value = "eta", .identifier = TOKEN_ID_OPERATOR },
         { .value = "mat", .identifier = TOKEN_ID_OPERATOR }, },
     {
+        { .value = "Zirr", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "Oidn", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "OIDN", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "oidn", .identifier = TOKEN_ID_OPERATOR },
         { .value = "path", .identifier = TOKEN_ID_OPERATOR },
         { .value = "type", .identifier = TOKEN_ID_OPERATOR },
         { .value = "flip", .identifier = TOKEN_ID_OPERATOR },
@@ -37,6 +42,10 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "name", .identifier = TOKEN_ID_OPERATOR },
         { .value = "View", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "alpha", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "Optix", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "optix", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "OPTIX", .identifier = TOKEN_ID_OPERATOR },
         { .value = "value", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sheen", .identifier = TOKEN_ID_OPERATOR },
         { .value = "image", .identifier = TOKEN_ID_OPERATOR },
@@ -51,6 +60,9 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "scale", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Shape", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "asym_g", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "medium", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "Medium", .identifier = TOKEN_ID_DATATYPE },
         { .value = "render", .identifier = TOKEN_ID_OPERATOR },
         { .value = "window", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sundir", .identifier = TOKEN_ID_OPERATOR },
@@ -64,6 +76,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "center", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Filter", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "sigma_a", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "sigma_s", .identifier = TOKEN_ID_OPERATOR },
         { .value = "texture", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Texture", .identifier = TOKEN_ID_DATATYPE },
         { .value = "samples", .identifier = TOKEN_ID_OPERATOR },
@@ -72,6 +86,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "Include", .identifier = TOKEN_ID_DATATYPE },
         { .value = "include", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "Denoiser", .identifier = TOKEN_ID_DATATYPE },
         { .value = "specular", .identifier = TOKEN_ID_OPERATOR },
         { .value = "metallic", .identifier = TOKEN_ID_OPERATOR },
         { .value = "rayleigh", .identifier = TOKEN_ID_OPERATOR },
@@ -79,6 +94,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
         { .value = "geometry", .identifier = TOKEN_ID_OPERATOR },
         { .value = "Material", .identifier = TOKEN_ID_DATATYPE }, },
     {
+        { .value = "luminance", .identifier = TOKEN_ID_OPERATOR },
         { .value = "wireframe", .identifier = TOKEN_ID_OPERATOR },
         { .value = "sheenTint", .identifier = TOKEN_ID_OPERATOR },
         { .value = "clearcoat", .identifier = TOKEN_ID_OPERATOR },

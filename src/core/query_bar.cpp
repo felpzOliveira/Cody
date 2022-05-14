@@ -30,7 +30,6 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
     int r = 0;
     char *search = nullptr;
     uint searchLen = 0;
-    int increment = 1;
     QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
 
     QueryBar_GetWrittenContent(queryBar, &search, &searchLen);
@@ -53,7 +52,6 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
             replace->toReplace[searchLen] = 0;
 
             replace->state = QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE;
-            increment = 0;
         }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_ASK){
             // TODO: This is a OK on the execute question we need to replace the content
             int toNext = 1;
@@ -79,8 +77,10 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
             QueryBarCmdSearch searchResult;
             BufferView *bView = View_GetBufferView(view);
             if(queryBar->searchCmd.valid){
-                cursor.textPosition = vec2ui(queryBar->searchCmd.lineNo,
-                                             queryBar->searchCmd.position+increment);
+                uint location = queryBar->searchCmd.position;
+                uint newSize  = queryBar->replaceCmd.toReplaceLen;
+                uint newPos = location + newSize;
+                cursor.textPosition = vec2ui(queryBar->searchCmd.lineNo, newPos);
             }else{
                 cursor = bView->sController.cursor;
             }
@@ -582,10 +582,15 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                         uint size = 0;
                         QueryBar_GetWrittenContent(queryBar, &content, &size);
                         if(content && size > 0){
-                            QueryBarHistoryItem *top =
-                                                CircularStack_At(qHistory->history, 0);
                             std::string data = std::string(content, size);
-                            if(data != top->value){
+                            bool insert = true;
+                            if(CircularStack_Size(qHistory->history) > 0){
+                                QueryBarHistoryItem *top =
+                                                CircularStack_At(qHistory->history, 0);
+                                insert = data != top->value;
+                            }
+
+                            if(insert){
                                 std::string path = QueryBarHistory_GetPath();
                                 QueryBarHistoryItem item;
                                 item.value = data;

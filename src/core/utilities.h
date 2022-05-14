@@ -20,7 +20,14 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
-#define BUG() printf("\n=========== BUG ===========\nLocation %s:%d Func: %s\n", __FILE__, __LINE__, __func__)
+#if defined(BUG_HUNT)
+    #define BUG() printf("\n=========== BUG ===========\nLocation %s:%d Func: %s\n",\
+                        __FILE__, __LINE__, __func__)
+    #define BUG_PRINT(...) printf(__VA_ARGS__)
+#else
+    #define BUG()do{}while(0)
+    #define BUG_PRINT(...)do{}while(0)
+#endif
 #define NullRet(x) if(!(x)) return
 
 const Float kInv255 = 0.003921569;
@@ -90,6 +97,9 @@ int TerminatorChar(char v);
 */
 int StringEqual(char *s0, char *s1, uint maxn);
 
+std::string StringReplace(std::string str, const std::string& from,
+                          const std::string& to);
+
 /*
 * Duplicates a string.
 */
@@ -125,9 +135,24 @@ int StringFirstNonEmpty(char *s0, uint s0len);
 char *StringNextWord(char *s0, uint s0len, uint *size);
 
 /*
+* Checks if the string starts with an integer as a first word.
+*/
+bool StringStartsWithInteger(std::string str);
+
+/*
 * Split a string into a list of string, splits based on space.
 */
 void StringSplit(std::string s0, std::vector<std::string> &splitted);
+
+/*
+* Trims a string.
+*/
+std::string StringTrim(std::string s);
+
+/*
+* Returns the following line, if any, inside the given string.
+*/
+std::string FetchSecondLine(std::string s);
 
 /*
 * Find the first ocurrency of 'v' inside 's0'.

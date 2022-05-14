@@ -5,33 +5,95 @@
 #include <glad/glad.h>
 #include <dbgapp.h>
 #include <queue>
+#include <stack>
 
+/**********************************************************************/
+//                 Expressions implementation                         //
+/**********************************************************************/
 void DbgExpression(ExpressionFeedback feedback, void *priv){
-    PRINT("%s ==> %s", feedback.expression.c_str(),
-           feedback.value.c_str());
+    DbgWidgetExpressionViewer *viewer = (DbgWidgetExpressionViewer *)priv;
+    viewer->SetExpression(&feedback);
 }
 
 template<typename Fn, typename ...Args>
-void TransverseExpressionTreeNode(ExpressionTreeNode *root, Fn fn, Args... args){
-    std::queue<ExpressionTreeNode *> nodeQ;
-    nodeQ.push(root);
-    while(!nodeQ.empty()){
-        ExpressionTreeNode *node = nodeQ.front();
-        nodeQ.pop();
+void TransverseExpressionTreeNode(ExpressionTreeNode *root, int bfs, Fn fn, Args... args){
+    struct NodeContext{
+        ExpressionTreeNode *node;
+        int depth;
+        int count;
+    };
 
-        if(fn(node, args...) == 0){
-            break;
-        }
+    std::queue<NodeContext> nodeQueue;
+    std::stack<NodeContext> nodeStack;
 
-        for(ExpressionTreeNode *nd : node->nodes){
-            nodeQ.push(nd);
-        }
+    if(bfs){
+        nodeQueue.push({ .node = root, .depth = 0, .count = 0, });
+    }else{
+        nodeStack.push({ .node = root, .depth = 0, .count = 0, });
     }
+
+    bool empty = false;
+    while(!empty){
+        NodeContext ctx;
+        if(bfs){
+            ctx = nodeQueue.front();
+            nodeQueue.pop();
+        }else{
+            ctx = nodeStack.top();
+            nodeStack.pop();
+        }
+
+        ExpressionTreeNode *node = ctx.node;
+        int depth = ctx.depth;
+        int count = ctx.count;
+        int n = 0;
+
+        if(fn(node, depth, count, args...)){
+            for(ExpressionTreeNode *nd : node->nodes){
+                if(bfs){
+                    nodeQueue.push({ .node = nd, .depth = depth+1, .count = n, });
+                }else{
+                    nodeStack.push({ .node = nd, .depth = depth+1, .count = n, });
+                }
+                n++;
+            }
+        }
+
+        empty = bfs ? nodeQueue.empty() : nodeStack.empty();
+    }
+}
+
+template<typename Fn, typename ...Args>
+void TransverseExpressionTreeActiveNodes(DbgWidgetExpressionViewer *dbgV,
+                                         Fn fn, Args... args)
+{
+    ExpressionTreeNode *root = dbgV->expTree.root;
+    auto call_fn = [&](ExpressionTreeNode *node, int depth, int count) -> int{
+        fn(node, depth, count, args...);
+        return (dbgV->states[node->identifier] == ExpViewState::Expanded ||
+                dbgV->states[node->identifier] == ExpViewState::Static) ? 1 : 0;
+    };
+
+    TransverseExpressionTreeNode(root, false, call_fn);
+}
+
+Geometry GetNodeGeometryIterative(int depth, Float cellWidth,
+                                  Float cellHeight, Float &y)
+{
+    Geometry geo;
+    //Float d = 0.1 * cellWidth;
+    Float d = 19;
+    Float x = depth * d;
+    geo.lower = vec2f(x, y);
+    geo.upper = vec2f(x + cellWidth, y + cellHeight);
+    y += cellHeight;
+    return geo;
 }
 
 DbgWidgetExpressionViewer::DbgWidgetExpressionViewer(){
     state = ExpressionNone;
     expTree.root = nullptr;
+    processClick = false;
 }
 
 DbgWidgetExpressionViewer::~DbgWidgetExpressionViewer(){
@@ -42,22 +104,82 @@ void DbgWidgetExpressionViewer::Clear(){
     state = ExpressionNone;
     expression = std::string();
     if(expTree.root) Dbg_FreeExpressionTree(expTree);
+    states.clear();
+}
+
+Geometry DbgWidgetExpressionViewer::ComputeRenderGeometry(WidgetRenderContext *wctx,
+                                                          const Transform &transform)
+{
+    Float y0 = 0;
+    Geometry res;
+    bool has_data = false;
+    auto fn = [&](ExpressionTreeNode *node, int depth, int count) -> int{
+        Geometry geo = GetNodeGeometryIterative(depth, cellWidth, cellHeight, y0);
+        geo.upper = transform.Point(geo.upper);
+        geo.lower = transform.Point(geo.lower);
+        if(has_data){
+            res = geo;
+            has_data = true;
+        }else{
+            res.lower = Min(Min(res.lower, geo.lower), geo.upper);
+            res.upper = Max(Max(res.upper, geo.lower), geo.upper);
+        }
+        return 1;
+    };
+
+    TransverseExpressionTreeActiveNodes(this, fn);
+    return res;
+}
+
+void DbgWidgetExpressionViewer::ProcessClickEvent(WidgetRenderContext *wctx,
+                                                  const Transform &transform)
+{
+    Float y0 = 0;
+    Geometry g = GetGeometry();
+    vec2f m(mouse.x - g.lower.x, mouse.y - g.lower.y);
+    m.y = g.Height() - m.y;
+
+    Geometry rGeo = ComputeRenderGeometry(wctx, transform);
+    if(!Geometry_IsPointInside(&rGeo, m)) return;
+
+    WidgetWindow *parent = wctx->window;
+    OpenGLFont *font = &parent->font;
+
+    m *= font->fontMath.invReduceScale;
+    auto fn = [&](ExpressionTreeNode *node, int depth, int count) -> int{
+        Geometry geo = GetNodeGeometryIterative(depth, cellWidth, cellHeight, y0);
+        vec2f lower = geo.lower * font->fontMath.invReduceScale;
+        vec2f upper = geo.upper * font->fontMath.invReduceScale;
+        geo.lower = transform.Point(lower);
+        geo.upper = transform.Point(upper);
+
+        if(Geometry_IsPointInside(&geo, m)){
+            int id = node->identifier;
+            if(states[id] == ExpViewState::Contracted){
+                states[id] = ExpViewState::Expanded;
+            }else if(states[id] == ExpViewState::Expanded){
+                states[id] = ExpViewState::Contracted;
+            }
+        }
+        return 1;
+    };
+    TransverseExpressionTreeActiveNodes(this, fn);
+}
+
+void DbgWidgetExpressionViewer::OnClick(){
+    if(!expTree.root) return;
+    processClick = true;
 }
 
 void DbgWidgetExpressionViewer::SetExpression(ExpressionFeedback *feedback){
     states.clear();
-    auto fn = [&](ExpressionTreeNode *node) -> int{
+    auto fn = [&](ExpressionTreeNode *node, int depth, int count) -> int{
         if(node->nodes.size() > 0){
-            printf("%s = ", node->values.owner.c_str());
-            for(ExpressionTreeNode *nd : node->nodes){
-                printf("%s ", nd->values.owner.c_str());
-            }
-            printf(DASH_N);
-            states.push_back(false);
+            states.push_back(ExpViewState::Contracted);
         }else{
-            PRINT("%s = %s", node->values.owner.c_str(),
-                  node->values.value.c_str());
+            states.push_back(ExpViewState::Static);
         }
+        node->identifier = states.size() - 1;
 
         return 1;
     };
@@ -66,7 +188,8 @@ void DbgWidgetExpressionViewer::SetExpression(ExpressionFeedback *feedback){
     if(feedback->rv){
         Dbg_ParseEvaluation((char *)feedback->value.c_str(), expTree);
         state = ExpressionValid;
-        TransverseExpressionTreeNode(expTree.root, fn);
+        expTree.expression = feedback->expression;
+        TransverseExpressionTreeNode(expTree.root, false, fn);
     }else{
         state = ExpressionInvalid;
     }
@@ -77,10 +200,105 @@ void DbgWidgetExpressionViewer::SetExpression(ExpressionFeedback *feedback){
 int DbgWidgetExpressionViewer::OnRender(WidgetRenderContext *wctx,
                                         const Transform &transform)
 {
+    vec4f col(0.2,0.2,0.2,1.0);
+    Float fcol[] = {col.x, col.y, col.z, col.w};
+    glClearBufferfv(GL_COLOR, 0, fcol);
+
+    OpenGLState *gl = wctx->state;
+    WidgetWindow *parent = wctx->window;
+    OpenGLFont *font = &parent->font;
+    Shader shader = gl->buttonShader;
+
     if(!expTree.root) return 0;
+    if(processClick){
+        ProcessClickEvent(wctx, transform);
+        processClick = false;
+    }
+
+    Float y1 = 0;
+    struct QuadInfo{
+        vec2f p0, p1;
+        int depth;
+    };
+    std::vector<QuadInfo> rects;
+
+    auto fn_text = [&](ExpressionTreeNode *node, int depth, int count) -> int{
+        Geometry geo = GetNodeGeometryIterative(depth, cellWidth, cellHeight, y1);
+        int pGlyph = -1;
+        std::string text;
+        text = states[node->identifier] == ExpViewState::Contracted ? "[C]" : "[E]";
+        text += depth == 0 ? expTree.expression : node->values.owner;
+        text += " : ";
+        text += node->values.value;
+        vec4i color(255);
+        vec2f lower = geo.lower * font->fontMath.invReduceScale;
+        vec2f upper = geo.upper * font->fontMath.invReduceScale;
+        vec2f p0 = transform.Point(lower);
+        vec2f p1 = transform.Point(upper);
+
+        rects.push_back({ .p0 = p0, .p1 = p1, .depth = depth });
+
+        lower = (geo.lower + vec2f(0, 0.1 * cellHeight)) *
+                            font->fontMath.invReduceScale;
+        p0 = transform.Point(lower);
+
+        Graphics_PushText(font, p0.x, p0.y, (char *)text.c_str(),
+                          text.size(), color, &pGlyph);
+        return 1;
+    };
+
+    Graphics_PrepareTextRendering(font, &gl->projection, &gl->model);
+    TransverseExpressionTreeActiveNodes(this, fn_text);
+    Graphics_FlushText(font);
+
+    ActivateShaderAndProjections(shader, gl);
+
+    for(QuadInfo &rect : rects){
+        int depth = rect.depth;
+        vec2f p0 = rect.p0;
+        vec2f p1 = rect.p1;
+        col = vec4f(1.0);
+        if(depth == 1) col = vec4f(1.0, 0.0, 0.0, 1.0);
+        if(depth == 2) col = vec4f(0.0, 1.0, 0.0, 1.0);
+        if(depth == 3) col = vec4f(0.0, 0.0, 1.0, 1.0);
+        if(depth == 4) col = vec4f(1.0, 0.0, 1.0, 1.0);
+        if(depth == 5) col = vec4f(0.0, 1.0, 1.0, 1.0);
+        Graphics_QuadPushBorder(&parent->quadBuffer, p0.x, p0.y, p1.x, p1.y, 2, col);
+    }
+
+    Graphics_QuadFlush(&parent->quadBuffer);
+
     return 0;
 }
 
+void DbgWidgetExpressionViewer::OnResize(int width, int height){
+    Geometry geo;
+    geo.lower = vec2ui(0);
+    geo.upper = vec2ui(width, height);
+    SetGeometry(geo, vec2f(0, .5), vec2f(0, .6));
+}
+
+void InitializeDbgExpressionViewer(WidgetWindow *window, DbgWidgetExpressionViewer *dbgVw){
+    if(dbgVw->handle != 0){
+        DbgApp_UnregisterCallbackByHandle(dbgVw->handle);
+        dbgVw->handle = 0;
+    }
+
+    dbgVw->Clear();
+
+    dbgVw->SetGeometry(window->GetGeometry(), vec2f(0, .5), vec2f(0, .6));
+    dbgVw->SetDraggable(true);
+    dbgVw->SetDragRegion(vec2f(0, 1), vec2f(0.9, 1));
+
+    dbgVw->handle = DbgApp_RegisterExpressionFeedbackCallback(DbgExpression, dbgVw);
+    if(!window->Contains(dbgVw)){
+        window->PushWidget(dbgVw);
+    }
+}
+
+/**********************************************************************/
+//                     Buttons Implementation                         //
+/**********************************************************************/
 #define kDelta 0.9
 
 void DbgStateReport(DbgState state, void *priv){
@@ -499,7 +717,6 @@ void InitializeDbgButtons(WidgetWindow *window, DbgWidgetButtons *dbgBt){
     dbgBt->buttons[DbgFinishIndex].AddClickedSlot(Slot<Widget *>(DbgButtonOnFinishClicked));
 
     dbgBt->handle = DbgApp_RegisterStateChangeCallback(DbgStateReport, dbgBt);
-    DbgApp_RegisterExpressionFeedbackCallback(DbgExpression, dbgBt);
     if(!window->Contains(dbgBt)){
         window->PushWidget(dbgBt);
     }
