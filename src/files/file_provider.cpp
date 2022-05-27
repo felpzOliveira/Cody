@@ -5,6 +5,7 @@
 #include <app.h>
 #include <file_base_hooks.h>
 #include <languages.h>
+#include <storage.h>
 
 typedef struct FileProvider{
     FileBufferList fileBuffer;
@@ -17,6 +18,7 @@ typedef struct FileProvider{
     Tokenizer emptyTokenizer, emptyDetachedTokenizer;
     Tokenizer litTokenizer, litDetachedTokenizer;
     Tokenizer cmakeTokenizer, cmakeDetachedTokenizer;
+    StorageDevice *storageDevice;
 }FileProvider;
 
 // Static allocation of the file provider
@@ -96,6 +98,8 @@ void FileProvider_Initialize(){
 
     fProvider.openHooksCount = 0;
     fProvider.createHooksCount = 0;
+
+    fProvider.storageDevice = FetchStorageDevice();
 
     FileHooks_RegisterDefault();
 }
@@ -236,8 +240,11 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     uint fileSize = 0;
     LineBufferProps props;
     char *content = nullptr;
+    StorageDevice *device = fProvider.storageDevice;
 
-    content = GetFileContents(targetPath, &fileSize);
+    if(device){
+        content = device->GetContentsOf(targetPath, &fileSize);
+    }
 
     lBuffer = AllocatorGetN(LineBuffer, 1);
     *lBuffer = LINE_BUFFER_INITIALIZER;
@@ -252,7 +259,7 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     LineBuffer_SetExtension(lBuffer, props.ext);
     LineBuffer_SetWrittable(lBuffer, true);
 
-    if(fileSize == 0){
+    if(fileSize == 0 || content == nullptr){
         AllocatorFree(content);
         LineBuffer_InitEmpty(lBuffer);
         content = nullptr;

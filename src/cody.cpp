@@ -8,6 +8,43 @@
 #include <cryptoutil.h>
 #include <mp.h>
 #include <gitbase.h>
+#include <arg_parser.h>
+#include <storage.h>
+
+typedef struct{
+    bool is_remote;
+    std::string ip;
+    int port;
+    std::string unknownPath;
+}CmdLineArgs;
+
+void DefaultArgs(CmdLineArgs *args){
+    args->is_remote = false;
+    args->ip = "127.0.0.1";
+    args->port = 1000;
+    args->unknownPath = std::string();
+}
+
+ARGUMENT_PROCESS(remote_flags){
+    CmdLineArgs *args = (CmdLineArgs *)config;
+    std::string ip = ParseNext(argc, argv, i, "--remote");
+    int port       = (int)ParseNextFloat(argc, argv, i, "--remote");
+    if(port <= 0 || port >= 65535){
+        printf("Invalid port value (%d)\n", port);
+        return ARG_ABORT;
+    }
+    args->is_remote = true;
+    args->ip = ip;
+    args->port = port;
+    return ARG_OK;
+}
+
+std::map<const char *, ArgDesc> arg_map = {
+    {"--remote",
+        { .processor = remote_flags,
+          .help = "Use cody as a remote editor for a running server." }
+    },
+};
 
 void testMP(){
     MPI val32 = MPI::FromI64(32);
@@ -97,7 +134,22 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
+#include <server.h>
+int port = 2000;
+void server_test(){
+    RPCServer server;
+    server.Start(port);
+}
+
+void client_test(){
+    RPCClient client;
+    client.ConnectTo("127.0.0.1", port);
+}
+
 int main(int argc, char **argv){
+    //server_test();
+    //client_test();
+    //return 0;
 #if 0
     Git_Initialize();
 
@@ -114,14 +166,32 @@ int main(int argc, char **argv){
     testMP();
     return 0;
 #endif
+    CmdLineArgs args;
+    DefaultArgs(&args);
+
+    ArgumentProcess(arg_map, argc, argv, "Cody", (void *)&args,
+    [&](std::string val) -> bool
+    {
+        // got too many unknowns
+        if(args.unknownPath.size() > 0) return ARG_ABORT;
+        // one unkown we handle as the path of a file or dir
+        args.unknownPath = val;
+        return ARG_OK;
+    }, 0);
+
+    if(!args.is_remote){
+        SetStorageDevice(StorageDeviceType::Local);
+    }else{
+        // TODO: Setup remote stuff
+    }
 
     DebuggerRoutines();
 
     CommandExecutorInit();
 
-    if(argc > 1){
+    if(args.unknownPath.size() > 0){
         char folder[PATH_MAX];
-        char *p = argv[1];
+        char *p = (char *)args.unknownPath.c_str();
         uint len = strlen(p);
         FileEntry entry;
         int r = GuessFileEntry(p, len, &entry, folder);

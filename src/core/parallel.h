@@ -65,6 +65,8 @@ template<typename T> class ConcurrentTimedQueue{
 
     ConcurrentTimedQueue(uint ms=PARALLEL_QUEUE_TIMEOUT_MS) : max_timeout_ms(ms){}
 
+    void set_interval(uint ms){ max_timeout_ms = ms; }
+
     std::optional<T> pop(){
         std::unique_lock<std::mutex> locker(mutex);
         auto max_ms = std::chrono::milliseconds(max_timeout_ms);

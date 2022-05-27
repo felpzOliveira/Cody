@@ -35,6 +35,11 @@ void Git_Initialize();
 void Git_Finalize();
 
 /*
+* Disable all git functions.
+*/
+void Git_Disable();
+
+/*
  * Attempt to open the root directory of the application as a git repo.
  */
 bool Git_OpenRootRepository();

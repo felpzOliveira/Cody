@@ -5,6 +5,7 @@
 #include <parallel.h>
 #include <fstream>
 #include <utilities.h>
+#include <storage.h>
 
 #define QUERY_BAR_HISTORY_PATH ".history"
 
@@ -641,8 +642,12 @@ void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath
     QueryBarHistory *qHistory = history;
     char *content = nullptr;
     uint fileSize = 0;
+    StorageDevice *device = FetchStorageDevice();
 
-    content = GetFileContents(basePath, &fileSize);
+    if(device){
+        content = device->GetContentsOf(basePath, &fileSize);
+    }
+
     if(content && fileSize > 0){
         Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
                         0, qHistory, true);

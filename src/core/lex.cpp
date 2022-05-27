@@ -411,7 +411,7 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
             token->reserved = StringDup(h, token->size);
         }
         // experimental, let other procs be called instead, hopefully
-        // this stabilizes the typedef struct{}<type>; synthax
+        // this stabilizes the typedef struct{}<type>; syntax
         BoundedStack_Pop(tokenizer->procStack);
     }
 

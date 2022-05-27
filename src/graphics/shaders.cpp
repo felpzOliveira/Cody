@@ -73,23 +73,6 @@ void Shader_StoragePublic(const std::string &filename, const std::string &conten
     ShaderStorage[filename] = content;
 }
 
-void Shader_StoragePublic(const char *path){
-    char *p = nullptr;
-    char *content = nullptr;
-    uint size = 0;
-
-    int addr = GetRightmostSplitter(path, strlen(path));
-    p = (char *)&path[addr+1];
-
-    content = GetFileContents(path, &size);
-    if(content != nullptr){
-        Shader_StoragePublic(p, std::string(content));
-        free(content);
-    }else{
-        DEBUG_MSG("Failed to read file %s\n", path);
-    }
-}
-
 int Shader_StorageQueryContent(const std::string &shadername, std::string &content){
     int rv = -1;
     if(ShaderStorage.find(shadername) != ShaderStorage.end()){
@@ -168,54 +151,6 @@ int Shader_CompileSource(const std::string &content, int type){
     rv = (int)id;
 
 end:
-    return rv;
-}
-
-int Shader_CompileFile(const char *path, int type, char *oContent){
-    int rv = -1;
-    uint id = 0;
-    uint filesize = 0;
-    std::string translated;
-    uint gltype = GL_VERTEX_SHADER;
-    const char *v = "VERTEX";
-    const char *f = "FRAGMENT";
-    char *str = (char *)v;
-    char *p = nullptr;
-
-    if((type != SHADER_TYPE_VERTEX &&
-        type != SHADER_TYPE_FRAGMENT) || path == nullptr) return rv;
-
-    char *content = GetFileContents(path, &filesize);
-    if(content == nullptr) return rv;
-
-    if(Shader_TranslateShaderContent(content, translated) != 1) goto end;
-
-    if(type == SHADER_TYPE_FRAGMENT){
-        str = (char *)f;
-        gltype = GL_FRAGMENT_SHADER;
-    }
-
-    id = glCreateShader(gltype);
-    if(id == 0){
-        DEBUG_MSG("Failed to create shader");
-        goto end;
-    }
-
-    p = (char *)translated.c_str();
-    glShaderSource(id, 1, (char **)&p, NULL);
-    glCompileShader(id);
-
-    if(Shader_CheckForCompileErrors(id, str)) goto end;
-
-    if(oContent){
-        oContent = content;
-        content = nullptr;
-    }
-
-    rv = (int)id;
-
-end:
-    if(content) AllocatorFree(content);
     return rv;
 }
 

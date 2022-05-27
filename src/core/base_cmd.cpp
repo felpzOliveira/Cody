@@ -11,6 +11,7 @@
 #include <theme.h>
 #include <dbgapp.h>
 #include <graphics.h>
+#include <storage.h>
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
@@ -804,12 +805,13 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
 static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
                                          uint *n, uint *size)
 {
+    StorageDevice *storage = FetchStorageDevice();
     std::string refPath(basePath);
     if(refPath[refPath.size()-1] != '/'){
         refPath += "/";
     }
 
-    if(ListFileEntries((char *)refPath.c_str(), entries, n, size) < 0){
+    if(storage->ListFiles((char *)refPath.c_str(), entries, n, size) < 0){
         return -1;
     }
 

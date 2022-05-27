@@ -49,6 +49,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/src"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/resources"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/crypto"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/git"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/src/rpc"
                     "${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include"
                     "${CMAKE_CURRENT_SOURCE_DIR}/external/libgit2/include")
 
@@ -57,12 +58,13 @@ file(GLOB MH_CORE src/core/*.cpp
                   src/resources/*.cpp
                   src/debugger/*.cpp
                   src/external/migdb/*.cpp
-                  ${CMAKE_BINARY_DIR}/*.cpp
                   src/languages/*.cpp
                   src/crypto/*.cpp
                   src/git/*.cpp
+                  src/rpc/*.cpp
                   src/graphics/*.cpp
-                  src/external/glad/src/*.cpp)
+                  src/external/glad/src/*.cpp
+                  ${CMAKE_BINARY_DIR}/*.cpp)
 
 file(GLOB MH_SHADERS shaders/*.glsl)
 

@@ -29,7 +29,6 @@ void Shader_UniformVec2(Shader &shader, const char *name, vec2f value);
 void Shader_UniformVec4(Shader &shader, const char *name, vec4f value);
 int Shader_Create(Shader &shader, uint vertex, uint fragment);
 
-int Shader_CompileFile(const char *path, int type, char *content=nullptr);
 int Shader_CompileSource(const std::string &content, int type);
 
 void Shader_StoragePublic(const std::string &filename, const std::string &content);

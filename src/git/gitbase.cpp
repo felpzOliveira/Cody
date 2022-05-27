@@ -9,14 +9,16 @@
 #include <gitgraph.h>
 
 #define MODULE_NAME "GIT"
+#define GIT_DISABLED_RET() do{ if(gitState.is_disabled) return; }while(0)
 
 struct GitState{
     git_repository *repo;
     git_reference *head;
     git_diff *diff;
+    bool is_disabled;
 };
 
-GitState gitState = {.repo = nullptr, .head = nullptr, .diff = nullptr};
+GitState gitState = {.repo=nullptr, .head=nullptr, .diff=nullptr, .is_disabled=false};
 
 /*
 * libgit2 has a bug on git_branch_next function regarding some pointers it handles.
@@ -133,6 +135,7 @@ static bool Git_TryOpenRepo(git_repository **repo, git_reference **head, std::st
 }
 
 bool Git_OpenDirectory(char *path){
+    if(gitState.is_disabled) return false;
     bool rv = false;
     git_repository *repo = nullptr;
     git_reference *head = nullptr;
@@ -155,7 +158,7 @@ bool Git_OpenRootRepository(){
 
 bool Git_GetReferenceHeadName(std::string &name){
     // check if the repo was successfully opened
-    if(!gitState.head) return false;
+    if(!gitState.head || gitState.is_disabled) return false;
     const char *refstr = git_reference_shorthand(gitState.head);
     if(refstr){
         name = std::string(refstr);
@@ -241,7 +244,7 @@ bool Git_FetchStatus(std::vector<std::string> *_status){
 }
 
 bool Git_FetchDiffDeltas(std::vector<std::string> *_deltas){
-    if(!gitState.repo) return false;
+    if(!gitState.repo || gitState.is_disabled) return false;
     if(!gitState.diff) return false;
 
     auto fn = [](const git_diff_delta *delta, float, void *obj) -> int{
@@ -281,7 +284,7 @@ bool Git_FetchDiffDeltas(std::vector<std::string> *_deltas){
 }
 
 bool Git_FetchDiffFor(const char *target, std::vector<LineHighlightInfo> *_hunks){
-    if(!gitState.repo) return false;
+    if(!gitState.repo || gitState.is_disabled) return false;
     int rv = -1;
     git_diff *diff = nullptr;
     git_diff_options diffopts = GIT_DIFF_OPTIONS_INIT;
@@ -544,7 +547,7 @@ bool Git_LogGraph(){
 }
 
 bool Git_ComputeCurrentDiff(){
-    if(!gitState.repo) return false;
+    if(!gitState.repo || gitState.is_disabled) return false;
 
     // recompute diff
     if(gitState.diff){
@@ -563,7 +566,7 @@ bool Git_ComputeCurrentDiff(){
 }
 
 std::string Git_GetRepositoryRoot(){
-    if(!gitState.repo) return std::string();
+    if(!gitState.repo || gitState.is_disabled) return std::string();
     const char *gitp = git_repository_path(gitState.repo);
     std::string str(gitp);
 
@@ -575,16 +578,21 @@ std::string Git_GetRepositoryRoot(){
 }
 
 void Git_Initialize(){
+    GIT_DISABLED_RET();
     git_libgit2_init();
     //DEBUG_MSG("Initialized\n");
 }
 
 void Git_Finalize(){
+    GIT_DISABLED_RET();
     if(gitState.repo) git_repository_free(gitState.repo);
     if(gitState.head) git_reference_free(gitState.head);
     if(gitState.diff) git_diff_free(gitState.diff);
     git_libgit2_shutdown();
-    DEBUG_MSG("Finalize\n");
+    //DEBUG_MSG("Finalize\n");
 }
 
+void Git_Disable(){
+    gitState.is_disabled = true;
+}
 

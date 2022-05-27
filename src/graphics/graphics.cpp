@@ -1167,22 +1167,6 @@ void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad){
     }
 }
 
-void Graphics_TextureInit(OpenGLState *state, const char *path,
-                          const char *key, FileExtension type)
-{
-    int x = 0, y = 0, n = 0;
-    uint8 *data = ImageUtils_LoadPixels(path, &x, &y, &n);
-    if(data){
-        _Graphics_InitTexture(state, data, x, y, n, key);
-        ImageUtils_FreePixels(data);
-        if(type != FILE_EXTENSION_NONE){
-            state->fileMap[type] = key;
-        }
-    }else{
-        printf("Failed to load %s\n", path);
-    }
-}
-
 void Graphics_TextureInit(OpenGLState *state, uint8 *image, uint len,
                           const char *key, FileExtension type)
 {

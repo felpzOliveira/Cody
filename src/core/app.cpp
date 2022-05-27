@@ -20,6 +20,7 @@
 #include <dbgapp.h>
 #include <widgets.h>
 #include <dbgwidget.h>
+#include <storage.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -116,6 +117,7 @@ bool App_IsStateWrite(){
 
 void AppEarlyInitialize(){
     View *view = nullptr;
+    StorageDevice *storage = FetchStorageDevice();
     srand(time(0));
     // TODO: Configuration file
     // NOTE: Configuration must be done first as tab spacing
@@ -137,7 +139,7 @@ void AppEarlyInitialize(){
 
     View_SetActive(appContext.activeView, 1);
 
-    GetCurrentWorkingDirectory(appContext.cwd, PATH_MAX);
+    storage->GetWorkingDirectory(appContext.cwd, PATH_MAX);
 
     appContext.autoCompleteMapping = AutoComplete_Initialize();
     std::string dir(appContext.cwd); dir += "/.cody";
@@ -150,8 +152,12 @@ void AppEarlyInitialize(){
     QueryBarHistory_DetachedLoad(&appContext.queryBarHistory,
                                  QueryBarHistory_GetPath().c_str());
 
-    Git_Initialize();
-    Git_OpenRootRepository();
+    if(storage->IsLocallyStored()){
+        Git_Initialize();
+        Git_OpenRootRepository();
+    }else{
+        Git_Disable();
+    }
 
     GitBuffer_InitializeInternalBuffer();
 
@@ -2368,6 +2374,14 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppMemoryDebugFreeze, Key_LeftControl, Key_1);
     RegisterRepeatableEvent(mapping, AppMemoryDebugCmp, Key_LeftControl, Key_2);
 
+    //FILE MANAGEMENT KEYS
+    RegisterRepeatableEvent(mapping, AppCommandOpenFile, Key_LeftAlt, Key_F);
+    RegisterRepeatableEvent(mapping, AppCommandKillView, Key_LeftControl,
+                            Key_LeftAlt, Key_K);
+    RegisterRepeatableEvent(mapping, AppCommandKillBuffer, Key_LeftControl, Key_K);
+    RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
+    RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
+
     //TODO: Create basic mappings
     RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
     RegisterRepeatableEvent(mapping, AppCommandRightArrow, Key_Right);
@@ -2376,7 +2390,6 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandSwitchTheme, Key_LeftControl, Key_T);
 
-    RegisterRepeatableEvent(mapping, AppCommandOpenFile, Key_LeftAlt, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandListFunctions, Key_LeftControl, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftControl);
@@ -2407,11 +2420,8 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandAutoComplete, Key_LeftControl, Key_N);
     RegisterRepeatableEvent(mapping, AppCommandSwapLineNbs, Key_LeftAlt, Key_N);
-    RegisterRepeatableEvent(mapping, AppCommandKillBuffer, Key_LeftControl, Key_K);
     RegisterRepeatableEvent(mapping, AppCommandKillEndOfLine, Key_LeftAlt, Key_K);
-    RegisterRepeatableEvent(mapping, AppCommandKillView, Key_LeftControl, Key_LeftAlt, Key_K);
 
-    RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearch, Key_LeftControl, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearchAndReplace, Key_LeftControl, Key_O);
     RegisterRepeatableEvent(mapping, AppCommandGitDiffCurrent, Key_LeftAlt, Key_O);
@@ -2432,7 +2442,6 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
 
     //TODO: re-do (AppCommandRedo)
-    RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand,
                             Key_LeftControl, Key_Semicolon);
 
