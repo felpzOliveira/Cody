@@ -93,6 +93,11 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
                      AesKeyLength length, std::vector<uint8_t> &out);
 
 /*
+ * Returns the length required to encrypt data of a given size.
+ */
+uint32_t AES_CBC_ComputeRequiredLength(uint32_t size);
+
+/*
  * Runs NIST test vectors on current implementation of AES-CBC.
  * Code must be compiled with AES_TEST.
  */

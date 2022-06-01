@@ -6,6 +6,7 @@
 #include <string.h>
 #include <autocomplete.h>
 #include <parallel.h>
+#include <storage.h>
 
 #define MODULE_NAME "Buffer"
 
@@ -1697,14 +1698,19 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
         return;
     }
 
+    FileHandle file;
+    StorageDevice *storage = FetchStorageDevice();
     uint lines = lineBuffer->lineCount;
-    FILE *fp = fopen(lineBuffer->filePath, "wb");
+    if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
+        printf("Could not open file %s in current storage device\n",
+               lineBuffer->filePath);
+        return;
+    }
+
     uint maxSize = 0;
     uint ic = 0;
     char *linePtr = nullptr;
     uint i = 0;
-
-    AssertA(fp != NULL, "Failed to open file");
 
     for(uint i = 0; i < lines; i++){
         Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
@@ -1751,12 +1757,12 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
             linePtr[ic+1] = 0;
         }
 
-        uint s = fwrite(linePtr, sizeof(char), ic, fp);
+        uint s = storage->StreamWriteBytes(&file, linePtr, sizeof(char), ic);
         (void)s;
         AssertA(s == ic, "Failed to write to file");
     }
 
-    fclose(fp);
+    storage->StreamFinish(&file);
     AllocatorFree(linePtr);
     lineBuffer->is_dirty = 0;
 }

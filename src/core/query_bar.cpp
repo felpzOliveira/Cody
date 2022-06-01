@@ -657,19 +657,24 @@ void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath
 }
 
 void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePath){
+    FileHandle file;
     std::string path(basePath);
     QueryBarHistory *qHistory = _history;
 
+    StorageDevice *storage = FetchStorageDevice();
     CircularStack<QueryBarHistoryItem> *history = qHistory->history;
-    FILE *fp = fopen(basePath, "w");
-    if(fp){
-        for(uint i = 0; i < CircularStack_Size(history); i++){
-            QueryBarHistoryItem *item = CircularStack_At(history, i);
-            if(item->value.size() > 0){
-                fprintf(fp, "%s\n", item->value.c_str());
-                printf(" Writting %s\n", item->value.c_str());
-            }
-        }
-        fclose(fp);
+    if(!storage->StreamWriteStart(&file, basePath)){
+        printf("Could not open file %s in current storage device\n", basePath);
+        return;
     }
+
+    for(uint i = 0; i < CircularStack_Size(history); i++){
+        QueryBarHistoryItem *item = CircularStack_At(history, i);
+        if(item->value.size() > 0){
+            storage->StreamWriteString(&file, item->value.c_str());
+            printf(" Writing %s\n", item->value.c_str());
+        }
+    }
+
+    storage->StreamFinish(&file);
 }

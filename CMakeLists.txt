@@ -2,6 +2,7 @@ project(Cody)
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 set(CODY "cody")
+set(SERVER "server")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
@@ -66,9 +67,19 @@ file(GLOB MH_CORE src/core/*.cpp
                   src/external/glad/src/*.cpp
                   ${CMAKE_BINARY_DIR}/*.cpp)
 
+file(GLOB SV_SRCS src/files/storage.cpp
+                  src/core/memory.cpp
+                  src/core/utilities.cpp
+                  src/crypto/*.cpp
+                  src/rpc/*.cpp
+                  src/rpc_server.cpp)
+
 file(GLOB MH_SHADERS shaders/*.glsl)
 
+add_executable(${SERVER} ${SV_SRCS})
+
 file(GLOB MH_SRCS src/cody.cpp)
+
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/external)
 
@@ -94,3 +105,4 @@ target_link_directories(${CODY} PRIVATE
                         ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2
                         ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
 target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})
+

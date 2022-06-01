@@ -86,8 +86,6 @@ std::string translateGLError(int errorCode);
 
 void __gl_validate(const char *cmd, int line, const char *fileName);
 
-void __gpu_gl_get_memory_usage();
-
 void __cpu_get_memory_usage(long unsigned int mem);
 
 void __memory_freeze();
@@ -201,7 +199,6 @@ inline void _debugger_trace(int sig){
         fprintf(stdout, "Error signal %d:\n", sig);
     }
 	__cpu_get_memory_usage(debug_memory_usage);
-	__gpu_gl_get_memory_usage();
     _debugger_memory_usage();
     backtrace_symbols_fd(array, size, STDOUT_FILENO);
     exit(1);

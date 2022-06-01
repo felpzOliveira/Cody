@@ -549,7 +549,7 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
         }
     }
 
-    // if we finished because the message was multiple of the block size
+    // if we finished and the message was multiple of the block size
     // we need to do one more to insert the padding, in this case the entire
     // block is a pad, i.e.: encrypt of 16 bytes of value 0x10.
     if(!is_last_block){
@@ -578,6 +578,15 @@ bool AES_CBC_Encrypt(uint8_t *input, size_t len, uint8_t *key, AesKeyLength leng
     memset(enc, 0, AES_BLOCK_SIZE_IN_BYTES);
 
     return true;
+}
+
+uint32_t AES_CBC_ComputeRequiredLength(uint32_t size){
+    // when size is 0 we have a complete pad block
+    if(size == 0) return AES_BLOCK_SIZE_IN_BYTES;
+
+    // otherwise a simple division gets it plus a padding block
+    uint32_t blocks = size / AES_BLOCK_SIZE_IN_BYTES;
+    return (blocks + 1) * AES_BLOCK_SIZE_IN_BYTES;
 }
 
 #if defined(AES_TEST)

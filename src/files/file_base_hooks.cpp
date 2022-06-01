@@ -10,6 +10,13 @@ std::string months[] = {
     "July", "August", "September", "October", "November", "December"
 };
 
+static void PushTime2(int val, std::stringstream &ss){
+    if(val < 10){
+        ss << "0";
+    }
+    ss << val;
+}
+
 static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     std::stringstream ss;
     std::time_t curr = time(0);
@@ -26,7 +33,12 @@ static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     }
 
     ss << "/* date = " << months[now->tm_mon] << " " << now->tm_mday << ext <<
-          (now->tm_year + 1900) << " " << now->tm_hour << ":" << now->tm_min << " */";
+          (now->tm_year + 1900) << " ";
+
+    PushTime2(now->tm_hour, ss);
+    ss << ":";
+    PushTime2(now->tm_min, ss);
+    ss << " */";
 
     std::string str = ss.str();
     LineBuffer_InsertLineAt(lineBuffer, 0, (char *)str.c_str(), str.size(), 0);

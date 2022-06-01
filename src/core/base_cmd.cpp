@@ -123,12 +123,9 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
     }
 
     if(size > 0){
+        StorageDevice *device = FetchStorageDevice();
         std::string path = AppGetConfigFilePath();
-        FILE *fp = fopen(path.c_str(), "a+");
-        if(fp){
-            fprintf(fp, "%s\n", entry);
-            fclose(fp);
-        }
+        device->AppendTo(path.c_str(), entry);
     }
 
     return 0;

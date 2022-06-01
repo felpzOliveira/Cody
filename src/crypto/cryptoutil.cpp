@@ -153,3 +153,11 @@ void CryptoUtil_BufferFromBase64(std::vector<unsigned char> &out, char *data, si
         }
     }
 }
+
+void CryptoUtil_DebugPrintBuffer(unsigned char *buffer, size_t len){
+    for(size_t i = 0; i < len; i++){
+        printf("%s%x%s", buffer[i] < 0x10 ? "0x0" : "0x", buffer[i],
+               (i+1) % 16 == 0 ? "\n" : " ");
+    }
+    printf("\n");
+}

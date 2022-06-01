@@ -46,6 +46,56 @@ static OpenGLState GlobalGLState;
 
 #define TOOGLE_VAR(var) (var) = !(var)
 
+
+std::string translateGLError(int errorCode){
+    std::string error;
+    switch (errorCode){
+        case GL_INVALID_ENUM:                  error = "INVALID_ENUM"; break;
+        case GL_INVALID_VALUE:                 error = "INVALID_VALUE"; break;
+        case GL_INVALID_OPERATION:             error = "INVALID_OPERATION"; break;
+        case GL_STACK_OVERFLOW:                error = "STACK_OVERFLOW"; break;
+        case GL_STACK_UNDERFLOW:               error = "STACK_UNDERFLOW"; break;
+        case GL_OUT_OF_MEMORY:                 error = "OUT_OF_MEMORY"; break;
+        case GL_INVALID_FRAMEBUFFER_OPERATION: error = "INVALID_FRAMEBUFFER_OPERATION"; break;
+        default: error = "Unknown Error";
+    }
+    return error;
+}
+
+void __gl_validate(const char *cmd, int line, const char *fileName){
+    int val = glGetError();
+    if(val != GL_NO_ERROR){
+        std::string msg = translateGLError(val);
+        std::cout << "(" << fileName << " : " << line << ") " << cmd << " => " << msg.c_str()
+                   << "[" << val << "]" << std::endl;
+        Assert(false);
+        //exit(0);
+    }
+}
+
+#if defined(MEMORY_DEBUG)
+
+#define GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX 0x9048
+#define GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX 0x9049
+
+void __gpu_gl_get_memory_usage(){
+    int total_mem_kb = 0;
+    glGetIntegerv(GL_GPU_MEM_INFO_TOTAL_AVAILABLE_MEM_NVX, &total_mem_kb);
+
+    int cur_avail_mem_kb = 0;
+    glGetIntegerv(GL_GPU_MEM_INFO_CURRENT_AVAILABLE_MEM_NVX, &cur_avail_mem_kb);
+    total_mem_kb /= 1024;
+    cur_avail_mem_kb /= 1024;
+    printf("[GPU] Current Available: %d / %d (MB)\n", cur_avail_mem_kb, total_mem_kb);
+}
+#endif
+
+void __gl_clear_errors(){
+    while(glGetError()){
+        ;
+    }
+}
+
 void OpenGLClearErrors(){
     while(glGetError()) ;
 }

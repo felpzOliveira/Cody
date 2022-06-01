@@ -10,19 +10,27 @@
 #include <gitbase.h>
 #include <arg_parser.h>
 #include <storage.h>
+#include <security.h>
 
 typedef struct{
     bool is_remote;
     std::string ip;
     int port;
+    uint8_t key[32];
+    bool has_key;
     std::string unknownPath;
 }CmdLineArgs;
 
 void DefaultArgs(CmdLineArgs *args){
     args->is_remote = false;
+    args->has_key = false;
     args->ip = "127.0.0.1";
     args->port = 1000;
     args->unknownPath = std::string();
+}
+
+void SetArgsKey(CmdLineArgs *args, uint8_t *mem){
+    memcpy(args->key, mem, 32);
 }
 
 ARGUMENT_PROCESS(remote_flags){
@@ -39,11 +47,62 @@ ARGUMENT_PROCESS(remote_flags){
     return ARG_OK;
 }
 
+ARGUMENT_PROCESS(keyfile_flags){
+    printf("Called@\n");
+    uint size = 0;
+    CmdLineArgs *args = (CmdLineArgs *)config;
+    std::string path = ParseNext(argc, argv, i, "--keyfile");
+    char *mem = GetFileContents(path.c_str(), &size);
+    if(size != 32){
+        printf("Invalid key size, key must be 32 bytes long\n");
+        return ARG_ABORT;
+    }
+
+    if(!mem){
+        printf("Failed to read key\n");
+        return ARG_ABORT;
+    }
+
+    SetArgsKey(args, (uint8_t *)mem);
+    AllocatorFree(mem);
+
+    args->has_key = true;
+    return ARG_OK;
+}
+
+ARGUMENT_PROCESS(keyval_flags){
+    std::vector<uint8_t> key;
+    CmdLineArgs *args = (CmdLineArgs *)config;
+    std::string path = ParseNext(argc, argv, i, "--key");
+    if(!(path.size() % 2 == 0 && path.size() > 0)){
+        printf("Invalid key, key must be a valid hex value\n");
+        return ARG_ABORT;
+    }
+
+    CryptoUtil_BufferFromHex(key, (char *)path.c_str(), path.size());
+    if(key.size() != 32){
+        printf("Invalid key size, key must be 32 bytes long\n");
+        return ARG_ABORT;
+    }
+
+    SetArgsKey(args, key.data());
+    args->has_key = true;
+    return ARG_OK;
+}
+
 std::map<const char *, ArgDesc> arg_map = {
     {"--remote",
         { .processor = remote_flags,
           .help = "Use cody as a remote editor for a running server." }
     },
+    {"--keyfile",
+        { .processor = keyfile_flags,
+          .help = "Sets a custom key to be used for a 256 bit key given in a file." }
+    },
+    {"--key",
+        { .processor = keyval_flags,
+          .help = "Sets a custom key to be used for AES 256 bit given as a hex string." }
+    }
 };
 
 void testMP(){
@@ -72,6 +131,7 @@ void testMP(){
 }
 
 void LoadStaticFilesOnStart(){
+    // TODO: Port to storage arch
     std::string path = AppGetConfigFilePath();
     FILE *fp = fopen(path.c_str(), "r");
     if(fp){
@@ -135,21 +195,45 @@ void StartWithFile(const char *path=nullptr){
 }
 
 #include <server.h>
-int port = 2000;
-void server_test(){
-    RPCServer server;
-    server.Start(port);
-}
-
 void client_test(){
     RPCClient client;
+    int port = 20000;
     client.ConnectTo("127.0.0.1", port);
+    std::vector<uint8_t> out;
+
+    if(!client.ReadEntireFile(out, "/home/felipe/Documents/lorem_ipsum.txt")){
+        printf("Failed to read file\n");
+    }else if(out.size() > 0){
+        char *ptr = (char *)out.data();
+        printf("File ( %lu ):\n%s\n", out.size(), ptr);
+    }else{
+        printf("Empty file\n");
+    }
+
+    out.clear();
+    if(!client.StreamWriteStart(out, "/home/felipe/Documents/test_file.txt")){
+        printf("Failed to open file\n");
+    }else{
+        printf("Opened file\n");
+    }
+
+    out.clear();
+    std::string val("Hello from client!");
+    if(!client.StreamWriteUpdate(out, (uint8_t *)val.c_str(), val.size())){
+        printf("Failed to write file\n");
+    }else{
+        printf("Updated file\n");
+    }
+
+    out.clear();
+    if(!client.StreamWriteFinal(out)){
+        printf("Failed to close file\n");
+    }else{
+        printf("Closed file\n");
+    }
 }
 
 int main(int argc, char **argv){
-    //server_test();
-    //client_test();
-    //return 0;
 #if 0
     Git_Initialize();
 
@@ -169,6 +253,8 @@ int main(int argc, char **argv){
     CmdLineArgs args;
     DefaultArgs(&args);
 
+    StorageDeviceEarlyInit();
+
     ArgumentProcess(arg_map, argc, argv, "Cody", (void *)&args,
     [&](std::string val) -> bool
     {
@@ -179,43 +265,57 @@ int main(int argc, char **argv){
         return ARG_OK;
     }, 0);
 
+    if(args.has_key)
+        SecurityServices::Start(args.key);
+    else
+        SecurityServices::Start();
+
     if(!args.is_remote){
         SetStorageDevice(StorageDeviceType::Local);
     }else{
         // TODO: Setup remote stuff
     }
 
+    client_test();
+    return 0;
+
     DebuggerRoutines();
 
     CommandExecutorInit();
 
-    if(args.unknownPath.size() > 0){
-        char folder[PATH_MAX];
-        char *p = (char *)args.unknownPath.c_str();
-        uint len = strlen(p);
-        FileEntry entry;
-        int r = GuessFileEntry(p, len, &entry, folder);
+    if(!args.is_remote){
+        if(args.unknownPath.size() > 0){
+            char folder[PATH_MAX];
+            char *p = (char *)args.unknownPath.c_str();
+            uint len = strlen(p);
+            FileEntry entry;
+            int r = GuessFileEntry(p, len, &entry, folder);
 
-        if(r == -1){
-            printf("Unknown argument, attempting to open as file\n");
+            if(r == -1){
+                printf("Unknown argument, attempting to open as file\n");
+                AppEarlyInitialize();
+                StartWithNewFile(p);
+                return 0;
+            }
+
+            IGNORE(CHDIR(folder));
             AppEarlyInitialize();
-            //StartWithFile();
-            StartWithNewFile(p);
-            return 0;
-        }
 
-        IGNORE(CHDIR(folder));
-        AppEarlyInitialize();
+            if(entry.type == DescriptorFile){
+                StartWithFile(entry.path);
+            }else{
+                StartWithFile();
+            }
 
-        if(entry.type == DescriptorFile){
-            StartWithFile(entry.path);
         }else{
+            AppEarlyInitialize();
             StartWithFile();
         }
-
     }else{
         AppEarlyInitialize();
-        StartWithFile();
+        BufferView *bView = nullptr;
+        InitializeEmptyView(&bView);
+        Graphics_Initialize();
     }
 
     return 0;

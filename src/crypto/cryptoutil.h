@@ -52,3 +52,8 @@ void CryptoUtil_RotateBufferLeft(unsigned char **buffer, size_t len);
  */
 void CryptoUtil_RotateBufferRight(unsigned char *buffer, size_t len);
 void CryptoUtil_RotateBufferRight(unsigned char **buffer, size_t len);
+
+/*
+ * Debug. Prints the contents of a buffer in 16 block hex format.
+ */
+void CryptoUtil_DebugPrintBuffer(unsigned char *buffer, size_t len);
