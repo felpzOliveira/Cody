@@ -191,6 +191,21 @@ __finish:
     return bytes;
 }
 #else
+
+static unsigned int ReadExactlyXBytes(int socket, unsigned int x, void *buffer){
+    unsigned int bytes = 0;
+    unsigned char *uc_ptr = (unsigned char *)buffer;
+    while(bytes < x){
+        int read = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
+        if(read < 1) break;
+        bytes += read;
+    }
+
+    LOG_VERBOSE(" <<< Received " << bytes << " bytes");
+    AssertA(bytes == x, "Unexpected number of bytes");
+    return bytes;
+}
+
 static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     unsigned int bytes = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
@@ -201,7 +216,7 @@ static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     }
 
     LOG_VERBOSE(" <<< Received " << bytes << " bytes");
-    AssertA(bytes == x, "Unexpected number of bytes");
+    //AssertA(bytes == x, "Unexpected number of bytes");
     return bytes;
 }
 
@@ -290,7 +305,7 @@ static ProtocolError ReadAndDecrypt(int socket, uint32_t x, std::vector<uint8_t>
     }
 
     LOG_VERBOSE(" - Waiting for " << memSize << " bytes");
-    read_size = ReadXBytes(socket, memSize, memPtr);
+    read_size = ReadExactlyXBytes(socket, memSize, memPtr);
     if(read_size != memSize){
         LOG_ERR("Did not read package entirely");
         err = ProtocolError::INVALID_REQUEST;
