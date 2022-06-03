@@ -127,74 +127,10 @@ static bool SendXBytes(int socket, unsigned int x, void *buffer){
     return true;
 }
 
-#if TRANSMITION_LOOP != 0
-static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
-    unsigned int bytes = 0;
-    int result = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
-    while(bytes < x){
-        LOG_VERBOSE(" -- Waiting for " << (x - bytes));
-        result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
-        if(result < 1){
-            break;
-        }
-
-        LOG_VERBOSE(" <<< Received " << result << " bytes");
-
-        bytes += result;
-    }
-
-    return bytes;
-}
-
-static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
-                                        void *buffer, long timeout,
-                                        ProtocolError &err)
-{
-    return ReadXBytes(socket, x, buffer);
-    unsigned int bytes = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
-    err = ProtocolError::NO_ERROR;
-    while(bytes < x){
-        struct pollfd fd;
-        int ret;
-
-        fd.fd = socket;
-        fd.events = POLLIN;
-        ret = poll(&fd, 1, timeout);
-        switch(ret){
-            case -1:{
-                err = ProtocolError::POLL_FAILURE;
-                bytes = 0;
-                goto __finish;
-            } break;
-            case 0:{
-                goto __finish;
-            } break;
-            default:{
-                int result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
-                if(result < 1){
-                    goto __finish;
-                }
-                LOG_VERBOSE(" <<< Received " << result << " bytes");
-                bytes += result;
-            } break;
-        }
-
-        /*
-         * Allow first package to be slow but not others.
-         */
-        if(timeout > MAX_TRANSPORT_SMALL_TIMEOUT_MS)
-            timeout = MAX_TRANSPORT_SMALL_TIMEOUT_MS;
-    }
-__finish:
-    return bytes;
-}
-#else
-
 static unsigned int ReadExactlyXBytes(int socket, unsigned int x, void *buffer){
     unsigned int bytes = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
+
     while(bytes < x){
         int read = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
         if(read < 1) break;
@@ -216,7 +152,6 @@ static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     }
 
     LOG_VERBOSE(" <<< Received " << bytes << " bytes");
-    //AssertA(bytes == x, "Unexpected number of bytes");
     return bytes;
 }
 
@@ -224,7 +159,6 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
                                         void *buffer, long timeout,
                                         ProtocolError &err)
 {
-    return ReadXBytes(socket, x, buffer);
     int ret;
     unsigned int bytes = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
@@ -255,7 +189,6 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
 __finish:
     return bytes;
 }
-#endif
 
 static ProtocolError EncryptAndSend(int socket, uint8_t *ptr, uint32_t length){
     std::vector<uint8_t> enc;
@@ -319,128 +252,6 @@ static ProtocolError ReadAndDecrypt(int socket, uint32_t x, std::vector<uint8_t>
 
 __finish:
     if(memPtr) delete[] memPtr;
-    return err;
-}
-
-static ProtocolError EncryptAndSend2(int socket, uint8_t *ptr, uint32_t remaining){
-    std::vector<uint8_t> enc;
-    ProtocolError err = ProtocolError::NO_ERROR;
-    uint32_t totalSize = remaining;
-    uint32_t blocks = MIN_BLOCKS(remaining);
-    uint32_t blen = 0;
-
-    LOG_VERBOSE("Sending data in " << blocks << " blocks ( " << remaining << " )");
-
-    // 1- Send the amount of blocks to transmit
-    if(!SecurityServices::Encrypt((uint8_t *)&blocks, sizeof(uint32_t), enc)){
-        err = ProtocolError::ENCRYPT_FAILURE;
-        goto __finish;
-    }
-
-    if(!SendXBytes(socket, enc.size(), enc.data())){
-        err = ProtocolError::SEND_FAILURE;
-        goto __finish;
-    }
-
-    // 2- Send the blocks, untill we have init/begin/finish on crypto, encrypt each block
-    for(uint32_t i = 0; i < blocks; i++){
-        enc.clear();
-        blen = remaining > MAX_BLOCK_SIZE ? MAX_BLOCK_SIZE : remaining;
-
-        if(!SecurityServices::Encrypt(&ptr[totalSize-remaining], blen, enc)){
-            err = ProtocolError::ENCRYPT_FAILURE;
-            goto __finish;
-        }
-
-        if(blen == MAX_BLOCK_SIZE){
-            if(enc.size() != MAX_TRANSPORT_SIZE){
-                LOG_ERR("Encrypted size is " << enc.size());
-            }
-            AssertA(enc.size() == MAX_TRANSPORT_SIZE,
-                    "Encrypted size is not max package size");
-        }
-
-        if(!SendXBytes(socket, enc.size(), enc.data())){
-            err = ProtocolError::SEND_FAILURE;
-            goto __finish;
-        }
-
-        remaining -= blen;
-    }
-
-__finish:
-    return err;
-}
-
-static ProtocolError ReadAndDecrypt2(int socket, uint32_t x, std::vector<uint8_t> &out,
-                                    long timeout_ms)
-{
-    std::vector<uint8_t> tmp;
-    uint32_t read_size = 0;
-    uint32_t blocks = 0;
-    bool is_limited = x > 0;
-    ProtocolError err = ProtocolError::NO_ERROR;
-    uint32_t block_count_size = SecurityServices::PackageRequiredSize(sizeof(uint32_t));
-
-    if(timeout_ms == 0)
-        read_size = ReadXBytes(socket, block_count_size, work_buffer);
-    else
-        read_size = ReadUpToXBytesTimed(socket, block_count_size, work_buffer,
-                                        timeout_ms, err);
-
-    if(read_size < 1 && err == ProtocolError::NO_ERROR){
-        err = ProtocolError::CONNECTION_CLOSED;
-        goto __finish;
-    }
-
-    if(err != ProtocolError::NO_ERROR){
-        goto __finish;
-    }
-
-    if(!SecurityServices::Decrypt(work_buffer, read_size, tmp)){
-        err = ProtocolError::DECRYPT_FAILURE;
-        goto __finish;
-    }
-
-    if(tmp.size() != sizeof(uint32_t)){
-        err = ProtocolError::INVALID_REQUEST;
-        goto __finish;
-    }
-
-    memcpy(&blocks, tmp.data(), sizeof(uint32_t));
-
-    LOG_VERBOSE("Reading " << blocks << " blocks");
-
-    for(uint32_t i = 0; i < blocks; i++){
-        uint32_t to_read_size = MAX_TRANSPORT_SIZE;
-        if(is_limited){
-            to_read_size = x > MAX_TRANSPORT_SIZE ? MAX_TRANSPORT_SIZE : x;
-        }
-
-        read_size = ReadUpToXBytesTimed(socket, to_read_size, work_buffer,
-                                        MAX_TRANSPORT_TIMEOUT_MS, err);
-
-        if(read_size < 1 && err == ProtocolError::NO_ERROR){
-            err = ProtocolError::CONNECTION_CLOSED;
-            goto __finish;
-        }
-
-        if(err != ProtocolError::NO_ERROR){
-            goto __finish;
-        }
-
-        if(!SecurityServices::Decrypt(work_buffer, read_size, out)){
-            err = ProtocolError::DECRYPT_FAILURE;
-            goto __finish;
-        }
-
-        if(is_limited){
-            x -= to_read_size;
-            if(x == 0) break;
-        }
-    }
-
-__finish:
     return err;
 }
 

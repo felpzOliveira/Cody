@@ -115,7 +115,7 @@ bool App_IsStateWrite(){
     return !Dbg_IsRunning();
 }
 
-void AppEarlyInitialize(){
+void AppEarlyInitialize(bool use_tabs){
     View *view = nullptr;
     StorageDevice *storage = FetchStorageDevice();
     srand(time(0));
@@ -123,7 +123,7 @@ void AppEarlyInitialize(){
     // NOTE: Configuration must be done first as tab spacing
     //       needs to be defined before the lexer can correctly mount buffers
     appGlobalConfig.tabSpacing = 4;
-    appGlobalConfig.useTabs = 0;
+    appGlobalConfig.useTabs = use_tabs ? 1 : 0;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
 

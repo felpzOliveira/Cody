@@ -14,6 +14,7 @@
 
 typedef struct{
     bool is_remote;
+    bool use_tabs;
     std::string ip;
     int port;
     uint8_t key[32];
@@ -23,6 +24,7 @@ typedef struct{
 
 void DefaultArgs(CmdLineArgs *args){
     args->is_remote = false;
+    args->use_tabs = false;
     args->has_key = false;
     args->ip = "127.0.0.1";
     args->port = 1000;
@@ -90,6 +92,12 @@ ARGUMENT_PROCESS(keyval_flags){
     return ARG_OK;
 }
 
+ARGUMENT_PROCESS(use_tabs_flags){
+    CmdLineArgs *args = (CmdLineArgs *)config;
+    args->use_tabs = true;
+    return ARG_OK;
+}
+
 std::map<const char *, ArgDesc> arg_map = {
     {"--remote",
         { .processor = remote_flags,
@@ -102,6 +110,10 @@ std::map<const char *, ArgDesc> arg_map = {
     {"--key",
         { .processor = keyval_flags,
           .help = "Sets a custom key to be used for AES 256 bit given as a hex string." }
+    },
+    {"--use-tabs",
+        { .processor = use_tabs_flags,
+          .help = "Sets the editor to use tabs instead of spaces for identation." }
     }
 };
 
@@ -340,13 +352,13 @@ int main(int argc, char **argv){
 
             if(r == -1){
                 printf("Unknown argument, attempting to open as file\n");
-                AppEarlyInitialize();
+                AppEarlyInitialize(args.use_tabs);
                 StartWithNewFile(p);
                 return 0;
             }
 
             IGNORE(CHDIR(folder));
-            AppEarlyInitialize();
+            AppEarlyInitialize(args.use_tabs);
 
             if(entry.type == DescriptorFile){
                 StartWithFile(entry.path);
@@ -355,11 +367,11 @@ int main(int argc, char **argv){
             }
 
         }else{
-            AppEarlyInitialize();
+            AppEarlyInitialize(args.use_tabs);
             StartWithFile();
         }
     }else{
-        AppEarlyInitialize();
+        AppEarlyInitialize(args.use_tabs);
         BufferView *bView = nullptr;
         InitializeEmptyView(&bView);
         Graphics_Initialize();

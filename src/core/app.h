@@ -39,7 +39,7 @@ extern AppConfig appGlobalConfig;
 * Performs early initialization of App structures when there is no graphics
 * interface loaded.
 */
-void AppEarlyInitialize();
+void AppEarlyInitialize(bool use_tabs=false);
 
 /*
 * Performs initialization when the graphics interface is already loaded.
