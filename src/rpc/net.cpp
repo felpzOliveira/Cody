@@ -11,6 +11,7 @@
  * Buffer for RPC stuff.
  */
 static uint8_t work_buffer[MAX_TRANSPORT_SIZE];
+static uint32_t ack_size = 0;
 
 const char *GetNetworkError(ProtocolError err){
     switch(err){
@@ -111,7 +112,7 @@ static bool SendXBytes(int socket, unsigned int x, void *buffer){
     int result = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
     while(bytes < x){
-        result = write(socket, uc_ptr + bytes, x - bytes);
+        result = send(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
         if(result < 1){
             LOG_ERR("Failed send with : " << strerror(errno));
             return false;
@@ -123,12 +124,13 @@ static bool SendXBytes(int socket, unsigned int x, void *buffer){
     return true;
 }
 
+#if TRANSMITION_LOOP != 0
 static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     unsigned int bytes = 0;
     int result = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
     while(bytes < x){
-        result = read(socket, uc_ptr + bytes, x - bytes);
+        result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
         if(result < 1){
             break;
         }
@@ -165,7 +167,7 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
                 goto __finish;
             } break;
             default:{
-                int result = read(socket, uc_ptr + bytes, x - bytes);
+                int result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
                 if(result < 1){
                     goto __finish;
                 }
@@ -177,12 +179,62 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
         /*
          * Allow first package to be slow but not others.
          */
-        if(timeout > MAX_TRANSPORT_TIMEOUT_MS)
-            timeout = MAX_TRANSPORT_TIMEOUT_MS;
+        if(timeout > MAX_TRANSPORT_SMALL_TIMEOUT_MS)
+            timeout = MAX_TRANSPORT_SMALL_TIMEOUT_MS;
     }
 __finish:
     return bytes;
 }
+#else
+static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
+    unsigned int bytes = 0;
+    unsigned char *uc_ptr = (unsigned char *)buffer;
+
+    bytes = recv(socket, uc_ptr, x, MSG_NOSIGNAL);
+    if(bytes < 1){
+        return 0;
+    }
+
+    LOG_VERBOSE(" <<< Received " << bytes << " bytes");
+    AssertA(bytes == x, "Unexpected number of bytes");
+    return bytes;
+}
+
+static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
+                                        void *buffer, long timeout,
+                                        ProtocolError &err)
+{
+    int ret;
+    unsigned int bytes = 0;
+    unsigned char *uc_ptr = (unsigned char *)buffer;
+    err = ProtocolError::NO_ERROR;
+    struct pollfd fd;
+
+    fd.fd = socket;
+    fd.events = POLLIN;
+    ret = poll(&fd, 1, timeout);
+    switch(ret){
+        case -1:{
+            err = ProtocolError::POLL_FAILURE;
+            bytes = 0;
+            goto __finish;
+        } break;
+        case 0:{
+            goto __finish;
+        } break;
+        default:{
+            int result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
+            if(result < 1){
+                goto __finish;
+            }
+            LOG_VERBOSE(" <<< Received " << result << " bytes");
+            bytes += result;
+        } break;
+    }
+__finish:
+    return bytes;
+}
+#endif
 
 static ProtocolError EncryptAndSend(int socket, uint8_t *ptr, uint32_t remaining){
     std::vector<uint8_t> enc;
@@ -419,6 +471,7 @@ void ServerService(RPCServer *server){
 
         RPCBaseCommand *cmd = server->cmdMap[code];
         int arg_size = cmd->GetArgumentsSize();
+        server->activeCmd = cmd;
 
         if(arg_size >= 0){
             error = ReadAndDecrypt(linuxNet->clientfd, arg_size,
@@ -444,9 +497,16 @@ void ServerService(RPCServer *server){
             LOG_ERR("Failed send with: " << GetNetworkError(error));
             break;
         }
+
+        server->activeCmd = nullptr;
     }
     close(linuxNet->clientfd);
     linuxNet->clientfd = -1;
+
+    if(server->activeCmd){
+        server->activeCmd->Cleanup();
+        server->activeCmd = nullptr;
+    }
 }
 
 void RPCServer::Terminate(){
@@ -460,6 +520,8 @@ void RPCServer::Terminate(){
 void RPCServer::Start(int port){
     int clientfd = -1;
     NetworkLinux *linuxNet = new NetworkLinux;
+    StorageDevice *storage = FetchStorageDevice();
+    std::string HOME = std::getenv("HOME") ? std::getenv("HOME") : ".";
     if(!linuxNet){
         LOG_ERR("Failed to allocate resources for networking");
         return;
@@ -467,16 +529,23 @@ void RPCServer::Start(int port){
 
     RPCInitializeCommandMap(cmdMap);
 
+    ack_size = SecurityServices::PackageRequiredSize(sizeof(uint32_t));
+
     linuxNet->sockfd = LinuxNetwork_CreateServerSocket(port);
     if(linuxNet->sockfd < 0){
         LOG_ERR("Failed to create socket");
         goto err_close;
     }
 
+    LOG(COLOR_YELLOW_BRIGHT << "[Server]" << COLOR_NONE
+            << " Setting " << HOME << " as starting path");
+
     while(1){
+        IGNORE(storage->Chdir(HOME.c_str()));
         linuxNet->clientfd = -1;
         LOG(COLOR_YELLOW_BRIGHT << "[Server]" << COLOR_NONE
             << " Waiting for connection on port " << port);
+
         clientfd = accept(linuxNet->sockfd, NULL, NULL);
         if(clientfd < 0){
             LOG_ERR("Failed to accept client");
@@ -577,6 +646,38 @@ static bool ClientDoChallenge(int socket){
     }
 }
 
+bool RPCClient::Chdir(std::vector<uint8_t> &out, const char *path){
+    uint32_t val = RPC_COMMAND_CHDIR;
+    uint32_t pathSize = strlen(path);
+    NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
+    int sock = linuxNet->sockfd;
+
+    ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
+    if(error != ProtocolError::NO_ERROR){
+        printf("Failed request with: %s\n", GetNetworkError(error));
+        return false;
+    }
+
+    error = EncryptAndSend(sock, (uint8_t *)path, pathSize+1);
+    if(error != ProtocolError::NO_ERROR){
+        printf("Failed request with: %s\n", GetNetworkError(error));
+        return false;
+    }
+
+    error = ReadAndDecrypt(sock, ack_size, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed read with: " << GetNetworkError(error));
+        return false;
+    }
+
+    if(out.size() < 1){
+        LOG_ERR("Got invalid response");
+        return false;
+    }
+
+    return out[0] == ACK;
+}
+
 bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
     uint32_t code = RPCStreamedWriteCommand::StreamStartCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
@@ -600,7 +701,7 @@ bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
         return false;
     }
 
-    error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+    error = ReadAndDecrypt(sock, ack_size, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
     if(error != ProtocolError::NO_ERROR){
         LOG_ERR("Failed read with: " << GetNetworkError(error));
         return false;
@@ -611,14 +712,12 @@ bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
         return false;
     }
 
-    if(out[0] == ACK){
-        return true;
-    }
-
-    return false;
+    return out[0] == ACK;
 }
 
-bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr, uint32_t size){
+bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr,
+                                  uint32_t size, int mode)
+{
     uint32_t code = RPCStreamedWriteCommand::StreamUpdateCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
     RPCBuffer buffer(size + 2*sizeof(uint32_t) + 1);
@@ -633,9 +732,7 @@ bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr, uint3
     }
 
     buffer.Push(&code, sizeof(uint32_t));
-    code = 0;
-
-    buffer.Push(&code, sizeof(uint32_t));
+    buffer.Push(&mode, sizeof(uint32_t));
     buffer.Push(ptr, size);
 
     error = EncryptAndSend(sock, buffer.Data(), buffer.Size());
@@ -656,6 +753,8 @@ bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr, uint3
     }
 
     val = out[0];
+
+    out.erase(out.begin(), out.begin()+1);
 
     rv = val == ACK;
 __finish:
@@ -699,6 +798,118 @@ __finish:
     return rv;
 }
 
+bool RPCClient::AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *data,
+                         uint32_t size, int with_line_brk)
+{
+    uint32_t val = RPC_COMMAND_APPEND;
+    uint32_t pathSize = strlen(path)+1;
+    NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
+    int sock = linuxNet->sockfd;
+
+    RPCBuffer buffer(3 * sizeof(uint32_t) + size + pathSize);
+    buffer.Push(&with_line_brk, sizeof(uint32_t));
+    buffer.Push(&pathSize, sizeof(uint32_t));
+    buffer.Push((uint8_t *)path, pathSize);
+    buffer.Push(&size, sizeof(uint32_t));
+    buffer.Push(data, size);
+
+    ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed request with: " << GetNetworkError(error));
+        return false;
+    }
+
+    error = EncryptAndSend(sock, (uint8_t *)buffer.Data(), buffer.Size());
+    if(error != ProtocolError::NO_ERROR){
+        printf("Failed request with: %s\n", GetNetworkError(error));
+        return false;
+    }
+
+    error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed read with: " << GetNetworkError(error));
+        return false;
+    }
+
+    if(out.size() < 1){
+        LOG_ERR("Got invalid response");
+        return false;
+    }
+
+    if(out[0] == ACK){
+        return true;
+    }
+
+    return false;
+}
+
+bool RPCClient::ListFiles(std::vector<uint8_t> &out, const char *path){
+    uint32_t val = RPC_COMMAND_LIST_FILES;
+    uint32_t pathSize = strlen(path);
+    NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
+    int sock = linuxNet->sockfd;
+
+    ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed request with: " << GetNetworkError(error));
+        return false;
+    }
+
+    error = EncryptAndSend(sock, (uint8_t *)path, pathSize+1);
+    if(error != ProtocolError::NO_ERROR){
+        printf("Failed request with: %s\n", GetNetworkError(error));
+        return false;
+    }
+
+    error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed read with: " << GetNetworkError(error));
+        return false;
+    }
+
+    if(out.size() < 1){
+        LOG_ERR("Got invalid response");
+        return false;
+    }
+
+    if(out[0] == ACK){
+        out.erase(out.begin(), out.begin() + 1);
+        return true;
+    }
+
+    return false;
+}
+
+bool RPCClient::GetPwd(std::vector<uint8_t> &out){
+    uint32_t val = RPC_COMMAND_GET_PWD;
+    NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
+    int sock = linuxNet->sockfd;
+
+    ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed request with: " << GetNetworkError(error));
+        return false;
+    }
+
+    error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+    if(error != ProtocolError::NO_ERROR){
+        LOG_ERR("Failed read with: " << GetNetworkError(error));
+        return false;
+    }
+
+    if(out.size() < 1){
+        LOG_ERR("Got invalid response");
+        return false;
+    }
+
+    if(out[0] == ACK){
+        out.erase(out.begin(), out.begin() + 1);
+        return true;
+    }
+
+    return false;
+}
+
 bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
     uint32_t val = RPC_COMMAND_READ_FILE;
     uint32_t pathSize = strlen(path);
@@ -731,7 +942,7 @@ bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
     uint8_t *ptr = out.data();
     val = ptr[0];
     if(val == ACK && out.size() >= sizeof(uint32_t)+1){
-        memcpy(&val, &ptr[sizeof(uint32_t)], sizeof(uint32_t));
+        memcpy(&val, &ptr[1], sizeof(uint32_t));
         if(val > 0){
             out.erase(out.begin(), out.begin() + (sizeof(uint32_t)+1));
         }
@@ -742,22 +953,24 @@ bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
     return false;
 }
 
-void RPCClient::ConnectTo(const char *ip, int port){
+bool RPCClient::ConnectTo(const char *ip, int port){
     int sock = LinuxNetwork_CreateClientSocket(ip, port);
     if(sock < 0){
         LOG_ERR("Failed to connect to " << ip << ":" << port);
-        return;
+        return false;
     }
 
+    ack_size = SecurityServices::PackageRequiredSize(sizeof(uint32_t));
     LOG_INFO("Connected [ " << sock << " ]");
     if(!ClientDoChallenge(sock)){
         close(sock);
-        return;
+        return false;
     }
 
     NetworkLinux *linuxNet = new NetworkLinux;
     linuxNet->sockfd = sock;
     net.prv = (void *)linuxNet;
+    return true;
 }
 
 RPCClient::~RPCClient(){

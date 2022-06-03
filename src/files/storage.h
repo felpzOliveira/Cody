@@ -17,11 +17,17 @@ class RPCClient{
 
     RPCClient() = default;
     ~RPCClient();
-    void ConnectTo(const char *ip, int port);
+    bool ConnectTo(const char *ip, int port);
     bool ReadEntireFile(std::vector<uint8_t> &out, const char *path);
     bool StreamWriteStart(std::vector<uint8_t> &out, const char *path);
-    bool StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr, uint32_t size);
+    bool StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr,
+                           uint32_t size, int mode=0);
     bool StreamWriteFinal(std::vector<uint8_t> &out);
+    bool Chdir(std::vector<uint8_t> &out, const char *path);
+    bool GetPwd(std::vector<uint8_t> &out);
+    bool ListFiles(std::vector<uint8_t> &out, const char *path);
+    bool AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *data,
+                  uint32_t size, int with_line_brk);
 };
 
 /*
@@ -41,15 +47,13 @@ class StorageDevice{
     virtual char *GetContentsOf(const char *path, uint *size) = 0;
     virtual bool IsLocallyStored() = 0;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) = 0;
-    virtual bool StreamReadStart(FileHandle *handle, const char *path) = 0;
     virtual bool StreamWriteString(FileHandle *handle, const char *str) = 0;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) = 0;
-    virtual size_t StreamReadBytes(FileHandle *handle, void *ptr,
-                                   size_t size, size_t nmemb) = 0;
     virtual bool StreamFinish(FileHandle *handle) = 0;
     virtual bool AppendTo(const char *path, const char *str, int with_line_brk=1) = 0;
     virtual void CloseFile(FileHandle *handle) = 0;
+    virtual int Chdir(const char *path) = 0;
 };
 
 /*
@@ -67,16 +71,14 @@ class LocalStorageDevice : public StorageDevice{
                           uint *n, uint *size) override;
     virtual char *GetContentsOf(const char *path, uint *size) override;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) override;
-    virtual bool StreamReadStart(FileHandle *handle, const char *path) override;
     virtual bool StreamWriteString(FileHandle *handle, const char *str) override;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) override;
-    virtual size_t StreamReadBytes(FileHandle *handle, void *ptr,
-                                   size_t size, size_t nmemb) override;
     virtual bool StreamFinish(FileHandle *handle) override;
     virtual bool AppendTo(const char *path, const char *str, int with_line_brk=1) override;
     virtual void CloseFile(FileHandle *handle) override;
     virtual bool IsLocallyStored() override{ return true; }
+    virtual int Chdir(const char *path) override{ return CHDIR(path); }
 };
 
 /*
@@ -94,16 +96,14 @@ class RemoteStorageDevice : public StorageDevice{
                           uint *n, uint *size) override;
     virtual char *GetContentsOf(const char *path, uint *size) override;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) override;
-    virtual bool StreamReadStart(FileHandle *handle, const char *path) override;
     virtual bool StreamWriteString(FileHandle *handle, const char *str) override;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) override;
-    virtual size_t StreamReadBytes(FileHandle *handle, void *ptr,
-                                   size_t size, size_t nmemb) override;
     virtual bool StreamFinish(FileHandle *handle) override;
     virtual bool AppendTo(const char *path, const char *str, int with_line_brk=1) override;
     virtual void CloseFile(FileHandle *handle) override;
     virtual bool IsLocallyStored() override{ return false; }
+    virtual int Chdir(const char *path) override;
 };
 
 /*

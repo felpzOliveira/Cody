@@ -36,6 +36,9 @@ namespace SecurityServices{
      */
     unsigned int ChallengeExpectedSize();
 
+    /*
+     * Returns the amount of bytes required for encryption of 'size' bytes.
+     */
     unsigned int PackageRequiredSize(unsigned int size);
 }
 

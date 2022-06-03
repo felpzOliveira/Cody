@@ -8,7 +8,11 @@
 
 #define RPC_COMMAND_READ_FILE     (1 << 0)
 #define RPC_COMMAND_STREAM_WRITE  (1 << 1)
-#define RPC_COMMAND_INVALID       (1 << 2)
+#define RPC_COMMAND_CHDIR         (1 << 2)
+#define RPC_COMMAND_GET_PWD       (1 << 3)
+#define RPC_COMMAND_LIST_FILES    (1 << 4)
+#define RPC_COMMAND_APPEND        (1 << 5)
+#define RPC_COMMAND_INVALID       (1 << 6)
 #define ACK 0x3f
 #define NACK 0x4f
 
@@ -39,9 +43,15 @@ class RPCBuffer{
         if(owns && mem) delete[] mem;
     }
 
-    uint8_t *Data(){ return mem; }
+    uint8_t *Data(uint32_t h=0){ return &mem[h]; }
+    uint8_t *Head(uint32_t h=0){ return &mem[head]; }
     uint32_t Length(){ return size; }
     uint32_t Size(){ return head; }
+
+    void Advance(uint32_t h){
+        AssertA(size - head >= h, "Cannot move");
+        head += h;
+    }
 
     void Push(void *ptr, uint32_t length){
         AssertA(size - head >= length, "Cannot fit more data");
@@ -50,7 +60,7 @@ class RPCBuffer{
     }
 
     void Pop(void *ptr, uint32_t length){
-        AssertA(size - head >= length, "Cannot fit more data");
+        AssertA(size - head >= length, "Cannot pop more data");
         memcpy(ptr, &mem[head], length);
         head += length;
     }
@@ -67,6 +77,8 @@ class RPCBaseCommand{
     virtual int GetArgumentsSize(){
         return -1;
     }
+
+    virtual void Cleanup(){}
 };
 
 class RPCReadCommand : public RPCBaseCommand{
@@ -112,6 +124,11 @@ class RPCStreamedWriteCommand : public RPCBaseCommand{
      */
     void ResetFileWrite();
 
+    /*
+     * Cleanup routine for when connection is lost/broken.
+     */
+    virtual void Cleanup() override;
+
     virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override{
         uint32_t step = 0;
         uint8_t *ptr = args;
@@ -142,8 +159,60 @@ class RPCStreamedWriteCommand : public RPCBaseCommand{
     static uint32_t StreamFinalCode(){ return 2; }
 };
 
+class RPCGetPwdCommand : public RPCBaseCommand{
+    public:
+
+    RPCGetPwdCommand() = default;
+    ~RPCGetPwdCommand() = default;
+
+    virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override;
+};
+
+class RPCListFilesCommand : public RPCBaseCommand{
+    public:
+
+    RPCListFilesCommand() = default;
+    ~RPCListFilesCommand() = default;
+
+    virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override;
+
+    virtual int GetArgumentsSize() override{
+        return MAX_DESCRIPTOR_LENGTH;
+    }
+};
+
+class RPCAppendToFileCommand : public RPCBaseCommand{
+    public:
+
+    RPCAppendToFileCommand() = default;
+    ~RPCAppendToFileCommand() = default;
+
+    virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override;
+
+    virtual int GetArgumentsSize() override{
+        return 0;
+    }
+};
+
+class RPCChdirCommand : public RPCBaseCommand{
+    public:
+
+    RPCChdirCommand() = default;
+    ~RPCChdirCommand() = default;
+
+    virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override;
+
+    virtual int GetArgumentsSize() override{
+        return MAX_DESCRIPTOR_LENGTH;
+    }
+};
+
 inline
 void RPCInitializeCommandMap(std::map<RPCCommandCode, RPCBaseCommand *> &cmdMap){
     cmdMap[RPC_COMMAND_READ_FILE] = new RPCReadCommand();
     cmdMap[RPC_COMMAND_STREAM_WRITE] = new RPCStreamedWriteCommand();
+    cmdMap[RPC_COMMAND_CHDIR] = new RPCChdirCommand();
+    cmdMap[RPC_COMMAND_GET_PWD] = new RPCGetPwdCommand();
+    cmdMap[RPC_COMMAND_LIST_FILES] = new RPCListFilesCommand();
+    cmdMap[RPC_COMMAND_APPEND] = new RPCAppendToFileCommand();
 }

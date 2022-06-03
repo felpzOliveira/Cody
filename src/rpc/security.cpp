@@ -48,7 +48,6 @@ bool SecurityServices::CreateChallenge(std::vector<uint8_t> &out, Challenge &ch)
     bool rv = Crypto_SecureRNG((void *)&ch, ChallengeSizeInBytes);
     if(!rv) return false;
     rv = SecurityServices::Encrypt((uint8_t *)&ch, ChallengeSizeInBytes, out);
-    CryptoUtil_DebugPrintBuffer(out.data(), out.size());
     return rv;
 }
 
@@ -57,9 +56,6 @@ bool SecurityServices::SolveChallenge(uint8_t *input, size_t len,
 {
     Challenge value = 0;
     std::vector<uint8_t> dec;
-
-    CryptoUtil_DebugPrintBuffer(input, len);
-
     bool rv = SecurityServices::Decrypt(input, len, dec);
     if(!rv) return false;
     if(dec.size() != ChallengeSizeInBytes){

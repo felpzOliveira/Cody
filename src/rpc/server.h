@@ -6,11 +6,15 @@
 #include <vector>
 #include <rpc.h>
 
+#define TRANSMITION_LOOP 0
+
+#define MAX_TRANSPORT_SMALL_TIMEOUT_SECONDS 0.005
 #define MAX_TRANSPORT_TIMEOUT_SECONDS 0.05
 #define MAX_TRANSPORT_LARGE_TIMEOUT_SECONDS 0.2
+#define MAX_TRANSPORT_SMALL_TIMEOUT_MS (MAX_TRANSPORT_SMALL_TIMEOUT_SECONDS * 1000.0)
 #define MAX_TRANSPORT_TIMEOUT_MS (MAX_TRANSPORT_TIMEOUT_SECONDS * 1000.0)
 #define MAX_TRANSPORT_LARGE_TIMEOUT_MS (MAX_TRANSPORT_LARGE_TIMEOUT_SECONDS * 1000.0)
-#define MAX_TRANSPORT_SIZE 4096
+#define MAX_TRANSPORT_SIZE 16384
 
 #if MAX_TRANSPORT_SIZE < 33
     #error "Minimum transport size is 33 ( 2 * 16 + 1 )."
@@ -47,6 +51,7 @@ class RPCBinder{
 class RPCServer{
     public:
     RPCNetwork net;
+    RPCBaseCommand *activeCmd;
     std::map<RPCCommandCode, RPCBaseCommand *> cmdMap;
 
     RPCServer() = default;

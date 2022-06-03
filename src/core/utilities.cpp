@@ -150,6 +150,47 @@ int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder){
     return r;
 }
 
+int ListFileEntriesLinear(char *basePath, std::vector<uint8_t> &out, uint32_t *size){
+    AssertA(basePath != nullptr, "Invalid query pointer");
+    DIR *dir = opendir(basePath);
+    struct dirent *entry = nullptr;
+    if(dir == nullptr) return -1;
+
+    uint8_t mem[32];
+    if(size) *size = 0;
+    do{
+        entry = readdir(dir);
+        if(entry != nullptr){
+            if(entry->d_type == DT_DIR || entry->d_type == DT_REG){
+                int keep = 1;
+                char *p = entry->d_name;
+                uint reclen = strlen(p);
+                if(reclen == 1){
+                    keep = p[0] != '.' ? 1 : 0;
+                }else if(reclen == 2){
+                    keep = (p[0] == '.' && p[1] == '.') ? 0 : 1;
+                }
+
+                if(keep){
+                    uint8_t id = DescriptorFile;
+                    if(entry->d_type == DT_DIR){
+                        id = DescriptorDirectory;
+                    }
+                    memcpy(mem, &reclen, sizeof(uint32_t));
+
+                    out.push_back(id);
+                    out.insert(out.end(), &mem[0], &mem[sizeof(uint32_t)]);
+                    out.insert(out.end(), &p[0], &p[reclen]);
+                    if(size) *size += 1;
+                }
+            }
+        }
+    }while(entry != nullptr);
+    closedir(dir);
+
+    return 1;
+}
+
 int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
     AssertA(n != nullptr && entries != nullptr && basePath != nullptr,
             "Invalid query pointers");

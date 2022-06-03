@@ -7,6 +7,7 @@
 #include <autocomplete.h>
 #include <parallel.h>
 #include <storage.h>
+#include <sstream>
 
 #define MODULE_NAME "Buffer"
 
@@ -1699,6 +1700,9 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     }
 
     FileHandle file;
+    // using a std::sttringstream for buffering the content
+    // is better for remote usage
+    std::stringstream ss;
     StorageDevice *storage = FetchStorageDevice();
     uint lines = lineBuffer->lineCount;
     if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
@@ -1757,10 +1761,15 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
             linePtr[ic+1] = 0;
         }
 
-        uint s = storage->StreamWriteBytes(&file, linePtr, sizeof(char), ic);
-        (void)s;
-        AssertA(s == ic, "Failed to write to file");
+        ss << std::string(linePtr, ic);
+        //uint s = storage->StreamWriteBytes(&file, linePtr, sizeof(char), ic);
+        //(void)s;
+        //AssertA(s == ic, "Failed to write to file");
     }
+
+    std::string v = ss.str();
+    //printf("Data is:\n%s\n", v.c_str());
+    storage->StreamWriteBytes(&file, (void *)v.c_str(), 1, v.size());
 
     storage->StreamFinish(&file);
     AllocatorFree(linePtr);

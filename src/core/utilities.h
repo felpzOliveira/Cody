@@ -182,6 +182,22 @@ uint GetDigitOf(uint value, uint n);
 int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size);
 
 /*
+* Generates a list of the files and directories present in 'basePath',
+* return >= 0 in case of success, -1 in case it could not read 'basePath'.
+* This routine does the same as the above, however it is better for the RPC
+* layer as it returns all data linearly in the vector 'out'. The output format is:
+*    |ID|Length|Path|ID|Length|Path| ...
+* where:
+*  - ID = the type of the path, i.e.: DescriptorFile or DescriptorDirectory (1 byte);
+*  - Length = The length of the path that follows (uint32_t - 4 bytes);
+*  - Path = The actual path of the file/directory discovered (Length bytes).
+* Finally, the 'size' is an convenience parameter to return the amount of entries
+* discovered (optional).
+*/
+int ListFileEntriesLinear(char *basePath, std::vector<uint8_t> &out,
+                          uint32_t *size=nullptr);
+
+/*
 * Attempt to guess what a path means, and fill a entry with the description.
 * Returns -1 in case it could not guess, 0 otherwise. It writes the full folder
 * path in 'folder' which should be of length PATH_MAX.

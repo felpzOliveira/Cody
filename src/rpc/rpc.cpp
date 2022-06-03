@@ -4,9 +4,103 @@
 #define LOG_MODULE "RPC"
 #include <log.h>
 
+void RPCStreamedWriteCommand::Cleanup(){
+    LOG_INFO("Running cleanup");
+    ResetFileWrite();
+}
+
 bool RPCBaseCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
         LOG_ERR("Called base RPCCommand, terminating connection");
         return false;
+}
+
+bool RPCAppendToFileCommand::Execute(uint8_t *args, uint32_t size,
+                                     std::vector<uint8_t> &out)
+{
+    if(!args || size < 1) return false;
+    RPCBuffer buffer(args, size);
+    StorageDevice *storage = FetchStorageDevice();
+
+    uint32_t clen = 0;
+    uint32_t filelen = 0;
+    uint32_t mode = 0;
+    uint8_t *path = nullptr;
+    uint8_t *data = nullptr;
+
+    buffer.Pop(&mode, sizeof(uint32_t));
+    buffer.Pop(&filelen, sizeof(uint32_t));
+
+    if(filelen < 1){
+        LOG_ERR("Invalid file length during append");
+        return false;
+    }
+
+    path = buffer.Head();
+    buffer.Advance(filelen);
+
+    buffer.Pop(&clen, sizeof(uint32_t));
+    if(clen < 1){
+        LOG_ERR("Invalid data length during append");
+        return false;
+    }
+
+    data = buffer.Head();
+
+    std::string pstr((char *)path, filelen);
+
+    data[clen-1] = 0;
+    if(storage->AppendTo(pstr.c_str(), (const char *)data, mode)){
+        out.push_back(ACK);
+    }else{
+        out.push_back(NACK);
+    }
+
+    return true;
+}
+
+bool RPCListFilesCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
+    if(!args || size < 1) return false;
+    std::string path((char *)args, size);
+    uint32_t len = 0;
+    // push ack and then rewrite in case it is not
+    out.push_back(ACK);
+    int ret = ListFileEntriesLinear((char *)path.c_str(), out, &len);
+    if(ret < 0){
+        out[0] = NACK;
+        LOG_ERR("Could not query " << path);
+    }else{
+        LOG_INFO("Queried " << path << " for " << len << " files");
+    }
+
+    return true;
+}
+
+bool RPCGetPwdCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
+    char path[PATH_MAX];
+    size_t len = PATH_MAX;
+
+    GetCurrentWorkingDirectory(path, len);
+    len = strlen(path);
+    LOG_INFO("Querying current working directory ( " << path << " )");
+
+    out.push_back(ACK);
+    out.insert(out.end(), &path[0], &path[len]);
+    return true;
+}
+
+bool RPCChdirCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
+    if(!args || size < 1) return false;
+    std::string path((char *)args, size);
+    int err = CHDIR(path.c_str());
+    if(err != 0){
+        LOG_ERR("Chdir to path " << path << " failed");
+        out.push_back(NACK);
+    }else{
+        LOG_INFO("Chdir to path " << path);
+        out.push_back(ACK);
+    }
+
+    return true;
 }
 
 bool RPCReadCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
@@ -15,7 +109,9 @@ bool RPCReadCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> 
     uint8_t mem[32];
     uint32_t filesize = 0;
     char *content = GetFileContents(path.c_str(), &filesize);
-    LOG_INFO("Called read RPCCommand ( " << path << " ) -- " << filesize);
+    if(filesize > 0) filesize += 1; // add '\0'
+
+    LOG_INFO("Called read ( " << path << " ) -- " << filesize);
 
     out.push_back(ACK);
     memcpy(mem, &filesize, sizeof(uint32_t));
@@ -24,7 +120,6 @@ bool RPCReadCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> 
     if(filesize > 0 && content){
         uint8_t *ptr = (uint8_t *)content;
         out.insert(out.end(), &ptr[0], &ptr[filesize]);
-        out.push_back(0);
     }
 
     AllocatorFree(content);
@@ -79,7 +174,7 @@ bool RPCStreamedWriteCommand::StreamUpdate(uint8_t *args, uint32_t size,
     size -= sizeof(uint32_t);
 
     memcpy(&code, args, sizeof(uint32_t));
-    LOG_INFO("Writing " << size << " bytes to file");
+    LOG_INFO("Writing " << size << " bytes to file ( Code : " << code << " )");
     if(code == 0){ // write string
         char *str = (char *)ptr;
         str[size] = 0;

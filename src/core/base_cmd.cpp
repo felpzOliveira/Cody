@@ -853,6 +853,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
         FileOpener *opener = View_GetFileOpener(view);
         QueryBar *queryBar = View_GetQueryBar(view);
         char *p = AppGetContextDirectory();
+        StorageDevice *storage = FetchStorageDevice();
         if(len < opener->pathLen){ // its a character remove update
             // check if we can erase the folder path
             if(opener->basePath[opener->pathLen-1] == '/'){ // change dir
@@ -861,7 +862,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
 
                 tmp = opener->basePath[n];
                 opener->basePath[n] = 0;
-                if(CHDIR(opener->basePath) < 0){
+                if(storage->Chdir(opener->basePath) < 0){
                     printf("Failed to change to %s directory\n", opener->basePath);
                     opener->basePath[n] = tmp;
                     return 0;
@@ -873,7 +874,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                 {
                     printf("Failed to list files from %s\n", opener->basePath);
                     opener->basePath[n] = tmp;
-                    IGNORE(CHDIR(opener->basePath));
+                    IGNORE(storage->Chdir(opener->basePath));
                     return 0;
                 }
 
@@ -889,7 +890,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
             uint contentLen = 0;
             QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
 
-            if(CHDIR(content) < 0){
+            if(storage->Chdir(content) < 0){
                 printf("Failed to change to %s directory\n", content);
                 return -1;
             }
@@ -898,7 +899,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                                              &opener->entryCount, &opener->entrySize) < 0)
             {
                 printf("Failed to list files from %s\n", content);
-                IGNORE(CHDIR(opener->basePath));
+                IGNORE(storage->Chdir(opener->basePath));
                 return -1;
             }
 
@@ -953,6 +954,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
     FileOpener *opener = View_GetFileOpener(view);
     int active = View_SelectableListGetActiveIndex(view);
     int rv = 1;
+    StorageDevice *storage = FetchStorageDevice();
     if(active == -1){ // is a creation
         queryBar->fileOpenCallback(view, entry);
         goto end;
@@ -974,7 +976,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
         folder[opener->pathLen + entry->pLen] = '/';
         folder[opener->pathLen + entry->pLen + 1] = 0;
         opener->pathLen += entry->pLen + 1;
-        if(CHDIR(opener->basePath) < 0){
+        if(storage->Chdir(opener->basePath) < 0){
             printf("Failed to change to %s directory\n", opener->basePath);
             goto end;
         }
@@ -983,7 +985,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
                                          &opener->entryCount, &opener->entrySize) < 0)
         {
             printf("Failed to list files from %s\n", opener->basePath);
-            IGNORE(CHDIR(opener->basePath));
+            IGNORE(storage->Chdir(opener->basePath));
             goto end;
         }
 

@@ -196,8 +196,38 @@ void StartWithFile(const char *path=nullptr){
 
 #include <server.h>
 void client_test(){
-    RPCClient client;
     int port = 20000;
+#if 1
+    SetStorageDevice(StorageDeviceType::Remote, "127.0.0.1", port);
+    FileEntry *entries = nullptr;
+    uint n = 0;
+    uint size = 0;
+
+    StorageDevice *storage = FetchStorageDevice();
+    if(storage->ListFiles((char *)"/home/felipe/Documents", &entries, &n, &size) < 0){
+        printf("Failed to list files\n");
+    }else{
+        for(uint i = 0; i < n; i++){
+            printf("Path = %s ( %s )\n", entries[i].path,
+                   entries[i].type == DescriptorDirectory ? "Directory" : "File");
+        }
+    }
+
+    if(entries) AllocatorFree(entries);
+
+    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
+                          "Some random text 1\n", 0)) return;
+
+    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
+                          "Some random text 2", 1)) return;
+
+    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
+                          "Some random text 3", 0)) return;
+
+    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
+                          "\nSome random text 4", 1)) return;
+#else
+    RPCClient client;
     client.ConnectTo("127.0.0.1", port);
     std::vector<uint8_t> out;
 
@@ -231,6 +261,22 @@ void client_test(){
     }else{
         printf("Closed file\n");
     }
+
+    out.clear();
+    if(client.Chdir(out, "/home/felipe/Documents")){
+        printf("Chdir ok\n");
+    }else{
+        printf("Chdir failed\n");
+    }
+
+    out.clear();
+    if(client.GetPwd(out)){
+        std::string data((char *)out.data(), out.size());
+        printf("Got pwd %s\n", data.c_str());
+    }else{
+        printf("Failed pwd\n");
+    }
+#endif
 }
 
 int main(int argc, char **argv){
@@ -273,11 +319,12 @@ int main(int argc, char **argv){
     if(!args.is_remote){
         SetStorageDevice(StorageDeviceType::Local);
     }else{
-        // TODO: Setup remote stuff
+        SetStorageDevice(StorageDeviceType::Remote,
+                         args.ip.c_str(), args.port);
     }
 
-    client_test();
-    return 0;
+    //client_test();
+    //return 0;
 
     DebuggerRoutines();
 

@@ -2,6 +2,9 @@
 #include <utilities.h>
 #include <rpc.h>
 
+#define LOG_MODULE "STORAGE"
+#include <log.h>
+
 StorageDevice *storageDevice = nullptr;
 StorageDevice *backupDevice = nullptr;
 
@@ -29,7 +32,6 @@ void SetStorageDevice(StorageDeviceType type, const char *ip, int port){
         } break;
         case StorageDeviceType::Remote:{
             storageDevice = new RemoteStorageDevice(ip, port);
-            // TODO: Setup ip/port
         } break;
         default:{
             printf("Unknown storage device type\n");
@@ -66,13 +68,6 @@ int LocalStorageDevice::ListFiles(char *basePath, FileEntry **entries,
     return ListFileEntries(basePath, entries, n, size);
 }
 
-bool LocalStorageDevice::StreamReadStart(FileHandle *handle, const char *path){
-    bool rv = LocalFile::FromPath(&handle->localFile, path, FileOpenMode::Read);
-    if(!rv) return rv;
-    handle->type = LocalFile::GetType();
-    return true;
-}
-
 bool LocalStorageDevice::StreamWriteStart(FileHandle *handle, const char *path){
     bool rv = LocalFile::FromPath(&handle->localFile, path, FileOpenMode::Write);
     if(!rv) return rv;
@@ -88,12 +83,6 @@ size_t LocalStorageDevice::StreamWriteBytes(FileHandle *handle, void *ptr,
                                             size_t size, size_t nmemb)
 {
     return handle->localFile.WriteBytes(ptr, size, nmemb);
-}
-
-size_t LocalStorageDevice::StreamReadBytes(FileHandle *handle, void *ptr,
-                                           size_t size, size_t nmemb)
-{
-    return handle->localFile.ReadBytes(ptr, size, nmemb);
 }
 
 bool LocalStorageDevice::StreamFinish(FileHandle *handle){
@@ -114,18 +103,90 @@ void LocalStorageDevice::CloseFile(FileHandle *handle){
 //i.e.: Read/Write operations on remote disk, not so trivial.   //
 //////////////////////////////////////////////////////////////////
 RemoteStorageDevice::RemoteStorageDevice(const char *ip, int port){
-    client.ConnectTo(ip, port);
+    if(!client.ConnectTo(ip, port)){
+        exit(0);
+    }
+}
+
+int RemoteStorageDevice::Chdir(const char *path){
+    std::vector<uint8_t> out;
+    return client.Chdir(out, path) ? 0 : -1;
 }
 
 int RemoteStorageDevice::ListFiles(char *basePath, FileEntry **entries,
                                    uint *n, uint *size)
 {
-    UNIMPLEMENTED();
-    return 0;
+    std::vector<uint8_t> out;
+    FileEntry *lEntries = nullptr;
+    uint currSize = 0;
+    uint base = 8;
+    uint count = 0;
+    if(!client.ListFiles(out, basePath)) return -1;
+
+    if(*n == 0 || *entries == nullptr){
+        lEntries = AllocatorGetN(FileEntry, base);
+        currSize = base;
+    }else{
+        lEntries = *entries;
+        currSize = *n;
+    }
+
+    uint s = 0;
+    uint8_t *ptr = out.data();
+    while(s < out.size()){
+        uint32_t length = 0;
+        uint8_t id = out[s];
+
+        if(id != DescriptorDirectory && id != DescriptorFile){
+            LOG_ERR("Unknown id value " << id);
+            return false;
+        }
+
+        if(out.size() < s + sizeof(uint32_t)){
+            LOG_ERR("Corrupted data - could not find length");
+            return false;
+        }
+
+        memcpy(&length, &ptr[s+1], sizeof(uint32_t));
+        if(out.size() < s + 1 + length){
+            LOG_ERR("Corrupted data - could not find content");
+            return false;
+        }
+
+        if(!(currSize > count + 1)){
+            lEntries = AllocatorExpand(FileEntry, lEntries,
+                                       currSize+base, currSize);
+            currSize += base;
+        }
+
+        lEntries[count].type = (FileType)id;
+        Memcpy(lEntries[count].path, &ptr[s+1+sizeof(uint32_t)], length);
+        lEntries[count].path[length] = 0;
+        lEntries[count].pLen = length;
+        lEntries[count].isLoaded = 0;
+        count++;
+        s += 1 + sizeof(uint32_t) + length;
+    }
+
+    *entries = lEntries;
+    *n = count;
+    *size = currSize;
+
+    return 1;
 }
 
 void RemoteStorageDevice::GetWorkingDirectory(char *dir, uint len){
-    UNIMPLEMENTED();
+    std::vector<uint8_t> out;
+    dir[0] = 0;
+    if(client.GetPwd(out)){
+        if(out.size() < 1 || out.size() > len){
+            LOG_ERR("Invalid pwd query?");
+            return;
+        }
+        memcpy(dir, out.data(), out.size());
+    }else{
+        LOG_ERR("Could not query pwd");
+    }
 }
 
 char *RemoteStorageDevice::GetContentsOf(const char *path, uint *size){
@@ -141,19 +202,17 @@ char *RemoteStorageDevice::GetContentsOf(const char *path, uint *size){
 
     char *content = AllocatorGetN(char, out.size());
     memcpy(content, out.data(), out.size());
+    *size = out.size()-1;
     return content;
 }
 
 bool RemoteStorageDevice::StreamWriteStart(FileHandle *handle, const char *path){
-    bool rv = RemoteFile::FromPath(&handle->remoteFile, path, FileOpenMode::Write);
-    if(!rv) return rv;
-    handle->type = RemoteFile::GetType();
-    return true;
-}
+    std::vector<uint8_t> out;
+    if(!client.StreamWriteStart(out, path)){
+        LOG_ERR("Failed to open file " << path);
+        return false;
+    }
 
-bool RemoteStorageDevice::StreamReadStart(FileHandle *handle, const char *path){
-    bool rv = RemoteFile::FromPath(&handle->remoteFile, path, FileOpenMode::Read);
-    if(!rv) return rv;
     handle->type = RemoteFile::GetType();
     return true;
 }
@@ -161,70 +220,54 @@ bool RemoteStorageDevice::StreamReadStart(FileHandle *handle, const char *path){
 size_t RemoteStorageDevice::StreamWriteBytes(FileHandle *handle, void *ptr,
                                              size_t size, size_t nmemb)
 {
-    return handle->remoteFile.WriteBytes(ptr, size, nmemb);
-}
+    std::vector<uint8_t> out;
+    uint32_t val = 0;
+    if(!client.StreamWriteUpdate(out, (uint8_t *)ptr, size * nmemb, 1)){
+        LOG_ERR("Failed to write data to file");
+        return 0;
+    }
 
-size_t RemoteStorageDevice::StreamReadBytes(FileHandle *handle, void *ptr,
-                                            size_t size, size_t nmemb)
-{
-    return handle->remoteFile.ReadBytes(ptr, size, nmemb);
+    if(out.size() < sizeof(uint32_t)){
+        LOG_ERR("Missing write byte count");
+        return 0;
+    }
+
+    memcpy(&val, out.data(), sizeof(uint32_t));
+    return val;
 }
 
 bool RemoteStorageDevice::StreamWriteString(FileHandle *handle, const char *str){
-    return handle->remoteFile.WriteString(str, 0);
-}
-
-bool RemoteStorageDevice::StreamFinish(FileHandle *handle){
-    handle->type = -1;
-    return handle->remoteFile.CloseFile();
-}
-
-bool RemoteStorageDevice::AppendTo(const char *path, const char *str, int with_line_brk){
-    return FileAppendTo<RemoteFile>(path, str, with_line_brk);
-}
-
-void RemoteStorageDevice::CloseFile(FileHandle *handle){
-    handle->remoteFile.CloseFile();
-}
-
-//////////////////////////////////////////////////////////////////
-//                 R E M O T E   F I L E                        //
-//i.e.: Dispatch operations to the RPC handler.                 //
-//////////////////////////////////////////////////////////////////
-size_t RemoteFile::WriteBytes(void *ptr, size_t size, size_t nmemb){
-    // TODO: Implement me!
-    UNIMPLEMENTED();
-    return 0;
-}
-
-size_t RemoteFile::ReadBytes(void *ptr, size_t size, size_t nmemb){
-    // TODO: Implement me!
-    UNIMPLEMENTED();
-    return 0;
-}
-
-bool RemoteFile::WriteString(const char *str, int with_line_brk){
-    // TODO: Implement me!
-    if(!is_open) return true;
-    UNIMPLEMENTED();
-    return false;
-}
-
-bool RemoteFile::CloseFile(){
-    // TODO: Implement me!
-    if(!is_open) return true;
-    UNIMPLEMENTED();
+    std::vector<uint8_t> out;
+    uint32_t len = strlen(str);
+    if(!client.StreamWriteUpdate(out, (uint8_t *)str, len+1, 0)){
+        LOG_ERR("Failed to write string to file");
+        return false;
+    }
     return true;
 }
 
-bool RemoteFile::OpenFile(const char *path, FileOpenMode mode){
-    // TODO: Implement me!
-    return false;
+bool RemoteStorageDevice::StreamFinish(FileHandle *handle){
+    std::vector<uint8_t> out;
+    if(!client.StreamWriteFinal(out)){
+        LOG_ERR("Failed to close file");
+        return false;
+    }
+    handle->type = -1;
+    return true;
 }
 
-bool RemoteFile::FromPath(RemoteFile *file, const char *path, FileOpenMode mode){
-    // TODO: Implement me!
-    UNIMPLEMENTED();
-    return false;
+bool RemoteStorageDevice::AppendTo(const char *path, const char *str, int with_line_brk){
+    std::vector<uint8_t> out;
+    uint32_t size = strlen(str) + 1;
+    if(!client.AppendTo(out, path, (uint8_t *)str, size, with_line_brk)){
+        LOG_ERR("Failed to append");
+        return false;
+    }
+    return true;
 }
+
+void RemoteStorageDevice::CloseFile(FileHandle *handle){
+    //handle->remoteFile.CloseFile();
+}
+
 

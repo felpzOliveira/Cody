@@ -91,18 +91,10 @@ class LocalFile{
 
 class RemoteFile{
     public:
-    bool is_open;
-    RemoteFile(): is_open(false){}
-    ~RemoteFile() { CloseFile(); }
+    RemoteFile() = default;
+    ~RemoteFile() = default;
 
     static int GetType(){ return 1; }
-
-    size_t WriteBytes(void *ptr, size_t size, size_t nmemb);
-    size_t ReadBytes(void *ptr, size_t size, size_t nmemb);
-    bool WriteString(const char *str, int with_line_brk=1);
-    bool OpenFile(const char *path, FileOpenMode mode);
-    bool CloseFile();
-    static bool FromPath(RemoteFile *file, const char *path, FileOpenMode mode);
 };
 
 struct FileHandle{
