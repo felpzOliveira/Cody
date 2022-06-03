@@ -6,18 +6,13 @@
 #include <log.h>
 
 StorageDevice *storageDevice = nullptr;
-StorageDevice *backupDevice = nullptr;
 
 StorageDevice *FetchStorageDevice(){
     return storageDevice;
 }
 
-StorageDevice *FetchBackupStorageDevice(){
-    return backupDevice;
-}
-
 void StorageDeviceEarlyInit(){
-    backupDevice = new LocalStorageDevice;
+    // TODO: Add whatever we need here
 }
 
 void SetStorageDevice(StorageDeviceType type, const char *ip, int port){

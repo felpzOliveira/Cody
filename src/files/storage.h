@@ -118,11 +118,6 @@ void StorageDeviceEarlyInit();
 StorageDevice *FetchStorageDevice();
 
 /*
-* Get the backup storage device.
-*/
-StorageDevice *FetchBackupStorageDevice();
-
-/*
 * Sets the application storage device.
 * NOTE: This routine should be called at startup and should never be touched
 * again as it could de-synchronize the files and generate a complete mess.
