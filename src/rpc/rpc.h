@@ -25,11 +25,16 @@ class RPCBuffer{
     uint32_t head;
     bool owns;
 
-    RPCBuffer(uint32_t length){
-        mem = new uint8_t[length];
-        size = length;
+    RPCBuffer(){
+        mem = nullptr;
         head = 0;
-        owns = true;
+        owns = false;
+    }
+
+    RPCBuffer(uint32_t length){
+        owns = false;
+        mem = nullptr;
+        Prepare(length);
     }
 
     RPCBuffer(uint8_t *ptr, uint32_t length){
@@ -41,6 +46,14 @@ class RPCBuffer{
 
     ~RPCBuffer(){
         if(owns && mem) delete[] mem;
+    }
+
+    void Prepare(uint32_t length){
+        if(owns && mem) delete[] mem;
+        mem = new uint8_t[length];
+        size = length;
+        head = 0;
+        owns = true;
     }
 
     uint8_t *Data(uint32_t h=0){ return &mem[h]; }

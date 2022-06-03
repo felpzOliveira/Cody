@@ -4,6 +4,9 @@
 #define LOG_MODULE "NET"
 #include <log.h>
 
+#define LOG_CLIENT(msg) LOG(COLOR_CYAN << "[Client] " << COLOR_NONE << msg)
+#define LOG_SERVER(msg) LOG(COLOR_YELLOW_BRIGHT << "[Server] " << COLOR_NONE << msg)
+
 #define MAX_BLOCK_SIZE (MAX_TRANSPORT_SIZE-2*AES_BLOCK_SIZE_IN_BYTES)
 #define MIN_BLOCKS(n) ((n + (MAX_BLOCK_SIZE-1)) / MAX_BLOCK_SIZE)
 
@@ -130,6 +133,7 @@ static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     int result = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
     while(bytes < x){
+        LOG_VERBOSE(" -- Waiting for " << (x - bytes));
         result = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
         if(result < 1){
             break;
@@ -147,6 +151,7 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
                                         void *buffer, long timeout,
                                         ProtocolError &err)
 {
+    return ReadXBytes(socket, x, buffer);
     unsigned int bytes = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
     err = ProtocolError::NO_ERROR;
@@ -204,6 +209,7 @@ static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
                                         void *buffer, long timeout,
                                         ProtocolError &err)
 {
+    return ReadXBytes(socket, x, buffer);
     int ret;
     unsigned int bytes = 0;
     unsigned char *uc_ptr = (unsigned char *)buffer;
@@ -236,7 +242,72 @@ __finish:
 }
 #endif
 
-static ProtocolError EncryptAndSend(int socket, uint8_t *ptr, uint32_t remaining){
+static ProtocolError EncryptAndSend(int socket, uint8_t *ptr, uint32_t length){
+    std::vector<uint8_t> enc;
+    ProtocolError err = ProtocolError::NO_ERROR;
+    uint32_t size = 0;
+    RPCBuffer buffer;
+
+    LOG_VERBOSE(" - Encrypting " << length);
+    if(!SecurityServices::Encrypt(ptr, length, enc)){
+        err = ProtocolError::ENCRYPT_FAILURE;
+        goto __finish;
+    }
+
+    size = enc.size();
+    buffer.Prepare(size + sizeof(uint32_t));
+    buffer.Push(&size, sizeof(uint32_t));
+    buffer.Push(enc.data(), size);
+
+    LOG_VERBOSE(" - Sending " << buffer.Size());
+    if(!SendXBytes(socket, buffer.Size(), buffer.Data())){
+        err = ProtocolError::SEND_FAILURE;
+        goto __finish;
+    }
+__finish:
+    return err;
+}
+
+static ProtocolError ReadAndDecrypt(int socket, uint32_t x, std::vector<uint8_t> &out,
+                                    long timeout_ms)
+{
+    uint32_t memSize = 0;
+    uint8_t *memPtr = nullptr;
+    ProtocolError err = ProtocolError::NO_ERROR;
+
+    uint32_t read_size = ReadXBytes(socket, sizeof(uint32_t), &memSize);
+    if(read_size != sizeof(uint32_t)){
+        LOG_ERR("Did not read the size of the package");
+        err = ProtocolError::INVALID_REQUEST;
+        goto __finish;
+    }
+
+    memPtr = new uint8_t[memSize];
+    if(!memPtr){
+        LOG_ERR("Could not allocate memory for " << memSize << " bytes");
+        err = ProtocolError::INVALID_REQUEST;
+        goto __finish;
+    }
+
+    LOG_VERBOSE(" - Waiting for " << memSize << " bytes");
+    read_size = ReadXBytes(socket, memSize, memPtr);
+    if(read_size != memSize){
+        LOG_ERR("Did not read package entirely");
+        err = ProtocolError::INVALID_REQUEST;
+        goto __finish;
+    }
+
+    if(!SecurityServices::Decrypt(memPtr, memSize, out)){
+        err = ProtocolError::DECRYPT_FAILURE;
+        goto __finish;
+    }
+
+__finish:
+    if(memPtr) delete[] memPtr;
+    return err;
+}
+
+static ProtocolError EncryptAndSend2(int socket, uint8_t *ptr, uint32_t remaining){
     std::vector<uint8_t> enc;
     ProtocolError err = ProtocolError::NO_ERROR;
     uint32_t totalSize = remaining;
@@ -286,7 +357,7 @@ __finish:
     return err;
 }
 
-static ProtocolError ReadAndDecrypt(int socket, uint32_t x, std::vector<uint8_t> &out,
+static ProtocolError ReadAndDecrypt2(int socket, uint32_t x, std::vector<uint8_t> &out,
                                     long timeout_ms)
 {
     std::vector<uint8_t> tmp;
@@ -537,14 +608,12 @@ void RPCServer::Start(int port){
         goto err_close;
     }
 
-    LOG(COLOR_YELLOW_BRIGHT << "[Server]" << COLOR_NONE
-            << " Setting " << HOME << " as starting path");
+    LOG_SERVER("Setting " << HOME << " as starting path");
 
     while(1){
         IGNORE(storage->Chdir(HOME.c_str()));
         linuxNet->clientfd = -1;
-        LOG(COLOR_YELLOW_BRIGHT << "[Server]" << COLOR_NONE
-            << " Waiting for connection on port " << port);
+        LOG_SERVER("Waiting for connection on port " << port);
 
         clientfd = accept(linuxNet->sockfd, NULL, NULL);
         if(clientfd < 0){
@@ -647,6 +716,7 @@ static bool ClientDoChallenge(int socket){
 }
 
 bool RPCClient::Chdir(std::vector<uint8_t> &out, const char *path){
+    LOG_CLIENT(" -- Chdir");
     uint32_t val = RPC_COMMAND_CHDIR;
     uint32_t pathSize = strlen(path);
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
@@ -679,6 +749,7 @@ bool RPCClient::Chdir(std::vector<uint8_t> &out, const char *path){
 }
 
 bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
+    LOG_CLIENT(" -- WriteStart");
     uint32_t code = RPCStreamedWriteCommand::StreamStartCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
     RPCBuffer buffer(work_buffer, sizeof(work_buffer));
@@ -718,6 +789,7 @@ bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
 bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr,
                                   uint32_t size, int mode)
 {
+    LOG_CLIENT(" -- WriteUpdate");
     uint32_t code = RPCStreamedWriteCommand::StreamUpdateCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
     RPCBuffer buffer(size + 2*sizeof(uint32_t) + 1);
@@ -762,6 +834,7 @@ __finish:
 }
 
 bool RPCClient::StreamWriteFinal(std::vector<uint8_t> &out){
+    LOG_CLIENT(" -- WriteFinal");
     uint32_t code = RPCStreamedWriteCommand::StreamFinalCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
@@ -801,6 +874,7 @@ __finish:
 bool RPCClient::AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *data,
                          uint32_t size, int with_line_brk)
 {
+    LOG_CLIENT(" -- AppendTo");
     uint32_t val = RPC_COMMAND_APPEND;
     uint32_t pathSize = strlen(path)+1;
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
@@ -844,6 +918,7 @@ bool RPCClient::AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *d
 }
 
 bool RPCClient::ListFiles(std::vector<uint8_t> &out, const char *path){
+    LOG_CLIENT(" -- ListFiles");
     uint32_t val = RPC_COMMAND_LIST_FILES;
     uint32_t pathSize = strlen(path);
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
@@ -881,6 +956,7 @@ bool RPCClient::ListFiles(std::vector<uint8_t> &out, const char *path){
 }
 
 bool RPCClient::GetPwd(std::vector<uint8_t> &out){
+    LOG_CLIENT(" -- GetPwd");
     uint32_t val = RPC_COMMAND_GET_PWD;
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
     int sock = linuxNet->sockfd;
@@ -911,6 +987,7 @@ bool RPCClient::GetPwd(std::vector<uint8_t> &out){
 }
 
 bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
+    LOG_CLIENT(" -- ReadFile");
     uint32_t val = RPC_COMMAND_READ_FILE;
     uint32_t pathSize = strlen(path);
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;

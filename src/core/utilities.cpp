@@ -7,7 +7,6 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <lex.h>
-#include <app.h>
 #include <limits.h>
 #include <dirent.h>
 #include <sstream>
