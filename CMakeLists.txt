@@ -1,4 +1,5 @@
-project(Cody)
+project(Cody LANGUAGES CXX C)
+
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 set(CODY "cody")
@@ -7,21 +8,24 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(CODY_BUILD "Build the editor" ON)
 
+set (CMAKE_CXX_STANDARD 17)
+set (CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Debug build")
-    set(MH_FLAGS "-g3 -O0 -Wall -std=c++17 -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic -fshort-enums")
+    set(MH_FLAGS "-g3 -O0 -Wall -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Valgrind)
     message(STATUS "Valgrind build")
-    set(MH_FLAGS "-g3 -O0 -Wall -std=c++17 -rdynamic -fshort-enums")
+    set(MH_FLAGS "-g3 -O0 -Wall -rdynamic -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Profiling)
     message(STATUS "Profiling build")
-    set(MH_FLAGS "-g -pg -Wall -std=c++17 -fshort-enums")
+    set(MH_FLAGS "-g -pg -Wall -fshort-enums")
 elseif(CMAKE_BUILD_TYPE MATCHES Memory)
     message(STATUS "Memory check build")
-    set(MH_FLAGS "-Ofast -Wall -std=c++17 -DMEMORY_DEBUG -fshort-enums")
+    set(MH_FLAGS "-Ofast -Wall -DMEMORY_DEBUG -fshort-enums")
 else()
     message(STATUS "Release build")
-    set(MH_FLAGS "-Ofast -Wall -std=c++17 -fshort-enums")
+    set(MH_FLAGS "-Ofast -Wall -fshort-enums")
 endif()
 
 if(CODY_BUILD)
@@ -80,9 +84,6 @@ file(GLOB SV_SRCS src/files/storage.cpp
 
 file(GLOB MH_SHADERS shaders/*.glsl)
 
-add_executable(${SERVER} ${SV_SRCS})
-add_definitions(${MH_FLAGS})
-
 if(CODY_BUILD)
     file(GLOB MH_SRCS src/cody.cpp)
 
@@ -99,6 +100,7 @@ if(CODY_BUILD)
 
     set (CODY_LIBRARIES
             dl
+            pthread
             ${X11_LIB}
             ${PTHREAD_LIB}
             ${LIB_GIT2_LIBRARIES}
@@ -110,4 +112,11 @@ if(CODY_BUILD)
                             ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
     target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})
 endif()
+
+add_executable(${SERVER} ${SV_SRCS})
+add_definitions(${MH_FLAGS})
+target_link_directories(${SERVER} PRIVATE
+                            ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2
+                            ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
+target_link_libraries(${SERVER} PRIVATE pthread)
 

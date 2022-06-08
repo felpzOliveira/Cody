@@ -4,6 +4,7 @@
 #include <utilities.h>
 #include <file_details.h>
 #include <rpc.h>
+#include <mutex>
 
 
 struct RPCNetwork{
@@ -14,8 +15,11 @@ struct RPCNetwork{
 class RPCClient{
     public:
     RPCNetwork net;
+    std::mutex mutex;
+    bool checkerRunning = false;
+    bool checkerDone;
 
-    RPCClient() = default;
+    RPCClient();
     ~RPCClient();
     bool ConnectTo(const char *ip, int port);
     bool ReadEntireFile(std::vector<uint8_t> &out, const char *path);

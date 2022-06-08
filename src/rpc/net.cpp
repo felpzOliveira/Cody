@@ -1,5 +1,6 @@
 #include <server.h>
 #include <aes.h>
+#include <chrono>
 
 #define LOG_MODULE "NET"
 #include <log.h>
@@ -542,6 +543,7 @@ static bool ClientDoChallenge(int socket){
 }
 
 bool RPCClient::Chdir(std::vector<uint8_t> &out, const char *path){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- Chdir");
     uint32_t val = RPC_COMMAND_CHDIR;
     uint32_t pathSize = strlen(path);
@@ -575,6 +577,7 @@ bool RPCClient::Chdir(std::vector<uint8_t> &out, const char *path){
 }
 
 bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- WriteStart");
     uint32_t code = RPCStreamedWriteCommand::StreamStartCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
@@ -615,6 +618,7 @@ bool RPCClient::StreamWriteStart(std::vector<uint8_t> &out, const char *path){
 bool RPCClient::StreamWriteUpdate(std::vector<uint8_t> &out, uint8_t *ptr,
                                   uint32_t size, int mode)
 {
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- WriteUpdate");
     uint32_t code = RPCStreamedWriteCommand::StreamUpdateCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
@@ -660,6 +664,7 @@ __finish:
 }
 
 bool RPCClient::StreamWriteFinal(std::vector<uint8_t> &out){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- WriteFinal");
     uint32_t code = RPCStreamedWriteCommand::StreamFinalCode();
     uint32_t val = RPC_COMMAND_STREAM_WRITE;
@@ -700,6 +705,7 @@ __finish:
 bool RPCClient::AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *data,
                          uint32_t size, int with_line_brk)
 {
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- AppendTo");
     uint32_t val = RPC_COMMAND_APPEND;
     uint32_t pathSize = strlen(path)+1;
@@ -744,6 +750,7 @@ bool RPCClient::AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *d
 }
 
 bool RPCClient::ListFiles(std::vector<uint8_t> &out, const char *path){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- ListFiles");
     uint32_t val = RPC_COMMAND_LIST_FILES;
     uint32_t pathSize = strlen(path);
@@ -782,6 +789,7 @@ bool RPCClient::ListFiles(std::vector<uint8_t> &out, const char *path){
 }
 
 bool RPCClient::GetPwd(std::vector<uint8_t> &out){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- GetPwd");
     uint32_t val = RPC_COMMAND_GET_PWD;
     NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
@@ -813,6 +821,7 @@ bool RPCClient::GetPwd(std::vector<uint8_t> &out){
 }
 
 bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
+    std::lock_guard<std::mutex> guard(mutex);
     LOG_CLIENT(" -- ReadFile");
     uint32_t val = RPC_COMMAND_READ_FILE;
     uint32_t pathSize = strlen(path);
@@ -856,7 +865,62 @@ bool RPCClient::ReadEntireFile(std::vector<uint8_t> &out, const char *path){
     return false;
 }
 
+static void RPCClientChecker(RPCClient *client){
+    NetworkLinux *linuxNet = (NetworkLinux *)client->net.prv;
+    int sock = linuxNet->sockfd;
+    uint32_t val = RPC_COMMAND_PING;
+    std::vector<uint8_t> out;
+    const long pollTimeout = 5000;
+    client->checkerDone = false;
+
+    while(client->checkerRunning){
+        out.clear();
+        {
+            std::lock_guard<std::mutex> guard(client->mutex);
+            ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
+            if(error != ProtocolError::NO_ERROR){
+                LOG_ERR("Connection error: " << GetNetworkError(error));
+                // TODO: terminate application or warn user and than terminate
+                exit(0);
+            }
+
+            error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
+            if(error != ProtocolError::NO_ERROR){
+                LOG_ERR("Connection error: " << GetNetworkError(error));
+                // TODO: terminate application or warn user and than terminate
+                exit(0);
+            }
+
+            if(out.size() != 1){
+                LOG_ERR("Got invalid response");
+                // TODO: terminate application or warn user and than terminate
+                exit(0);
+            }
+
+            if(out[0] != ACK){
+                LOG_ERR("Got invalid response, not ACK");
+                // TODO: terminate application or warn user and than terminate
+                exit(0);
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
+    }
+
+    client->checkerDone = true;
+}
+
+static void StopRPCClientChecker(RPCClient *client){
+    const long pollTimeout = 200;
+    client->checkerRunning = false;
+    while(!client->checkerDone){
+        std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
+    }
+}
+
 bool RPCClient::ConnectTo(const char *ip, int port){
+    if(checkerRunning) StopRPCClientChecker(this);
+
     int sock = LinuxNetwork_CreateClientSocket(ip, port);
     if(sock < 0){
         LOG_ERR("Failed to connect to " << ip << ":" << port);
@@ -873,10 +937,22 @@ bool RPCClient::ConnectTo(const char *ip, int port){
     NetworkLinux *linuxNet = new NetworkLinux;
     linuxNet->sockfd = sock;
     net.prv = (void *)linuxNet;
+
+    checkerRunning = true;
+    std::thread(RPCClientChecker, this).detach();
     return true;
 }
 
+RPCClient::RPCClient(){
+    checkerRunning = false;
+    checkerDone = true;
+}
+
 RPCClient::~RPCClient(){
+    if(checkerRunning){
+        StopRPCClientChecker(this);
+    }
+
     if(net.prv){
         NetworkLinux *linuxNet = (NetworkLinux *)net.prv;
         if(linuxNet->sockfd > 0) close(linuxNet->sockfd);

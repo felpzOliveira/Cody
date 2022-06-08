@@ -4,6 +4,12 @@
 #define LOG_MODULE "RPC"
 #include <log.h>
 
+bool RPCPingCommand::Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out){
+    LOG_INFO("Answering ping request");
+    out.push_back(ACK);
+    return true;
+}
+
 void RPCStreamedWriteCommand::Cleanup(){
     LOG_INFO("Running cleanup");
     ResetFileWrite();

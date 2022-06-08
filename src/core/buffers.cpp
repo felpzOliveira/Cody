@@ -208,7 +208,14 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
         if(direction < 0){
             if(rawp == 0) break;
         }else{
-            if(rawp == buffer->taken-1) break;
+            if(rawp == buffer->taken-1){
+                // NOTE: The end of the buffer is a tab
+                // we need to return the maximum possible position
+                // otherwise whenever we insert a tab in an empty line
+                // we would return 3 which is the position of a tab
+                // and not an actual writable position.
+                return buffer->taken;
+            }
         }
 
         rawp += direction;
@@ -1767,13 +1774,26 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
         //AssertA(s == ic, "Failed to write to file");
     }
 
-    std::string v = ss.str();
-    //printf("Data is:\n%s\n", v.c_str());
-    storage->StreamWriteBytes(&file, (void *)v.c_str(), 1, v.size());
-
-    storage->StreamFinish(&file);
     AllocatorFree(linePtr);
     lineBuffer->is_dirty = 0;
+
+    std::string v = ss.str();
+    if(!storage->IsLocallyStored()){
+        DispatchExecution([&](HostDispatcher *dispatcher){
+            std::string localStr = v;
+            FileHandle localFile = file;
+            StorageDevice *localStorage = storage;
+
+            dispatcher->DispatchHost();
+
+            localStorage->StreamWriteBytes(&localFile, (void *)localStr.c_str(),
+                                           1, localStr.size());
+            localStorage->StreamFinish(&localFile);
+        });
+    }else{
+        storage->StreamWriteBytes(&file, (void *)v.c_str(), 1, v.size());
+        storage->StreamFinish(&file);
+    }
 }
 
 int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){

@@ -941,13 +941,9 @@ void AppCommandInsertTab(){
     Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
     char spaces[16];
     int offset = 0;
-    if(appGlobalConfig.useTabs){
-        Memset(spaces, '\t', appGlobalConfig.tabSpacing);
-        offset = 1;
-    }else{
-        Memset(spaces, ' ', appGlobalConfig.tabSpacing);
-        offset = appGlobalConfig.tabSpacing;
-    }
+
+    Memset(spaces, appGlobalConfig.useTabs ? '\t' : ' ', appGlobalConfig.tabSpacing);
+    offset = appGlobalConfig.tabSpacing;
 
     vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
     if(id.x != (int)cursor.x || id.y != OPERATION_INSERT_CHAR){

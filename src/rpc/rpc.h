@@ -12,7 +12,8 @@
 #define RPC_COMMAND_GET_PWD       (1 << 3)
 #define RPC_COMMAND_LIST_FILES    (1 << 4)
 #define RPC_COMMAND_APPEND        (1 << 5)
-#define RPC_COMMAND_INVALID       (1 << 6)
+#define RPC_COMMAND_PING          (1 << 6)
+#define RPC_COMMAND_INVALID       (1 << 7)
 #define ACK 0x3f
 #define NACK 0x4f
 
@@ -220,6 +221,18 @@ class RPCChdirCommand : public RPCBaseCommand{
     }
 };
 
+class RPCPingCommand : public RPCBaseCommand{
+    public:
+
+    RPCPingCommand() = default;
+    ~RPCPingCommand() = default;
+
+    virtual bool Execute(uint8_t *args, uint32_t size, std::vector<uint8_t> &out) override;
+    virtual int GetArgumentsSize() override{
+        return -1;
+    }
+};
+
 inline
 void RPCInitializeCommandMap(std::map<RPCCommandCode, RPCBaseCommand *> &cmdMap){
     cmdMap[RPC_COMMAND_READ_FILE] = new RPCReadCommand();
@@ -228,4 +241,5 @@ void RPCInitializeCommandMap(std::map<RPCCommandCode, RPCBaseCommand *> &cmdMap)
     cmdMap[RPC_COMMAND_GET_PWD] = new RPCGetPwdCommand();
     cmdMap[RPC_COMMAND_LIST_FILES] = new RPCListFilesCommand();
     cmdMap[RPC_COMMAND_APPEND] = new RPCAppendToFileCommand();
+    cmdMap[RPC_COMMAND_PING] = new RPCPingCommand();
 }
