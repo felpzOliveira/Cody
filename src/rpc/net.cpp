@@ -111,10 +111,10 @@ err_close:
     return -1;
 }
 
-static bool SendXBytes(int socket, unsigned int x, void *buffer){
-    unsigned int bytes = 0;
+static bool SendXBytes(int socket, uint32_t x, void *buffer){
+    uint32_t bytes = 0;
     int result = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
+    uint8_t *uc_ptr = (uint8_t *)buffer;
     while(bytes < x){
         result = send(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
         if(result < 1){
@@ -128,9 +128,9 @@ static bool SendXBytes(int socket, unsigned int x, void *buffer){
     return true;
 }
 
-static unsigned int ReadExactlyXBytes(int socket, unsigned int x, void *buffer){
-    unsigned int bytes = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
+static uint32_t ReadExactlyXBytes(int socket, uint32_t x, void *buffer){
+    uint32_t bytes = 0;
+    uint8_t *uc_ptr = (uint8_t *)buffer;
 
     while(bytes < x){
         int read = recv(socket, uc_ptr + bytes, x - bytes, MSG_NOSIGNAL);
@@ -143,9 +143,9 @@ static unsigned int ReadExactlyXBytes(int socket, unsigned int x, void *buffer){
     return bytes;
 }
 
-static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
-    unsigned int bytes = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
+static uint32_t ReadXBytes(int socket, uint32_t x, void *buffer){
+    uint32_t bytes = 0;
+    uint8_t *uc_ptr = (uint8_t *)buffer;
 
     bytes = recv(socket, uc_ptr, x, MSG_NOSIGNAL);
     if(bytes < 1){
@@ -156,13 +156,12 @@ static unsigned int ReadXBytes(int socket, unsigned int x, void *buffer){
     return bytes;
 }
 
-static unsigned int ReadUpToXBytesTimed(int socket, unsigned int x,
-                                        void *buffer, long timeout,
-                                        ProtocolError &err)
+static uint32_t ReadUpToXBytesTimed(int socket, uint32_t x, void *buffer,
+                                    long timeout, ProtocolError &err)
 {
     int ret;
-    unsigned int bytes = 0;
-    unsigned char *uc_ptr = (unsigned char *)buffer;
+    uint32_t bytes = 0;
+    uint8_t *uc_ptr = (uint8_t *)buffer;
     err = ProtocolError::NO_ERROR;
     struct pollfd fd;
 
@@ -267,7 +266,7 @@ static double TimevalDifference(struct timeval start, struct timeval end){
 //       to brute-force the key
 static bool ServerDoChallenge(int socket){
     Challenge ch;
-    unsigned int read_size = 0;
+    uint32_t read_size = 0;
     std::vector<uint8_t> vec;
     char mem[64];
     ProtocolError err = ProtocolError::NO_ERROR;
@@ -333,7 +332,7 @@ bool ExecuteCommand(RPCBaseCommand *cmd, std::vector<uint8_t> *args,
 
 void ServerService(RPCServer *server){
     NetworkLinux *linuxNet = (NetworkLinux *)server->net.prv;
-    unsigned int code_block_size =
+    uint32_t code_block_size =
             SecurityServices::PackageRequiredSize(sizeof(RPCCommandCode));
 
     LOG_VERBOSE("Got new connection");
@@ -501,7 +500,7 @@ err_close:
 }
 
 static bool ClientDoChallenge(int socket){
-    unsigned int read_size = 0;
+    uint32_t read_size = 0;
     std::vector<uint8_t> out;
     char mem[64];
 
