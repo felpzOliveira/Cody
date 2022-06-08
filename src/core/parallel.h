@@ -52,6 +52,49 @@ void ClearBuildErrors();
 ///////////////////////////////////////////////////////
 
 /*
+* Utility routine for handling conditions variable under a function.
+* Wait 'timeout_ms' under the function 'fn'. The function fn is directly passed
+* to the 'wait_until' primitive so it must return a bool value that triggers
+* the wait to stop. This routine itself returns < 0 in case the condition was
+* not met and we timed out and > 0 when the condition was met.
+*/
+template<typename Fn>
+inline int ConditionVariableWait(std::condition_variable &cv, std::mutex &mutex,
+                                 long timeout_ms, Fn fn)
+{
+    std::unique_lock<std::mutex> locker(mutex);
+    auto start = std::chrono::system_clock::now();
+    auto max_poll_ms = std::chrono::milliseconds(timeout_ms);
+    bool done = false;
+    bool terminated = false;
+    while(!done && !terminated){
+        cv.wait_until(locker, start + max_poll_ms,
+                      [&]{ terminated = fn(); return terminated; });
+
+        auto end = std::chrono::system_clock::now();
+        auto elapsed =
+                std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+        done = elapsed >= timeout_ms;
+    }
+
+    return terminated ? 1 : -1;
+}
+
+/*
+* Utility routine for handling condition variables under a function. Triggers one
+* call to notify, possibly waking one thread.
+*/
+template<typename Fn>
+inline void ConditionVariableTriggerOne(std::condition_variable &cv, std::mutex &mutex,
+                                        Fn fn)
+{
+    std::unique_lock<std::mutex> locker(mutex);
+    fn();
+    locker.unlock();
+    cv.notify_one();
+}
+
+/*
 * Blocking Queue with timeout. Calling pop() blocks for 'max_timeout_ms'
 * if an item is detected than it is returned otherwise an empty std::optional<T>
 * is returned instead.

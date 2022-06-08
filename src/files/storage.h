@@ -5,7 +5,7 @@
 #include <file_details.h>
 #include <rpc.h>
 #include <mutex>
-
+#include <condition_variable>
 
 struct RPCNetwork{
     // private data for the actual network layer
@@ -15,7 +15,8 @@ struct RPCNetwork{
 class RPCClient{
     public:
     RPCNetwork net;
-    std::mutex mutex;
+    std::mutex mutex, waitmutex;
+    std::condition_variable cv;
     bool checkerRunning = false;
     bool checkerDone;
 

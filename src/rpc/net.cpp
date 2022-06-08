@@ -903,15 +903,19 @@ static void RPCClientChecker(RPCClient *client){
             }
         }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
+        (void) ConditionVariableWait(client->cv, client->waitmutex, pollTimeout,
+                                     [&](){ return !client->checkerRunning; });
     }
 
     client->checkerDone = true;
+    LOG_INFO(" -- Terminated");
 }
 
 static void StopRPCClientChecker(RPCClient *client){
     const long pollTimeout = 200;
-    client->checkerRunning = false;
+    ConditionVariableTriggerOne(client->cv, client->waitmutex,
+                                [&](){ client->checkerRunning = false; });
+
     while(!client->checkerDone){
         std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
     }
