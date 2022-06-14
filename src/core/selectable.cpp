@@ -64,7 +64,7 @@ void SelectableList_Push(SelectableList *list, char *item, uint len){
             list->selectableSize = n;
         }
 
-        LineBuffer_InsertLine(list->listBuffer, item, len, 0);
+        LineBuffer_InsertLine(list->listBuffer, item, len);
         list->selectable[insertId] = list->listBuffer->lineCount-1;
         list->used++;
     }

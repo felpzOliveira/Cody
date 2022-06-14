@@ -185,7 +185,7 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
         Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->writePosU8);
     }
 
-    queryBar->writePos = Buffer_InsertStringAt(&queryBar->buffer, 0, title, len, 0);
+    queryBar->writePos = Buffer_InsertStringAt(&queryBar->buffer, 0, title, len);
     queryBar->writePosU8 = Buffer_Utf8RawPositionToPosition(&queryBar->buffer,
                                                             queryBar->writePos);
     queryBar->cursor.textPosition.y = queryBar->writePosU8 + lastp;
@@ -421,7 +421,7 @@ void QueryBar_SetEntry(QueryBar *queryBar, View *view, char *str, uint len){
         uint rawP = queryBar->writePos;
         Buffer_RemoveRangeRaw(&queryBar->buffer, rawP, queryBar->buffer.taken);
         if(len > 0){
-            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, 0);
+            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len);
         }
 
         queryBar->cursor.textPosition.y =
@@ -436,7 +436,7 @@ int QueryBar_AddEntry(QueryBar *queryBar, View *view, char *str, uint len){
     if(QueryBar_AcceptInput(queryBar, str, len)){
         uint p = queryBar->cursor.textPosition.y;
         uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p);
-        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, 0);
+        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len);
 
         queryBar->cursor.textPosition.y =
             Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);

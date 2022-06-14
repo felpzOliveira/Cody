@@ -277,7 +277,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
             linearResults.res.push_back(res->results[i]);
             linearResults.count++;
 
-            LineBuffer_InsertLine(lineBuffer, (char *)m, len, 0);
+            LineBuffer_InsertLine(lineBuffer, (char *)m, len);
         }
     }
 
@@ -866,7 +866,7 @@ static void FileOpenUpdateList(View *view){
 
     for(uint i = 0; i < opener->entryCount; i++){
         FileEntry *e = &opener->entries[i];
-        LineBuffer_InsertLine(lb, e->path, e->pLen, 0);
+        LineBuffer_InsertLine(lb, e->path, e->pLen);
     }
 
     View_SelectableListSwapList(view, lb, 0);
@@ -1081,7 +1081,7 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 
     for(uint i = 0; i < opener->entryCount; i++){
         FileEntry *e = &opener->entries[i];
-        LineBuffer_InsertLine(lineBuffer, e->path, e->pLen, 0);
+        LineBuffer_InsertLine(lineBuffer, e->path, e->pLen);
     }
 
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
@@ -1140,7 +1140,7 @@ int SwitchBufferCommandStart(View *view){
                 char *ptr = buf->lineBuffer->filePath;
                 uint len = buf->lineBuffer->filePathSize;
                 uint n = GetSimplifiedPathName(ptr, len);
-                LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n, 0);
+                LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n);
             }
         }
 
@@ -1189,7 +1189,7 @@ int SwitchThemeCommandStart(View *view){
     for(uint i = 0; i < themes->size(); i++){
         ThemeDescription dsc = themes->at(i);
         uint slen = strlen(dsc.name);
-        LineBuffer_InsertLine(lineBuffer, (char *)dsc.name, slen, 0);
+        LineBuffer_InsertLine(lineBuffer, (char *)dsc.name, slen);
     }
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;

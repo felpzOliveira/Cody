@@ -1083,16 +1083,6 @@ LEX_TOKENIZER(Lex_TokenizeNext){
     uint tablen = 0;
     // 1- Skip spaces and encode in our format
     while(**p == ' ' || **p == '\t' || **p == '\r'){
-        if(**p == '\t') tablen += tokenizer->tabSpacing-1;
-        if(process_tab){
-            if(**p == '\t'){
-                for(int i = 0; i < tokenizer->tabSpacing-1; i++){
-                    AssertA(**p == '\t', "Invalid lexing inside tabs");
-                    (*p)++;
-                }
-            }
-        }
-
         offset++;
         (*p)++;
     }
@@ -1295,7 +1285,7 @@ void Lex_BuildTokenLookupTable(TokenLookupTable *lookupTable,
     lookupTable->nSize = elements;
 }
 
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable,
+void Lex_BuildTokenizer(Tokenizer *tokenizer, SymbolTable *symTable,
                         std::vector<std::vector<std::vector<GToken>> *> refTables,
                         TokenizerSupport *support)
 {
@@ -1308,7 +1298,6 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTa
     tokenizer->linesAggregated = 0;
     tokenizer->linePosition = 0;
     tokenizer->lineBeginning = 0;
-    tokenizer->tabSpacing = Max(1, tabSpacing);
     tokenizer->aggregate = 0;
     tokenizer->type = 0;
     tokenizer->inclusion = 0;

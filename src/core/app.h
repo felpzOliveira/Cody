@@ -23,7 +23,6 @@ typedef enum{
 }CursorStyle;
 
 typedef struct{
-    int tabSpacing;
     int tabLength;
     int useTabs;
     int autoCompleteSize;
@@ -59,8 +58,6 @@ BindingMap *AppGetFreetypingBinding();
 * Gets tab configuration. Returns the tab spacing and 'using_tab' returns
 * 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
 */
-int AppGetTabConfiguration(int *using_tab);
-
 int AppGetTabLength(int *using_tab);
 
 /*

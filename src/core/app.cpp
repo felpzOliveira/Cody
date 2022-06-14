@@ -128,9 +128,6 @@ void AppEarlyInitialize(bool use_tabs){
     StorageDevice *storage = FetchStorageDevice();
     srand(time(0));
     // TODO: Configuration file
-    // NOTE: Configuration must be done first as tab spacing
-    //       needs to be defined before the lexer can correctly mount buffers
-    appGlobalConfig.tabSpacing = 1;
     appGlobalConfig.tabLength = 4;
     appGlobalConfig.pathCompression = -1;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
@@ -172,14 +169,6 @@ void AppEarlyInitialize(bool use_tabs){
     GitBuffer_InitializeInternalBuffer();
 
     BaseCommand_InitializeCommandMap();
-}
-
-int AppGetTabConfiguration(int *using_tab){
-    if(using_tab){
-        *using_tab = appGlobalConfig.useTabs;
-    }
-
-    return appGlobalConfig.tabSpacing;
 }
 
 int AppGetTabLength(int *using_tab){
@@ -1062,7 +1051,7 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
         Memcpy(&lineHelper[len], dataptr, toNextLine * sizeof(char));
     }
 
-    LineBuffer_InsertLineAt(lineBuffer, at.x+1, lineHelper, len+toNextLine, 0);
+    LineBuffer_InsertLineAt(lineBuffer, at.x+1, lineHelper, len+toNextLine);
     if(toNextLine > 0){
         buffer = BufferView_GetBufferAt(bufferView, at.x);
         Buffer_RemoveRange(buffer, at.y, buffer->count);
@@ -1392,9 +1381,9 @@ void AppCommandQueryBarSearchAndReplace(){
                     Buffer_EraseSymbols(buf, symTable);
 
                     Buffer_RemoveRangeRaw(buf, searchResult->position,
-                                          searchResult->position + searchReplace->toLocateLen);
+                                searchResult->position + searchReplace->toLocateLen);
                     Buffer_InsertRawStringAt(buf, searchResult->position,
-                                             searchReplace->toReplace, searchReplace->toReplaceLen, 0);
+                                searchReplace->toReplace, searchReplace->toReplaceLen);
                     RemountTokensBasedOn(bView, cursor.x);
                     BufferView_Dirty(bView);
                 }
@@ -1857,7 +1846,7 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
         // Re-insert the line in raw mode to avoid processing
         Buffer_RemoveRange(buffer, 0, buffer->count);
         if(len + llen > 0)
-            Buffer_InsertRawStringAt(buffer, 0, lineHelper, len+llen, 0);
+            Buffer_InsertRawStringAt(buffer, 0, lineHelper, len+llen);
         changes = 1;
     }
 

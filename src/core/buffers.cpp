@@ -213,7 +213,7 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
                 // NOTE: The end of the buffer is a tab
                 // we need to return the maximum possible position
                 // otherwise whenever we insert a tab in an empty line
-                // we would return 3 which is the position of a tab
+                // we would return tabLen-1 which is the position of a tab
                 // and not an actual writable position.
                 return buffer->taken;
             }
@@ -401,15 +401,8 @@ void Buffer_Init(Buffer *buffer, uint size){
     buffer->is_ours = false;
 }
 
-void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
+void Buffer_InitSet(Buffer *buffer, char *head, uint leno){
     uint len = leno;
-    if(decode_tab){
-        for(uint i = 0; i < leno; i++){
-            if(head[i] == '\t'){
-                len += appGlobalConfig.tabSpacing - 1;
-            }
-        }
-    }
 
     if(buffer->data == nullptr){
         buffer->size = len+DefaultAllocatorSize;
@@ -425,18 +418,8 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno, int decode_tab){
     uint ic = 0;
     if(len > 0){
         for(uint i = 0; i < leno; i++){
-            if(decode_tab){
-                if(head[i] == '\t'){
-                    for(int k = 0; k < appGlobalConfig.tabSpacing; k++){
-                        buffer->data[ic++] = '\t';
-                    }
-                }else if(head[i] != '\n'){
-                    buffer->data[ic++] = head[i];
-                }
-            }else{
-                if(head[i] != '\n'){
-                    buffer->data[ic++] = head[i];
-                }
+            if(head[i] != '\n'){
+                buffer->data[ic++] = head[i];
             }
         }
     }
@@ -593,18 +576,10 @@ void Buffer_RemoveRange(Buffer *buffer, uint u8start, uint u8end){
     }
 }
 
-uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
-                              uint len, int decode_tab)
-{
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len){
     uint ic = 0;
     uint osize = len;
     if(len > 0){
-        if(decode_tab){
-            for(uint i = 0; i < osize; i++){
-                if(str[i] == '\t') len += appGlobalConfig.tabSpacing-1;
-            }
-        }
-
         if(buffer->data == nullptr){
             uint newSize = at + len + DefaultAllocatorSize;
             buffer->data = AllocatorGetN(char, newSize);
@@ -626,15 +601,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
         }
 
         for(uint i = 0; i < osize; i++){
-            char v = str[i];
-            if(decode_tab && v == '\t'){
-                for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
-                    buffer->data[at+ic] = v;
-                    ic++;
-                }
-            }
-
-            buffer->data[at+ic] = v;
+            buffer->data[at+ic] = str[i];
             ic++;
         }
 
@@ -654,9 +621,9 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
     return ic;
 }
 
-uint Buffer_InsertStringAt(Buffer *buffer, uint rap, char *str, uint len, int decode_tab){
+uint Buffer_InsertStringAt(Buffer *buffer, uint rap, char *str, uint len){
     uint at = Buffer_Utf8PositionToRawPosition(buffer, rap);
-    return Buffer_InsertRawStringAt(buffer, at, str, len, decode_tab);
+    return Buffer_InsertRawStringAt(buffer, at, str, len);
 }
 
 void Buffer_Release(Buffer *buffer){
@@ -759,7 +726,7 @@ uint LineBuffer_InsertRawText(LineBuffer *lineBuffer, char *text, uint size){
                                       u8offset, &dummy, 1);
 }
 
-void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int decode_tab){
+void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size){
     AssertA(lineBuffer != nullptr, "Invalid line initialization");
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
@@ -774,7 +741,7 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int de
         lineBuffer->size = newSize;
     }
     if(size > 0 && line)
-        Buffer_InitSet(lineBuffer->lines[lineBuffer->lineCount], line, size, decode_tab);
+        Buffer_InitSet(lineBuffer->lines[lineBuffer->lineCount], line, size);
     else
         Buffer_Init(lineBuffer->lines[lineBuffer->lineCount], DefaultAllocatorSize);
     lineBuffer->lineCount++;
@@ -818,9 +785,7 @@ void LineBuffer_MergeConsecutiveLines(LineBuffer *lineBuffer, uint base){
     }
 }
 
-void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
-                             uint size, int decode_tab)
-{
+void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint size){
     Buffer *Li = nullptr;
     // make sure we can hold at least one more line
     if(!(lineBuffer->lineCount < lineBuffer->size)){
@@ -857,7 +822,7 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
     }
 
     if(line && size > 0)
-        Buffer_InitSet(Li, line, size, decode_tab);
+        Buffer_InitSet(Li, line, size);
     else
         Buffer_Init(Li, DefaultAllocatorSize);
     lineBuffer->lineCount++;
@@ -926,7 +891,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     TokenizerStateContext tokenizerContext;
     Lex_TokenizerGetCurrentState(tokenizer, &tokenizerContext);
 
-    LineBuffer_InsertLine(lineBuffer, *p, size-1, 1);
+    LineBuffer_InsertLine(lineBuffer, *p, size-1);
     workContext->workTokenListHead = 0;
 
     Lex_TokenizerPrepareForNewLine(tokenizer, lineNr-1);
@@ -1144,7 +1109,7 @@ void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
             if(line.ctype == GIT_LINE_REMOVED){
                 n += rems;
                 LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
-                                        line.content.size(), 1);
+                                        line.content.size());
                 adds += 1;
                 //p = "-";
             }else if(line.ctype == GIT_LINE_INSERTED){
@@ -1442,7 +1407,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             //Buffer *buffer = lineBuffer->lines[base];
             text[proc] = 0;
             lastBuffer = lineBuffer->lines[base];
-            Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, 1);
+            Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize);
             //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
             if(pp < 0){
                 uint rpos = Buffer_Utf8PositionToRawPosition(lastBuffer, at);
@@ -1468,7 +1433,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     // If we did not finish at '\n' than manually copy the missing content
     if(lineSize > 0){
         lastBuffer = lineBuffer->lines[base];
-        uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, 1);
+        uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize);
         Buffer_Claim(lastBuffer);
         at += n;
         //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
@@ -1482,7 +1447,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             // if we inserted a new line than this must be copied to the final buffer
             at = lastBuffer->taken;
             Buffer_InsertRawStringAt(lastBuffer, lastBuffer->taken,
-                                     &firstLine[firstP], toCopy, 0);
+                                     &firstLine[firstP], toCopy);
             Buffer_Claim(lastBuffer);
         }
     }
@@ -1517,7 +1482,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
 
 void LineBuffer_InitEmpty(LineBuffer *lineBuffer){
     LineBuffer_InitBlank(lineBuffer);
-    LineBuffer_InsertLine(lineBuffer, nullptr, 0, 1);
+    LineBuffer_InsertLine(lineBuffer, nullptr, 0);
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, 0);
     Lex_TokenizerContextEmpty(&buffer->stateContext);
 }
@@ -1647,12 +1612,6 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
                 size += DefaultAllocatorSize;
             }
             data[ic++] = *p;
-            if(*p == '\t'){
-                for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
-                    p++; c++;
-                    AssertA(*p == '\t', "Incorrect line tab configuration");
-                }
-            }
             AssertA(*p != '\n', "Invalid line configuration {break point}");
             p++; c++;
         }
@@ -1780,12 +1739,6 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
 
         while(taken > c && process){
             linePtr[ic++] = *ptr;
-            if(*ptr == '\t'){
-                for(int k = 0; k < appGlobalConfig.tabSpacing-1; k++){
-                    ptr++; c++;
-                    AssertA(*ptr == '\t', "Incorrect line tab configuration");
-                }
-            }
             AssertA(*ptr != '\n', "Invalid line configuration {break point}");
             ptr++; c++;
         }

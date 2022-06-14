@@ -122,25 +122,22 @@ uint Buffer_FindFirstNonEmptyLocation(Buffer *buffer);
 * Initializes a previously allocated Buffer from a string pointer given in 'head'
 * with size 'len'.
 */
-void Buffer_InitSet(Buffer *buffer, char *head, uint len, int decode_tab);
+void Buffer_InitSet(Buffer *buffer, char *head, uint len);
 
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
-* and must have length 'len'. If you are copying raw data to this buffer and needs 
-* the issue of tab x spacing handled use decode_tab = 1. The position 'at' is a UTF-8
+* and must have length 'len'. The position 'at' is a UTF-8
 * encoded position. Returns the amount of bytes actually inserted after tab expansion.
 */
-uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, int decode_tab=0);
+uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len);
 
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
 * and must have length 'len'. This function receives the 'at' position in raw bytes, you
-* must know where is correct to start the writing in the buffer. Use 'decode_tab' = 0
-* to not perform tab expansion, i.e.: the string was already expanded, or 1 to perform
-* tab expansion. Returns the amount of bytes actually inserted after tab expansion.
+* must know where is correct to start the writing in the buffer.
+* Returns the amount of bytes actually inserted after tab expansion.
 */
-uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str,
-                              uint len, int decode_tab=0);
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len);
 
 /*
 * Updates the curret token list inside the buffer given. This function copies
@@ -278,14 +275,13 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
 * Inserts a new line at the end of the LineBuffer. The line is specified by its contents
 * in 'line' with size 'size'.
 */
-void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size, int decode_tab);
+void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size);
 
 /*
 * Inserts a new line at a position 'at' of the LineBuffer. The line is 
 * specified by its contents in 'line' with size 'size'.
 */
-void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line,
-                             uint size, int decode_tab);
+void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint size);
 
 /*
 * Inserts a (possible) multiline UTF-8 text at position 'at'. Returns the amount

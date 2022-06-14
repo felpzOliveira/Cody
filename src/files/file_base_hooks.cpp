@@ -41,7 +41,7 @@ static void CppHeaderCreate(LineBuffer *lineBuffer, Tokenizer *tokenizer){
     ss << " */";
 
     std::string str = ss.str();
-    LineBuffer_InsertLineAt(lineBuffer, 0, (char *)str.c_str(), str.size(), 0);
+    LineBuffer_InsertLineAt(lineBuffer, 0, (char *)str.c_str(), str.size());
     LineBuffer_ReTokenizeFromBuffer(lineBuffer, tokenizer, 0, 0);
 }
 

@@ -18,7 +18,7 @@ LineBuffer *GitBuffer_GetLineBuffer(){
 void GitBuffer_PushLine(char *line, uint size){
     if(gitBuffer.base){
         uint start = gitBuffer.base->lineCount-1;
-        LineBuffer_InsertLineAt(gitBuffer.base, start, line, size, 1);
+        LineBuffer_InsertLineAt(gitBuffer.base, start, line, size);
         LineBuffer_FastTokenGen(gitBuffer.base, start, 1);
     }
 }

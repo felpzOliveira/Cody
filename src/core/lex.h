@@ -72,7 +72,7 @@ typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
 #define TOKEN_INITIALIZER {.size = 0, .position = 0, .identifier = TOKEN_ID_NONE}
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
 #define TOKENIZER_CONTEXT_INITIALIZER {.entry = nullptr, .lookup = nullptr}
-#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .tabSpacing = 1, .fetcher = nullptr, .lastToken = TOKEN_INITIALIZER, .procStack = nullptr }
+#define TOKENIZER_INITIALIZER {.contexts = nullptr, .contextCount = 0, .unfinishedContext = -1, .linePosition = -1, .lineBeginning = 0, .fetcher = nullptr, .lastToken = TOKEN_INITIALIZER, .procStack = nullptr }
 
 struct Token;
 struct TokenizerContext;
@@ -209,7 +209,6 @@ struct Tokenizer{
     int linePosition;
     int lineBeginning;
     int autoIncrementor;
-    int tabSpacing;
     TokenizerFetchCallback *fetcher;
     Token lastToken;
     BoundedStack *procStack;
@@ -263,7 +262,7 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
 /*
 * Builds a tokenizer from default tables.
 */
-void Lex_BuildTokenizer(Tokenizer *tokenizer, int tabSpacing, SymbolTable *symTable,
+void Lex_BuildTokenizer(Tokenizer *tokenizer, SymbolTable *symTable,
                         std::vector<std::vector<std::vector<GToken>> *> refTables,
                         TokenizerSupport *support);
 

@@ -68,7 +68,7 @@ int AutoComplete_Search(char *value, uint valuelen, SelectableList *list){
     LineBuffer_InitBlank(lineBuffer);
     auto push_wd = [&](char *buf, uint len, Trie *) -> void{
         if(len != valuelen)
-            LineBuffer_InsertLine(lineBuffer, buf, len, 0);
+            LineBuffer_InsertLine(lineBuffer, buf, len);
     };
 
     Trie_Search(&autoComplete.root, value, valuelen, push_wd);

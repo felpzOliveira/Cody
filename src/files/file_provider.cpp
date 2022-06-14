@@ -32,48 +32,38 @@ static void InitTokenizers(){
     //           this might be tricky, but might be the standard other editors do.
 
     // C/C++
-    Lex_BuildTokenizer(&fProvider.cppTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
-                       &cppSupport);
+    Lex_BuildTokenizer(&fProvider.cppTokenizer, &fProvider.symbolTable,
+                       {&cppReservedPreprocessor, &cppReservedTable}, &cppSupport);
 
-    Lex_BuildTokenizer(&fProvider.cppDetachedTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cppReservedPreprocessor, &cppReservedTable},
-                       &cppSupport);
+    Lex_BuildTokenizer(&fProvider.cppDetachedTokenizer, &fProvider.symbolTable,
+                       {&cppReservedPreprocessor, &cppReservedTable}, &cppSupport);
 
     // GLSL
-    Lex_BuildTokenizer(&fProvider.glslTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
-                       &glslSupport);
+    Lex_BuildTokenizer(&fProvider.glslTokenizer, &fProvider.symbolTable,
+                       {&glslReservedPreprocessor, &glslReservedTable}, &glslSupport);
 
-    Lex_BuildTokenizer(&fProvider.glslDetachedTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&glslReservedPreprocessor, &glslReservedTable},
-                       &glslSupport);
+    Lex_BuildTokenizer(&fProvider.glslDetachedTokenizer, &fProvider.symbolTable,
+                       {&glslReservedPreprocessor, &glslReservedTable}, &glslSupport);
     // LIT
-    Lex_BuildTokenizer(&fProvider.litTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
-                       &litSupport);
+    Lex_BuildTokenizer(&fProvider.litTokenizer, &fProvider.symbolTable,
+                       {&litReservedPreprocessor, &litReservedTable}, &litSupport);
 
-    Lex_BuildTokenizer(&fProvider.litDetachedTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&litReservedPreprocessor, &litReservedTable},
-                       &litSupport);
+    Lex_BuildTokenizer(&fProvider.litDetachedTokenizer, &fProvider.symbolTable,
+                       {&litReservedPreprocessor, &litReservedTable}, &litSupport);
 
     // Empty
-    Lex_BuildTokenizer(&fProvider.emptyTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
-                       &noneSupport);
+    Lex_BuildTokenizer(&fProvider.emptyTokenizer, &fProvider.symbolTable,
+                       {&noneReservedPreprocessor, &noneReservedTable}, &noneSupport);
 
-    Lex_BuildTokenizer(&fProvider.emptyDetachedTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&noneReservedPreprocessor, &noneReservedTable},
-                       &noneSupport);
+    Lex_BuildTokenizer(&fProvider.emptyDetachedTokenizer, &fProvider.symbolTable,
+                       {&noneReservedPreprocessor, &noneReservedTable}, &noneSupport);
 
     // Cmake
-    Lex_BuildTokenizer(&fProvider.cmakeTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cmakeReservedPreprocessor, &cmakeReservedTable},
-                       &cmakeSupport);
+    Lex_BuildTokenizer(&fProvider.cmakeTokenizer, &fProvider.symbolTable,
+                       {&cmakeReservedPreprocessor, &cmakeReservedTable}, &cmakeSupport);
 
-    Lex_BuildTokenizer(&fProvider.cmakeDetachedTokenizer, appGlobalConfig.tabSpacing,
-                       &fProvider.symbolTable, {&cmakeReservedPreprocessor, &cmakeReservedTable},
-                       &cmakeSupport);
+    Lex_BuildTokenizer(&fProvider.cmakeDetachedTokenizer, &fProvider.symbolTable,
+                       {&cmakeReservedPreprocessor, &cmakeReservedTable}, &cmakeSupport);
 }
 
 void FileProvider_Initialize(){
