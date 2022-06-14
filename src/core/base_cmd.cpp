@@ -13,10 +13,15 @@
 #include <graphics.h>
 #include <storage.h>
 
+struct CmdInformation{
+    std::string help;
+    std::function<int(char *, uint, View *)> fn;
+};
+
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
 static std::map<std::string, std::string> mathSymbolMap;
-static std::map<std::string, std::function<int(char *, uint, View *)>> cmdMap;
+static std::map<std::string, CmdInformation> cmdMap;
 
 struct QueriableSearchResult{
     std::vector<GlobalSearchResult> res;
@@ -579,6 +584,30 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
     return r;
 }
 
+int BaseCommand_PathCompression(char *cmd, uint size, View *){
+    int r = 1;
+    uint len = 0;
+    bool negative = false;
+    char *arg = StringNextWord(cmd, size, &len);
+    char *ptr = arg;
+    uint val = 0;
+    if(*arg == '-' && len > 1){
+        ptr = &arg[1];
+        negative = true;
+        len -= 1;
+    }
+
+    if(StringIsDigits(ptr, len)){
+        val = StringToUnsigned(ptr, len);
+    }else{
+        return r;
+    }
+
+    int pick = negative ? -val : val;
+    AppSetPathCompression(pick);
+    return r;
+}
+
 int BaseCommand_DbgStart(char *cmd, uint size, View *view){
     int r = 1;
     char pmax[PATH_MAX];
@@ -719,24 +748,25 @@ int BaseCommand_CursorSegmentToogle(char *, uint, View *){
 }
 
 void BaseCommand_InitializeCommandMap(){
-    cmdMap[CMD_DIMM_STR] = BaseCommand_SetDimm;
-    cmdMap[CMD_KILLSPACES_STR] = BaseCommand_KillSpaces;
-    cmdMap[CMD_SEARCH_STR] = BaseCommand_SearchAllFiles;
-    cmdMap[CMD_FUNCTIONS_STR] = BaseCommand_SearchFunctions;
-    cmdMap[CMD_GIT_STR] = BaseCommand_Git;
-    cmdMap[CMD_HSPLIT_STR] = BaseCommand_Hsplit;
-    cmdMap[CMD_VSPLIT_STR] = BaseCommand_Vsplit;
-    cmdMap[CMD_EXPAND_STR] = BaseCommand_ExpandRestore;
-    cmdMap[CMD_KILLVIEW_STR] = BaseCommand_KillView;
-    cmdMap[CMD_KILLBUFFER_STR] = BaseCommand_KillBuffer;
-    cmdMap[CMD_DBG_START_STR] = BaseCommand_DbgStart;
-    cmdMap[CMD_DBG_BREAK_STR] = BaseCommand_DbgBreak;
-    cmdMap[CMD_DBG_EXIT_STR] = BaseCommand_DbgExit;
-    cmdMap[CMD_DBG_RUN_STR] = BaseCommand_DbgRun;
-    cmdMap[CMD_DBG_FINISH_STR] = BaseCommand_DbgFinish;
-    cmdMap[CMD_DBG_EVALUATE_STR] = BaseCommand_DbgEvaluate;
-    cmdMap[CMD_CURSORSEG_STR] = BaseCommand_CursorSegmentToogle;
-    cmdMap[CMD_CURSORSET_STR] = BaseCommand_CursorSetFormat;
+    cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
+    cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
+    cmdMap[CMD_SEARCH_STR] = {CMD_SEARCH_HELP, BaseCommand_SearchAllFiles};
+    cmdMap[CMD_FUNCTIONS_STR] = {CMD_FUNCTIONS_HELP, BaseCommand_SearchFunctions};
+    cmdMap[CMD_GIT_STR] = {CMD_GIT_HELP, BaseCommand_Git};
+    cmdMap[CMD_HSPLIT_STR] = {CMD_HSPLIT_HELP, BaseCommand_Hsplit};
+    cmdMap[CMD_VSPLIT_STR] = {CMD_VSPLIT_HELP, BaseCommand_Vsplit};
+    cmdMap[CMD_EXPAND_STR] = {CMD_EXPAND_HELP, BaseCommand_ExpandRestore};
+    cmdMap[CMD_KILLVIEW_STR] = {CMD_KILLVIEW_HELP, BaseCommand_KillView};
+    cmdMap[CMD_KILLBUFFER_STR] = {CMD_KILLBUFFER_HELP, BaseCommand_KillBuffer};
+    cmdMap[CMD_DBG_START_STR] = {CMD_DBG_START_HELP, BaseCommand_DbgStart};
+    cmdMap[CMD_DBG_BREAK_STR] = {CMD_DBG_BREAK_HELP, BaseCommand_DbgBreak};
+    cmdMap[CMD_DBG_EXIT_STR] = {CMD_DBG_EXIT_HELP, BaseCommand_DbgExit};
+    cmdMap[CMD_DBG_RUN_STR] = {CMD_DBG_RUN_HELP, BaseCommand_DbgRun};
+    cmdMap[CMD_DBG_FINISH_STR] = {CMD_DBG_FINISH_HELP, BaseCommand_DbgFinish};
+    cmdMap[CMD_DBG_EVALUATE_STR] = {CMD_DBG_EVALUATE_HELP, BaseCommand_DbgEvaluate};
+    cmdMap[CMD_CURSORSEG_STR] = {CMD_CURSORSEG_HELP, BaseCommand_CursorSegmentToogle};
+    cmdMap[CMD_CURSORSET_STR] = {CMD_CURSORSET_HELP, BaseCommand_CursorSetFormat};
+    cmdMap[CMD_PATH_COMPRESSION_STR] = {CMD_PATH_COMPRESSION_HELP, BaseCommand_PathCompression};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
@@ -754,10 +784,11 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
             std::string val = it->first;
             char *ptr = (char *)val.c_str();
             if(StringStartsWith(cmd, size, ptr, Min(size, val.size()))){
+                CmdInformation cmdInfo = it->second;
                 /* commands that are explicitly typed should be added to history */
                 QueryBar *targetBar = View_GetQueryBar(view);
                 QueryBar_EnableInputToHistory(targetBar);
-                rv = it->second(cmd, size, view);
+                rv = cmdInfo.fn(cmd, size, view);
                 return rv;
             }
         }

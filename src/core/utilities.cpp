@@ -456,11 +456,11 @@ int ExtensionStringContains(const char *string, const char *extensions){
     return 1;
 }
 
-void StringSplit(std::string s, std::vector<std::string> &output){
+void StringSplit(std::string s, std::vector<std::string> &output, char value){
     std::string val;
     bool on_space = false;
     for(uint i = 0; i < s.size(); i++){
-        if(s[i] == ' '){
+        if(s[i] == value){
             if(!on_space){
                 on_space = true;
                 if(val.size() > 0){

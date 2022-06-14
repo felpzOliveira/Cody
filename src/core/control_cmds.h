@@ -30,3 +30,7 @@ void ControlCommands_RestoreExpand();
 */
 void ControlCommands_SwapExpand();
 
+/*
+* Queries to check if the view is currently expanded or not.
+*/
+int ControlCommands_IsExpanded();

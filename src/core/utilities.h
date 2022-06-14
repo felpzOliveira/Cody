@@ -142,7 +142,7 @@ bool StringStartsWithInteger(std::string str);
 /*
 * Split a string into a list of string, splits based on space.
 */
-void StringSplit(std::string s0, std::vector<std::string> &splitted);
+void StringSplit(std::string s0, std::vector<std::string> &splitted, char value=' ');
 
 /*
 * Trims a string.

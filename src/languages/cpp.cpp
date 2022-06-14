@@ -220,7 +220,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "new", .identifier = TOKEN_ID_OPERATOR },
         { .value = "and", .identifier = TOKEN_ID_OPERATOR }, },
     {
-        { .value = "elif", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "elif", .identifier = TOKEN_ID_PREPROCESSOR_IF },
         { .value = "FILE", .identifier = TOKEN_ID_DATATYPE },
         { .value = "dim3", .identifier = TOKEN_ID_DATATYPE },
         { .value = "this", .identifier = TOKEN_ID_OPERATOR },
@@ -229,7 +229,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
         { .value = "NULL", .identifier = TOKEN_ID_OPERATOR },
         { .value = "case", .identifier = TOKEN_ID_OPERATOR },
         { .value = "true", .identifier = TOKEN_ID_OPERATOR },
-        { .value = "else", .identifier = TOKEN_ID_PREPROCESSOR },
+        { .value = "else", .identifier = TOKEN_ID_PREPROCESSOR_IF },
         { .value = "line", .identifier = TOKEN_ID_PREPROCESSOR },
         { .value = "goto", .identifier = TOKEN_ID_OPERATOR },
         { .value = "bool", .identifier = TOKEN_ID_DATATYPE },

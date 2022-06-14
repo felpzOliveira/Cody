@@ -370,6 +370,44 @@ void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len){
     *len = queryBar->buffer.taken - queryBar->writePos;
 }
 
+uint QueryBar_GetRenderContent(QueryBar *queryBar, std::string &str){
+    std::vector<std::string> splitted;
+    char *content = nullptr;
+    uint contentLen = 0;
+    uint diff = 0;
+    int compression = AppGetPathCompression();
+    QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
+
+    if(compression < 0){
+        str = std::string(content, contentLen);
+        return 0;
+    }
+
+    std::string possiblePaths;
+    for(uint i = 0; i < contentLen; i++){
+        if(content[i] != ' '){
+            possiblePaths = std::string(&content[i], contentLen-i);
+            break;
+        }
+    }
+
+    StringSplit(possiblePaths, splitted, '/');
+    if((int)splitted.size() > compression){
+        bool is_folder = content[contentLen-1] == '/';
+        str = " ../";
+        for(uint i = splitted.size()-compression-1; i < splitted.size(); i++){
+            str += splitted[i];
+            if(i < splitted.size() - 1) str += "/";
+        }
+        if(is_folder) str += "/";
+        diff = contentLen - str.size();
+    }else{
+        str = std::string(content, contentLen);
+    }
+
+    return diff;
+}
+
 void QueryBar_GetTitle(QueryBar *queryBar, char **ptr, uint *len){
     AssertA(queryBar != nullptr && ptr != nullptr && len != nullptr,
             "Invalid QueryBar pointer");

@@ -40,6 +40,8 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size, void *){
     ViewTree_Begin(&iterator);
 
     if(StringIsDigits(utf8Data, utf8Size)){
+        if(ControlCommands_IsExpanded()) return;
+
         bool swapped = false;
         uint index = StringToUnsigned(utf8Data, utf8Size);
         int id = -1;
@@ -101,6 +103,10 @@ void ControlCmdsRestoreCurrent(){
         ViewTree_ExpandRestore();
         FinishEvent();
     }
+}
+
+int ControlCommands_IsExpanded(){
+    return controlCmds.is_expanded;
 }
 
 static void ControlCmdsHandleExpandRestore(int yield=1){

@@ -8,6 +8,7 @@
 #include <parallel.h>
 #include <storage.h>
 #include <sstream>
+#include <log.h>
 
 #define MODULE_NAME "Buffer"
 
@@ -224,7 +225,6 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
     return rawp;
 }
 
-//TODO: Review, this might be showing some issues with lexer
 uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
     if(!(rawp <= buffer->taken)){
         BUG();
@@ -1144,7 +1144,7 @@ void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
             if(line.ctype == GIT_LINE_REMOVED){
                 n += rems;
                 LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
-                line.content.size(), 1);
+                                        line.content.size(), 1);
                 adds += 1;
                 //p = "-";
             }else if(line.ctype == GIT_LINE_INSERTED){
@@ -1366,7 +1366,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     * Algorithm: We need to insert a possible multi-line text at a given position.
     * We need to get the content from the position forward in the buffer. Move all
     * the buffers bellow to the amount of lines inserted. Add the first line to the
-    * of the original buffer, insert the rest of the lines and finally the original
+    * the original buffer, insert the rest of the lines and finally the original
     * text from the position. Because we will make multiple line movements
     * it is faster if we directly move the buffers than to perform line insertion
     * with 'LineBuffer_InsertLineAt'.
@@ -1700,17 +1700,47 @@ vec2i LineBuffer_GetActiveBuffer(LineBuffer *lineBuffer){
     return lineBuffer->activeBuffer;
 }
 
+static bool saveDispatchRunning = false;
 void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     if(lineBuffer->filePathSize < 1){
         printf("Skipping un-writtable linebuffer\n");
         return;
     }
 
+    StorageDevice *storage = FetchStorageDevice();
+    const long pollTimeout = 100;
+    long timeTaken = 0;
+
+    // Whenever we save remotely we need to make sure that any previous
+    // writes are complete because the server is not asynchronous. And if
+    // connection is slow it might happen that dispatching another save
+    // will corrupt the first one because dispatching spawns a different
+    // thread and the dispatching routine shares host dispatchers based on the
+    // the type of dispatch that is happening. So I'll wait at most 2 seconds
+    // to see if any previous dispatches finishes, if not we have no choice but
+    // to refuse this write and force the user to request again later.
+
+    // TODO: It might be worth to store the time the dispatch was made
+    //       to make sure this is indeed a dispatch running and not a bug.
+    //       However attempting to detect a slow connection/bug on socket
+    //       is very tricky.
+    if(!storage->IsLocallyStored()){
+        while(saveDispatchRunning && timeTaken < 2000){
+            std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
+            timeTaken += pollTimeout;
+        }
+
+        if(saveDispatchRunning){
+            LOG_ERR("Cannot save file, dispatch still running. Retry later.");
+            lineBuffer->is_dirty = 1;
+            return;
+        }
+    }
+
     FileHandle file;
     // using a std::sttringstream for buffering the content
     // is better for remote usage
     std::stringstream ss;
-    StorageDevice *storage = FetchStorageDevice();
     uint lines = lineBuffer->lineCount;
     if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
         printf("Could not open file %s in current storage device\n",
@@ -1783,12 +1813,14 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
             std::string localStr = v;
             FileHandle localFile = file;
             StorageDevice *localStorage = storage;
+            saveDispatchRunning = true;
 
             dispatcher->DispatchHost();
 
             localStorage->StreamWriteBytes(&localFile, (void *)localStr.c_str(),
                                            1, localStr.size());
             localStorage->StreamFinish(&localFile);
+            saveDispatchRunning = false;
         });
     }else{
         storage->StreamWriteBytes(&file, (void *)v.c_str(), 1, v.size());

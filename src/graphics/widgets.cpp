@@ -8,6 +8,7 @@
 #include <buffers.h>
 #include <iostream>
 
+/* Button widget constants */
 uint ButtonWidget::kWidth  = 92;
 uint ButtonWidget::kHeight = 32;
 Float ButtonWidget::kScaleUp = 1.1;
@@ -22,6 +23,9 @@ uint ButtonWidget::kAllEdgesMask   = ButtonWidget::kLeftEdgeMask |
                                      ButtonWidget::kTopEdgeMask  |
                                      ButtonWidget::kBottonEdgeMask;
 
+/* Text widget constants */
+uint TextWidget::kAlignLeft   = (1 << 0);
+uint TextWidget::kAlignCenter = (1 << 1);
 
 
 void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
@@ -78,7 +82,7 @@ void WidgetWindowOnPress(int x, int y, void *priv){
         Float xs = ((Float)(x - geo.lower.x)) / w;
         Float ys = ((Float)(y - geo.lower.y)) / h;
         bool inside = ((xs >= dragRegionX.x && xs <= dragRegionX.y) &&
-                       (ys >= dragRegionY.x && ys <= dragRegionY.y));
+        (ys >= dragRegionY.x && ys <= dragRegionY.y));
         if(inside){
             ww->lastMotion->isDragging = true;
             ww->lastMotion->dragStart = vec2ui(x, y);
@@ -116,7 +120,7 @@ void WidgetWindowOnMotion(int x, int y, void *priv){
         Float nx = ox + dx, ux = nx + w;
         Float ny = oy + dy, uy = ny + h;
         if(((nx >= 0 && nx <= mw) && (ux >= 0 && ux <= mw) &&
-           (ny >= 0 && ny <= mh) && (uy >= 0 && uy <= mh)) || true)
+        (ny >= 0 && ny <= mh) && (uy >= 0 && uy <= mh)) || true)
         {
             bool overlaps = false;
             geo.lower = vec2ui(nx, ny);
@@ -568,10 +572,10 @@ ButtonWidget::ButtonWidget(std::string val) : Widget(){
     transitionStyle.type = WIDGET_TRANSITION_SCALE;
 }
 
-void ButtonWidget::PreferredGeometry(vec2f center, Geometry parentGeo){
+void ButtonWidget::PreferredGeometry(vec2f point, Geometry parentGeo){
     Float w = parentGeo.upper.x - parentGeo.lower.x;
     Float h = parentGeo.upper.y - parentGeo.lower.y;
-    Float ux = w * center.x, uy = h * center.y;
+    Float ux = w * point.x, uy = h * point.y;
     uint x0 = parentGeo.lower.x + ux - ButtonWidget::kWidth / 2.0;
     uint x1 = parentGeo.lower.x + ux + ButtonWidget::kWidth / 2.0;
     uint y0 = parentGeo.lower.y + uy - ButtonWidget::kHeight / 2.0;
@@ -737,7 +741,7 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
         Graphics_ComputeTransformsForFontSize(font, fSize, &model);
         Graphics_PrepareTextRendering(font, &gl->projection, &model);
         vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(),
-                                                 text.size(), &geometry, true);
+                                                text.size(), &geometry, true);
 
         p = transform.Point(p + vec2f(xoff, 0));
         vec4i color(255);
@@ -759,6 +763,7 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
     if(paint.valid){
         paint.paintFn(wctx, transform, geometry);
     }
+
     return 0;
 }
 
@@ -803,6 +808,54 @@ int ImageTextureWidget::OnRender(WidgetRenderContext *wctx, const Transform &tra
     OpenGLState *gl = wctx->state;
     PushImageIntoState(wctx, textureId, geometry, transform);
     Graphics_ImageFlush(gl, &parent->quadImageBuffer);
+    return 0;
+}
+
+/*********************************/
+// Text widget
+/*********************************/
+int TextWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform){
+    OpenGLState *gl = wctx->state;
+    WidgetWindow *parent = wctx->window;
+    OpenGLFont *font = &parent->font;
+    FontMath fMath = font->fontMath;
+    Shader shader = gl->buttonShader;
+    Float ypos = 0;
+    Float px = ((Float)(geometry.upper.x - geometry.lower.x));
+    Float py = ((Float)(geometry.upper.y - geometry.lower.y)) / lineOffset;
+    if((Float)lines.size() > lineOffset){
+        py = ((Float)(geometry.upper.y - geometry.lower.y)) / (Float)lines.size();
+    }
+
+    vec2f upper(geometry.upper.x - geometry.lower.x, geometry.upper.y - geometry.lower.y);
+    upper *= font->fontMath.invReduceScale;
+
+    ActivateShaderAndProjections(shader, gl, transform);
+
+    Transform model;
+    Graphics_ComputeTransformsForFontSize(font, fontSize, &model);
+    model = model * transform;
+
+    Graphics_PrepareTextRendering(font, &gl->projection, &model);
+    for(std::string &str : lines){
+        Geometry geo;
+        int pGlyph = -1;
+        geo.lower = vec2f(0, ypos);
+        geo.upper = vec2f(px, ypos + py);
+        if(str.size() > 0){
+            uint size = str.size();
+            char *text = (char *)str.c_str();
+            vec2f p = Graphics_ComputeCenteringStart(font, text, size, &geo);
+            if(alignment & TextWidget::kAlignLeft){
+                p.x = 0;
+            }
+            Graphics_PushText(font, p.x, p.y, text, size, color, &pGlyph);
+        }
+        ypos += py;
+    }
+
+    Graphics_FlushText(font);
+    font->fontMath = fMath;
     return 0;
 }
 
@@ -899,7 +952,7 @@ int TextTableWidget::OnRender(WidgetRenderContext *wctx, const Transform &transf
             Float y0 = (ypos-thick2) * font->fontMath.invReduceScale;
             Float y1 = (ypos+thick2) * font->fontMath.invReduceScale;
             Graphics_QuadPush(&parent->quadBuffer, vec2ui(0, y0),
-                              vec2ui(upper.x, y1), col);
+            vec2ui(upper.x, y1), col);
         }
 
         ypos += py;
@@ -982,57 +1035,5 @@ int ScrollableWidget::OnRender(WidgetRenderContext *wctx, const Transform &){
         animating |= widget->UnprojectedRender(wctx);
     }
     return animating;
-}
-
-PopupWindow::PopupWindow() : WidgetWindow(800, 400, "Popup!")
- //WidgetWindow((WindowX11 *)Graphics_GetBaseWindow(), AppGetFreetypingBinding(), vec2f(200, 150), vec2f(1000, 550))
-{
-    WidgetStyle s0;
-    int off = 0;
-    OpenGLState *state = Graphics_GetGlobalContext();
-    uint tid0 = 0, tid1 = 0;
-
-    tid0 = Graphics_FetchTextureFor(state, FILE_EXTENSION_CUDA, &off);
-    tid1 = Graphics_FetchTextureFor(state, FILE_EXTENSION_LIT, &off);
-
-    //b0.SetText("B0");
-    b1.SetText("B1");
-    b0.SetTextureId(tid0);
-
-    Geometry geometry = WidgetWindow::GetGeometry();
-    b0.PreferredGeometry(vec2f(0.3, .24), geometry);
-    b1.PreferredGeometry(vec2f(0.7, .24), geometry);
-
-    image.SetGeometry(geometry, vec2f(0.0, 0.4), vec2f(0.5, 0.9));
-    image.SetTextureId(tid1);
-
-    timage.SetGeometry(geometry, vec2f(0.3, 0.95), vec2f(0.5, 0.9));
-    timage.SetTextureId(tid1);
-
-    tbutton.SetText("SCButton!");
-    tbutton.SetGeometry(geometry, vec2f(0.3, 0.95), vec2f(0.5, 0.9));
-    tbutton.SetTextureId(tid0);
-
-    int nrows = 3;
-    int ncols = 4;
-    tt.SetColumns(ncols);
-    tt.SetGeometry(geometry, vec2f(0.3, 0.95), vec2f(0.4, 0.95));
-    tt.AddRows(nrows);
-
-    for(int i = 0; i < nrows; i++){
-        for(int j = 0; j < ncols; j++){
-            std::stringstream ss;
-            ss << "Item_" << i << "_" << j;
-            tt.SetItem(ss.str(), i, j);
-        }
-    }
-
-    sc.SetWidget(&tt);
-    sc.SetGeometry(geometry, vec2f(0.3, 0.95), vec2f(0.5, 0.9));
-
-    WidgetWindow::PushWidget(&image);
-    WidgetWindow::PushWidget(&b0);
-    WidgetWindow::PushWidget(&b1);
-    WidgetWindow::PushWidget(&sc);
 }
 

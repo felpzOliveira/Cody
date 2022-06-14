@@ -869,37 +869,38 @@ static void RPCClientChecker(RPCClient *client){
     int sock = linuxNet->sockfd;
     uint32_t val = RPC_COMMAND_PING;
     std::vector<uint8_t> out;
-    const long pollTimeout = 5000;
+    const long pollTimeout = 60000;
     client->checkerDone = false;
 
     while(client->checkerRunning){
         out.clear();
         {
+            LOG_INFO("Querying Server");
             std::lock_guard<std::mutex> guard(client->mutex);
             ProtocolError error = EncryptAndSend(sock, (uint8_t *)&val, sizeof(uint32_t));
             if(error != ProtocolError::NO_ERROR){
-                LOG_ERR("Connection error: " << GetNetworkError(error));
+                LOG_ERR("Connection error[1]: " << GetNetworkError(error));
                 // TODO: terminate application or warn user and than terminate
-                exit(0);
+                _Exit(0);
             }
 
             error = ReadAndDecrypt(sock, 0, out, MAX_TRANSPORT_LARGE_TIMEOUT_MS);
             if(error != ProtocolError::NO_ERROR){
-                LOG_ERR("Connection error: " << GetNetworkError(error));
+                LOG_ERR("Connection error[2]: " << GetNetworkError(error));
                 // TODO: terminate application or warn user and than terminate
-                exit(0);
+                _Exit(0);
             }
 
             if(out.size() != 1){
                 LOG_ERR("Got invalid response");
                 // TODO: terminate application or warn user and than terminate
-                exit(0);
+                _Exit(0);
             }
 
             if(out[0] != ACK){
                 LOG_ERR("Got invalid response, not ACK");
                 // TODO: terminate application or warn user and than terminate
-                exit(0);
+                _Exit(0);
             }
         }
 

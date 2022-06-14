@@ -19,6 +19,7 @@
 #include <dbgapp.h>
 #include <widgets.h>
 #include <dbgwidget.h>
+#include <popupwindow.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -323,8 +324,9 @@ Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
                 continue;
             }
 
-            if(v == '\t' || v == ' '){
-                x += fonsComputeStringAdvance(font->fsContext, " ", 1, &previousGlyph);
+            if(v == ' ' || v == '\t'){
+                x += fonsComputeStringAdvance(font->fsContext, (char *)&v, 1,
+                                              &previousGlyph);
                 pos ++;
                 continue;
             }
@@ -1377,6 +1379,7 @@ void OpenGLEntry(){
     Timing_Update();
 
     //_debugger_memory_usage();
+    //state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
 
     while(!WindowShouldCloseX11(state->window)){
         MakeContextX11(state->window);
@@ -1399,7 +1402,10 @@ void OpenGLEntry(){
 
         // render popups and other windows
         for(std::shared_ptr<WidgetWindow> &sww : state->widgetWindows){
-            animating |= sww.get()->DispatchRender(&wctx);
+            WidgetWindow *ptr = sww.get();
+            if(ptr){
+                animating |= ptr->DispatchRender(&wctx);
+            }
         }
 
         UpdateEventsAndHandleRequests(animating);

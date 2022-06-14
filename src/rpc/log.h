@@ -36,23 +36,28 @@ template<typename T> struct PartTrait { typedef T Type; };
 
 #define LOG(msg) Log(__FILE__, __LINE__, Part<bool, bool>() << msg)
 
-#define LOG_ERR(msg) LOG(COLOR_RED << "{" LOG_MODULE "} " << COLOR_NONE << msg)
-#define LOG_INFO(msg) LOG("{" LOG_MODULE "} " << msg)
-#define LOG_VERBOSE(msg) LOG(COLOR_BLUE << " - {" LOG_MODULE "} " << COLOR_NONE << msg)
+#if !defined(ENABLE_VERBOSE)
+    #define LOG_VERBOSE(msg) do{}while(0)
+#endif
+
+#if defined(LOG_MODULE)
+    #define LOG_ERR(msg) LOG(COLOR_RED << "{" LOG_MODULE "} " << COLOR_NONE << msg)
+    #define LOG_INFO(msg) LOG("{" LOG_MODULE "} " << msg)
+    #if !defined(LOG_VERBOSE)
+        #define LOG_VERBOSE(msg) LOG(COLOR_BLUE << " - {" LOG_MODULE "} " << COLOR_NONE << msg)
+    #endif
+#else
+    #define LOG_ERR(msg) LOG(COLOR_RED << COLOR_NONE << msg)
+    #define LOG_INFO(msg) LOG(msg)
+    #if !defined(LOG_VERBOSE)
+        #define LOG_VERBOSE(msg) LOG(msg)
+    #endif
+#endif
 
 inline std::string __GetTimeString(struct tm tmstruct, const char *fmt){
     char buffer[80];
     strftime(buffer, sizeof(buffer), fmt, &tmstruct);
     return std::string(buffer);
-}
-
-inline std::string CurrentTime(void){
-    time_t     now = time(0);
-    struct tm  tstruct;
-    char       buf[80];
-    tstruct = *localtime(&now);
-    strftime(buf, sizeof(buf), "%X", &tstruct);
-    return std::string(buf);
 }
 
 inline std::string LoggableCurrentTime(void){

@@ -8,8 +8,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(CODY_BUILD "Build the editor" ON)
 
-set (CMAKE_CXX_STANDARD 17)
-set (CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_BUILD_TYPE MATCHES Debug)
     message(STATUS "Debug build")
@@ -115,8 +115,5 @@ endif()
 
 add_executable(${SERVER} ${SV_SRCS})
 add_definitions(${MH_FLAGS})
-target_link_directories(${SERVER} PRIVATE
-                            ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2
-                            ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
 target_link_libraries(${SERVER} PRIVATE pthread)
 

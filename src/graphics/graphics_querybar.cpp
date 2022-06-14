@@ -23,6 +23,8 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
     OpenGLFont *font = &state->font;
     char *header = nullptr;
     uint headerLen = 0;
+    std::string headerstr;
+
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
@@ -35,12 +37,18 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
     Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
 
     QueryBar_GetTitle(bar, &header, &headerLen);
+    //QueryBar_GetRenderTitle(bar, headerstr);
+
     if(header){
         vec4i col = GetColor(theme, TOKEN_ID_NONE);
         _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph);
     }
 
-    QueryBar_GetWrittenContent(bar, &header, &headerLen);
+    //QueryBar_GetWrittenContent(bar, &header, &headerLen);
+    (void) QueryBar_GetRenderContent(bar, headerstr);
+    header = (char *)headerstr.c_str();
+    headerLen = headerstr.size();
+
     if(headerLen > 0 && header){
         vec4i col = GetColor(theme, TOKEN_ID_NONE);
         _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph);
@@ -101,13 +109,18 @@ static vec4f Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, ve
     int pGlyph = -1;
     int utf8Len = 1;
     int pUtf8Len = 1;
+    std::string headerstr;
     OpenGLFont *font = &state->font;
     Buffer *buffer = &bar->buffer;
     char *ptr = buffer->data;
     uint pos = bar->cursor.textPosition.y;
     int baseGlyph = -1;
 
+    uint diff = QueryBar_GetRenderContent(bar, headerstr);
+
     rawp = Buffer_Utf8PositionToRawPosition(buffer, pos-1, &utf8Len);
+    rawp -= diff;
+
     x0 = fonsComputeStringAdvance(state->font.fsContext, ptr, rawp+utf8Len, &pGlyph);
     x0 += 10;
 

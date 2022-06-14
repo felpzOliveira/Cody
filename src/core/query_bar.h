@@ -141,6 +141,13 @@ void QueryBar_EnableCursorJump(QueryBar *queryBar);
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len);
 
 /*
+* Returns the contents written into a QueryBar after title passed during
+* activation. This routine processes the contents and [possibly] simplifies
+* it for rendering purposes.
+*/
+uint QueryBar_GetRenderContent(QueryBar *queryBar, std::string &str);
+
+/*
 * Returns a accessor to the current title of a QueryBar. Length 'len' is returned
 * in bytes.
 */

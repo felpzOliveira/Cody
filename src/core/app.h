@@ -24,8 +24,10 @@ typedef enum{
 
 typedef struct{
     int tabSpacing;
+    int tabLength;
     int useTabs;
     int autoCompleteSize;
+    int pathCompression;
     std::string rootFolder;
     std::string configFile;
     std::string configFolder;
@@ -58,6 +60,8 @@ BindingMap *AppGetFreetypingBinding();
 * 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
 */
 int AppGetTabConfiguration(int *using_tab);
+
+int AppGetTabLength(int *using_tab);
 
 /*
 * Sets the style for rendering the cursor.
@@ -124,6 +128,22 @@ void AppSetBindingsForState(ViewState state, ViewType type=NoneView);
 * Gets cwd from app context.
 */
 char *AppGetContextDirectory();
+
+/*
+* Gets the path compression global configuration.
+* NOTE: This variable returns the amount by wich a path displayed in the query bar
+* should be reduced by. For example, if this value returns as 3, it means whenever
+* the query bar is displaying a path and it contains more than 3 folders in depth it will
+* be compressed to begin with '.../' instead of displaying the full path. Negative values
+* when returned mean to not perform any path compression.
+*/
+int AppGetPathCompression();
+
+/*
+* Sets the global configuration of path compression for the query bar.
+* See note on AppGetPathCompression to understand on how to set this value.
+*/
+void AppSetPathCompression(int value);
 
 /*
 * Computes the indentation level of the line given by buffer+1.

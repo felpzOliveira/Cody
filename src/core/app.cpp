@@ -115,6 +115,14 @@ bool App_IsStateWrite(){
     return !Dbg_IsRunning();
 }
 
+int AppGetPathCompression(){
+    return appGlobalConfig.pathCompression;
+}
+
+void AppSetPathCompression(int value){
+    appGlobalConfig.pathCompression = value;
+}
+
 void AppEarlyInitialize(bool use_tabs){
     View *view = nullptr;
     StorageDevice *storage = FetchStorageDevice();
@@ -122,7 +130,9 @@ void AppEarlyInitialize(bool use_tabs){
     // TODO: Configuration file
     // NOTE: Configuration must be done first as tab spacing
     //       needs to be defined before the lexer can correctly mount buffers
-    appGlobalConfig.tabSpacing = 4;
+    appGlobalConfig.tabSpacing = 1;
+    appGlobalConfig.tabLength = 4;
+    appGlobalConfig.pathCompression = -1;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
@@ -170,6 +180,14 @@ int AppGetTabConfiguration(int *using_tab){
     }
 
     return appGlobalConfig.tabSpacing;
+}
+
+int AppGetTabLength(int *using_tab){
+    if(using_tab){
+        *using_tab = appGlobalConfig.useTabs;
+    }
+
+    return appGlobalConfig.tabLength;
 }
 
 void AppAddStoredFile(std::string basePath){
@@ -942,8 +960,13 @@ void AppCommandInsertTab(){
     char spaces[16];
     int offset = 0;
 
-    Memset(spaces, appGlobalConfig.useTabs ? '\t' : ' ', appGlobalConfig.tabSpacing);
-    offset = appGlobalConfig.tabSpacing;
+    if(appGlobalConfig.useTabs){
+        offset = 1;
+        spaces[0] = '\t';
+    }else{
+        Memset(spaces, ' ', appGlobalConfig.tabLength);
+        offset = appGlobalConfig.tabLength;
+    }
 
     vec2i id = LineBuffer_GetActiveBuffer(bufferView->lineBuffer);
     if(id.x != (int)cursor.x || id.y != OPERATION_INSERT_CHAR){
@@ -953,7 +976,7 @@ void AppCommandInsertTab(){
                                    vec2i((int)cursor.x, OPERATION_INSERT_CHAR));
     }
 
-    Buffer_InsertStringAt(buffer, cursor.y, spaces, appGlobalConfig.tabSpacing);
+    Buffer_InsertStringAt(buffer, cursor.y, spaces, offset);
     RemountTokensBasedOn(bufferView, cursor.x);
 
     cursor.y += offset;
@@ -1003,14 +1026,16 @@ vec2ui AppCommandNewLine(BufferView *bufferView, vec2ui at){
 
     uint s = AppComputeLineIndentLevel(buffer, at.y);
     uint tid = Buffer_GetTokenAt(buffer, at.y);
-    len = appGlobalConfig.tabSpacing * s;
+    uint offset = appGlobalConfig.useTabs ? 1 : appGlobalConfig.tabLength;
+
+    len = offset * s;
 
     // consider the case where the next token is a brace close and the user want to
     // ignore the last indent level
     if(tid < buffer->tokenCount){
         if(buffer->tokens[tid].identifier == TOKEN_ID_BRACE_CLOSE){
-            if((int)len >= appGlobalConfig.tabSpacing){
-                len -= appGlobalConfig.tabSpacing;
+            if(len >= offset){
+                len -= offset;
             }
         }
     }
@@ -1511,6 +1536,7 @@ ViewNode *AppGetNextViewNode(){
 }
 
 void AppCommandSwapView(){
+    NullRet(!ControlCommands_IsExpanded());
     ViewNode *vnode = AppGetNextViewNode();
     if(vnode->view){
         if(BufferView_IsVisible(&vnode->view->bufferView)){
@@ -1746,7 +1772,7 @@ uint AppComputeLineIndentLevel(Buffer *buffer){
 
 void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
     char *lineHelper = nullptr;
-    uint tabSize = appGlobalConfig.tabSpacing;
+    uint tabSize = appGlobalConfig.useTabs ? 1 : appGlobalConfig.tabLength;
     char indentChar = ' ';
     int changes = 0;
     if(appGlobalConfig.useTabs){

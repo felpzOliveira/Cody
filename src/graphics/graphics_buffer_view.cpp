@@ -705,13 +705,8 @@ void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *
 
                 if(Buffer_IsBlank(buffer) && buffer->tokenCount == 1){
                     Token *token = &buffer->tokens[0];
-                    uint pos = 0;
-                    while((int)pos < token->size){
-                        x.y += fonsComputeStringAdvance(font->fsContext, " ", 1,
-                                                        &previousGlyph);
-                        pos++;
-                    }
-
+                    x.y += fonsComputeStringAdvance(font->fsContext, buffer->data,
+                                                    token->size, &previousGlyph);
                     Graphics_QuadPush(state, vec2f(x.x, y.x), vec2f(x.y, y.y), emptyColor);
                 }else if(buffer->tokenCount > 1){
                     int previousGlyph = -1;
@@ -1006,8 +1001,8 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                     continue;
                 }
 
-                if(v == '\t' || v == ' '){
-                    x += fonsComputeStringAdvance(font->fsContext, " ", 1,
+                if(v == ' ' || v == '\t'){
+                    x += fonsComputeStringAdvance(font->fsContext, (char *)&v, 1,
                                                   &previousGlyph);
                     pos ++;
                     continue;
@@ -1146,7 +1141,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     Graphics_PrepareTextRendering(state, projection, &state->scale);
 
     int is_tab = 0;
-    int tabSpace = AppGetTabConfiguration(&is_tab);
+    int tabSpace = AppGetTabLength(&is_tab);
     enddesc[0] = 0;
     std::string head, fmt;
     int k = 0, kk = 0;

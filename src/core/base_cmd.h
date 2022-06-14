@@ -18,23 +18,61 @@ struct FileEntry;
 #define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
 
 #define CMD_CURSORSET_STR "cursor-format "
+#define CMD_CURSORSET_HELP "Sets the format of the cursor (choices: quad, dash, rect)."
+
 #define CMD_DIMM_STR "dimm "
+#define CMD_DIMM_HELP "Sets if the current theme should dimm inactive views (choices: on/off)."
+
 #define CMD_KILLSPACES_STR "kill-spaces"
+#define CMD_KILLSPACES_HELP "Removes all extra spaces in the current file."
+
 #define CMD_SEARCH_STR "search "
+#define CMD_SEARCH_HELP "Perform a full search on all opened files (usage: search <value>)."
+
 #define CMD_FUNCTIONS_STR "functions"
+#define CMD_FUNCTIONS_HELP "List all functions found on all opened files."
+
 #define CMD_GIT_STR "git "
+#define CMD_GIT_HELP "Perform git operations (choices: diff, status, open)."
+
 #define CMD_HSPLIT_STR "hsplit"
+#define CMD_HSPLIT_HELP "Split the current view horizontally."
+
 #define CMD_VSPLIT_STR "vsplit"
+#define CMD_VSPLIT_HELP "Split the current view vertically."
+
 #define CMD_EXPAND_STR "expand"
+#define CMD_EXPAND_HELP "Expand/Restore a view to the largest possible size."
+
 #define CMD_KILLVIEW_STR "kill-view"
+#define CMD_KILLVIEW_HELP "Closes a view reclaiming the view's taken geometry."
+
 #define CMD_KILLBUFFER_STR "kill-buffer"
+#define CMD_KILLBUFFER_HELP "Closes the file opened in the current view (if any)."
+
 #define CMD_CURSORSEG_STR "cursor-seg "
+#define CMD_CURSORSEG_HELP "Enable/Disable rendering of the line that connects the double cursor."
+
+#define CMD_PATH_COMPRESSION_STR "path-compression "
+#define CMD_PATH_COMPRESSION_HELP "Configures the amount by which paths should be reduced in the query bar."
+
 #define CMD_DBG_START_STR "dbg start "
+#define CMD_DBG_START_HELP "Start the debugger on a given file (unfinished)."
+
 #define CMD_DBG_BREAK_STR "dbg break "
+#define CMD_DBG_BREAK_HELP "Adds a breakpoint on a given instance of the debugger (unfinished)."
+
 #define CMD_DBG_EXIT_STR "dbg exit"
+#define CMD_DBG_EXIT_HELP "Terminates the debugger (unfinished)."
+
 #define CMD_DBG_RUN_STR "dbg run"
+#define CMD_DBG_RUN_HELP "Triggers execution of the program opened in the debugger (unfinished)."
+
 #define CMD_DBG_FINISH_STR "dbg finish"
+#define CMD_DBG_FINISH_HELP "Sends a finish command to the debuggee (unfinished)."
+
 #define CMD_DBG_EVALUATE_STR "dbg eval "
+#define CMD_DBG_EVALUATE_HELP "Evaluates an expression on an instance of the debugger (unfinished)."
 
 #define MAX_THREADS 16
 struct GlobalSearchResult{

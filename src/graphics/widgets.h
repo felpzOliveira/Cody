@@ -10,6 +10,7 @@
 #include <graphics.h>
 #include <vector>
 #include <sstream>
+#include <theme.h>
 
 #define WIDGET_TRANSITION_SCALE      0
 #define WIDGET_TRANSITION_BACKGROUND 1
@@ -652,6 +653,70 @@ class ImageTextureWidget : public Widget{
                                    Geometry geometry, Transform eTransform);
 };
 
+/*
+* A simple text widget so we can do multiline easily.
+*/
+class TextWidget : public Widget{
+    public:
+    std::vector<std::string> lines;
+    uint alignment;
+    Float fontSize;
+    Float lineOffset;
+    vec4i color;
+
+    static uint kAlignLeft;
+    static uint kAlignCenter;
+
+    /*
+    * Basic constructors.
+    */
+    TextWidget() : Widget(), alignment(TextWidget::kAlignCenter),
+        fontSize(19), lineOffset(10.0), color(DefaultGetUIColor(UIScopeLine))
+    {}
+
+    /*
+    * Renders the contents of the line vector.
+    */
+    virtual int OnRender(WidgetRenderContext *, const Transform &transform) override;
+
+    /*
+    * Adds a new line to the text widget.
+    */
+    void AddTextLine(std::string line){ lines.push_back(line); }
+
+    /*
+    * Remove all lines from the text widget.
+    */
+    void Clear(){ lines.clear(); }
+
+    /*
+    * Sets the color to be used for text rendering. Values are between 0-255.
+    */
+    void SetColor(vec4i col){ color = col; }
+
+    /*
+    * Sets a HINT to how to compute spacing between two lines. Computation is simply
+    * made by using GeometryHeight / offset. You can use this variable to adjust this
+    * spacing. Be aware that if the line count requested to render is larger than
+    * whatever the offset is than computation is GeometryHeight / lineCount instead.
+    */
+    void SetLineOffsetHint(Float offset){ lineOffset = Max(1.f, offset); }
+
+    /*
+    * Set the font size to be used for rendering the text. Be aware that
+    * there is no line wrapping so if you set a size that is too big the text
+    * will simply be clipped.
+    */
+    void SetFontSize(Float size){ fontSize = Max(1.f, size); }
+
+    /*
+    * Set the text alignment type. Note that even tho it is a bit mask
+    * it should only be set to one of the values as there is no point in
+    * performing multiple alignments. Either use kAlignLeft or kAlignCenter.
+    */
+    void SetAlignment(uint value){ alignment = value; }
+};
+
 class TextRow{
     public:
     std::vector<std::string> data;
@@ -871,12 +936,3 @@ class ScrollableWidget final : public Widget{
 
 };
 
-/* Test */
-class PopupWindow : public WidgetWindow{
-    public:
-    ButtonWidget b0, b1, tbutton;
-    ImageTextureWidget image, timage;
-    TextTableWidget tt;
-    ScrollableWidget sc;
-    PopupWindow();
-};

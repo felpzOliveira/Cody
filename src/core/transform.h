@@ -38,6 +38,17 @@ struct Matrix4x4{
             printf("]\n");
         }
     }
+
+    void PrintSelf() const{
+        for(int i = 0; i < 4; ++i){
+            printf("[ ");
+            for(int j = 0; j < 4; ++j){
+                printf("%g  ", m[i][j]);
+            }
+
+            printf("]\n");
+        }
+    }
 };
 
 class Transform{
@@ -120,6 +131,10 @@ class Transform{
     Transform operator*(const Transform &t2) const;
     bool SwapsHandedness() const;
     void PrintSelf(){
+        m.PrintSelf();
+    }
+
+    void PrintSelf() const{
         m.PrintSelf();
     }
 };
