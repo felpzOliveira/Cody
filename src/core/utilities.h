@@ -20,6 +20,8 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
+#define BUG_HUNT
+
 #if defined(BUG_HUNT)
     #define BUG() printf("\n=========== BUG ===========\nLocation %s:%d Func: %s\n",\
                         __FILE__, __LINE__, __func__)
@@ -264,6 +266,17 @@ uint StringComputeU8Count(char *s0, uint len);
 * to return the size in bytes of the encoded character.
 */
 uint StringComputeRawPosition(char *s0, uint len, uint u8p, int *size);
+
+/*
+* Returns the address in 'path' where printing should start in order to display
+* the last 'width' folders/files that are compounded in 'path'.
+* Example: if path = C:/dev/folder1/folder2/file.txt and width = 2 than the return is
+* at = 15 (f) because:
+*                5   4     3       2       1
+*                C:/dev/folder1/folder2/file.txt
+*                0123456789abcde^
+*/
+uint StringCompressPath(char *path, uint size, uint width);
 
 /*
 * Convert colors.

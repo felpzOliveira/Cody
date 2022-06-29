@@ -202,6 +202,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
     linearResults.res.clear();
 
     uint max_written_len = 60;
+    int pathCompression = 2;
     for(int tid = 0; tid < MAX_THREADS; tid++){
         GlobalSearch *res = &results[tid];
         for(uint i = 0; i < res->count; i++){
@@ -228,6 +229,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
 
             LineBuffer *lBuffer = res->results[i].lineBuffer;
             char *pptr = &(res->results[i].lineBuffer->filePath[at]);
+            uint pptr_size = strlen(pptr);
             char m[256];
 
             Buffer *buffer = LineBuffer_GetBufferAt(lBuffer, res->results[i].line);
@@ -257,11 +259,17 @@ int SearchAllFilesCommandStart(View *view, std::string title){
             end_loc = f - start_loc > max_written_len ? start_loc + max_written_len : f;
             char ss = buffer->data[end_loc];
             buffer->data[end_loc] = 0;
+            uint filename_start = StringCompressPath(pptr, pptr_size, pathCompression);
+            if(filename_start > 0){
+                len = snprintf(m, sizeof(m), "../");
+            }
 
             if(start_loc == 0 || pickId == fid){
-                len = snprintf(m, sizeof(m), "%s:%d: ", pptr, res->results[i].line);
+                len += snprintf(&m[len], sizeof(m)-len, "%s:%d: ", &pptr[filename_start],
+                                res->results[i].line);
             }else{
-                len = snprintf(m, sizeof(m), "%s:%d:... ", pptr, res->results[i].line);
+                len += snprintf(&m[len], sizeof(m)-len, "%s:%d:... ", &pptr[filename_start],
+                                res->results[i].line);
             }
 
             if(end_loc == f){
@@ -1201,7 +1209,7 @@ int SwitchThemeCommandStart(View *view){
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
-// Seach text command routines.
+// Search text command routines.
 //////////////////////////////////////////////////////////////////////////////////////////
 int QueryBarCommandSearch(QueryBar *queryBar, LineBuffer *lineBuffer,
                           DoubleCursor *dcursor, char *toSearch,

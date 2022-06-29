@@ -351,6 +351,18 @@ uint StringComputeU8Count(char *s0, uint len){
     return r;
 }
 
+uint StringCompressPath(char *path, uint size, uint width){
+    uint at = 0;
+    uint counter = 0;
+    for(at = size-1; at > 0 && counter < width; at--){
+        if(path[at] == '/') counter++;
+    }
+
+    // at + 1 => '/'
+    if(counter == width) return at + 2;
+    return 0;
+}
+
 uint StringComputeRawPosition(char *s0, uint len, uint u8p, int *size){
     uint r = 0;
     if(len > 0 && s0){

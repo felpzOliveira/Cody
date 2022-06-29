@@ -47,6 +47,12 @@
 * start of a regexless regex engine.
 */
 
+/*
+* There are bugs on highlighting some components, i.e.: struct, typedef, etc...
+* if it is not fixed yet you can disable it with the following variable.
+*/
+extern bool LEX_DISABLE_PROC_STACK;
+
 typedef enum{
     TOKENIZER_STATE_CLEAN,
     TOKENIZER_STATE_MULTILINE,

@@ -444,8 +444,7 @@ std::optional<vec2ui> AppGetTextPosition(int x, int y, View *view,
     Float x0 = ScreenToGL(pos.x, state) - bufferView->lineOffset;
 
     if(x0 > 0){
-        colNo = fonsComputeStringOffsetCount(state->font.fsContext,
-                                             buffer->data, x0);
+        colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x0);
         colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
         res = std::optional<vec2ui>(vec2ui(lineNo, colNo));
     }
@@ -572,8 +571,7 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
         Float x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
         if(x < 0) return;
-        colNo = fonsComputeStringOffsetCount(state->font.fsContext,
-                                             buffer->data, x);
+        colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x);
 
         colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);
         if(ghost.x != (uint)lineNo || ghost.y != colNo){

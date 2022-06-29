@@ -68,11 +68,13 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         maxn = Max(buffer->taken, maxn);
     }
 
+    Float multiplier = opener ? (opener->entries ? 0.03 : 0.01) : 0;
+
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
         uint size = 80;
         int pGlyph = -1;
-        Float x = lWidth * 0.03;
+        Float x = lWidth * multiplier;
         Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
         Float ym = (y1 + y0) * 0.5 - 0.4 * state->font.fontMath.fontSizeAtRenderCall;
 
@@ -81,7 +83,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
         SelectableList_GetItem(list, i, &buffer);
         AssertA(buffer != nullptr, "Invalid buffer returned by View_SelectableListGetItem");
 
-        if(opener && style->with_load){
+        if(opener && style->with_load && opener->entries){
             x = Max(x, 2 * size);
         }
 

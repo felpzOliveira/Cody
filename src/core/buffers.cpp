@@ -207,9 +207,9 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
     direction = direction < 0 ? -1 : 1;
     while(buffer->data[rawp] == '\t'){
         if(direction < 0){
-            if(rawp == 0) break;
+            if(rawp < 1) break;
         }else{
-            if(rawp == buffer->taken-1){
+            if(rawp >= buffer->taken-1){
                 // NOTE: The end of the buffer is a tab
                 // we need to return the maximum possible position
                 // otherwise whenever we insert a tab in an empty line

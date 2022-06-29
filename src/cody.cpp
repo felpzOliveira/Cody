@@ -50,7 +50,6 @@ ARGUMENT_PROCESS(remote_flags){
 }
 
 ARGUMENT_PROCESS(keyfile_flags){
-    printf("Called@\n");
     uint size = 0;
     CmdLineArgs *args = (CmdLineArgs *)config;
     std::string path = ParseNext(argc, argv, i, "--keyfile");
@@ -98,6 +97,11 @@ ARGUMENT_PROCESS(use_tabs_flags){
     return ARG_OK;
 }
 
+ARGUMENT_PROCESS(disable_proc_stack){
+    LEX_DISABLE_PROC_STACK = true;
+    return ARG_OK;
+}
+
 std::map<const char *, ArgDesc> arg_map = {
     {"--remote",
         { .processor = remote_flags,
@@ -110,6 +114,10 @@ std::map<const char *, ArgDesc> arg_map = {
     {"--key",
         { .processor = keyval_flags,
           .help = "Sets a custom key to be used for AES 256 bit given as a hex string." }
+    },
+    {"--no-proc",
+        { .processor = disable_proc_stack,
+            .help = "Disable interpretation of complex synthax (struct/typedef/...)." }
     },
     {"--use-tabs",
         { .processor = use_tabs_flags,
@@ -204,91 +212,6 @@ void StartWithFile(const char *path=nullptr){
     }
 
     Graphics_Initialize();
-}
-
-#include <server.h>
-void client_test(){
-    int port = 20000;
-#if 1
-    SetStorageDevice(StorageDeviceType::Remote, "127.0.0.1", port);
-    FileEntry *entries = nullptr;
-    uint n = 0;
-    uint size = 0;
-
-    StorageDevice *storage = FetchStorageDevice();
-    if(storage->ListFiles((char *)"/home/felipe/Documents", &entries, &n, &size) < 0){
-        printf("Failed to list files\n");
-    }else{
-        for(uint i = 0; i < n; i++){
-            printf("Path = %s ( %s )\n", entries[i].path,
-                   entries[i].type == DescriptorDirectory ? "Directory" : "File");
-        }
-    }
-
-    if(entries) AllocatorFree(entries);
-
-    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
-                          "Some random text 1\n", 0)) return;
-
-    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
-                          "Some random text 2", 1)) return;
-
-    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
-                          "Some random text 3", 0)) return;
-
-    if(!storage->AppendTo("/home/felipe/Documents/append_test.txt",
-                          "\nSome random text 4", 1)) return;
-#else
-    RPCClient client;
-    client.ConnectTo("127.0.0.1", port);
-    std::vector<uint8_t> out;
-
-    if(!client.ReadEntireFile(out, "/home/felipe/Documents/lorem_ipsum.txt")){
-        printf("Failed to read file\n");
-    }else if(out.size() > 0){
-        char *ptr = (char *)out.data();
-        printf("File ( %lu ):\n%s\n", out.size(), ptr);
-    }else{
-        printf("Empty file\n");
-    }
-
-    out.clear();
-    if(!client.StreamWriteStart(out, "/home/felipe/Documents/test_file.txt")){
-        printf("Failed to open file\n");
-    }else{
-        printf("Opened file\n");
-    }
-
-    out.clear();
-    std::string val("Hello from client!");
-    if(!client.StreamWriteUpdate(out, (uint8_t *)val.c_str(), val.size())){
-        printf("Failed to write file\n");
-    }else{
-        printf("Updated file\n");
-    }
-
-    out.clear();
-    if(!client.StreamWriteFinal(out)){
-        printf("Failed to close file\n");
-    }else{
-        printf("Closed file\n");
-    }
-
-    out.clear();
-    if(client.Chdir(out, "/home/felipe/Documents")){
-        printf("Chdir ok\n");
-    }else{
-        printf("Chdir failed\n");
-    }
-
-    out.clear();
-    if(client.GetPwd(out)){
-        std::string data((char *)out.data(), out.size());
-        printf("Got pwd %s\n", data.c_str());
-    }else{
-        printf("Failed pwd\n");
-    }
-#endif
 }
 
 int main(int argc, char **argv){

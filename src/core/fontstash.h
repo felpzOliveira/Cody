@@ -1319,7 +1319,6 @@ static FONSglyph* fons__getGlyph(FONScontext* cstash, FONSfont* font, unsigned i
 
 	// Blur
 	if (iblur > 0) {
-        printf("BLUR\n");
 		stash->nscratch = 0;
 		bdst = &stash->texData[glyph->x0 + glyph->y0 * cstash->params.width];
 		fons__blur(stash, bdst, gw,gh, cstash->params.width, iblur);
@@ -1459,6 +1458,7 @@ FONS_DEF int fonsComputeStringOffsetCount(FONScontext* cstash, const char *e, fl
 	float width;
     float x = 0, y = 0;
     int curr = 0;
+    int tabLen = AppGetTabLength(nullptr);
     char *str = (char *)e;
     char *end = (char *)e + strlen(e);
 
@@ -1481,6 +1481,41 @@ FONS_DEF int fonsComputeStringOffsetCount(FONScontext* cstash, const char *e, fl
 
     // Align vertically.
 	y += fons__getVertAlign(cstash, font, state->align, isize);
+    while(str != end){
+        char target = *str;
+        if(target == '\t'){
+            target = ' ';
+            for(int ss = 0; ss < tabLen; ss++){
+                if (fons__decutf8(&utf8state, &codepoint, (const unsigned char)target))
+                    continue;
+                glyph = fons__getGlyph(cstash, font, codepoint, isize, iblur);
+                if(glyph != NULL){
+                    fons__getQuad(cstash, font, prevGlyphIndex, glyph, scale,
+                                  state->spacing, &x, &y, &q);
+                    x += FONS_DEFAULT_X_SPACING;
+                    if(x > x1) return curr;
+                }
+                prevGlyphIndex = glyph != NULL ? glyph->index : -1;
+            }
+            curr++;
+        }else{
+            if (fons__decutf8(&utf8state, &codepoint, (const unsigned char)target)){
+                ++str;
+                continue;
+            }
+            glyph = fons__getGlyph(cstash, font, codepoint, isize, iblur);
+            if(glyph != NULL){
+                fons__getQuad(cstash, font, prevGlyphIndex, glyph, scale,
+                              state->spacing, &x, &y, &q);
+                x += FONS_DEFAULT_X_SPACING;
+                if(x > x1) return curr;
+            }
+            curr++;
+            prevGlyphIndex = glyph != NULL ? glyph->index : -1;
+        }
+        ++str;
+    }
+#if 0
     for(; str != end; ++str){
         if (fons__decutf8(&utf8state, &codepoint, *(const unsigned char*)str))
 			continue;
@@ -1495,7 +1530,7 @@ FONS_DEF int fonsComputeStringOffsetCount(FONScontext* cstash, const char *e, fl
         curr++;
         prevGlyphIndex = glyph != NULL ? glyph->index : -1;
     }
-
+#endif
     return curr;
 }
 

@@ -22,6 +22,8 @@
 
 #define INC_OR_ZERO(p, n, r) do{ if((r) < n) (*p)++; else return 0; }while(0)
 
+bool LEX_DISABLE_PROC_STACK = false;
+
 //TODO: What happens when user insert a new } or ) or whatever and we simply retokenize
 //      that line? Do all other parts work?
 inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
@@ -113,6 +115,8 @@ int Lex_IsUserToken(Token *token){
 }
 
 static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
+    if(LEX_DISABLE_PROC_STACK) return 0;
+
     int added = 0;
     if(token->identifier == TOKEN_ID_DATATYPE_STRUCT_DEF){
         LogicalProcessor proc = {
