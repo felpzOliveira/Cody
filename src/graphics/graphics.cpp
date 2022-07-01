@@ -256,11 +256,15 @@ void ActivateViewportAndProjection(OpenGLState *state, View *vview, GLViewport t
     glEnable(GL_SCISSOR_TEST);
 }
 
-Float ScreenToGL(Float x, OpenGLState *state){
+Float ScreenToTransform(Float x, Transform model){
     vec3f p(x, 0, 0);
-    Transform inv = Inverse(state->model);
+    Transform inv = Inverse(model);
     p = inv.Point(p);
     return p.x;
+}
+
+Float ScreenToGL(Float x, OpenGLState *state){
+    return ScreenToTransform(x, state->model);
 }
 
 vec2ui ScreenToGL(vec2ui u, OpenGLState * state){

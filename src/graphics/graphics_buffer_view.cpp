@@ -695,7 +695,7 @@ void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *
 
             glUseProgram(font->cursorShader.id);
             Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->model.m);
             for(uint i = visibleLines.x; i <= visibleLines.y; i++){
                 Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
                 if(!buffer) continue;
@@ -1272,7 +1272,9 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
                         cursor, 0, baseHeight, visibleLines);
 
     OpenGLComputeCursorProjection(state, &state->glCursor, &translate, width, view);
+
     state->model = state->scale * translate;
+    View_SetTranslateTransform(vview, state->model);
 
     if(view->isActive){
         cursor = BufferView_GetGhostCursorPosition(view);

@@ -351,7 +351,8 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
 
         uint colNo = 0;
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
-        x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
+        Transform transform = View_GetTranslateTransform(view);
+        x = ScreenToTransform(mouse.x, transform) - bufferView->lineOffset;
         if(x > 0){
             colNo = fonsComputeStringOffsetCount(state->font.fsContext,
                                                  buffer->data, x);
@@ -544,6 +545,8 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
 
     ViewState vstate = View_GetState(view);
     uint dy = view->geometry.upper.y - view->geometry.lower.y;
+    // account for view transform
+    Transform transform = View_GetTranslateTransform(view);
 
     if(vstate == View_SelectableList){
         SelectableList *list = &view->selectableList;
@@ -569,8 +572,9 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
 
         uint colNo = 0;
         Buffer *buffer = BufferView_GetBufferAt(bufferView, (uint)lineNo);
-        Float x = ScreenToGL(mouse.x, state) - bufferView->lineOffset;
+        Float x = ScreenToTransform(mouse.x, transform) - bufferView->lineOffset;
         if(x < 0) return;
+
         colNo = fonsComputeStringOffsetCount(state->font.fsContext, buffer->data, x);
 
         colNo = Buffer_PositionTabCompensation(buffer, colNo, -1);

@@ -35,6 +35,10 @@ struct FileOpener{
     ushort pathLen;
 };
 
+struct ViewTransform{
+    Transform translate;
+};
+
 struct View{
     BufferView bufferView;
     FileOpener *fileOpener;
@@ -47,6 +51,7 @@ struct View{
     ViewState state;
     RenderList renderList[View_StatesCount];
     ControlProps controlProps;
+    ViewTransform transforms;
 };
 
 /*
@@ -68,6 +73,21 @@ void View_SetGeometry(View *view, Geometry geometry, uint lineHeight);
 * Sets the view as the active view.
 */
 void View_SetActive(View *view, int isActive);
+
+/*
+* Reset the view geometry transforms.
+*/
+void View_ResetTransforms(View *view);
+
+/*
+* Sets the transformation for a given view.
+*/
+void View_SetTranslateTransform(View *view, Transform translate);
+
+/*
+* Gets the transformation for a given view.
+*/
+Transform View_GetTranslateTransform(View *view);
 
 /*
 * Triggers a view to be in a selectable list mode.

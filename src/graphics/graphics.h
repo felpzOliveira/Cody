@@ -516,6 +516,7 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH);
 Float ScreenToGL(Float x, OpenGLState *state);
 vec2ui ScreenToGL(vec2ui u, OpenGLState * state);
 Float GLToScreen(Float x, OpenGLState *state);
+Float ScreenToTransform(Float x, Transform model);
 
 /*
 * Debug utilities.

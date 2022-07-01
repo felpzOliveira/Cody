@@ -99,10 +99,25 @@ void View_SelectableListSet(View *view, LineBuffer *sourceBuffer,
                             cancel, commit, filter);
 }
 
+Transform View_GetTranslateTransform(View *view){
+    return view->transforms.translate;
+}
+
+void View_SetTranslateTransform(View *view, Transform translate){
+    view->transforms.translate = translate;
+}
+
+void View_ResetTransforms(View *view){
+    view->transforms.translate = Transform();
+}
+
 void View_EarlyInitialize(View *view){
     view->descLocation = DescriptionTop; // TODO: Config
     view->fileOpener = AllocatorGetN(FileOpener, 1);
     view->autoCompleteList = AllocatorGetN(SelectableList, 1);
+
+    View_ResetTransforms(view);
+
     SelectableList_Init(&view->selectableList);
     SelectableList_Init(view->autoCompleteList);
     QueryBar_Initialize(&view->queryBar);
