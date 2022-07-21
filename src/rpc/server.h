@@ -5,6 +5,7 @@
 #include <map>
 #include <vector>
 #include <rpc.h>
+#include <security.h>
 
 #define MAX_TRANSPORT_SMALL_TIMEOUT_SECONDS 0.005
 #define MAX_TRANSPORT_TIMEOUT_SECONDS 0.05
@@ -45,15 +46,44 @@ class RPCBinder{
     RPCBinder() = default;
 };
 
+class BridgeOpt{
+    public:
+    std::string ip;
+    int port;
+    uint8_t *key;
+
+    BridgeOpt() = default;
+
+    BridgeOpt(std::string _ip, int _port, uint8_t *k_ptr){
+        ip = _ip;
+        port = _port;
+        key = k_ptr;
+    }
+};
+
 // dedicated thread
 class RPCServer{
     public:
-    RPCNetwork net;
+    SecurityServices::Context ctx_base, ctx_out;
+    int mode;
+    BridgeOpt bopts;
+    RPCNetwork net, net_out;
     RPCBaseCommand *activeCmd;
     std::map<RPCCommandCode, RPCBaseCommand *> cmdMap;
 
     RPCServer() = default;
     ~RPCServer() = default;
+
+    void Initialize(int md, BridgeOpt b_opts, uint8_t *u_key=nullptr){
+        mode = md;
+        SecurityServices::CreateContext(ctx_base, u_key);
+        if(md == 1){
+            bopts = b_opts;
+            SecurityServices::CreateContext(ctx_out, b_opts.key);
+        }else{
+            SetStorageDevice(StorageDeviceType::Local);
+        }
+    }
     void Start(int port);
     void Terminate();
 };

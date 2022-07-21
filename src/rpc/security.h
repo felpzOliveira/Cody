@@ -8,26 +8,37 @@
 #define ChallengeSizeInBytes 8
 
 namespace SecurityServices{
+
+    struct Context{
+        bool is_initialized;
+        uint8_t key[32];
+
+        Context() : is_initialized(false){}
+    };
+
+    /*
+     * Contexts for encryption/decryption operations.
+     */
+    void CreateContext(Context &context, uint8_t *key=nullptr);
+
+    /*
+     * Copy a context.
+     */
+    void CopyContext(Context *dst, Context *src);
+
     /*
      * Wrappers for AES-256 that contains both the encrypted/decrypted data
      * and the iv used (for encryption only). Use this when send/recv messages.
      */
-    bool Encrypt(uint8_t *input, size_t len, std::vector<uint8_t> &out);
-    bool Decrypt(uint8_t *input, size_t len, std::vector<uint8_t> &out);
+    bool Encrypt(Context *ctx, uint8_t *input, size_t len, std::vector<uint8_t> &out);
+    bool Decrypt(Context *ctx, uint8_t *input, size_t len, std::vector<uint8_t> &out);
 
     /*
-     * We are going to use a challenge-response authentication design, however
-     * currently we don't support key-exchange with Frodo yet as asymetric implementation
-     * is missing. So currently we simply test if the key is the same with a simple AES
-     * encryption. The code has a hardcoded key for testing purposes but if you are using
-     * this and Frodo is not yet implemented you can overwrite this key with a given key
-     * bellow and use the flag --key when launching.
+     * Challenge-Response related operations.
      */
-    void Start(uint8_t *userKey=nullptr);
-
-    bool CreateChallenge(std::vector<uint8_t> &out, Challenge &ch);
-    bool SolveChallenge(uint8_t *input, size_t len, std::vector<uint8_t> &out);
-    bool IsChallengeSolved(uint8_t *input, size_t len, Challenge &ch);
+    bool CreateChallenge(Context *ctx, std::vector<uint8_t> &out, Challenge &ch);
+    bool SolveChallenge(Context *ctx, uint8_t *input, size_t len, std::vector<uint8_t> &out);
+    bool IsChallengeSolved(Context *ctx, uint8_t *input, size_t len, Challenge &ch);
 
     /*
      * Returns the size of the package generated for the challenge and the size

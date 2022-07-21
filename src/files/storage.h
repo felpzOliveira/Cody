@@ -6,6 +6,7 @@
 #include <rpc.h>
 #include <mutex>
 #include <condition_variable>
+#include <security.h>
 
 struct RPCNetwork{
     // private data for the actual network layer
@@ -17,6 +18,8 @@ class RPCClient{
     RPCNetwork net;
     std::mutex mutex, waitmutex;
     std::condition_variable cv;
+    SecurityServices::Context secCtx;
+    bool filter_incomming = true;
     bool checkerRunning = false;
     bool checkerDone;
 
@@ -33,6 +36,8 @@ class RPCClient{
     bool ListFiles(std::vector<uint8_t> &out, const char *path);
     bool AppendTo(std::vector<uint8_t> &out, const char *path, uint8_t *data,
                   uint32_t size, int with_line_brk);
+    void SetSecurityContext(SecurityServices::Context *ctx);
+    void DisableIncommingFilter(){ filter_incomming = false; }
 };
 
 /*
@@ -94,7 +99,7 @@ class RemoteStorageDevice : public StorageDevice{
     public:
     RPCClient client;
 
-    RemoteStorageDevice(const char *ip, int port);
+    RemoteStorageDevice(const char *ip, int port, SecurityServices::Context *ctx);
 
     virtual void GetWorkingDirectory(char *dir, uint len) override;
     virtual int ListFiles(char *basePath, FileEntry **entries,
@@ -128,5 +133,6 @@ StorageDevice *FetchStorageDevice();
 * again as it could de-synchronize the files and generate a complete mess.
 */
 void SetStorageDevice(StorageDeviceType type=StorageDeviceType::Local,
-                      const char *ip=nullptr, int port=0);
+                      const char *ip=nullptr, int port=0,
+                      SecurityServices::Context *ctx=nullptr);
 

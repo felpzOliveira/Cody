@@ -15,7 +15,9 @@ void StorageDeviceEarlyInit(){
     // TODO: Add whatever we need here
 }
 
-void SetStorageDevice(StorageDeviceType type, const char *ip, int port){
+void SetStorageDevice(StorageDeviceType type, const char *ip, int port,
+                      SecurityServices::Context *ctx)
+{
     if(storageDevice){
         printf("Warning: Asked for storage device swap, this operation is not supported\n");
         return;
@@ -26,7 +28,7 @@ void SetStorageDevice(StorageDeviceType type, const char *ip, int port){
             storageDevice = new LocalStorageDevice;
         } break;
         case StorageDeviceType::Remote:{
-            storageDevice = new RemoteStorageDevice(ip, port);
+            storageDevice = new RemoteStorageDevice(ip, port, ctx);
         } break;
         default:{
             printf("Unknown storage device type\n");
@@ -97,7 +99,10 @@ void LocalStorageDevice::CloseFile(FileHandle *handle){
 //                 R E M O T E   S T O R A G E                  //
 //i.e.: Read/Write operations on remote disk, not so trivial.   //
 //////////////////////////////////////////////////////////////////
-RemoteStorageDevice::RemoteStorageDevice(const char *ip, int port){
+RemoteStorageDevice::RemoteStorageDevice(const char *ip, int port,
+                                         SecurityServices::Context *ctx)
+{
+    client.SetSecurityContext(ctx);
     if(!client.ConnectTo(ip, port)){
         exit(0);
     }
@@ -264,5 +269,4 @@ bool RemoteStorageDevice::AppendTo(const char *path, const char *str, int with_l
 void RemoteStorageDevice::CloseFile(FileHandle *handle){
     //handle->remoteFile.CloseFile();
 }
-
 

@@ -3,6 +3,8 @@
 #include <aes.h>
 #include <rng.h>
 #include <cryptoutil.h>
+#define LOG_MODULE "Security"
+#include <log.h>
 
 // TODO: This whole file is for testing and does not represent anything yet
 // TODO: Key exchange with Frodo
@@ -13,16 +15,38 @@ uint8_t key[32] = { 0x19, 0x57, 0x72, 0x14, 0xf9, 0x50, 0xfd, 0x01, 0x95,
                     0x8c, 0xc1, 0x28, 0xa4, 0x9d, 0x47, 0x02, 0xc4, 0x2a,
                     0x88, 0x0e, 0xb8, 0x65, 0xc5 };
 
-void SecurityServices::Start(uint8_t *userKey){
-    // TODO: Initialize crypto stuff
+void SecurityServices::CreateContext(SecurityServices::Context &context, uint8_t *userKey){
     if(userKey){
-        memcpy(key, userKey, 32 * sizeof(uint8_t));
+        memcpy(context.key, userKey, 32 * sizeof(uint8_t));
+    }else{
+        memcpy(context.key, key, 32 * sizeof(uint8_t));
     }
+
+    context.is_initialized = true;
 }
 
-bool SecurityServices::Encrypt(uint8_t *input, size_t len, std::vector<uint8_t> &out){
+void SecurityServices::CopyContext(SecurityServices::Context *dst,
+                                   SecurityServices::Context *src)
+{
+    memcpy(dst->key, src->key, 32 * sizeof(uint8_t));
+    dst->is_initialized = src->is_initialized;
+}
+
+bool SecurityServices::Encrypt(Context *ctx, uint8_t *input, size_t len,
+                               std::vector<uint8_t> &out)
+{
+    if(!ctx){
+        LOG_ERR("No crypto context active");
+        return false;
+    }
+
+    if(!ctx->is_initialized){
+        LOG_ERR("Crypto context is not initialized during encrypt");
+        return false;
+    }
+
     std::vector<uint8_t> iv;
-    bool rv = AES_CBC_Encrypt(input, len, (uint8_t *)key, AES256, out, iv);
+    bool rv = AES_CBC_Encrypt(input, len, (uint8_t *)ctx->key, AES256, out, iv);
     if(rv){
         for(int i = 0; i < AES_BLOCK_SIZE_IN_BYTES; i++){
             out.push_back(iv[i]);
@@ -31,7 +55,19 @@ bool SecurityServices::Encrypt(uint8_t *input, size_t len, std::vector<uint8_t> 
     return rv;
 }
 
-bool SecurityServices::Decrypt(uint8_t *input, size_t len, std::vector<uint8_t> &out){
+bool SecurityServices::Decrypt(Context *ctx, uint8_t *input, size_t len,
+                               std::vector<uint8_t> &out)
+{
+    if(!ctx){
+        LOG_ERR("No crypto context active");
+        return false;
+    }
+
+    if(!ctx->is_initialized){
+        LOG_ERR("Crypto context is not initialized during decrypt");
+        return false;
+    }
+
     uint8_t *iv = nullptr;
     uint8_t *enc = input;
 
@@ -41,22 +77,24 @@ bool SecurityServices::Decrypt(uint8_t *input, size_t len, std::vector<uint8_t> 
     iv = &input[len - AES_BLOCK_SIZE_IN_BYTES];
     len -= AES_BLOCK_SIZE_IN_BYTES;
 
-    return AES_CBC_Decrypt(enc, len, (uint8_t *)key, iv, AES256, out);
+    return AES_CBC_Decrypt(enc, len, (uint8_t *)ctx->key, iv, AES256, out);
 }
 
-bool SecurityServices::CreateChallenge(std::vector<uint8_t> &out, Challenge &ch){
+bool SecurityServices::CreateChallenge(Context *ctx, std::vector<uint8_t> &out,
+                                       Challenge &ch)
+{
     bool rv = Crypto_SecureRNG((void *)&ch, ChallengeSizeInBytes);
     if(!rv) return false;
-    rv = SecurityServices::Encrypt((uint8_t *)&ch, ChallengeSizeInBytes, out);
+    rv = SecurityServices::Encrypt(ctx, (uint8_t *)&ch, ChallengeSizeInBytes, out);
     return rv;
 }
 
-bool SecurityServices::SolveChallenge(uint8_t *input, size_t len,
+bool SecurityServices::SolveChallenge(Context *ctx, uint8_t *input, size_t len,
                                       std::vector<uint8_t> &out)
 {
     Challenge value = 0;
     std::vector<uint8_t> dec;
-    bool rv = SecurityServices::Decrypt(input, len, dec);
+    bool rv = SecurityServices::Decrypt(ctx, input, len, dec);
     if(!rv) return false;
     if(dec.size() != ChallengeSizeInBytes){
         printf("Decrypted size is not %d (%d)\n", ChallengeSizeInBytes, (int)dec.size());
@@ -65,13 +103,15 @@ bool SecurityServices::SolveChallenge(uint8_t *input, size_t len,
 
     memcpy(&value, dec.data(), ChallengeSizeInBytes);
     value += 1;
-    return SecurityServices::Encrypt((uint8_t *)&value, ChallengeSizeInBytes, out);
+    return SecurityServices::Encrypt(ctx, (uint8_t *)&value, ChallengeSizeInBytes, out);
 }
 
-bool SecurityServices::IsChallengeSolved(uint8_t *input, size_t len, Challenge &ch){
+bool SecurityServices::IsChallengeSolved(Context *ctx, uint8_t *input,
+                                         size_t len, Challenge &ch)
+{
     uint64_t value = 0;
     std::vector<uint8_t> dec;
-    bool rv = SecurityServices::Decrypt(input, len, dec);
+    bool rv = SecurityServices::Decrypt(ctx, input, len, dec);
     if(!rv) return false;
     if(dec.size() != ChallengeSizeInBytes){
         printf("Decrypted size is not %d (%d)\n", ChallengeSizeInBytes, (int)dec.size());

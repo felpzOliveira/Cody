@@ -231,6 +231,7 @@ int main(int argc, char **argv){
     testMP();
     return 0;
 #endif
+    SecurityServices::Context context;
     CmdLineArgs args;
     DefaultArgs(&args);
 
@@ -247,15 +248,15 @@ int main(int argc, char **argv){
     }, 0);
 
     if(args.has_key)
-        SecurityServices::Start(args.key);
+        SecurityServices::CreateContext(context, args.key);
     else
-        SecurityServices::Start();
+        SecurityServices::CreateContext(context);
 
     if(!args.is_remote){
         SetStorageDevice(StorageDeviceType::Local);
     }else{
-        SetStorageDevice(StorageDeviceType::Remote,
-                         args.ip.c_str(), args.port);
+        SetStorageDevice(StorageDeviceType::Remote, args.ip.c_str(),
+                         args.port, &context);
     }
 
     //client_test();
