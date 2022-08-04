@@ -233,7 +233,7 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
 * Adjust the position to **make sure** it does not lie inside a tab expansion.
 * The direction variable can be passed to tell to which side of a tab it should
 * clamp in case it does indeed lie inside a tab expansion, it has value -1 for
-* clamping t othe left and +1 for clamping to the right.
+* clamping to the left and +1 for clamping to the right.
 */
 uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction);
 
@@ -266,7 +266,12 @@ void LineBuffer_InitEmpty(LineBuffer *lineBuffer);
 
 /*
 * Initializes a LineBuffer from the contents of a file given in 'fileContents' with size
-* 'filesize'.
+* 'filesize'. This routine can parse through the file in parallel using the flag
+* 'synchronous', note that when building the LineBuffer in parallel the contents of the
+* file must not be freed until the LineBuffer is marked as writtable. Note that when
+* parsing in parallel, by default, the host is only dispatched back when at least 500
+* lines have been parsed. This is done so that if the file is immediatly rendered
+* it has a minimal size, during this process the file is marked as read-only.
 */
 void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
                      char *fileContents, uint filesize, bool synchronous=true);

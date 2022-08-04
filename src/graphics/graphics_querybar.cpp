@@ -173,10 +173,6 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         vec2ui lines = BufferView_GetViewRange(bView);
         Buffer *buffer = BufferView_GetBufferAt(bView, result->lineNo);
         uint p8 = Buffer_Utf8RawPositionToPosition(buffer, result->position);
-        uint e8 = Buffer_Utf8RawPositionToPosition(buffer, result->position +
-                                                   result->length);
-
-        AssertA(e8 > p8, "Zero QueryBar result");
 
         // 2- I think this model is correct because cursor will jump
         //    to the line when the QueryBar triggers a search. This means
@@ -187,8 +183,8 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
 
         // 3- Compute coordinates
         Float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
-        uint rawp = 0, orawp = 0;
-        int len8 = 1, plen8 = 1;
+        uint orawp = 0;
+        int len8 = 1;
         int pGlyph = -1;
         int oGlyph = -1;
         if(p8 > 0){
@@ -198,8 +194,11 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
             oGlyph = pGlyph;
         }
 
-        rawp = Buffer_Utf8PositionToRawPosition(buffer, e8-1, &plen8);
-        x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &buffer->data[rawp],
+        // since there is a match we don't actually need to compute the raw position
+        // for the searched string, we can simply copy the already filled string
+        // from the search context which is better since it starts at 0 and is null
+        // terminated
+        x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &searched[0],
                                            result->length, &pGlyph);
 
         y0 = (result->lineNo - lines.x) * state->font.fontMath.fontSizeAtRenderCall;
@@ -222,7 +221,8 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         vec4i wcolor = GetUIColor(theme, UISearchWord);
 
         slen = result->length;
-        //printf("%s at (%u %u) ( %u )\n", searched, result->lineNo, p8, slen);
+        //printf("%s at (%u %u) ( %u - %u )\n", searched, result->lineNo,
+                //p8, slen, (uint)strlen(searched));
 
         Graphics_PrepareTextRendering(state, &state->projection, &model);
         Graphics_PushText(state, x0, y0, searched, slen, wcolor, &oGlyph);

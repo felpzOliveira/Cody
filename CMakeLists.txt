@@ -1,35 +1,38 @@
-project(Cody LANGUAGES CXX C)
+cmake_policy(SET CMP0048 NEW)
+
+project(Cody VERSION 1.0.0 LANGUAGES CXX C)
 
 cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 set(CODY "cody")
 set(SERVER "server")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+set(BUILD_TYPE "Release" CACHE STRING "Defines the type of build to perform ( default is release )")
 
 option(CODY_BUILD "Build the editor" ON)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if(CMAKE_BUILD_TYPE MATCHES Debug)
+if(${BUILD_TYPE} STREQUAL "Debug")
     message(STATUS "Debug build")
     set(MH_FLAGS "-g3 -O0 -Wall -DDEBUG_BUILD -DMEMORY_DEBUG -rdynamic -fshort-enums")
-elseif(CMAKE_BUILD_TYPE MATCHES Valgrind)
+elseif(${BUILD_TYPE} STREQUAL "Valgrind")
     message(STATUS "Valgrind build")
     set(MH_FLAGS "-g3 -O0 -Wall -rdynamic -fshort-enums")
-elseif(CMAKE_BUILD_TYPE MATCHES Profiling)
+elseif(${BUILD_TYPE} STREQUAL "Profiling")
     message(STATUS "Profiling build")
     set(MH_FLAGS "-g -pg -Wall -fshort-enums")
-elseif(CMAKE_BUILD_TYPE MATCHES Memory)
+elseif(${BUILD_TYPE} STREQUAL "Memory")
     message(STATUS "Memory check build")
     set(MH_FLAGS "-Ofast -Wall -DMEMORY_DEBUG -fshort-enums")
-else()
+elseif(${BUILD_TYPE} STREQUAL "Release")
     message(STATUS "Release build")
     set(MH_FLAGS "-Ofast -Wall -fshort-enums")
 endif()
 
 if(CODY_BUILD)
-    #find_library(PCRE_LIB NAMES pcre libpcre)
+    find_library(PCRE_LIB NAMES pcre libpcre)
     find_library(X11_LIB NAMES X11)
     find_library(Z_LIB NAMES z)
     find_library(PTHREAD_LIB NAMES pthread)
@@ -104,8 +107,8 @@ if(CODY_BUILD)
             ${X11_LIB}
             ${PTHREAD_LIB}
             ${LIB_GIT2_LIBRARIES}
-            ${Z_LIB})
-     #       ${PCRE_LIB})
+            ${Z_LIB}
+            ${PCRE_LIB})
 
     target_link_directories(${CODY} PRIVATE
                             ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2

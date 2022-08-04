@@ -20,8 +20,14 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
-#define BUG_HUNT
+//#define BUG_HUNT
 
+/*
+* Utilities for tracing errors and bugs. A lot of BUG() calls are not really bugs
+* but states that were not considered. It seems that they happen sometimes but
+* are not really issues as the editor recovers from them. However if we ever
+* decide we want to extinguish them we can trace by defining BUG_HUNT.
+*/
 #if defined(BUG_HUNT)
     #define BUG() printf("\n=========== BUG ===========\nLocation %s:%d Func: %s\n",\
                         __FILE__, __LINE__, __func__)
@@ -32,6 +38,9 @@
 #endif
 #define NullRet(x) if(!(x)) return
 
+/*
+* Some constants that are used through the code.
+*/
 const Float kInv255 = 0.003921569;
 const Float kAlphaReduceDefault = 1.0;
 const Float kAlphaReduceInactive = 0.6;
@@ -95,6 +104,12 @@ void RemoveUnwantedLineTerminators(std::string &line);
 int TerminatorChar(char v);
 
 /*
+* Checks if the character given is a stop point, i.e.:
+* ' ', '+', '-', '.', '=', ...
+*/
+int StopChar(char v);
+
+/*
 * Checks if strings are equal.
 */
 int StringEqual(char *s0, char *s1, uint maxn);
@@ -142,7 +157,7 @@ char *StringNextWord(char *s0, uint s0len, uint *size);
 bool StringStartsWithInteger(std::string str);
 
 /*
-* Split a string into a list of string, splits based on space.
+* Split a string into a list of string, splits are based 'value'.
 */
 void StringSplit(std::string s0, std::vector<std::string> &splitted, char value=' ');
 
@@ -248,7 +263,7 @@ int  FastStringSearch(char *s0, char *s1, uint s0len, uint s1len);
 uint GetSimplifiedPathName(char *fullPath, uint len);
 
 /*
-* Get the size and content of the of a UTF-8 character at a given position.
+* Get the size and content of a UTF-8 character at a given position.
 * The string 's0' does not need to be null terminated in which case 'len' should
 * hold its size. In case 'len' = -1 this routine uses standard methods to detect
 * the size of the string 's0'.
@@ -306,7 +321,7 @@ int CodepointToString(int cp, char *c);
 int StringToCodepoint(char *u, int size, int *off);
 
 /*
-* Checks if a string contains a extensions, mostly for GLX/GL stuff
+* Checks if a string contains an extension, mostly for GLX/GL stuff
 */
 int ExtensionStringContains(const char *string, const char *extensions);
 
@@ -315,17 +330,22 @@ int ExtensionStringContains(const char *string, const char *extensions);
 */
 uint Bad_RNG16();
 
+/* Standard memcpy */
+void Memcpy(void *dst, void *src, uint size);
+/* Standard memset */
+void Memset(void *dst, unsigned char v, uint size);
+
+
+/*
+* Utilities for measuring the time a function takes to execute,
+* this is mostly for debug, not a reliable measurement.
+*/
 template<typename Fn>
 inline double MeasureInterval(const Fn &fn){
     clock_t start = clock();
     fn();
     return double(clock() - start)/CLOCKS_PER_SEC;
 }
-
-/* memcpy */
-void Memcpy(void *dst, void *src, uint size);
-/* memset */
-void Memset(void *dst, unsigned char v, uint size);
 
 #if 0
     #define MeasureTime(msg, ...) do{\
@@ -337,6 +357,7 @@ void Memset(void *dst, unsigned char v, uint size);
 #else
     #define MeasureTime(msg, ...) __VA_ARGS__
 #endif
+
 /* Data structures - Structures create their own copy of the item so you can free yours*/
 
 /*

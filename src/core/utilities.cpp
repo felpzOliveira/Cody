@@ -117,6 +117,21 @@ int FileExists(char *path){
     return exists;
 }
 
+FileType SymlinkGetType(const char *path){
+    char tmp[2048];
+    ssize_t r = readlink(path, tmp, 2048);
+    if(r < 0){
+        return DescriptorFile;
+    }
+
+    struct stat st;
+    if(stat(tmp, &st) == 0){
+        if(st.st_mode & S_IFDIR) return DescriptorDirectory;
+    }
+
+    return DescriptorFile;
+}
+
 //TODO: Windows
 int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder){
     int r = -1;
@@ -160,7 +175,9 @@ int ListFileEntriesLinear(char *basePath, std::vector<uint8_t> &out, uint32_t *s
     do{
         entry = readdir(dir);
         if(entry != nullptr){
-            if(entry->d_type == DT_DIR || entry->d_type == DT_REG){
+            if(entry->d_type == DT_DIR || entry->d_type == DT_REG ||
+               entry->d_type == DT_LNK)
+            {
                 int keep = 1;
                 char *p = entry->d_name;
                 uint reclen = strlen(p);
@@ -174,6 +191,8 @@ int ListFileEntriesLinear(char *basePath, std::vector<uint8_t> &out, uint32_t *s
                     uint8_t id = DescriptorFile;
                     if(entry->d_type == DT_DIR){
                         id = DescriptorDirectory;
+                    }else if(entry->d_type == DT_LNK){
+                        id = SymlinkGetType(p);
                     }
                     memcpy(mem, &reclen, sizeof(uint32_t));
 
@@ -213,7 +232,9 @@ int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
     do{
         entry = readdir(dir);
         if(entry != nullptr){
-            if(entry->d_type == DT_DIR || entry->d_type == DT_REG){
+            if(entry->d_type == DT_DIR || entry->d_type == DT_REG ||
+               entry->d_type == DT_LNK)
+            {
                 int keep = 1;
                 char *p = entry->d_name;
                 uint reclen = strlen(p);
@@ -233,6 +254,8 @@ int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
                     if(entry->d_type == DT_DIR){
                         lEntries[count].type = DescriptorDirectory;
                         //printf("Directory %s (len = %d)\n", entry->d_name, (int) reclen);
+                    }else if(entry->d_type == DT_LNK){
+                        lEntries[count].type = SymlinkGetType(p);
                     }else{
                         lEntries[count].type = DescriptorFile;
                         //printf("File %s\n", entry->d_name);
@@ -740,6 +763,15 @@ int TerminatorChar(char v){
     return (v < 48 || (v > 57 && v < 64) ||
             (v > 90 && v < 95) || (v > 122))
         ? 1 : 0;
+}
+
+// TODO: Add as needed
+int StopChar(char v){
+    return (v == ' ' || v == '+' || v == '-' || v == '/' || v == '.' ||
+            v == '\"' || v == '\'' || v == '*' || v == '&' || v == '!' ||
+            v == '|' || v == '(' || v == ')' || v == '{' || v == '}' ||
+            v == '[' || v == ']' || v == ';' || v == ',' || v == '<' ||
+            v == '>' || v == '\t');
 }
 
 void RemoveUnwantedLineTerminators(std::string &line){

@@ -444,6 +444,13 @@ int Buffer_IsBlank(Buffer *buffer){
     return 1;
 }
 
+/*
+* It seems that these routines need to account for utf-8 characters otherwise
+* whenever they are present in comments or strings we cannot actually perform
+* directional jumps with cursor. Handling the exact start of a utf-8 character
+* is quite tricky and could be very slow (potentially), so instead we'll invert
+* the tests and check for specific stop characters.
+*/
 uint Buffer_FindPreviousSeparator(Buffer *buffer, uint rawp){
     if(buffer->taken == 0 || rawp == 0) return 0;
     if(rawp > buffer->taken){
@@ -455,10 +462,10 @@ uint Buffer_FindPreviousSeparator(Buffer *buffer, uint rawp){
 
     uint n = rawp-1;
     // skip empty chars
-    while(TerminatorChar(buffer->data[n]) && n > 0) n--;
+    while(StopChar(buffer->data[n]) && n > 0) n--;
 
     for(; n > 0; n--){
-        if(TerminatorChar(buffer->data[n])){ // TODO: use TerminatorChar?
+        if(StopChar(buffer->data[n])){
             return n+1;
         }
     }
@@ -476,10 +483,10 @@ uint Buffer_FindNextSeparator(Buffer *buffer, uint rawp){
 
     uint n = rawp+1;
     // skip empty chars
-    while(TerminatorChar(buffer->data[n]) && n < buffer->taken) n++;
+    while(StopChar(buffer->data[n]) && n < buffer->taken) n++;
 
     for(; n < buffer->taken; n++){
-        if(TerminatorChar(buffer->data[n])){ // TODO: use TerminatorChar?
+        if(StopChar(buffer->data[n])){
             return n;
         }
     }
@@ -1697,7 +1704,7 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     }
 
     FileHandle file;
-    // using a std::sttringstream for buffering the content
+    // using a std::stringstream for buffering the content
     // is better for remote usage
     std::stringstream ss;
     uint lines = lineBuffer->lineCount;

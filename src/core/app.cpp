@@ -643,14 +643,28 @@ void AppCommandFreeTypingJumpToDirection(int direction){
             if(tid >= 0){
                 targetY = token->position;
                 if(!Symbol_IsTokenJumpable(token->identifier)){
-                    targetY = Buffer_FindPreviousSeparator(buffer, cursor.y);
+                    uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y);
+                    targetY = Buffer_FindPreviousSeparator(buffer, rawp);
                 }
-            }else{
-                targetY = 0;
             }
 
             cursor.y = Buffer_Utf8RawPositionToPosition(buffer, targetY);
 
+            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
+        } break;
+        case DIRECTION_RIGHT:{ // Move right
+            Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
+            int tid = BufferView_LocateNextCursorToken(bufferView, &token);
+            uint targetY = buffer->taken;
+            if(tid >= 0){
+                targetY = token->position + token->size;
+                if(!Symbol_IsTokenJumpable(token->identifier)){
+                    uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y);
+                    targetY = Buffer_FindNextSeparator(buffer, rawp);
+                }
+            }
+
+            cursor.y = Buffer_Utf8RawPositionToPosition(buffer, targetY);
             BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
         case DIRECTION_UP:{ // Move Up
@@ -682,23 +696,6 @@ void AppCommandFreeTypingJumpToDirection(int direction){
                 cursor.x = line;
                 BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
             }
-        } break;
-
-        case DIRECTION_RIGHT:{ // Move right
-            Buffer *buffer = BufferView_GetBufferAt(bufferView, cursor.x);
-            int tid = BufferView_LocateNextCursorToken(bufferView, &token);
-            uint targetY = 0;
-            if(tid >= 0){
-                targetY = token->position + token->size;
-                if(!Symbol_IsTokenJumpable(token->identifier)){
-                    targetY = Buffer_FindNextSeparator(buffer, cursor.y);
-                }
-            }else{
-                targetY = buffer->taken;
-            }
-
-            cursor.y = Buffer_Utf8RawPositionToPosition(buffer, targetY);
-            BufferView_CursorToPosition(bufferView, cursor.x, cursor.y);
         } break;
 
         default: AssertA(0, "Invalid direction given");
