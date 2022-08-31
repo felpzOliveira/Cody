@@ -1,0 +1,71 @@
+#include <languages.h>
+
+TokenizerSupport cmakeSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+    .multilineComment = false,
+    .lineCommentChar = '#',
+};
+
+TARGET src/languages/cmake.cpp
+BEGIN cmakeReservedPreprocessor
+END
+BEGIN cmakeReservedTable
+$ DATATYPE
+{ DATATYPE
+} DATATYPE
+if OPERATOR
+NOT PREPROCESSOR
+set OPERATOR
+GLOB PREPROCESSOR
+list OPERATOR
+file OPERATOR
+else OPERATOR
+EQUAL PREPROCESSOR
+endif OPERATOR
+elseif OPERATOR
+export OPERATOR
+option OPERATOR
+COMMAND OPERATOR
+MATCHES PREPROCESSOR
+install OPERATOR
+project OPERATOR
+message OPERATOR
+STREQUAL PREPROCESSOR
+function OPERATOR
+find_path OPERATOR
+add_library OPERATOR
+endfunction OPERATOR
+find_package OPERATOR
+find_library OPERATOR
+source_group OPERATOR
+find_package OPERATOR
+get_property OPERATOR
+set_property OPERATOR
+CMAKE_COMMAND OPERATOR
+enable_testing OPERATOR
+add_executable OPERATOR
+configure_file OPERATOR
+add_definitions OPERATOR
+execute_process OPERATOR
+link_directories OPERATOR
+add_subdirectory OPERATOR
+CMAKE_BUILD_TYPE OPERATOR
+mark_as_advanced OPERATOR
+CMAKE_SOURCE_DIR DATATYPE
+CMAKE_BINARY_DIR DATATYPE
+add_custom_target OPERATOR
+CMAKE_CXX_COMPILER DATATYPE
+add_custom_command OPERATOR
+include_directories OPERATOR
+target_link_libraries OPERATOR
+set_target_properties OPERATOR
+target_compile_options OPERATOR
+cmake_minimum_required OPERATOR
+CMAKE_CURRENT_BINARY_DIR DATATYPE
+CMAKE_CURRENT_SOURCE_DIR DATATYPE
+target_include_directories OPERATOR
+CMAKE_RUNTIME_OUTPUT_DIRECTORY DATATYPE
+END

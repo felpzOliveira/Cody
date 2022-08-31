@@ -86,6 +86,7 @@ file(GLOB SV_SRCS src/files/storage.cpp
                   src/rpc_server.cpp)
 
 file(GLOB MH_SHADERS shaders/*.glsl)
+file(GLOB MH_LANGS lang_tables/*)
 
 if(CODY_BUILD)
     file(GLOB MH_SRCS src/cody.cpp)
@@ -99,7 +100,7 @@ if(CODY_BUILD)
                             ${CMAKE_SOURCE_DIR}
                             ${CMAKE_SOURCE_DIR}/src/resources
                             ${CMAKE_BINARY_DIR}
-                        DEPENDS ${MH_SHADERS})
+                        DEPENDS ${MH_SHADERS} ${MH_LANGS})
 
     set (CODY_LIBRARIES
             dl

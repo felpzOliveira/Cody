@@ -5,8 +5,63 @@
 #include <fstream>
 #include <algorithm>
 #include <vector>
+#include <map>
 
 namespace fs = std::filesystem;
+
+int starts_with(std::string s0, std::string s1){
+    if(s1.size() > s0.size()) return 0;
+    for(uint i = 0; i < s1.size(); i++){
+        if(s0[i] != s1[i]) return 0;
+    }
+
+    return 1;
+}
+
+void split(std::string s, std::vector<std::string> &output, char value){
+    std::string val;
+    bool on_space = false;
+    for(unsigned int i = 0; i < s.size(); i++){
+        if(s[i] == value){
+            if(!on_space){
+                on_space = true;
+                if(val.size() > 0){
+                    output.push_back(val);
+                    val.clear();
+                }
+            }
+        }else{
+            on_space = false;
+            val.push_back(s[i]);
+        }
+    }
+
+    if(val.size() > 0){
+        output.push_back(val);
+    }
+}
+
+std::string clean_string(std::string str){
+    const std::string WHITESPACE = " \n\r\t\f\v";
+    auto lefttrim = [&](std::string s) -> std::string{
+        size_t start = s.find_first_not_of(WHITESPACE);
+        return (start == std::string::npos) ? "" : s.substr(start);
+    };
+
+    auto righttrim = [&](std::string s) -> std::string{
+        size_t end = s.find_last_not_of(WHITESPACE);
+        return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+    };
+
+    str = righttrim(lefttrim(str));
+    std::string::iterator siterator = std::unique(str.begin(), str.end(),
+    [](char el, char er)->bool{
+        return (el == er) && (el == ' ');
+    });
+
+    str.erase(siterator, str.end());
+    return str;
+}
 
 std::string path_without_ext(std::string path){
     size_t index = path.find_last_of(".");
@@ -200,7 +255,124 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
     return 0;
 }
 
+int language_table_gen(std::string path){
+    struct token_type{
+        std::string value;
+        std::string type;
+
+        token_type(std::string v, std::string t){
+            value = v;
+            type = t;
+        }
+    };
+
+    constexpr unsigned int split_count = 2;
+    std::string line;
+
+    std::map<std::string, std::map<int, std::vector<token_type>>> tokenNamedMaps;
+
+    std::ifstream ifs(path);
+    if(!ifs.is_open()){
+        printf(" ** Could not open %s\n", path.c_str());
+        return -1;
+    }
+
+    bool parsing = false;
+    std::string runningName;
+    std::string pathName;
+    std::map<int, std::vector<token_type>> runningMap;
+    std::string context;
+
+    while(std::getline(ifs, line)){
+        if(!parsing){
+            if(starts_with(line, "BEGIN ")){
+                runningName = line.substr(6);
+                runningMap.clear();
+                parsing = true;
+            }else if(starts_with(line, "TARGET ")){
+                pathName = std::string("../") + line.substr(7);
+            }else{
+                context += line + "\n";
+            }
+        }else if(parsing){
+            if(starts_with(line, "END")){
+                tokenNamedMaps[runningName] = runningMap;
+                parsing = false;
+            }else{
+                std::vector<std::string> splitted;
+                split(line, splitted, ' ');
+                if(splitted.size() != split_count){
+                    printf(" ** Invalid line %s\n", line.c_str());
+                    ifs.close();
+                    return -1;
+                }
+
+                std::string val = clean_string(splitted[0]);
+                std::string tp  = clean_string(splitted[1]);
+                if(runningMap.find(val.size()) == runningMap.end()){
+                    std::vector<token_type> tk;
+                    tk.push_back(token_type(val, tp));
+                    runningMap[val.size()] = tk;
+                }else{
+                    runningMap[val.size()].push_back(token_type(val, tp));
+                }
+            }
+        }
+    }
+
+    ifs.close();
+
+    std::stringstream ss;
+    ss << "/* Build from '" << path << "' */\n";
+    ss << "/* Contextual content */" << std::endl;
+    ss << "/////////////////////////////////\n";
+    ss << context << std::endl;
+    ss << "/////////////////////////////////\n";
+
+    ss << "/* Auto generated file ( " << __DATE__ << " " << __TIME__ << " ) */\n";
+    for(auto bit = tokenNamedMaps.begin(); bit != tokenNamedMaps.end(); bit++){
+        ss << "\nstd::vector<std::vector<GToken>> " << bit->first << " = {\n";
+        for(auto it = bit->second.begin(); it != bit->second.end(); it++){
+            unsigned int count = it->second.size();
+            unsigned int v = 0;
+            ss << "\t{\n";
+            for(token_type tk : it->second){
+                ss << "\t\t{ .value = \"" << tk.value << "\", .identifier = TOKEN_ID_"
+                    << tk.type << " },";
+                if(v < count-1){
+                    ss << "\n";
+                }else{
+                    ss << " },\n";
+                }
+                v++;
+            }
+        }
+        ss << "};\n";
+    }
+
+    if(pathName.size() > 0){
+        std::ofstream ofs(pathName);
+        if(ofs.is_open()){
+            ofs << ss.str() << std::endl;
+            ofs.close();
+        }
+    }
+    return 0;
+}
+
+int PackLanguages(std::string baseDir){
+    std::string dir = baseDir + std::string("/lang_tables");
+    int r = ForAllFiles(dir.c_str(), [&](fs::directory_entry entry,
+                        std::string filenameStr, std::ifstream *ifs) -> int
+    {
+        std::string path = dir + std::string("/") + filenameStr;
+        return language_table_gen(path.c_str());
+    });
+    return r;
+}
+
 int main(int argc, char **argv){
+
     std::string c_file("../src/resources");
     if(argc != 3 && argc != 4){
         std::cout << "No paths specified" << std::endl;
@@ -214,6 +386,9 @@ int main(int argc, char **argv){
     resourcepath += "/resources.h";
 
     int r = PackShaders(&vars, argv[1], c_file);
+    if(r != 0) return r;
+
+    r = PackLanguages(argv[1]);
     if(r != 0) return r;
 
     r = PackIcons(&vars, argv[1], c_file);

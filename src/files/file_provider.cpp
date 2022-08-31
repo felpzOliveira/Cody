@@ -6,6 +6,7 @@
 #include <file_base_hooks.h>
 #include <languages.h>
 #include <storage.h>
+#include <sstream>
 
 typedef struct FileProvider{
     FileBufferList fileBuffer;
@@ -24,12 +25,61 @@ typedef struct FileProvider{
 // Static allocation of the file provider
 static FileProvider fProvider;
 
+#if 0
+static void DumplangFile(std::vector<std::vector<std::vector<GToken>> *> ss,
+                         std::vector<const char *> titles, std::string path,
+                         std::string target)
+{
+    std::stringstream pp;
+    if(titles.size() != ss.size()){
+        printf("Invalid size for language file\n");
+        return;
+    }
+
+    uint i = 0;
+    pp << "TARGET " << target << std::endl;
+    for(std::vector<std::vector<GToken>> *k : ss){
+        pp << "BEGIN " << titles[i++] << std::endl;
+        for(std::vector<GToken> &ref : *k){
+            for(GToken tk : ref){
+                std::string name = Symbol_GetIdString(tk.identifier);
+                if(name.size() == 0){
+                    printf("MISSING TOKEN DEFINITION\n");
+                    return;
+                }
+                name.erase(0, 9);
+                pp << tk.value << " " << name << "\n";
+            }
+        }
+        pp << "END" << std::endl;
+    }
+
+    std::ofstream ofs(path);
+    if(ofs.is_open()){
+        ofs << pp.str();
+        ofs.close();
+    }
+}
+#endif
+
 static void InitTokenizers(){
     // NOTE: If this ever becomes slow we have 2 options:
     //        1- Use ParallelFor, I do believe we are able to initialize these
     //           in parallel.
     //        2- Initialize tokenizers only when their respective file is detected,
     //           this might be tricky, but might be the standard other editors do.
+
+    //DumplangFile({&cppReservedPreprocessor, &cppReservedTable},
+                //{"cppReservedPreprocessor", "cppReservedTable"}, "lang_cpp", "cpp.cpp");
+
+    //DumplangFile({&glslReservedPreprocessor, &glslReservedTable},
+                //{"glslReservedPreprocessor", "glslReservedTable"}, "lang_glsl", "glsl.cpp");
+
+    //DumplangFile({&litReservedPreprocessor, &litReservedTable},
+                //{"litReservedPreprocessor", "litReservedTable"}, "lang_lit", "lit.cpp");
+
+    //DumplangFile({&cmakeReservedPreprocessor, &cmakeReservedTable},
+                //{"cmakeReservedPreprocessor", "cmakeReservedTable"}, "lang_cmake", "cmake.cpp");
 
     // C/C++
     Lex_BuildTokenizer(&fProvider.cppTokenizer, &fProvider.symbolTable,

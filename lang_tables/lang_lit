@@ -1,0 +1,107 @@
+#include <languages.h>
+
+TokenizerSupport litSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+    .multilineComment = false,
+    .lineCommentChar = '#',
+};
+
+// This is kinda hacky because Lit uses '-' symbol for keywords
+// for instance: set-integrator is one token. However our lexer
+// does not support breaking out the divider list so we hack
+// the lexer by letting it split 'set-integrator' into 3 tokens:
+// 'set'   +  '-'   + 'integrator'. At somepoint we might
+// want to allow for a more robust divider list on the lexer
+// but it is not a must now.
+
+TARGET src/languages/lit.cpp
+BEGIN litReservedPreprocessor
+END
+BEGIN litReservedTable
+- OPERATOR
+uv OPERATOR
+max OPERATOR
+sky OPERATOR
+ray OPERATOR
+set OPERATOR
+eta OPERATOR
+mat OPERATOR
+Zirr OPERATOR
+Oidn OPERATOR
+OIDN OPERATOR
+oidn OPERATOR
+path OPERATOR
+type OPERATOR
+flip OPERATOR
+base OPERATOR
+name OPERATOR
+View DATATYPE
+alpha OPERATOR
+Optix OPERATOR
+optix OPERATOR
+OPTIX OPERATOR
+value OPERATOR
+sheen OPERATOR
+image OPERATOR
+width OPERATOR
+light OPERATOR
+pixel OPERATOR
+depth OPERATOR
+model OPERATOR
+coeff OPERATOR
+rough OPERATOR
+sigma OPERATOR
+scale OPERATOR
+Shape DATATYPE
+asym_g OPERATOR
+medium OPERATOR
+Medium DATATYPE
+render OPERATOR
+window OPERATOR
+sundir OPERATOR
+pixels OPERATOR
+height OPERATOR
+global OPERATOR
+vertex OPERATOR
+normal OPERATOR
+rotate OPERATOR
+radius OPERATOR
+center OPERATOR
+Filter DATATYPE
+sigma_a OPERATOR
+sigma_s OPERATOR
+texture OPERATOR
+Texture DATATYPE
+samples OPERATOR
+indices OPERATOR
+normals OPERATOR
+Include DATATYPE
+include DATATYPE
+Denoiser DATATYPE
+specular OPERATOR
+metallic OPERATOR
+rayleigh OPERATOR
+emission OPERATOR
+geometry OPERATOR
+Material DATATYPE
+luminance OPERATOR
+wireframe OPERATOR
+sheenTint OPERATOR
+clearcoat OPERATOR
+intensity OPERATOR
+normalize OPERATOR
+transform OPERATOR
+translate OPERATOR
+subsurface OPERATOR
+integrator OPERATOR
+resolution OPERATOR
+dispersion OPERATOR
+anisotropic OPERATOR
+reflectance OPERATOR
+transmission OPERATOR
+specularTint OPERATOR
+clearcoatGloss OPERATOR
+END
