@@ -10,6 +10,7 @@ TokenizerSupport litSupport = {
     .lookups = true,
     .multilineComment = false,
     .lineCommentChar = '#',
+    .procs = {},
 };
 
 // This is kinda hacky because Lit uses '-' symbol for keywords

@@ -149,7 +149,11 @@ void AppEarlyInitialize(bool use_tabs){
     storage->GetWorkingDirectory(appContext.cwd, PATH_MAX);
 
     appContext.autoCompleteMapping = AutoComplete_Initialize();
-    std::string dir(appContext.cwd); dir += "/.cody";
+    std::string dir(appContext.cwd);
+    if(dir[dir.size()-1] != '/'){
+        dir += "/";
+    }
+    dir += ".cody";
     appGlobalConfig.configFolder = dir;
     appGlobalConfig.rootFolder = appContext.cwd;
     appGlobalConfig.configFile = dir + std::string("/.config");
@@ -1381,8 +1385,10 @@ void AppCommandQueryBarSearchAndReplace(){
 
                     Buffer_RemoveRangeRaw(buf, searchResult->position,
                                 searchResult->position + searchReplace->toLocateLen);
-                    Buffer_InsertRawStringAt(buf, searchResult->position,
+                    if(searchReplace->toReplaceLen > 0){
+                        Buffer_InsertRawStringAt(buf, searchResult->position,
                                 searchReplace->toReplace, searchReplace->toReplaceLen);
+                    }
                     RemountTokensBasedOn(bView, cursor.x);
                     BufferView_Dirty(bView);
                 }

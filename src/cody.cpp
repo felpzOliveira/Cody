@@ -296,6 +296,7 @@ int main(int argc, char **argv){
         }
     }else{
         AppEarlyInitialize(args.use_tabs);
+        AppSetPathCompression(2);
         BufferView *bView = nullptr;
         InitializeEmptyView(&bView);
         Graphics_Initialize();

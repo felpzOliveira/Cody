@@ -10,6 +10,7 @@ TokenizerSupport glslSupport = {
     .lookups = true,
     .multilineComment = true,
     .lineCommentChar = 0,
+    .procs = {},
 };
 
 

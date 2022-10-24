@@ -10,6 +10,8 @@ TokenizerSupport cmakeSupport = {
     .lookups = true,
     .multilineComment = false,
     .lineCommentChar = '#',
+    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0 },
+               {"$<", ">", TOKEN_ID_DATATYPE, 0 }, },
 };
 
 
@@ -38,24 +40,37 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "EQUAL", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "endif", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "PUBLIC", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "TARGET", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "SHARED", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "STATIC", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "FOLDER", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "POLICY", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "elseif", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "export", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "option", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "PRIVATE", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "COMMAND", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "MATCHES", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "install", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "project", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "message", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "PROPERTY", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "REQUIRED", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "STREQUAL", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "function", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "LANGUAGES", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "find_path", .identifier = TOKEN_ID_OPERATOR }, },
+	{
+		{ .value = "C_STANDARD", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "add_library", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "endfunction", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "cmake_policy", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "find_package", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "find_library", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "source_group", .identifier = TOKEN_ID_OPERATOR },
@@ -95,6 +110,7 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "CMAKE_CURRENT_BINARY_DIR", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CMAKE_CURRENT_SOURCE_DIR", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "target_compile_definitions", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "target_include_directories", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "CMAKE_RUNTIME_OUTPUT_DIRECTORY", .identifier = TOKEN_ID_DATATYPE }, },

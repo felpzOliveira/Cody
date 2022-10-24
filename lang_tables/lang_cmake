@@ -7,6 +7,8 @@ TokenizerSupport cmakeSupport = {
     .lookups = true,
     .multilineComment = false,
     .lineCommentChar = '#',
+    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0 },
+               {"$<", ">", TOKEN_ID_DATATYPE, 0 }, },
 };
 
 TARGET src/languages/cmake.cpp
@@ -18,7 +20,18 @@ $ DATATYPE
 } DATATYPE
 if OPERATOR
 NOT PREPROCESSOR
+PUBLIC RESERVED
+PRIVATE RESERVED
+TARGET RESERVED
+SHARED RESERVED
+STATIC RESERVED
+PROPERTY RESERVED
+FOLDER RESERVED
+LANGUAGES RESERVED
+POLICY PREPROCESSOR
+C_STANDARD RESERVED
 set OPERATOR
+cmake_policy OPERATOR
 GLOB PREPROCESSOR
 list OPERATOR
 file OPERATOR
@@ -27,6 +40,7 @@ EQUAL PREPROCESSOR
 endif OPERATOR
 elseif OPERATOR
 export OPERATOR
+REQUIRED RESERVED
 option OPERATOR
 COMMAND OPERATOR
 MATCHES PREPROCESSOR
@@ -47,6 +61,7 @@ set_property OPERATOR
 CMAKE_COMMAND OPERATOR
 enable_testing OPERATOR
 add_executable OPERATOR
+target_compile_definitions OPERATOR
 configure_file OPERATOR
 add_definitions OPERATOR
 execute_process OPERATOR

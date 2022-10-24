@@ -57,7 +57,7 @@ class StorageDevice{
     virtual char *GetContentsOf(const char *path, uint *size) = 0;
     virtual bool IsLocallyStored() = 0;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) = 0;
-    virtual bool StreamWriteString(FileHandle *handle, const char *str) = 0;
+    virtual bool StreamWriteString(FileHandle *handle, const char *str, int line_brk=0) = 0;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) = 0;
     virtual bool StreamFinish(FileHandle *handle) = 0;
@@ -81,7 +81,7 @@ class LocalStorageDevice : public StorageDevice{
                           uint *n, uint *size) override;
     virtual char *GetContentsOf(const char *path, uint *size) override;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) override;
-    virtual bool StreamWriteString(FileHandle *handle, const char *str) override;
+    virtual bool StreamWriteString(FileHandle *handle, const char *str, int line_brk=0) override;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) override;
     virtual bool StreamFinish(FileHandle *handle) override;
@@ -106,7 +106,7 @@ class RemoteStorageDevice : public StorageDevice{
                           uint *n, uint *size) override;
     virtual char *GetContentsOf(const char *path, uint *size) override;
     virtual bool StreamWriteStart(FileHandle *handle, const char *path) override;
-    virtual bool StreamWriteString(FileHandle *handle, const char *str) override;
+    virtual bool StreamWriteString(FileHandle *handle, const char *str, int line_brk=0) override;
     virtual size_t StreamWriteBytes(FileHandle *handle, void *ptr,
                                     size_t size, size_t nmemb) override;
     virtual bool StreamFinish(FileHandle *handle) override;

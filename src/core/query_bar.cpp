@@ -20,8 +20,11 @@ static int QueryBar_EmptySearchReplaceCallback(QueryBar *bar, View *view, int ac
 }
 
 std::string QueryBarHistory_GetPath(){
-    std::string path(AppGetContextDirectory());
-    path += std::string("/.cody/") + QUERY_BAR_HISTORY_PATH;
+    std::string path(AppGetConfigDirectory());
+    if(path[path.size()-1] != '/'){
+        path += "/";
+    }
+    path += QUERY_BAR_HISTORY_PATH;
     return path;
 }
 
@@ -52,6 +55,11 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
             replace->toReplaceLen = searchLen;
             replace->toReplace[searchLen] = 0;
 
+            replace->state = QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE;
+        }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_REPLACE){
+            // this is actually an erase
+            replace->toReplaceLen = 0;
+            replace->toReplace[0] = 0;
             replace->state = QUERY_BAR_SEARCH_AND_REPLACE_EXECUTE;
         }else if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_ASK){
             // TODO: This is a OK on the execute question we need to replace the content
@@ -710,7 +718,7 @@ void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePa
         QueryBarHistoryItem *item = CircularStack_At(history, i);
         if(item->value.size() > 0){
             storage->StreamWriteString(&file, item->value.c_str());
-            printf(" Writing %s\n", item->value.c_str());
+            //printf(" Writing %s\n", item->value.c_str());
         }
     }
 

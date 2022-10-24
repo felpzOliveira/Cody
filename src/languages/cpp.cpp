@@ -9,6 +9,7 @@ TokenizerSupport cppSupport = {
     .lookups = true,
     .multilineComment = true,
     .lineCommentChar = 0,
+    .procs = {},
 };
 
 

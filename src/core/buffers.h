@@ -104,7 +104,7 @@ void Buffer_Init(Buffer *buffer, uint size);
 * Marks this buffer as being modified by our editor. While we automatically call
 * this function in several places during editing because of the nature of this
 * operation it is better for you to call this manually when you are about to edit
-* a buffer. This is used to better format a output file when writing to disk.
+* a buffer. This is used to better format the output file when writing to disk.
 */
 void Buffer_Claim(Buffer *buffer);
 

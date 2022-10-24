@@ -72,8 +72,8 @@ bool LocalStorageDevice::StreamWriteStart(FileHandle *handle, const char *path){
     return true;
 }
 
-bool LocalStorageDevice::StreamWriteString(FileHandle *handle, const char *str){
-    return handle->localFile.WriteString(str, 0);
+bool LocalStorageDevice::StreamWriteString(FileHandle *handle, const char *str, int line_brk){
+    return handle->localFile.WriteString(str, line_brk);
 }
 
 size_t LocalStorageDevice::StreamWriteBytes(FileHandle *handle, void *ptr,
@@ -236,12 +236,22 @@ size_t RemoteStorageDevice::StreamWriteBytes(FileHandle *handle, void *ptr,
     return val;
 }
 
-bool RemoteStorageDevice::StreamWriteString(FileHandle *handle, const char *str){
+bool RemoteStorageDevice::StreamWriteString(FileHandle *handle, const char *str, int line_brk){
     std::vector<uint8_t> out;
-    uint32_t len = strlen(str);
-    if(!client.StreamWriteUpdate(out, (uint8_t *)str, len+1, 0)){
-        LOG_ERR("Failed to write string to file");
-        return false;
+    if(!line_brk){
+        uint32_t len = strlen(str);
+        if(!client.StreamWriteUpdate(out, (uint8_t *)str, len+1, 0)){
+            LOG_ERR("Failed to write string to file");
+            return false;
+        }
+    }else{
+        std::string tmp(str);
+        tmp += "\n";
+        uint32_t len = tmp.size();
+        if(!client.StreamWriteUpdate(out, (uint8_t *)tmp.c_str(), len+1, 0)){
+            LOG_ERR("Failed to write string to file");
+            return false;
+        }
     }
     return true;
 }

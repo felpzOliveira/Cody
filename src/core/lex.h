@@ -48,8 +48,13 @@
 */
 
 /*
-* There are bugs on highlighting some components, i.e.: struct, typedef, etc...
-* if it is not fixed yet you can disable it with the following variable.
+* There are bugs on highlighting some components, i.e.: templates, typedef, etc...
+* if it is not fixed yet you can disable it with the following variable. Its
+* default value is false, i.e.: attempt to highlight everything. Some constructs
+* in C++ might be too dificult to parse without an actual lexer so you may experience
+* bugs. If this is annoying to you, you can either run cody with -no-proc flag or
+* go into lex.cpp and set this variable to true, it should run without attempting to
+* detect these constructs and be bug free - hopefully.
 */
 extern bool LEX_DISABLE_PROC_STACK;
 
@@ -73,7 +78,6 @@ typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
 #define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer, int process_tab)
 
 #define LEX_LOGICAL_PROCESSOR(name) int name(Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p)
-
 
 #define TOKEN_INITIALIZER {.size = 0, .position = 0, .identifier = TOKEN_ID_NONE}
 #define LOOKUP_TABLE_INITIALIZER {.table = nullptr, .nSize = 0, .startOffset = 0}
@@ -193,6 +197,10 @@ typedef struct{
     uint indentLevel;
     uint parenLevel;
 
+    // context parsing
+    int context_depth;
+    int context_id;
+
     // Comment parsing
     int aggregate;
     int type;
@@ -225,6 +233,10 @@ struct Tokenizer{
     // help bufferview with information about nest at start of line
     uint runningIndentLevel;
     uint runningParenIndentLevel;
+
+    // context parsing
+    int context_depth;
+    int context_id;
 
     // Comment parsing
     int aggregate;

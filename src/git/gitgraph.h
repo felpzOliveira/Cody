@@ -3,6 +3,7 @@
 #include <git2.h>
 #include <vector>
 #include <string>
+#include <gitbase.h>
 
 typedef struct GitGraphNode{
     git_commit *commit;
@@ -21,9 +22,10 @@ typedef struct GitGraph{
 /*
 * Builds a graph based on the tree reachable from the given commit.
 */
-GitGraph *GitGraph_Build(git_commit *commit);
+GitGraph *GitGraph_Build(GitState *state);
 
 /*
 * Releases the memory from a given graph.
 */
 void GitGraph_Free(GitGraph *graph);
+

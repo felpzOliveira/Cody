@@ -1,4 +1,5 @@
 #include <gitgraph.h>
+#include <gitbase.h>
 #include <stack>
 #include <map>
 
@@ -188,4 +189,56 @@ GitGraph *GitGraph_Build(git_commit *commit){
     ggraph->graph = gnode;
 
     return ggraph;
+}
+
+PriorityQueue<commit_info> *Git_GetStartingCommits(GitState *state, bool local_only){
+    PriorityQueue<commit_info> *pq = nullptr;
+    if(state->repo){
+        std::map<std::string, commit_info *> cmtMap;
+        pq = PriorityQueue_Create<commit_info>(commit_info_comp);
+        auto iterator = [&](git_reference *ref, GitReferenceType type) -> bool{
+            if(type == GIT_REF_BRANCH_LOCAL ||
+               (!local_only && type == GIT_REF_BRANCH_REMOTE))
+            {
+                const char *branchName = nullptr;
+                git_branch_name(&branchName, ref);
+
+                // TODO: figure out how to add HEAD into viweing
+                std::string name(branchName);
+                if(name == "origin/HEAD" || name == "HEAD") return true;
+
+                commit_info *info = new commit_info;
+
+                git_reference_name_to_id(&info->oid, state->repo, git_reference_name(ref));
+                git_commit_lookup(&info->commit, state->repo, &info->oid);
+
+                std::string h1 = GitGraph_GetCommitHash(info->commit);
+                if(cmtMap.find(h1) == cmtMap.end()){
+                    info->type = type;
+                    info->branch = branchName;
+                    info->time = git_commit_time(info->commit);
+                    PriorityQueue_Push(pq, info);
+                    cmtMap[h1] = info;
+                }else{
+                    git_commit_free(info->commit);
+                    delete info;
+                }
+            }
+            return true;
+        };
+
+        Git_TransverseRelevantReferences(state, iterator);
+    }
+    return pq;
+}
+
+GitGraph *GitGraph_Build(GitState *state){
+    PriorityQueue<commit_info> *pq = Git_GetStartingCommits(state, false);
+
+    commit_info *info = PriorityQueue_Peek(pq);
+    GitGraph *graph = GitGraph_Build(info->commit);
+    GitGraph_Free(graph);
+
+    PriorityQueue_Free(pq);
+    return nullptr;
 }

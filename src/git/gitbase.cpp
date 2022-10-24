@@ -11,105 +11,7 @@
 #define MODULE_NAME "GIT"
 #define GIT_DISABLED_RET() do{ if(gitState.is_disabled) return; }while(0)
 
-struct GitState{
-    git_repository *repo;
-    git_reference *head;
-    git_diff *diff;
-    bool is_disabled;
-};
-
 GitState gitState = {.repo=nullptr, .head=nullptr, .diff=nullptr, .is_disabled=false};
-
-/*
-* libgit2 has a bug on git_branch_next function regarding some pointers it handles.
-* Compiling it with -O2/-Ofast makes that function generate a SIGSEGV so we have
-* to bypass it and make a stable version for listing branches. After a little toying
-* we see it is a simple git_reference_* manager, so we just do that manually here
-* and hope the bug does not lie in the git_reference API. libgit2 has the bad principle
-* to not initialize its variables so it might be that they are pointing to somewhere
-* broken and missing a check. Since the issue only happens when debug is not enabled
-* I can't be sure where the issue is without a heavy debug session, so I'll rewrite
-* that function.
-*/
-/**********************************************************************/
-#define GIT_REFS_DIR (char *)"refs/"
-#define GIT_REFS_HEADS_DIR GIT_REFS_DIR "heads/"
-#define GIT_REFS_TAGS_DIR GIT_REFS_DIR "tags/"
-#define GIT_REFS_REMOTES_DIR GIT_REFS_DIR "remotes/"
-#define GIT_REFS_NOTES_DIR GIT_REFS_DIR "notes/"
-
-typedef enum{
-    GIT_REF_NONE = 0,
-    GIT_REF_TAG,
-    GIT_REF_BRANCH_LOCAL,
-    GIT_REF_BRANCH_REMOTE,
-}GitReferenceType;
-
-const char *GitReferenceString(GitReferenceType type){
-    switch(type){
-        case GIT_REF_TAG : return "Tag";
-        case GIT_REF_BRANCH_LOCAL : return "Local Branch";
-        case GIT_REF_BRANCH_REMOTE : return "Remote Branch";
-        default: return "Unknow";
-    }
-}
-
-// The function fn should return true in case it wants to keep transversing
-// or false if it should interrupt
-template<typename Fn> static bool Git_TransverseRelevantReferences(const Fn &fn){
-    if(!gitState.repo) return false;
-    int rv = 0, err = 0;
-    git_reference_iterator *it = nullptr;
-    git_reference *ref = nullptr;
-    bool keep = true;
-
-    rv = git_reference_iterator_new(&it, gitState.repo);
-    if(rv != 0){
-        DEBUG_MSG("Failed to create references iterator\n");
-        return false;
-    }
-
-    while((err = git_reference_next(&ref, it)) == 0 && keep){
-        GitReferenceType type = GIT_REF_NONE;
-        const char *ptr = git_reference_name(ref);
-        uint len = strlen(ptr);
-        if(StringStartsWith((char *)ptr, len,
-            GIT_REFS_TAGS_DIR, strlen(GIT_REFS_TAGS_DIR)))
-        {
-            type = GIT_REF_TAG;
-        }else if(StringStartsWith((char *)ptr, len,
-            GIT_REFS_HEADS_DIR, strlen(GIT_REFS_HEADS_DIR)))
-        {
-            type = GIT_REF_BRANCH_LOCAL;
-        }else if(StringStartsWith((char *)ptr, len,
-            GIT_REFS_REMOTES_DIR, strlen(GIT_REFS_REMOTES_DIR)))
-        {
-            type = GIT_REF_BRANCH_REMOTE;
-        }
-
-        if(type != GIT_REF_NONE){
-            keep = fn(ref, type);
-        }
-
-        git_reference_free(ref);
-        ref = nullptr;
-    }
-
-    git_reference_iterator_free(it);
-
-    if(err != GIT_ITEROVER && err != 0){
-        rv = -1;
-    }
-
-    return rv == 0;
-}
-/**********************************************************************/
-
-static std::string Git_GetCommitHash(git_commit *cmt, uint n=9){
-    const git_oid *oid = git_commit_id(cmt);
-    std::string buf(git_oid_tostr_s(oid), n);
-    return buf;
-}
 
 static bool Git_TryOpenRepo(git_repository **repo, git_reference **head, std::string root){
     int rv = 0;
@@ -347,69 +249,8 @@ bool Git_FetchDiffFor(const char *target, std::vector<LineHighlightInfo> *_hunks
     return rv == 0;
 }
 
-struct commit_info{
-    git_time_t time;
-    git_oid oid;
-    std::string branch;
-    git_commit *commit;
-    int btype; // 0 - local only, 1 - remote only, 2 - both
-    GitReferenceType type;
-};
 
-int commit_info_comp(commit_info *a, commit_info *b){
-    return a->time > b->time;
-}
-
-typedef PriorityQueue<commit_info> CommitInfoPriorityQueue;
-
-static CommitInfoPriorityQueue *Git_GetStartingCommits(bool local_only=false){
-    CommitInfoPriorityQueue *pq = nullptr;
-    if(gitState.repo){
-        std::vector<commit_info *> list;
-        pq = PriorityQueue_Create<commit_info>(commit_info_comp);
-        auto iterator = [&](git_reference *ref, GitReferenceType type) -> bool{
-            if(type == GIT_REF_BRANCH_LOCAL ||
-               (!local_only && type == GIT_REF_BRANCH_REMOTE))
-            {
-                const char *branchName = nullptr;
-                git_branch_name(&branchName, ref);
-
-                // TODO: figure out how to add HEAD into viweing
-                std::string name(branchName);
-                if(name == "origin/HEAD" || name == "HEAD") return true;
-
-                commit_info *info = new commit_info;
-
-                bool insert = true;
-                git_reference_name_to_id(&info->oid, gitState.repo, git_reference_name(ref));
-                git_commit_lookup(&info->commit, gitState.repo, &info->oid);
-
-                std::string h1 = Git_GetCommitHash(info->commit);
-                for(commit_info *e : list){
-                    std::string h0 = Git_GetCommitHash(e->commit);
-                    insert = h0 != h1;
-                    if(!insert) break;
-                }
-
-                if(insert){
-                    info->type = type;
-                    info->branch = branchName;
-                    info->time = git_commit_time(info->commit);
-                    PriorityQueue_Push(pq, info);
-                    list.push_back(info);
-                }else{
-                    git_commit_free(info->commit);
-                    delete info;
-                }
-            }
-            return true;
-        };
-
-        Git_TransverseRelevantReferences(iterator);
-    }
-    return pq;
-}
-
+#if 0
 std::string shrink_message(std::string msg){
     int i = -1;
     for(uint j = 0; j < msg.size(); j++){
@@ -513,19 +354,18 @@ void Git_PrintTree2(commit_info *info){
 }
 
 bool Git_LogGraph(){
-    CommitInfoPriorityQueue *pq = Git_GetStartingCommits();
+    CommitInfoPriorityQueue *pq = Git_GetStartingCommits(false);
     if(!pq) return false;
     if(PriorityQueue_Size(pq) > 0){
         printf("Size %d\n", PriorityQueue_Size(pq));
-        commit_info *info = PriorityQueue_Peek(pq);
+        //commit_info *info = PriorityQueue_Peek(pq);
         PriorityQueue_Pop(pq);
 
         //Git_PrintTree2(info);
         //Git_PrintTree3(info->commit, 0);
         //Git_PrintTree(info->commit, 0);
         //printf("Counter = %d\n", (int)counter);
-        //GitGraph *graph = GitGraph_Build(info->commit);
-        //GitGraph_Free(graph);
+        GitGraph *graph = GitGraph_Build();
     }
 #if 0
     while(PriorityQueue_Size(pq) > 0){
@@ -544,6 +384,12 @@ bool Git_LogGraph(){
 #endif
     PriorityQueue_Free(pq);
     return true;
+}
+#endif
+
+bool Git_LogGraph(){
+    GitGraph_Build(&gitState);
+    return false;
 }
 
 bool Git_ComputeCurrentDiff(){

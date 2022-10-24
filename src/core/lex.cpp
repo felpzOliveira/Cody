@@ -488,6 +488,8 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
     return filter > 1 ? 0 : 1;
 }
 
+// NOTE: Since binary declarations are not standard I won't support them here
+//       makes this thing easier to handle.
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_Number){
     (void)context;
@@ -815,11 +817,85 @@ LEX_PROCESSOR(Lex_Comments){
         }
     }
 
-    end:
+end:
     *len = rLen;
     tokenizer->aggregate = aggregate;
     tokenizer->type = type;
     return rLen > 0 ? (aggregate > 0 ? 3 : 1) : 0;
+}
+
+inline bool Lex_CharStringCmp(char **ptr, size_t n, const std::string &str){
+    if(n < str.size()) return false;
+    for(size_t i = 0; i < str.size(); i++){
+        char *at = (*ptr) + i;
+        if(*at != str[i]) return false;
+    }
+    return true;
+}
+
+/* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
+LEX_PROCESSOR(Lex_ContextualProcessor){
+    size_t rLen = 0;
+    size_t startSize = 0, endSize = 0;
+    ContextualProcessor *proc = nullptr;
+    int type = tokenizer->context_id;
+    int aggregate = tokenizer->context_depth;
+
+    *len = 0;
+    *head = *p;
+    if(tokenizer->support.procs.size() == 0) goto end;
+
+    // no proc active
+    if(type < 0){
+        for(size_t i = 0; i < tokenizer->support.procs.size(); i++){
+            proc = &tokenizer->support.procs[i];
+            if(Lex_CharStringCmp(p, n, proc->start)){
+                type = i;
+                rLen += proc->start.size();
+                (*p) += proc->start.size();
+                aggregate = 1;
+                break;
+            }
+        }
+
+        if(type < 0){
+            goto end;
+        }
+    }
+
+    proc = &tokenizer->support.procs[type];
+    startSize = proc->start.size();
+    endSize = proc->end.size();
+
+    while(rLen < n){
+        if(Lex_CharStringCmp(p, n - rLen, proc->end)){
+            rLen += endSize;
+            (*p) += endSize;
+            aggregate -= 1;
+            if(aggregate == 0){
+                type = -1;
+                goto end;
+            }
+        }else if(Lex_CharStringCmp(p, n - rLen, proc->start)){
+            aggregate += 1;
+            rLen += startSize;
+            (*p) += startSize;
+        }else{
+            (*p)++;
+            rLen++;
+        }
+    }
+
+end:
+    // we have to do this here because the outside scope does not know the proc to use
+    if(rLen > 0){
+        token->identifier = proc->id;
+        token->size = rLen;
+    }
+    *len = rLen;
+    tokenizer->context_id = type;
+    tokenizer->context_depth = aggregate;
+    return rLen > 0 ? proc->is_multiline : -1;
 }
 
 /* (char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher, TokenizerContext *context, Tokenizer *tokenizer) */
@@ -935,6 +1011,14 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
 
     if(n == 1 && **p == '\\'){
         rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }
+
+    lexrv = Lex_ContextualProcessor(p, n, &h, &len, context, token, tokenizer);
+    if(lexrv > 0){ // found something that is multiline
+        rv = TOKENIZER_OP_UNFINISHED;
+        goto end;
+    }else if(lexrv == 0){ // found something that is on the line
         goto end;
     }
 
@@ -1305,6 +1389,8 @@ void Lex_BuildTokenizer(Tokenizer *tokenizer, SymbolTable *symTable,
     tokenizer->aggregate = 0;
     tokenizer->type = 0;
     tokenizer->inclusion = 0;
+    tokenizer->context_depth = 0;
+    tokenizer->context_id = -1;
     tokenizer->runningIndentLevel = 0;
     tokenizer->runningParenIndentLevel = 0;
 
@@ -1351,6 +1437,8 @@ void Lex_TokenizerContextReset(Tokenizer *tokenizer){
     tokenizer->lineBeginning = 0;
     tokenizer->aggregate = 0;
     tokenizer->type = 0;
+    tokenizer->context_id = -1;
+    tokenizer->context_depth = 0;
     tokenizer->inclusion = 0;
     tokenizer->runningIndentLevel = 0;
     tokenizer->runningParenIndentLevel = 0;
@@ -1368,6 +1456,8 @@ void Lex_TokenizerContextEmpty(TokenizerStateContext *context){
     context->indentLevel = 0;
     context->parenLevel = 0;
     context->type = 0;
+    context->context_id = -1;
+    context->context_depth = 0;
     BoundedStack_SetDefault(&context->procStack);
 }
 
@@ -1380,6 +1470,8 @@ void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *c
     context->inclusion = tokenizer->inclusion;
     context->aggregate = tokenizer->aggregate;
     context->type = tokenizer->type;
+    context->context_id = tokenizer->context_id;
+    context->context_depth = tokenizer->context_depth;
     context->indentLevel = tokenizer->runningIndentLevel;
     context->parenLevel = tokenizer->runningParenIndentLevel;
     BoundedStack_Copy(&context->procStack, tokenizer->procStack);
@@ -1397,6 +1489,8 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
     tokenizer->inclusion = context->inclusion;
     tokenizer->aggregate = context->aggregate;
     tokenizer->type = context->type;
+    tokenizer->context_depth = context->context_depth;
+    tokenizer->context_id = context->context_id;
     tokenizer->runningIndentLevel = context->indentLevel;
     tokenizer->runningParenIndentLevel = context->parenLevel;
     BoundedStack_Copy(tokenizer->procStack, &context->procStack);

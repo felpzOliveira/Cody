@@ -11,6 +11,13 @@ typedef struct{
     TokenId identifier;
 }GToken; // TODO: At least TRY to parse from this and see if it is ok
 
+// context aware parsing
+struct ContextualProcessor{
+    std::string start, end;
+    TokenId id;
+    int is_multiline;
+};
+
 typedef struct{
     bool comments;
     bool strings;
@@ -18,6 +25,7 @@ typedef struct{
     bool lookups;
     bool multilineComment;
     char lineCommentChar;
+    std::vector<ContextualProcessor> procs;
 }TokenizerSupport;
 
 // C/C++
