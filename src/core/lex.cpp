@@ -6,7 +6,7 @@
 #include <vector>
 #include <buffers.h>
 
-#if 1
+#if 0
     #define PRINT_SAFE(head, ptr, len)do{\
         char __mem[128], __n[64];\
         memcpy(__n, ptr, len);\
