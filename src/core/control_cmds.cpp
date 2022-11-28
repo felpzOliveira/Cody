@@ -187,6 +187,107 @@ void ControlCommands_RestoreExpand(){
     FinishEvent();
 }
 
+// Up/right => direction = 1, 0 otherwise
+void ControlCommands_ViewArrowSelect(int direction, int axis){
+    NullRet(!ControlCommands_IsExpanded());
+    int other_axis = (axis+1)%2;
+    View *view = AppGetActiveView();
+    ViewTreeIterator iterator;
+
+    ViewTree_Begin(&iterator);
+
+    ViewNode *vnode = iterator.value;
+    bool found = false;
+    // find the current view and get the baseX value
+    while(iterator.value){
+        if(view == iterator.value->view){
+            vnode = iterator.value;
+            found = true;
+            break;
+        }
+        ViewTree_Next(&iterator);
+    }
+
+    if(found){
+        auto cmp = [&](ViewNode *nodeA, ViewNode *nodeB) -> int{
+            if(direction == 1)
+                return nodeA->geometry.lower[axis] < nodeB->geometry.lower[axis];
+            else
+                return nodeA->geometry.lower[axis] > nodeB->geometry.lower[axis];
+        };
+        ViewNode *bestfit = nullptr;
+        PriorityQueue<ViewNode> *pq = PriorityQueue_Create<ViewNode>(cmp);
+        vec2ui lower = vnode->geometry.lower;
+        vec2ui upper = vnode->geometry.upper;
+        uint dif = 99999;
+        ViewTree_Begin(&iterator);
+
+        while(iterator.value){
+            if(iterator.value != vnode){
+                bool insert = false;
+                if(direction == 1)
+                    insert = iterator.value->geometry.upper[axis] > upper[axis];
+                else
+                    insert = iterator.value->geometry.lower[axis] < lower[axis];
+                if(insert){
+                    PriorityQueue_Push(pq, iterator.value);
+                }
+            }
+            ViewTree_Next(&iterator);
+        }
+
+        PriorityQueue_ForAllItems(pq, [&](ViewNode *pqNode) -> int{
+            uint cur_dif = dif;
+            if(direction == 1 && axis == 1)
+                cur_dif = Absf((Float)pqNode->geometry.lower[other_axis] -
+                                (Float)lower[other_axis]);
+            else if(direction == 1 && axis == 0)
+                cur_dif = Absf((Float)pqNode->geometry.upper[other_axis] -
+                                (Float)upper[other_axis]);
+            else if(direction == 1)
+                cur_dif = Absf((Float)pqNode->geometry.lower[other_axis] -
+                                (Float)lower[other_axis]);
+            else
+                cur_dif = Absf((Float)pqNode->geometry.upper[other_axis] -
+                                (Float)upper[other_axis]);
+
+            if(cur_dif < dif){
+                bestfit = pqNode;
+                dif = cur_dif;
+            }
+            return 1;
+        });
+
+        if(bestfit){
+            if(BufferView_IsVisible(&bestfit->view->bufferView)){
+                ViewTree_SetActive(bestfit);
+                AppSetActiveView(bestfit->view);
+            }
+        }
+        PriorityQueue_Free(pq);
+    }else{
+        BUG();
+        BUG_PRINT("Could not locate the active view in view tree");
+    }
+    ControlCmdsClear();
+}
+
+void ControlCommands_ViewDown(){
+    ControlCommands_ViewArrowSelect(0, 1);
+}
+
+void ControlCommands_ViewUp(){
+    ControlCommands_ViewArrowSelect(1, 1);
+}
+
+void ControlCommands_ViewRight(){
+    ControlCommands_ViewArrowSelect(1, 0);
+}
+
+void ControlCommands_ViewLeft(){
+    ControlCommands_ViewArrowSelect(0, 0);
+}
+
 void ControlCommands_Initialize(){
     BindingMap *mapping = KeyboardCreateMapping();
 
@@ -196,10 +297,10 @@ void ControlCommands_Initialize(){
     RegisterRepeatableEvent(mapping, ControlCmdsRenderIndices, Key_Q);
     RegisterRepeatableEvent(mapping, ControlCmdsExpandCurrent, Key_Z);
     RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Space);
-    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Left);
-    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Right);
-    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Down);
-    RegisterRepeatableEvent(mapping, ControlCmdsClear, Key_Up);
+    RegisterRepeatableEvent(mapping, ControlCommands_ViewLeft, Key_Left);
+    RegisterRepeatableEvent(mapping, ControlCommands_ViewRight, Key_Right);
+    RegisterRepeatableEvent(mapping, ControlCommands_ViewDown, Key_Down);
+    RegisterRepeatableEvent(mapping, ControlCommands_ViewUp, Key_Up);
 
     controlCmds.mapping = mapping;
     controlCmds.lastMapping = nullptr;

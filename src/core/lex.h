@@ -180,6 +180,12 @@ struct BoundedStack{
     int top;
 };
 
+struct TokenRegister{
+    char **where;
+    size_t rLen;
+    TokenId id;
+};
+
 /*
 * Tokenizer state. Can be used to save and restore tokenization from
 * a specific point. While 'Lex_TokenizerGetCurrentState' can retrieve most
@@ -192,6 +198,8 @@ typedef struct{
     uint backTrack;
     uint forwardTrack;
     BoundedStack procStack;
+
+    TokenRegister tokenRegister;
 
     // utility for faster nest computation and identation
     uint indentLevel;
@@ -229,6 +237,9 @@ struct Tokenizer{
     uint runningLine;
     int givenTokens;
     SymbolTable *symbolTable;
+
+    // add for injection of tokens so we can break parsing into multiple tokens
+    TokenRegister tokenRegister;
 
     // help bufferview with information about nest at start of line
     uint runningIndentLevel;

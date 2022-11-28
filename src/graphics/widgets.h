@@ -383,7 +383,7 @@ class Widget{
     void SetStyle(WidgetStyle stl){ style = stl; style.valid = true; }
 
     /*
-    * Starts a animation (transition) in this widget. If a transition is already
+    * Starts an animation (transition) in this widget. If a transition is already
     * in place than this call is ignored.
     */
     void Animate(const WidgetTransition &wtransition);
@@ -398,7 +398,7 @@ class Widget{
     void InterruptAnimation();
 
     /*
-    * Computest the widget geometry *after* applying the transition in place.
+    * Compute the widget geometry *after* applying the transition in place.
     * Calling this is the same as advancing the animation by 'dt'. This routine
     * calls OnAnimationUpdate to allow childs to update, returns the new geometry
     * which is also updated to the widget's global geometry.

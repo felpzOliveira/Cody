@@ -72,6 +72,10 @@ typedef struct{
     vec4i datatypeColor;
     // color to display comments
     vec4i commentColor;
+    // color to display TODO inside a comment
+    vec4i commentTodoColor;
+    // color to display NOTE inside a comment
+    vec4i commentNoteColor;
     // color to display strings, i.e.: "string"
     vec4i stringColor;
     // color to display numbers

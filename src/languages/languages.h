@@ -4,6 +4,7 @@
 #define LANGUAGES_H
 #include <symbol.h>
 #include <vector>
+#include <functional>
 
 // auxiliary structure for building the token table.
 typedef struct{
@@ -16,6 +17,9 @@ struct ContextualProcessor{
     std::string start, end;
     TokenId id;
     int is_multiline;
+    // when multiline = 2 this informs if the capture
+    // should continue
+    std::function<bool(char *, char *)> fnChecker;
 };
 
 typedef struct{
@@ -42,6 +46,11 @@ extern TokenizerSupport glslSupport;
 extern std::vector<std::vector<GToken>> litReservedPreprocessor;
 extern std::vector<std::vector<GToken>> litReservedTable;
 extern TokenizerSupport litSupport;
+
+// Python
+extern std::vector<std::vector<GToken>> pyReservedPreprocessor;
+extern std::vector<std::vector<GToken>> pyReservedTable;
+extern TokenizerSupport pythonSupport;
 
 // Empty
 extern std::vector<std::vector<GToken>> noneReservedPreprocessor;

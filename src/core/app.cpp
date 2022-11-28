@@ -79,6 +79,7 @@ void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
             targetGeo.extensionX = view->geometry.extensionX;
             targetGeo.extensionY = view->geometry.extensionY;
             View_SetGeometry(view, targetGeo, lineHeight);
+            node->geometry = targetGeo;
         }
 
         return 0;

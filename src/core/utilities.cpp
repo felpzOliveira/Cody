@@ -771,7 +771,7 @@ int StopChar(char v){
             v == '\"' || v == '\'' || v == '*' || v == '&' || v == '!' ||
             v == '|' || v == '(' || v == ')' || v == '{' || v == '}' ||
             v == '[' || v == ']' || v == ';' || v == ',' || v == '<' ||
-            v == '>' || v == '\t');
+            v == '>' || v == '\t' || v == ':' || v == '\\' || v == '\n');
 }
 
 void RemoveUnwantedLineTerminators(std::string &line){

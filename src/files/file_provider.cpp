@@ -15,6 +15,7 @@ typedef struct FileProvider{
     file_hook creationHooks[MAX_HOOKS];
     uint openHooksCount, createHooksCount;
     Tokenizer cppTokenizer, cppDetachedTokenizer;
+    Tokenizer pyTokenizer, pyDetachedTokenizer;
     Tokenizer glslTokenizer, glslDetachedTokenizer;
     Tokenizer emptyTokenizer, emptyDetachedTokenizer;
     Tokenizer litTokenizer, litDetachedTokenizer;
@@ -88,6 +89,13 @@ static void InitTokenizers(){
     Lex_BuildTokenizer(&fProvider.cppDetachedTokenizer, &fProvider.symbolTable,
                        {&cppReservedPreprocessor, &cppReservedTable}, &cppSupport);
 
+    // Python
+    Lex_BuildTokenizer(&fProvider.pyTokenizer, &fProvider.symbolTable,
+                       {&pyReservedPreprocessor, &pyReservedTable}, &pythonSupport);
+
+    Lex_BuildTokenizer(&fProvider.pyDetachedTokenizer, &fProvider.symbolTable,
+                       {&pyReservedPreprocessor, &pyReservedTable}, &pythonSupport);
+
     // GLSL
     Lex_BuildTokenizer(&fProvider.glslTokenizer, &fProvider.symbolTable,
                        {&glslReservedPreprocessor, &glslReservedTable}, &glslSupport);
@@ -122,6 +130,7 @@ void FileProvider_Initialize(){
 
     // Tokenizers all share the same Symbol Table as it is very expensive to have multiple
     fProvider.cppTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.pyTokenizer    = TOKENIZER_INITIALIZER;
     fProvider.glslTokenizer  = TOKENIZER_INITIALIZER;
     fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litTokenizer   = TOKENIZER_INITIALIZER;
@@ -129,6 +138,7 @@ void FileProvider_Initialize(){
 
     // Detached tokenizer for parallel parsing
     fProvider.cppDetachedTokenizer   = TOKENIZER_INITIALIZER;
+    fProvider.pyDetachedTokenizer    = TOKENIZER_INITIALIZER;
     fProvider.glslDetachedTokenizer  = TOKENIZER_INITIALIZER;
     fProvider.emptyDetachedTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litDetachedTokenizer   = TOKENIZER_INITIALIZER;
@@ -214,6 +224,11 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len,
             props->type = 2;
             if(detached) return FileProvider_GetDetachedEmptyTokenizer();
             return FileProvider_GetEmptyTokenizer();
+        }else if(strExt == ".py" || strExt == ".PY"){
+            props->type = 5;
+            props->ext = FILE_EXTENSION_PYTHON;
+            if(detached) return FileProvider_GetDetachedPythonTokenizer();
+            return FileProvider_GetPythonTokenizer();
         }
 
         // TODO: Cmake file should be handled here as well
@@ -237,6 +252,7 @@ Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
         case 2: return FileProvider_GetEmptyTokenizer();
         case 3: return FileProvider_GetLitTokenizer();
         case 4: return FileProvider_GetCmakeTokenizer();
+        case 5: return FileProvider_GetPythonTokenizer();
         default:{
             //TODO: Empty tokenizer
             return FileProvider_GetEmptyTokenizer();
@@ -359,6 +375,10 @@ Tokenizer *FileProvider_GetCppTokenizer(){
     return &fProvider.cppTokenizer;
 }
 
+Tokenizer *FileProvider_GetPythonTokenizer(){
+    return &fProvider.pyTokenizer;
+}
+
 Tokenizer *FileProvider_GetGlslTokenizer(){
     return &fProvider.glslTokenizer;
 }
@@ -385,6 +405,10 @@ Tokenizer *FileProvider_GetDetachedGlslTokenizer(){
 
 Tokenizer *FileProvider_GetDetachedEmptyTokenizer(){
     return &fProvider.emptyDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedPythonTokenizer(){
+    return &fProvider.pyDetachedTokenizer;
 }
 
 Tokenizer *FileProvider_GetDetachedLitTokenizer(){

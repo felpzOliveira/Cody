@@ -969,6 +969,13 @@ class Geometry{
         extensionY = vec2f(0, 0);
     }
 
+    Geometry(const Geometry &other){
+        lower = other.lower;
+        upper = other.upper;
+        extensionX = other.extensionX;
+        extensionY = other.extensionY;
+    }
+
     vec2f Center(){
         Float x = (Float)lower.x + (Float)upper.x;
         Float y = (Float)lower.y + (Float)upper.y;

@@ -1,0 +1,86 @@
+#include <languages.h>
+#include <functional>
+
+// we only capture '@<letter*>.<letter*>...
+bool python_decorator_capture(char *head, char *curr){
+    char value = *curr;
+    // 1 - grab any valid character
+    if((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z'))
+        return true;
+    // 2 - accept @<something>.<something2> and compoundend strings
+    // i.e. : something_something
+    return value == '.' || value == '_';
+}
+
+TokenizerSupport pythonSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+    .multilineComment = false,
+    .lineCommentChar = '#',
+    .procs = { { "@", "a", TOKEN_ID_DATATYPE, 2,  python_decorator_capture }, },
+};
+
+TARGET src/languages/py.cpp
+BEGIN pyReservedPreprocessor
+END
+BEGIN pyReservedTable
++ MATH
+- MATH
+> MORE
+< LESS
+/ MATH
+% MATH
+! MATH
+= MATH
+* ASTERISK
+& MATH
+| MATH
+^ MATH
+~ MATH
+, COMMA
+. MATH
+( PARENTHESE_OPEN
+) PARENTHESE_CLOSE
+{ BRACE_OPEN
+} BRACE_CLOSE
+[ BRACKET_OPEN
+] BRACKET_CLOSE
+: MATH
+if OPERATOR
+raise OPERATOR
+True OPERATOR
+False OPERATOR
+None OPERATOR
+def OPERATOR
+import OPERATOR
+return OPERATOR
+try OPERATOR
+while OPERATOR
+del OPERATOR
+elif OPERATOR
+in OPERATOR
+and OPERATOR
+else OPERATOR
+is OPERATOR
+as OPERATOR
+except OPERATOR
+lambda OPERATOR
+with OPERATOR
+assert OPERATOR
+finnally OPERATOR
+nonlocal OPERATOR
+yield OPERATOR
+break OPERATOR
+for OPERATOR
+not OPERATOR
+class OPERATOR
+from OPERATOR
+or OPERATOR
+continue OPERATOR
+global OPERATOR
+pass OPERATOR
+self OPERATOR
+__init__ RESERVED
+END

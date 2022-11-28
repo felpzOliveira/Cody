@@ -3,6 +3,8 @@
 /////////////////////////////////
 #include <languages.h>
 
+bool empty_cmake_capture(char *, char *){ return true; }
+
 TokenizerSupport cmakeSupport = {
     .comments = true,
     .strings = true,
@@ -10,13 +12,13 @@ TokenizerSupport cmakeSupport = {
     .lookups = true,
     .multilineComment = false,
     .lineCommentChar = '#',
-    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0 },
-               {"$<", ">", TOKEN_ID_DATATYPE, 0 }, },
+    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0, empty_cmake_capture },
+               {"$<", ">", TOKEN_ID_DATATYPE, 0, empty_cmake_capture }, },
 };
 
 
 /////////////////////////////////
-/* Auto generated file ( Aug 31 2022 16:29:34 ) */
+/* Auto generated file ( Nov 19 2022 17:52:59 ) */
 
 std::vector<std::vector<GToken>> cmakeReservedPreprocessor = {
 };

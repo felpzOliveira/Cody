@@ -48,11 +48,13 @@ int FileProvider_IsLineBufferDirty(char *hint_name, uint len);
 * Asks the file provider for a specific tokenizer
 */
 Tokenizer *FileProvider_GetCppTokenizer();
+Tokenizer *FileProvider_GetPythonTokenizer();
 Tokenizer *FileProvider_GetGlslTokenizer();
 Tokenizer *FileProvider_GetEmptyTokenizer();
 Tokenizer *FileProvider_GetLitTokenizer();
 Tokenizer *FileProvider_GetCmakeTokenizer();
 Tokenizer *FileProvider_GetDetachedCppTokenizer();
+Tokenizer *FileProvider_GetDetachedPythonTokenizer();
 Tokenizer *FileProvider_GetDetachedGlslTokenizer();
 Tokenizer *FileProvider_GetDetachedEmptyTokenizer();
 Tokenizer *FileProvider_GetDetachedLitTokenizer();

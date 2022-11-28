@@ -841,6 +841,7 @@ static void OpenGLLoadIcons(OpenGLState *state){
     Graphics_TextureInit(state, cmake_png, cmake_png_len, ".cmake", FILE_EXTENSION_CMAKE);
     Graphics_TextureInit(state, cpp_png, cpp_png_len, ".cpp", FILE_EXTENSION_CPP);
     Graphics_TextureInit(state, cppheader_png, cppheader_png_len, ".cppheader");
+    Graphics_TextureInit(state, py_png, py_png_len, ".py", FILE_EXTENSION_PYTHON);
     Graphics_TextureInit(state, glsl_png, glsl_png_len, ".glsl", FILE_EXTENSION_GLSL);
     Graphics_TextureInit(state, cuda_png, cuda_png_len, ".cu", FILE_EXTENSION_CUDA);
     Graphics_TextureInit(state, text_png, text_png_len, ".txt", FILE_EXTENSION_TEXT);
@@ -1110,6 +1111,8 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     // TODO: Maybe create an array so we can easily loop this thing
     if(strExt == ".cpp" || strExt == ".cc" || strExt == ".c"){
         id = state->textureMap[".cpp"];
+    }else if(strExt == ".py"){
+        id = state->textureMap[".py"];
     }else if(strExt == ".h" || strExt == ".hpp"){
         //id = state->textureMap[".cppheader"];
         //*off = 15;
@@ -1246,6 +1249,7 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH){
     }
 
     GlobalGLState.eventHandlers.push_back({.fn = eH, .interval = stateInterval});
+    Timing_Update();
 }
 
 void UpdateEventsAndHandleRequests(int animating){

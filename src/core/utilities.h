@@ -623,6 +623,15 @@ void PriorityQueue_Heapify(PriorityQueue<Item> *pq, int i){
     }
 }
 
+template<typename Item, typename Fn> inline
+void PriorityQueue_ForAllItems(PriorityQueue<Item> *pq, Fn fn){
+    if(!pq) return;
+    for(uint i = 0; i < pq->size; i++){
+        if(fn(pq->entries[i].data) == 0)
+            break;
+    }
+}
+
 template<typename Item> inline
 int PriorityQueue_Push(PriorityQueue<Item> *pq, Item *item){
     if(!pq || !item) return 0;

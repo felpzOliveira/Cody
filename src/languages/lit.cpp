@@ -23,7 +23,7 @@ TokenizerSupport litSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Aug 31 2022 16:29:34 ) */
+/* Auto generated file ( Nov 19 2022 17:52:59 ) */
 
 std::vector<std::vector<GToken>> litReservedPreprocessor = {
 };
@@ -70,6 +70,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "scale", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "Shape", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "albedo", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "asym_g", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "medium", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "Medium", .identifier = TOKEN_ID_DATATYPE },
@@ -86,6 +87,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "center", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "Filter", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "density", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "scatter", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "sigma_a", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "sigma_s", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "texture", .identifier = TOKEN_ID_OPERATOR },

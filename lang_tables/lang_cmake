@@ -1,5 +1,7 @@
 #include <languages.h>
 
+bool empty_cmake_capture(char *, char *){ return true; }
+
 TokenizerSupport cmakeSupport = {
     .comments = true,
     .strings = true,
@@ -7,8 +9,8 @@ TokenizerSupport cmakeSupport = {
     .lookups = true,
     .multilineComment = false,
     .lineCommentChar = '#',
-    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0 },
-               {"$<", ">", TOKEN_ID_DATATYPE, 0 }, },
+    .procs = { {"${", "}", TOKEN_ID_DATATYPE, 0, empty_cmake_capture },
+               {"$<", ">", TOKEN_ID_DATATYPE, 0, empty_cmake_capture }, },
 };
 
 TARGET src/languages/cmake.cpp

@@ -503,7 +503,7 @@ void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad);
 * rate, than the routine will be sampled at higher frequency, this avoids races where
 * it would not be possible to combine different events under different frequencies.
 * Because all events run together, if an event take too long to return the routine
-* might not be called in 'ival' seconds, it is however garanteed to be executed by an
+* might not be called in 'ival' seconds, it is however garanteed to be executed by a
 * triggered timer under 'ival' seconds. Events are called *after* the rendering is done
 * so the routine might consider all previous actions to UI have already been updated
 * into the current framebuffer.

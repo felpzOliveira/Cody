@@ -18,6 +18,8 @@ Theme themeTerminal = {
     .operatorColor   = ColorFromHex(0xfffce94f),
     .datatypeColor   = ColorFromHex(0xff87ffaf),
     .commentColor    = ColorFromHex(0xff34e2e2),
+    .commentTodoColor = ColorFromHex(0xffc7ff00),
+    .commentNoteColor = ColorFromHex(0xffc7ff00),
     .stringColor     = ColorFromHex(0xffad7fa6),
     .numberColor     = ColorFromHex(0xffad7fa8),
     .reservedColor   = ColorFromHex(0xffad7fa8),
@@ -83,6 +85,8 @@ Theme themeGruvboxLight = {
     .operatorColor   = ColorFromHex(0xCC960d01),
     .datatypeColor   = ColorFromHex(0xFF9b0511),
     .commentColor    = ColorFromHex(0xFFA29385),
+    .commentTodoColor = ColorFromHex(0xFF00557f),
+    .commentNoteColor = ColorFromHex(0xFF00557f),
     .stringColor     = ColorFromHex(0xff124b28),
     .numberColor     = ColorFromHex(0xFF116677),
     .reservedColor   = ColorFromHex(0xFF116677),
@@ -146,6 +150,8 @@ Theme themeDracula = {
     .operatorColor   = ColorFromHex(0xCCD38545),
     .datatypeColor   = ColorFromHex(0xCCff79c6),
     .commentColor    = ColorFromHex(0xFF6272a4),
+    .commentTodoColor = ColorFromHex(0xFF50fa7b),
+    .commentNoteColor = ColorFromHex(0xFF50fa7b),
     .stringColor     = ColorFromHex(0xFFf1fa8c),
     .numberColor     = ColorFromHex(0xFF6B8E23),
     .reservedColor   = ColorFromHex(0xFF6B8E23),
@@ -204,6 +210,8 @@ Theme themeYavid = {
     .operatorColor   = ColorFromHex(0xCCD38545),
     .datatypeColor   = ColorFromHex(0xCC719FAE),
     .commentColor    = ColorFromHex(0xFF7D7D7D),
+    .commentTodoColor = ColorFromHex(0xFFDFDA77),
+    .commentNoteColor = ColorFromHex(0xFFDFDA77),
     .stringColor     = ColorFromHex(0xFF6B8E23),
     .numberColor     = ColorFromHex(0xFF6B8E23),
     .reservedColor   = ColorFromHex(0xFF6B8E23),
@@ -268,6 +276,8 @@ Theme themeRadical = {
 
     .datatypeColor   = ColorFromHex(0xCCf67397),
     .commentColor    = ColorFromHex(0x48cff0e9),
+    .commentTodoColor = ColorFromHex(0xCCc7ff00),
+    .commentNoteColor = ColorFromHex(0xCCc7ff00),
     .stringColor     = ColorFromHex(0xCCbaf7fc),
     .numberColor     = ColorFromHex(0xCCfffc7f),
     .reservedColor   = ColorFromHex(0xCCf862b9),
@@ -329,6 +339,8 @@ Theme theme4Coder = {
 
     .datatypeColor   = ColorFromHex(0xCCffc110),
     .commentColor    = ColorFromHex(0xCCa3a3a3),
+    .commentTodoColor = ColorFromHex(0xCCA8383F),
+    .commentNoteColor = ColorFromHex(0XCC56A555),
     .stringColor     = ColorFromHex(0xCC8bb92d),
     .numberColor     = ColorFromHex(0xCC8bb92d),
     .reservedColor   = ColorFromHex(0xCCd0ad81),
@@ -398,6 +410,8 @@ Theme themeNoah = {
     .operatorColor   = ColorFromHex(0xffffcf7a),
     .datatypeColor   = ColorFromHex(0xff00cdd0),
     .commentColor    = ColorFromHex(0xff565f83),
+    .commentTodoColor = ColorFromHex(0xffffcf7a),
+    .commentNoteColor = ColorFromHex(0xffffcf7a),
     .stringColor     = ColorFromHex(0xffc2ed94),
     .numberColor     = ColorFromHex(0xffffcf7a),
     .reservedColor   = ColorFromHex(0xff00cdd0),
@@ -443,8 +457,8 @@ Theme themeNoah = {
     .isLight = false,
 };
 
-Theme *defaultTheme = &themeRadical;
-//Theme *defaultTheme = &theme4Coder;
+//Theme *defaultTheme = &themeRadical;
+Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
 //Theme *defaultTheme = &themeTerminal;
@@ -525,6 +539,8 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_OPERATOR, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE, datatypeColor);
         COLOR_RET(TOKEN_ID_COMMENT, commentColor);
+        COLOR_RET(TOKEN_ID_COMMENT_TODO, commentTodoColor);
+        COLOR_RET(TOKEN_ID_COMMENT_NOTE, commentNoteColor);
         COLOR_RET(TOKEN_ID_STRING, stringColor);
         COLOR_RET(TOKEN_ID_NUMBER, numberColor);
         COLOR_RET(TOKEN_ID_RESERVED, reservedColor);

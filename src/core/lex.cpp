@@ -6,7 +6,7 @@
 #include <vector>
 #include <buffers.h>
 
-#if 0
+#if 1
     #define PRINT_SAFE(head, ptr, len)do{\
         char __mem[128], __n[64];\
         memcpy(__n, ptr, len);\
@@ -497,6 +497,7 @@ LEX_PROCESSOR(Lex_Number){
     int dotCount = 0;
     int eCount = 0;
     int xCount = 0;
+    int pCount = 0;
     size_t rLen = 0;
     int iValue = 0;
     int uCount = 0;
@@ -538,6 +539,15 @@ LEX_PROCESSOR(Lex_Number){
         }else if(uCount == 1 && !(**p == 'L' || **p == 'l')){
             LEX_DEBUG("\'U\' marks termination \n");
             goto end;
+        }else if(**p == 'p'){
+            if(pCount > 0){
+                LEX_DEBUG("\'p\' found many times\n");
+                goto end;
+            }
+            pCount++;
+            rLen++;
+            (*p)++;
+            goto _number_start;
         }else if(**p == 'U' || **p == 'u'){
             if(uCount > 0){
                 LEX_DEBUG("\'U\' found many times\n");
@@ -558,7 +568,7 @@ LEX_PROCESSOR(Lex_Number){
             rLen ++;
             (*p)++;
             goto _number_start;
-        }else if(**p == 'f' && xCount == 0){
+        }else if(**p == 'f'){
             if(dotCount < 1 && eCount == 0){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
@@ -579,7 +589,7 @@ LEX_PROCESSOR(Lex_Number){
             }
 
             if(rLen+1 < n){
-                if(Lex_IsAnyNumber((*((*p)+1))) && dotCount == 0 && eCount == 0){
+                if(Lex_IsAnyNumber((*((*p)+1))) && eCount == 0){
                     xCount = 1;
                     rLen++;
                     (*p)++;
@@ -730,20 +740,63 @@ LEX_PROCESSOR(Lex_String){
     return rLen > 0 ? 1 : 0;
 }
 
+/* when inside a comment detect specific keywords, this could be by the tokenizer support */
+TokenId Lex_CommentInnerID(char *head, size_t len){
+    if(len != 4) return TOKEN_ID_IGNORE;
+    TokenId ret = TOKEN_ID_IGNORE;
+    if(StringEqual(head, (char *)"TODO", 4))
+        ret = TOKEN_ID_COMMENT_TODO;
+    if(StringEqual(head, (char *)"NOTE", 4))
+        ret = TOKEN_ID_COMMENT_NOTE;
+
+    return ret;
+}
+
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_Comments){
     int aggregate = tokenizer->aggregate;
     int type = tokenizer->type;
     //token->identifier = TOKEN_ID_COMMENT;
 
+    int gathering = 1;
     size_t rLen = 0;
     char prev = 0;
     char lineChar = tokenizer->support.lineCommentChar;
+    char *word_start = 0;
     int is_cpp_based = 0;
+    TokenRegister *tReg = &tokenizer->tokenRegister;
     *len = 0;
     *head = *p;
     if(!tokenizer->support.comments){
         return 0;
+    }
+
+    auto register_pos = [&]() -> int{
+        size_t dif = (*p) - word_start;
+        TokenId ret = Lex_CommentInnerID(word_start, dif);
+        if(ret == TOKEN_ID_IGNORE)
+            return 0;
+        tReg->where = p;
+        tReg->rLen = dif;
+        tReg->id = ret;
+        rLen -= dif;
+        (*p) -= dif;
+        *len = rLen;
+        tokenizer->aggregate = aggregate;
+        tokenizer->type = type;
+        token->identifier = TOKEN_ID_COMMENT;
+        return 1;
+    };
+
+    if(tReg->id != TOKEN_ID_IGNORE){
+        rLen = tReg->rLen;
+        (*p) += rLen;
+        *len = rLen;
+        token->identifier = tReg->id;
+        tReg->id = TOKEN_ID_IGNORE;
+        tReg->where = nullptr;
+        tReg->rLen = 0;
+        return 3;
     }
 
     if(lineChar == 0){
@@ -779,7 +832,17 @@ LEX_PROCESSOR(Lex_Comments){
         }
     }
 
+    if(!StopChar(**p)){
+        word_start = *p;
+        gathering = 0;
+    }
     while(rLen < n){
+        if(gathering){
+            if(!StopChar(**p)){
+                word_start = *p;
+                gathering = 0;
+            }
+        }
         if(type == 2){
             if(**p == '/' && prev == '*'){
                 (*p) ++;
@@ -787,14 +850,15 @@ LEX_PROCESSOR(Lex_Comments){
                 aggregate = 0;
                 goto end;
             }else{
-#if 0
-                if(TerminatorChar(**p)){
-                    goto consume;
-                }
-#endif
+
                 prev = **p;
                 (*p) ++;
                 rLen++;
+                if(StopChar(**p) && gathering == 0){
+                    gathering = 1;
+                    if(register_pos() == 1)
+                        return -1;
+                }
             }
         }else{
             if(rLen+1 <= n){
@@ -806,21 +870,30 @@ LEX_PROCESSOR(Lex_Comments){
                     goto end;
                 }
             }
-#if 0
-            if(TerminatorChar(**p)){
-                goto consume;
-            }
-#endif
+
             (*p)++;
             rLen++;
             aggregate = 0;
+            if(StopChar(**p) && gathering == 0){
+                gathering = 1;
+                if(register_pos() == 1){
+                    tokenizer->aggregate = 1;
+                    return -1;
+                }
+            }
         }
+    }
+
+    if(gathering == 0){
+        if(register_pos() == 1)
+            return -1;
     }
 
 end:
     *len = rLen;
     tokenizer->aggregate = aggregate;
     tokenizer->type = type;
+    token->identifier = TOKEN_ID_COMMENT;
     return rLen > 0 ? (aggregate > 0 ? 3 : 1) : 0;
 }
 
@@ -840,6 +913,7 @@ LEX_PROCESSOR(Lex_ContextualProcessor){
     ContextualProcessor *proc = nullptr;
     int type = tokenizer->context_id;
     int aggregate = tokenizer->context_depth;
+    int multiline_ret = 0;
 
     *len = 0;
     *head = *p;
@@ -864,8 +938,21 @@ LEX_PROCESSOR(Lex_ContextualProcessor){
     }
 
     proc = &tokenizer->support.procs[type];
+    multiline_ret = proc->is_multiline;
     startSize = proc->start.size();
     endSize = proc->end.size();
+
+    if(multiline_ret == 2){
+        while(rLen < n){
+            if(!proc->fnChecker((char *)*head, (char *)*p))
+                break;
+            rLen++;
+            (*p)++;
+        }
+        type = -1;
+        multiline_ret = 0;
+        goto end;
+    }
 
     while(rLen < n){
         if(Lex_CharStringCmp(p, n - rLen, proc->end)){
@@ -895,7 +982,7 @@ end:
     *len = rLen;
     tokenizer->context_id = type;
     tokenizer->context_depth = aggregate;
-    return rLen > 0 ? proc->is_multiline : -1;
+    return rLen > 0 ? multiline_ret : -1;
 }
 
 /* (char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher, TokenizerContext *context, Tokenizer *tokenizer) */
@@ -1025,12 +1112,14 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCode){
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
         token->size = len;
-        token->identifier = TOKEN_ID_COMMENT;
         rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }else if(lexrv > 0){
         token->size = len;
-        token->identifier = TOKEN_ID_COMMENT;
+        goto end;
+    }else if(lexrv == -1){
+        token->size = len;
+        rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }
 
@@ -1080,12 +1169,14 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     lexrv = Lex_Comments(p, n, &h, &len, context, token, tokenizer);
     if(lexrv == 3){
         token->size = len;
-        token->identifier = TOKEN_ID_COMMENT;
         rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }else if(lexrv > 0){
         token->size = len;
-        token->identifier = TOKEN_ID_COMMENT;
+        goto end;
+    }else if(lexrv == -1){
+        token->size = len;
+        rv = TOKENIZER_OP_UNFINISHED;
         goto end;
     }
 
@@ -1444,6 +1535,9 @@ void Lex_TokenizerContextReset(Tokenizer *tokenizer){
     tokenizer->runningParenIndentLevel = 0;
     tokenizer->runningLine = 0;
     tokenizer->unfinishedContext = -1;
+    tokenizer->tokenRegister.where = nullptr;
+    tokenizer->tokenRegister.id = TOKEN_ID_IGNORE;
+    tokenizer->tokenRegister.rLen = 0;
     BoundedStack_SetDefault(tokenizer->procStack);
 }
 
@@ -1458,6 +1552,9 @@ void Lex_TokenizerContextEmpty(TokenizerStateContext *context){
     context->type = 0;
     context->context_id = -1;
     context->context_depth = 0;
+    context->tokenRegister.where = nullptr;
+    context->tokenRegister.id = TOKEN_ID_IGNORE;
+    context->tokenRegister.rLen = 0;
     BoundedStack_SetDefault(&context->procStack);
 }
 
@@ -1474,6 +1571,9 @@ void Lex_TokenizerGetCurrentState(Tokenizer *tokenizer, TokenizerStateContext *c
     context->context_depth = tokenizer->context_depth;
     context->indentLevel = tokenizer->runningIndentLevel;
     context->parenLevel = tokenizer->runningParenIndentLevel;
+    context->tokenRegister.where = tokenizer->tokenRegister.where;
+    context->tokenRegister.id = tokenizer->tokenRegister.id;
+    context->tokenRegister.rLen = tokenizer->tokenRegister.rLen;
     BoundedStack_Copy(&context->procStack, tokenizer->procStack);
     if(tokenizer->unfinishedContext >= 0){
         context->backTrack = tokenizer->linesAggregated+1;
@@ -1493,6 +1593,9 @@ void Lex_TokenizerRestoreFromContext(Tokenizer *tokenizer,TokenizerStateContext 
     tokenizer->context_id = context->context_id;
     tokenizer->runningIndentLevel = context->indentLevel;
     tokenizer->runningParenIndentLevel = context->parenLevel;
+    tokenizer->tokenRegister.where = context->tokenRegister.where;
+    tokenizer->tokenRegister.id = context->tokenRegister.id;
+    tokenizer->tokenRegister.rLen = context->tokenRegister.rLen;
     BoundedStack_Copy(tokenizer->procStack, &context->procStack);
     //printf("Stack size: %d\n", BoundedStack_Size(tokenizer->procStack));
 }
