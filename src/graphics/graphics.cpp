@@ -20,6 +20,7 @@
 #include <widgets.h>
 #include <dbgwidget.h>
 #include <popupwindow.h>
+#include <modal.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -465,8 +466,14 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
 }
 
 vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
-    if(!theme->dynamicCursor){
-        return GetUIColorf(theme, UICursor);
+    // account for dual mode
+    UIElement element = UICursor;
+    int dualMode = DualModeGetState();
+    if(dualMode == ENTRY_MODE_LOCK)
+        element = UIQueryBarCursor;
+
+    if(!theme->dynamicCursor || dualMode == ENTRY_MODE_LOCK){
+        return GetUIColorf(theme, element);
     }else{
         vec4i color;
         vec2ui cursor;
@@ -484,16 +491,16 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
 
         uint tid = Buffer_GetTokenAt(buffer, cursor.y);
         if(tid >= buffer->tokenCount){
-            return GetUIColorf(theme, UICursor);
+            return GetUIColorf(theme, element);
         }
 
         Token *token = &buffer->tokens[tid];
         if(token == nullptr){
-            return GetUIColorf(theme, UICursor);
+            return GetUIColorf(theme, element);
         }
 
         if(!Symbol_IsTokenQueriable(token->identifier)){
-            return GetUIColorf(theme, UICursor);
+            return GetUIColorf(theme, element);
         }
 
         char *str = &buffer->data[token->position];
@@ -501,7 +508,7 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
         r = Graphics_ComputeTokenColor(str, token, symTable, theme, cursor.x,
                                        token->identifier, nullptr, &color);
         if(r == -1){
-            return GetUIColorf(theme, UICursor);
+            return GetUIColorf(theme, element);
         }
 
         return ColorFromInt(color);

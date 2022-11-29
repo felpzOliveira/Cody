@@ -5,7 +5,15 @@
 #include <ctime>
 #include <iomanip>
 #include <iostream>
+#include <app.h>
 
+// TODO(29/11/22): Review or re-do the tmux-like rendering of views ids.
+//                 We are again viewing errors in this routine as no id is shown
+//                 but the event is actually happening, i.e.: not able to do anything
+//                 as it is in the ctrl+b lock but no id is shown for ctrl+b+q
+//                 this could be a timer thing, a rendering thing or an event thing
+//                 since we cannot be sure as this is hard to duplicate in debug
+//                 re-write this.
 int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
                                       Theme *theme, Float dt, ControlProps *props)
 {
@@ -69,15 +77,8 @@ int Graphics_RenderControlCommands(View *view, OpenGLState *state,
     View_GetControlRenderOpts(view, &props);
     int animating = 0;
 
-    switch(props->opts){
-        case Control_Opts_Indices:{
-            animating = Graphics_RenderControlCmdsIndices(view, state, theme, dt, props);
-        } break;
-
-        default:{
-            animating = 0;
-        }
-    }
+    if(AppGetRenderViewIndices())
+        animating = Graphics_RenderControlCmdsIndices(view, state, theme, dt, props);
 
     return animating;
 }

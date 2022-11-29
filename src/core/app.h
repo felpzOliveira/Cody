@@ -16,6 +16,9 @@ struct Buffer;
 #define OPEN_FILE_FLAGS_NO_CREATION    (0 << 1)
 #define OPEN_FILE_FLAGS_ALLOW_CREATION (1 << 1)
 
+#define ENTRY_MODE_FREE 0
+#define ENTRY_MODE_LOCK 1
+
 typedef enum{
     CURSOR_RECT,
     CURSOR_DASH,
@@ -27,6 +30,8 @@ typedef struct{
     int useTabs;
     int autoCompleteSize;
     int pathCompression;
+    int displayWrongIdent;
+    int displayViewIndices;
     std::string rootFolder;
     std::string configFile;
     std::string configFolder;
@@ -125,6 +130,35 @@ void AppSetBindingsForState(ViewState state, ViewType type=NoneView);
 * Gets cwd from app context.
 */
 char *AppGetContextDirectory();
+
+/*
+* Get the character that SHOULD NOT BE USED FOR IDENTATION, i.e.:
+* if the editor is using tabs this returns ' ' (space) and if the editor
+* is using spaces this returns '\t'.
+*/
+char AppGetInvalidSpaceChar();
+
+/*
+* Get the current state of the configuration for displaying the wrong identation
+* character.
+*/
+int AppGetDisplayWrongIdent();
+
+/*
+* Sets the current state of the configuration for displaying the wrong identation
+* character.
+*/
+void AppSetDisplayWrongIdent(int should_display);
+
+/*
+* Sets the flag indicating if the graphic interface should render view indices.
+*/
+void AppSetRenderViewIndices(int should_render);
+
+/*
+* Gets the flag indicating if the graphic interface should render view indices.
+*/
+int AppGetRenderViewIndices();
 
 /*
 * Gets the path compression global configuration.
@@ -315,6 +349,7 @@ void AppCommandUndo();
 void AppCommandNewLine();
 void AppCommandInsertTab();
 void AppCommandGitDiffCurrent();
+void AppCommandGitDiff(BufferView *view);
 void AppCommandGitStatus();
 void AppCommandGitOpenRoot(char *path);
 void AppCommandRemovePreviousToken();

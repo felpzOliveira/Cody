@@ -138,6 +138,11 @@ const char *KeyboardGetStateName(int state);
 BindingMap *KeyboardCreateMapping();
 BindingMap *KeyboardCreateMapping(void *refWindow);
 
+
+#define _KeyboardSetActiveMapping(mapping)do{\
+    printf("Called from %s:%d [%s]\n", __FILE__, __LINE__, __func__);\
+    KeyboardSetActiveMapping(mapping);\
+}while(0)
 /*
 * Sets the active mapping to handle key events.
 */

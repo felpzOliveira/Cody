@@ -21,6 +21,8 @@
 #include <widgets.h>
 #include <dbgwidget.h>
 #include <storage.h>
+#include <modal.h>
+#include <functional>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -39,6 +41,7 @@ typedef struct{
     int activeId;
     uint dbgHandle;
     uint dbgBkptHandle;
+    std::function<void(void)> mouseHook;
 
     char cwd[PATH_MAX];
     Geometry currentGeometry;
@@ -61,6 +64,8 @@ void AppInitializeQueryBarBindings();
 void AppCommandAutoComplete();
 void AppCommandFreeTypingArrows(int direction);
 void AppCommandQueryBarCommit();
+
+void AppEmptyMouseHook(){}
 
 void AppSetViewingGeometry(Geometry geometry, Float lineHeight){
     Float w = (Float)(geometry.upper.x - geometry.lower.x);
@@ -124,6 +129,27 @@ void AppSetPathCompression(int value){
     appGlobalConfig.pathCompression = value;
 }
 
+char AppGetInvalidSpaceChar(){
+    if(appGlobalConfig.useTabs) return ' ';
+    return '\t';
+}
+
+int AppGetDisplayWrongIdent(){
+    return appGlobalConfig.displayWrongIdent;
+}
+
+void AppSetDisplayWrongIdent(int should_display){
+    appGlobalConfig.displayWrongIdent = should_display;
+}
+
+void AppSetRenderViewIndices(int should_render){
+    appGlobalConfig.displayViewIndices = should_render;
+}
+
+int AppGetRenderViewIndices(){
+    return appGlobalConfig.displayViewIndices;
+}
+
 void AppEarlyInitialize(bool use_tabs){
     View *view = nullptr;
     StorageDevice *storage = FetchStorageDevice();
@@ -131,6 +157,8 @@ void AppEarlyInitialize(bool use_tabs){
     // TODO: Configuration file
     appGlobalConfig.tabLength = 4;
     appGlobalConfig.pathCompression = -1;
+    appGlobalConfig.displayWrongIdent = 0;
+    appGlobalConfig.displayViewIndices = 0;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
@@ -308,6 +336,21 @@ View *AppSearchView(LineBuffer *lineBuffer){
     }
 
     return foundView;
+}
+
+void AppRestoreAllViews(){
+    ViewTreeIterator iterator;
+    ViewTree_Begin(&iterator);
+    while(iterator.value){
+        View *view = iterator.value->view;
+        BufferView *bView = &view->bufferView;
+        ViewType type = BufferView_GetViewType(bView);
+        if(type == GitDiffView){
+            AppCommandGitDiff(bView);
+        }
+
+        ViewTree_Next(&iterator);
+    }
 }
 
 void AppRestoreCurrentBufferViewState(){
@@ -591,10 +634,13 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
 
         BufferView_SetMousePressed(bufferView, 0);
     }
+
+    appContext.mouseHook();
 }
 
 void AppHandleMousePress(int x, int y, OpenGLState *state){
     AppOnMouseMotion(x, y, state, true);
+    appContext.mouseHook();
 }
 
 void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
@@ -2058,8 +2104,7 @@ void AppCommandGitStatus(){
     }
 }
 
-void AppCommandGitDiffCurrent(){
-    BufferView *bView = AppGetActiveBufferView();
+void AppCommandGitDiff(BufferView *bView){
     bool allow_write = true;
     NullRet(bView->lineBuffer);
 
@@ -2126,6 +2171,11 @@ void AppCommandGitDiffCurrent(){
             }
         }
     }
+}
+
+void AppCommandGitDiffCurrent(){
+    BufferView *bView = AppGetActiveBufferView();
+    AppCommandGitDiff(bView);
 }
 
 void AppCommandEnterKey(){
@@ -2330,6 +2380,14 @@ void DbgSupportBreakpointFeedback(BreakpointFeedback feedback, void *){
     }
 }
 
+void AppRemoveMouseHook(){
+    appContext.mouseHook = AppEmptyMouseHook;
+}
+
+void AppSetMouseHook(std::function<void(void)> hook){
+    appContext.mouseHook = hook;
+}
+
 void AppInitialize(){
     KeyboardInitMappings();
     AppInitializeFreeTypingBindings();
@@ -2340,6 +2398,9 @@ void AppInitialize(){
           DbgApp_RegisterStateChangeCallback(DbgSupportStateChange, nullptr);
     appContext.dbgBkptHandle =
           DbgApp_RegisterBreakpointFeedbackCallback(DbgSupportBreakpointFeedback, nullptr);
+
+    AppRemoveMouseHook();
+    DualModeEnter();
 }
 
 void AppInitializeQueryBarBindings(){
@@ -2379,6 +2440,18 @@ void AppMemoryDebugCmp(){
 #endif
 }
 
+// TODO: Look, this thing is working nice however it might be interesting
+//       to support dual mode for typing like vim or emacs. While I don't really
+//       feel like this is something that is actually needed because the integration
+//       is looking smooth enough to not have this be required, it might simplify
+//       implementation of multi-line editing as we can pretty much disable all inputs
+//       and not have to care about the states of each view. So ... maybe implement
+//       a dual mode for more robust editing like multi-line tabs and erases?
+//       It is also pretty easy to implement it since keyboard is handled by individual
+//       mapping, so we can pretty much just create a 'dual.cpp' and implement custom
+//       commands with a new different keyboard binding there and disable the default
+//       entry and return routines, just like the small tmux we already have.
+// TODO: Multi-line operations: edit/erase/tab/move
 void AppInitializeFreeTypingBindings(){
     BindingMap *mapping = nullptr;
     mapping = KeyboardCreateMapping();
@@ -2399,7 +2472,6 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSaveBufferView, Key_LeftAlt, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandStoreFileCommand, Key_LeftControl, Key_E);
 
-    //TODO: Create basic mappings
     RegisterRepeatableEvent(mapping, AppCommandLeftArrow, Key_Left);
     RegisterRepeatableEvent(mapping, AppCommandRightArrow, Key_Right);
     RegisterRepeatableEvent(mapping, AppCommandUpArrow, Key_Up);
@@ -2466,11 +2538,15 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppJumpToNextError, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);
-    RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
+    //RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_X);
 
     // Let the control commands bind its things
     ControlCommands_Initialize();
     ControlCommands_BindTrigger(mapping);
+
+    // Let dual controller do its thing as well
+    DualModeInit();
+    DualMode_BindTrigger(mapping);
 
     DbgApp_Initialize();
 

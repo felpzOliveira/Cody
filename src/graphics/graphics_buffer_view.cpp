@@ -12,7 +12,6 @@
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                      Float &x, Float &y, uint lineNr);
 
-
 static Float ComputeTransformOf(Float x, Transform *transform){
     vec3f p(x, 0, 0);
     p = transform->Point(p);
@@ -680,52 +679,121 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
     }
 }
 
+template<typename Fn>
+void Graphics_ForEachVisibleLine(View *vview,  Fn fn){
+    BufferView *view = View_GetBufferView(vview);
+    if(!view->isActive) return;
+
+    LineBuffer *lineBuffer = BufferView_GetLineBuffer(view);
+    if(!lineBuffer) return;
+
+    vec2ui visibleLines = BufferView_GetViewRange(view);
+    for(uint i = visibleLines.x; i <= visibleLines.y; i++){
+        Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        if(!buffer) continue;
+        fn(visibleLines, i, buffer);
+    }
+}
+
+void Graphics_RenderWrongIdentation(OpenGLState *state, View *vview, Transform *projection,
+                                    Theme *theme)
+{
+    OpenGLFont *font = &state->font;
+    int previousGlyph = -1;
+    vec4f color(0.5, 0.1, 0.1, 0.5);
+    char target = AppGetInvalidSpaceChar();
+
+    glEnable(GL_BLEND);
+    glUseProgram(font->cursorShader.id);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->model.m);
+
+    int added = 0;
+    Graphics_ForEachVisibleLine(vview, [&](vec2ui visibleLines, uint i, Buffer *buffer){
+        vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
+        vec2f x(2.0f, 2.0f);
+        if(buffer->tokenCount > 0){
+            Token *token = &buffer->tokens[0];
+            if(token->identifier != TOKEN_ID_SPACE){
+                return;
+            }
+
+            x.y += fonsComputeStringAdvance(font->fsContext, buffer->data,
+                                            token->size, &previousGlyph);
+            if(buffer->data[0] == target){
+                Graphics_QuadPush(state, vec2f(x.x, y.x), vec2f(x.y, y.y), color);
+                added += 1;
+            }
+        }
+    });
+
+    if(added > 0)
+        Graphics_QuadFlush(state);
+    glDisable(GL_BLEND);
+}
+
+/* Responsible for rendering the space highlight at empty lines and at end of lines */
 void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *projection,
                                     Theme *theme)
 {
-    BufferView *view = View_GetBufferView(vview);
-    if(view->isActive){
-        LineBuffer *lineBuffer=  BufferView_GetLineBuffer(view);
-        if(lineBuffer){
-            OpenGLFont *font = &state->font;
-            int previousGlyph = -1;
-            vec2ui visibleLines = BufferView_GetViewRange(view);
-            vec4f emptyColor(0.5, 0.5, 0.1, 0.5);
-            //vec4f extraColor(0.4, 0.1, 0.1, 0.5);
+    OpenGLFont *font = &state->font;
+    int previousGlyph = -1;
+    vec4f emptyColor(0.5, 0.5, 0.1, 0.5);
+    vec4f wrongIdentColor(0.5, 0.1, 0.1, 0.5);
 
-            glUseProgram(font->cursorShader.id);
-            Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-            Shader_UniformMatrix4(font->cursorShader, "modelView", &state->model.m);
-            for(uint i = visibleLines.x; i <= visibleLines.y; i++){
-                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-                if(!buffer) continue;
+    int render_wi = AppGetDisplayWrongIdent();
+    char target = AppGetInvalidSpaceChar();
 
-                vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
-                vec2f x(2.0f, 2.0f);
+    glUseProgram(font->cursorShader.id);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->model.m);
 
-                if(Buffer_IsBlank(buffer) && buffer->tokenCount == 1){
-                    Token *token = &buffer->tokens[0];
+    int added = 0;
+    Graphics_ForEachVisibleLine(vview, [&](vec2ui visibleLines, uint i, Buffer *buffer){
+        vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
+        vec2f x(2.0f, 2.0f);
+        bool added_by_wi = false;
+
+        if(buffer->tokenCount > 0 && render_wi){
+            Token *token = &buffer->tokens[0];
+            if(token->identifier == TOKEN_ID_SPACE){
+                if(buffer->data[0] == target){
                     x.y += fonsComputeStringAdvance(font->fsContext, buffer->data,
-                                                    token->size, &previousGlyph);
-                    Graphics_QuadPush(state, vec2f(x.x, y.x), vec2f(x.y, y.y), emptyColor);
-                }else if(buffer->tokenCount > 1){
-                    int previousGlyph = -1;
-                    Token *token = &buffer->tokens[buffer->tokenCount-1];
-                    if(token->identifier == TOKEN_ID_SPACE){
-                        x.x += Graphics_GetTokenXPos(state, buffer,
-                                        buffer->tokenCount-1, previousGlyph);
-                        x.y = x.x + Graphics_GetTokenXSize(state, buffer,
-                                        buffer->tokenCount-1, previousGlyph);
-
-                        Graphics_QuadPush(state, vec2f(x.x, y.x),
-                                          vec2f(x.y, y.y), emptyColor);
-                    }
+                                            token->size, &previousGlyph);
+                    Graphics_QuadPush(state, vec2f(x.x, y.x),
+                                      vec2f(x.y, y.y), wrongIdentColor);
+                    added += 1;
+                    added_by_wi = true;
                 }
             }
-
-            Graphics_QuadFlush(state);
         }
-    }
+
+        if(Buffer_IsBlank(buffer) && buffer->tokenCount == 1 && !added_by_wi){
+            Token *token = &buffer->tokens[0];
+            x.y += fonsComputeStringAdvance(font->fsContext, buffer->data,
+                                            token->size, &previousGlyph);
+            Graphics_QuadPush(state, vec2f(x.x, y.x), vec2f(x.y, y.y), emptyColor);
+            added += 1;
+        }
+
+        if(buffer->tokenCount > 1){
+            int previousGlyph = -1;
+            Token *token = &buffer->tokens[buffer->tokenCount-1];
+            if(token->identifier == TOKEN_ID_SPACE){
+                x.x += Graphics_GetTokenXPos(state, buffer,
+                                            buffer->tokenCount-1, previousGlyph);
+                x.y = x.x + Graphics_GetTokenXSize(state, buffer,
+                                            buffer->tokenCount-1, previousGlyph);
+
+                Graphics_QuadPush(state, vec2f(x.x, y.x),
+                                  vec2f(x.y, y.y), emptyColor);
+                added += 1;
+            }
+        }
+    });
+
+    if(added > 0)
+        Graphics_QuadFlush(state);
 }
 
 static void Graphics_RenderDbgBreaks(OpenGLState *state, View *vview, Transform *projection,
@@ -879,7 +947,7 @@ void Graphics_RenderBuildErrors(OpenGLState *state, View *view, Float lineSpan,
 
     glUseProgram(font->cursorShader.id);
     Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-    Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
     Graphics_QuadFlush(state, 1);
 }
 

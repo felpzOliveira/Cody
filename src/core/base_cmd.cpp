@@ -755,6 +755,12 @@ int BaseCommand_CursorSegmentToogle(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_ToogleWrongIdent(char *, uint, View *){
+    int val = AppGetDisplayWrongIdent() > 0 ? 1 : 0;
+    AppSetDisplayWrongIdent(1 - val);
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
@@ -775,6 +781,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_CURSORSEG_STR] = {CMD_CURSORSEG_HELP, BaseCommand_CursorSegmentToogle};
     cmdMap[CMD_CURSORSET_STR] = {CMD_CURSORSET_HELP, BaseCommand_CursorSetFormat};
     cmdMap[CMD_PATH_COMPRESSION_STR] = {CMD_PATH_COMPRESSION_HELP, BaseCommand_PathCompression};
+    cmdMap[CMD_WRONGIDENT_DISPLAY_STR] = {CMD_WRONGIDENT_DISPLAY_HELP, BaseCommand_ToogleWrongIdent};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

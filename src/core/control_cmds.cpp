@@ -65,22 +65,8 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size, void *){
 
         if(!swapped){
             ControlCommands_YieldKeyboard();
-        }else{
-            // if we jump to a view than we need make sure we restore all views
-            while(viewStack.size() > 0){
-                View *view = viewStack.top();
-                viewStack.pop();
-                View_SetControlOpts(view, Control_Opts_None);
-            }
         }
     }else{
-        // clear the interface in case something was rendering from our side
-        while(iterator.value){
-            // I think we can default to always calling this and not get into
-            // any trouble
-            View_SetControlOpts(iterator.value->view, Control_Opts_None);
-            ViewTree_Next(&iterator);
-        }
         ControlCommands_YieldKeyboard();
     }
 
@@ -88,12 +74,6 @@ void ControlCmdsDefaultEntry(char *utf8Data, int utf8Size, void *){
 }
 
 void ControlCmdsClear(){
-    ViewTreeIterator iterator;
-    ViewTree_Begin(&iterator);
-    while(iterator.value){
-        View_SetControlOpts(iterator.value->view, Control_Opts_None);
-        ViewTree_Next(&iterator);
-    }
     ControlCommands_YieldKeyboard();
     FinishEvent();
 }
@@ -150,6 +130,7 @@ bool IndicesEvent(){
 }
 
 void FinishEvent(){
+    AppSetRenderViewIndices(0);
     finished = true;
 }
 
@@ -162,20 +143,7 @@ void StartEvent(){
 }
 
 void ControlCmdsRenderIndices(){
-    ViewTreeIterator iterator;
-
-    ViewTree_Begin(&iterator);
-    while(iterator.value){
-        if(iterator.value->view){
-            if(BufferView_IsVisible(View_GetBufferView(iterator.value->view))){
-                View_SetControlOpts(iterator.value->view, Control_Opts_Indices,
-                                    kTransitionControlIndices);
-            }
-        }
-
-        ViewTree_Next(&iterator);
-    }
-
+    AppSetRenderViewIndices(1);
     StartEvent();
 }
 

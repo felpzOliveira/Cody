@@ -492,12 +492,11 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
 //       makes this thing easier to handle.
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_Number){
-    (void)context;
+     (void)context;
     int iNum = 0;
     int dotCount = 0;
     int eCount = 0;
     int xCount = 0;
-    int pCount = 0;
     size_t rLen = 0;
     int iValue = 0;
     int uCount = 0;
@@ -539,15 +538,6 @@ LEX_PROCESSOR(Lex_Number){
         }else if(uCount == 1 && !(**p == 'L' || **p == 'l')){
             LEX_DEBUG("\'U\' marks termination \n");
             goto end;
-        }else if(**p == 'p'){
-            if(pCount > 0){
-                LEX_DEBUG("\'p\' found many times\n");
-                goto end;
-            }
-            pCount++;
-            rLen++;
-            (*p)++;
-            goto _number_start;
         }else if(**p == 'U' || **p == 'u'){
             if(uCount > 0){
                 LEX_DEBUG("\'U\' found many times\n");
@@ -568,7 +558,7 @@ LEX_PROCESSOR(Lex_Number){
             rLen ++;
             (*p)++;
             goto _number_start;
-        }else if(**p == 'f'){
+        }else if(**p == 'f' && xCount == 0){
             if(dotCount < 1 && eCount == 0){
                 LEX_DEBUG("\'f\' found without \'.\'\n");
                 goto end;
@@ -589,7 +579,7 @@ LEX_PROCESSOR(Lex_Number){
             }
 
             if(rLen+1 < n){
-                if(Lex_IsAnyNumber((*((*p)+1))) && eCount == 0){
+                if(Lex_IsAnyNumber((*((*p)+1))) && dotCount == 0 && eCount == 0){
                     xCount = 1;
                     rLen++;
                     (*p)++;

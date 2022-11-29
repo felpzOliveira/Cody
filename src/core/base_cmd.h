@@ -17,6 +17,9 @@ struct FileEntry;
 #define OnFileOpenCallback std::function<void(View *view, FileEntry *entry)>
 #define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
 
+#define CMD_WRONGIDENT_DISPLAY_STR "ident-display"
+#define CMD_WRONGIDENT_DISPLAY_HELP "Toogle the display of the wrong identation character."
+
 #define CMD_CURSORSET_STR "cursor-format "
 #define CMD_CURSORSET_HELP "Sets the format of the cursor (choices: quad, dash, rect)."
 
