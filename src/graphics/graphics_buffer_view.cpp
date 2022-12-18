@@ -8,9 +8,20 @@
 #include <gitbase.h>
 #include <iostream>
 #include <dbgapp.h>
+#include <font.h>
+
+#define INVALID_CHAR_STRING "?"
+#define INVALID_CHAR_SIZE 1
+
+struct _Quad{
+    vec2ui left, right;
+    vec2f screen;
+    vec4f color;
+    int depth;
+};
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
-                     Float &x, Float &y, uint lineNr);
+                     Float &x, Float &y, uint lineNr, std::vector<_Quad> *errorQuads);
 
 static Float ComputeTransformOf(Float x, Transform *transform){
     vec3f p(x, 0, 0);
@@ -315,6 +326,7 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     Float x0 = 2.0f;
     Float x = x0;
     Float y = baseHeight;
+    std::vector<_Quad> errorQuads;
     OpenGLFont *font = &state->font;
 
     Graphics_PrepareTextRendering(state, projection, &state->model);
@@ -334,25 +346,39 @@ void _Graphics_RenderTextBlock(OpenGLState *state, BufferView *view, Float baseH
     }
 
     for(uint i = st0; i < ed0; i++){
-        if(OpenGLRenderLine(view, state, x, y, i)){
-#if 0
-            vec4i s(128);
-            int pGlyph  = -1;
-            const char *p = "..";
-            uint plen = strlen(p);
-            Float xof = fonsComputeStringAdvance(font->fsContext, p, plen, &pGlyph);
-            Float xst = state->renderLineWidth - view->lineOffset - xof - 2;
-            Float yi = y - font->fontMath.fontSizeAtRenderCall;
-            pGlyph  = -1;
-            fonsStashMultiTextColor(font->fsContext, xst, yi, s.ToUnsigned(),
-                                    p, NULL, &pGlyph);
-#endif
-        }
+        OpenGLRenderLine(view, state, x, y, i, &errorQuads);
         x = x0;
         y += font->fontMath.fontSizeAtRenderCall;
     }
 
     Graphics_FlushText(state);
+
+    glUseProgram(font->cursorShader.id);
+    Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
+
+    for(_Quad &quad : errorQuads){
+        quad.right.y = quad.left.y + baseHeight;
+        vec2f pMed = vec2f(quad.left.x, quad.left.y);
+        Graphics_QuadPush(state, quad.left, quad.right, vec4f(1, 0, 0, 0.2));
+        quad.screen = GLToScreen(pMed, state);
+    }
+
+    Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
+    Graphics_QuadFlush(state, 1);
+
+    Float fSize = Graphics_GetFontSize();
+    Graphics_SetFontSize(state, fSize * 0.8);
+    Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
+
+    vec4i color = vec4i(255,0,0,255);
+    for(_Quad quad : errorQuads){
+        int pGlyph = -1;
+        vec2f p = ScreenToGLf(quad.screen, state);
+        Graphics_PushText(state, p.x, p.y, (char *)"?", 1, color, &pGlyph);
+    }
+
+    Graphics_FlushText(state);
+    Graphics_SetFontSize(state, fSize);
 }
 
 void _Graphics_RenderDbgElements(OpenGLState *state, View *view, Float lineSpan,
@@ -466,9 +492,17 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
             char *chr = &buffer->data[rawp];
             if(*chr != '\t'){
                 Graphics_PrepareTextRendering(state, projection, &state->model);
+                int off = 0;
+                int cp = StringToCodepoint(chr, len, &off);
                 vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
-                fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
-                                        chr, chr+len, &pGlyph);
+                if(!Font_SupportsCodepoint(cp)){
+                    //const char *mem = INVALID_CHAR_STRING;
+                    //fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
+                                            //mem, mem+INVALID_CHAR_SIZE, &pGlyph);
+                }else{
+                    fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
+                                            chr, chr+len, &pGlyph);
+                }
                 Graphics_FlushText(state);
             }
         }
@@ -512,11 +546,6 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
             Float minY = -font->fontMath.fontSizeAtRenderCall;
             Float maxY = (view->sController.currentMaxRange + 1)*
                 font->fontMath.fontSizeAtRenderCall;
-            struct _Quad{
-                vec2ui left, right;
-                vec4f color;
-                int depth;
-            };
 
             std::vector<_Quad> quads;
 
@@ -1044,7 +1073,7 @@ bool Graphics_RenderLineHighlight(OpenGLState *state, View *vview, Float lineSpa
 }
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
-                     Float &x, Float &y, uint lineNr)
+                     Float &x, Float &y, uint lineNr, std::vector<_Quad> *errorQuads)
 {
 
     int previousGlyph = -1;
@@ -1088,18 +1117,48 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
 
             if(token->identifier == TOKEN_ID_SPACE){
                 // NOTE: nothing to do, space was already inserted
-            }else if(token->position < (int)buffer->taken){
-                char *p = &buffer->data[token->position];
-                char *e = &buffer->data[token->position + token->size];
-                int r = Graphics_ComputeTokenColor(p, token, symTable, defaultTheme,
-                                                   lineNr, i, view, &col);
-                if(r < 0) continue;
-                pos += token->size;
-                x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
-                                            p, e, &previousGlyph);
-                if(x > state->renderLineWidth - view->lineOffset){
-                    largeLine = 1;
+                continue;
+            }
+
+            int where = token->position;
+            char *p = &buffer->data[where];
+            int r = Graphics_ComputeTokenColor(p, token, symTable, defaultTheme,
+                                               lineNr, i, view, &col);
+            if(r < 0) continue;
+            const char *mem = INVALID_CHAR_STRING;
+            do{
+                int off = 0;
+                int cp = StringToCodepoint(&buffer->data[where], token->size, &off);
+                if(cp > 0){
+                    if(!Font_SupportsCodepoint(cp)){
+                        _Quad quad;
+                        quad.left = vec2ui(x, y);
+                        x += fonsComputeStringAdvance(font->fsContext, (char *)&mem,
+                                                      INVALID_CHAR_SIZE, &previousGlyph);
+                        quad.right = vec2ui(x, y);
+                        errorQuads->push_back(quad);
+                    }else{
+                        p = &buffer->data[where];
+                        x = fonsStashMultiTextColor(font->fsContext, x, y,
+                                                    col.ToUnsigned(), p, p+off,
+                                                    &previousGlyph);
+                    }
+                    where += off;
+                }else{
+                    _Quad quad;
+                    quad.left = vec2ui(x, y);
+                    uint f = fonsComputeStringAdvance(font->fsContext, (char *)&mem,
+                                                      INVALID_CHAR_SIZE, &previousGlyph);
+                    x += f * (token->position + token->size - where);
+                    where = token->position + token->size;
+                    quad.right = vec2ui(x, y);
+                    errorQuads->push_back(quad);
                 }
+            }while(where < token->size + token->position);
+
+            pos = where;
+            if(x > state->renderLineWidth - view->lineOffset){
+                largeLine = 1;
             }
         }
     }
@@ -1282,21 +1341,22 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
 }
 
 int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Float dt){
-    Float ones[] = {1,1,1,1};
     char linen[32];
     BufferView *view = View_GetBufferView(vview);
 
     OpenGLFont *font = &state->font;
     Geometry geometry = view->geometry;
 
-    Float originalScaleWidth = (geometry.upper.x - geometry.lower.x) * font->fontMath.invReduceScale;
+    Float originalScaleWidth = (geometry.upper.x - geometry.lower.x) *
+                                            font->fontMath.invReduceScale;
+
     state->renderLineWidth = originalScaleWidth;
     Transform translate;
 
     vec4f backgroundColor = GetUIColorf(theme, UIBackground);
     vec4f backgroundLineNColor = GetUIColorf(theme, UILineNumberBackground);
     Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z,
-        backgroundColor.w };
+                     backgroundColor.w };
     Float fcolLN[] = { backgroundLineNColor.x, backgroundLineNColor.y,
         backgroundLineNColor.z, backgroundLineNColor.w };
 
@@ -1317,7 +1377,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     ActivateViewportAndProjection(state, vview, ViewportAllView);
 
     glClearBufferfv(GL_COLOR, 0, fcol);
-    glClearBufferfv(GL_DEPTH, 0, ones);
+    glClearBufferfv(GL_DEPTH, 0, kOnes);
     Float baseHeight = 0;
     if(vview->descLocation == DescriptionTop){
         baseHeight = font->fontMath.fontSizeAtRenderCall;

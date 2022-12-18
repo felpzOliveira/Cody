@@ -1,5 +1,17 @@
 #include <view.h>
 
+const char *View_GetStateString(ViewState state){
+#define STR_CASE(x) case x : return #x
+    switch(state){
+        STR_CASE(View_FreeTyping);
+        STR_CASE(View_QueryBar);
+        STR_CASE(View_SelectableList);
+        STR_CASE(View_AutoComplete);
+        default: return "None";
+    }
+#undef STR_CASE
+}
+
 static void View_SelectableListSetLineBuffer(View *view, LineBuffer *sourceBuffer){
     SelectableList *list = &view->selectableList;
     SelectableList_SetLineBuffer(list, sourceBuffer);

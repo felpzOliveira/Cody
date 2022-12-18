@@ -275,6 +275,19 @@ vec2ui ScreenToGL(vec2ui u, OpenGLState * state){
     return vec2ui((uint)p.x, (uint)p.y);
 }
 
+vec2f ScreenToGLf(vec2f u, OpenGLState * state){
+    vec3f p(u.x, u.y, 0);
+    Transform inv = Inverse(state->scale);
+    p = inv.Point(p);
+    return vec2f(p.x, p.y);
+}
+
+vec2f GLToScreen(vec2f u, OpenGLState *state){
+    vec3f p(u.x, u.y, 0);
+    p = state->model.Point(p);
+    return vec2f(p.x, p.y);
+}
+
 Float GLToScreen(Float x, OpenGLState *state){
     vec3f p(x, 0, 0);
     p = state->model.Point(p);
@@ -1323,12 +1336,9 @@ void Graphics_RequestClose(WidgetWindow *w){
 }
 
 /*
-* TODO: It is interesting to attempt to render 1 +2pages and allow
-*       for a translation matrix. It might allow us to better represent
-*       transitions and the viewing interface? Also it allows us to by-pass
-*       the 'translate at end of file' issue we have right now.
+* TODO: Implement a hex editor for binary files so we can open binary files.
+*       it shouldn't be too dificult, we mostly have everything already.
 */
-
 int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
     OpenGLState *state = &GlobalGLState;
     OpenGLFont *font = &state->font;

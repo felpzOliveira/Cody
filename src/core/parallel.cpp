@@ -200,7 +200,7 @@ void print_error(std::string &msg, BuildParseCtx &parseCtx, int is_err){
         parseCtx.lastMessage = error.message;
         PushBuildErrors(&error);
     }else{
-        printf("Could not parse error\n");
+        //printf("Could not parse error\n");
     }
 }
 

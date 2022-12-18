@@ -2296,8 +2296,8 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
-                FileProvider_Load(targetPath, l, &lBuffer, false);
-                BufferView_SwapBuffer(bView, lBuffer, CodeView);
+                if(FileProvider_Load(targetPath, l, &lBuffer, false))
+                    BufferView_SwapBuffer(bView, lBuffer, CodeView);
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
                 if(f == 0 || lBuffer == nullptr){

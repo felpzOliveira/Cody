@@ -402,9 +402,10 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
 /*
 * Generic call to render a view, it basically checks if the view has a file to render
-* otherwise it renders a default welcome message.
+* otherwise it renders a default welcome message, render files as text to be edited.
 */
 int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt);
+
 /*
 * Renders a OpenGLSelector.
 */
@@ -515,7 +516,9 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH);
 */
 Float ScreenToGL(Float x, OpenGLState *state);
 vec2ui ScreenToGL(vec2ui u, OpenGLState * state);
+vec2f ScreenToGLf(vec2f u, OpenGLState * state);
 Float GLToScreen(Float x, OpenGLState *state);
+vec2f GLToScreen(vec2f u, OpenGLState *state);
 Float ScreenToTransform(Float x, Transform model);
 
 /*

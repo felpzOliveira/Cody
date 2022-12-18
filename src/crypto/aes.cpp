@@ -418,7 +418,7 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
     }
 
     if(len % AES_BLOCK_SIZE_IN_BYTES != 0 || len == 0){
-        printf("Not compatible PKCS#7 padding\n");
+        printf("PKCS#7 padding is not compatible\n");
         return false;
     }
 

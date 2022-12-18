@@ -75,7 +75,7 @@ typedef TOKENIZER_FETCH_CALL(TokenizerFetchCallback);
 #define LEX_PROCESSOR_TABLE(name) int name(char **p, uint n, Token *token, TokenLookupTable *lookup, TokenizerFetchCallback *fetcher, TokenizerContext *context, Tokenizer *tokenizer)
 #define LEX_TOKENIZER_ENTRY_CONTEXT(name) int name(char **p, uint n, TokenizerContext *context)
 #define LEX_TOKENIZER_EXEC_CONTEXT(name) int name(char **p, uint n, Token *token, uint *offset, TokenizerContext *context, Tokenizer *tokenizer)
-#define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer, int process_tab)
+#define LEX_TOKENIZER(name) int name(char **p, uint n, Token *token, Tokenizer *tokenizer)
 
 #define LEX_LOGICAL_PROCESSOR(name) int name(Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p)
 

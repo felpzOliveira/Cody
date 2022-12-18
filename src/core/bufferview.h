@@ -81,14 +81,16 @@ struct BufferViewFileLocation{
 };
 
 inline const char *ViewTypeString(ViewType type){
+#define STR_CASE(x) case x : return #x
     switch(type){
-        case CodeView : return "CodeView";
-        case GitDiffView : return "GitDiffView";
-        case GitStatusView: return "GitStatusView";
-        case DbgView: return "DbgView";
-        case EmptyView : return "EmptyView";
+        STR_CASE(CodeView);
+        STR_CASE(GitDiffView);
+        STR_CASE(GitStatusView);
+        STR_CASE(DbgView);
+        STR_CASE(EmptyView);
         default: return "(none)";
     }
+#undef STR_CASE
 }
 
 /*

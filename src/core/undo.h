@@ -9,7 +9,8 @@
 
 struct Buffer;
 
-#define BUFFER_CHANGE_INITIALIZER {.bufferInfo = vec2ui(0,0), .buffer = nullptr, .change = CHANGE_NONE}
+#define BUFFER_CHANGE_INITIALIZER {.bufferInfo = vec2ui(0,0), .buffer = nullptr,\
+    .change = CHANGE_NONE}
 
 #define OPERATION_INSERT_CHAR 0
 #define OPERATION_REMOVE_CHAR 1

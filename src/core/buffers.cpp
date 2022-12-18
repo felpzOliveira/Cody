@@ -886,7 +886,7 @@ uint LineBuffer_TokenizerFileFetcher(char **p, uint fet){
     return 0;
 }
 
-#define DEBUG_TOKENS  0
+#define DEBUG_TOKENS 0
 static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
                                      uint at, uint total, void *prv)
 {
@@ -916,7 +916,7 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
         Token token;
         token.reserved = nullptr;
         char *h = *p;
-        int rc = Lex_TokenizeNext(p, iSize, &token, tokenizer, 0);
+        int rc = Lex_TokenizeNext(p, iSize, &token, tokenizer);
         if(rc < 0){
             iSize = 0;
         }else{
@@ -969,7 +969,6 @@ static void LineBuffer_LineProcessor(char **p, uint size, uint lineNr,
     buffer->stateContext = tokenizerContext;
     buffer->stateContext.forwardTrack = 0;
     buffer->erased = false;
-
 }
 
 static uint currentID;
@@ -1008,7 +1007,7 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
     do{
         Token token;
         token.reserved = nullptr;
-        int rc = Lex_TokenizeNext(&p, size, &token, tokenizer, 1);
+        int rc = Lex_TokenizeNext(&p, size, &token, tokenizer);
         if(rc < 0){
             size = 0;
         }else{
@@ -1259,6 +1258,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     AssertA(lineBuffer != nullptr && fileContents != nullptr && filesize > 0,
             "Invalid line buffer initialization");
 
+    synchronous = true;
     if(synchronous){
         LineBufferTokenizer lineBufferTokenizer;
         LineBuffer_InitBlank(lineBuffer);
@@ -1272,7 +1272,6 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
         current = 0;
         totalSize = filesize;
         content = fileContents;
-
         Lex_TokenizerSetFetchCallback(tokenizer, LineBuffer_TokenizerFileFetcher);
 
         Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
@@ -1284,6 +1283,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
         content = nullptr;
 
         Lex_TokenizerSetFetchCallback(tokenizer, nullptr);
+
     }else{ // Make the file tokenization run in a different thread
         DispatchExecution([&](HostDispatcher *dispatcher){
             // becarefull with pointers and variables as the parent
@@ -1310,8 +1310,8 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
             current = 0;
             totalSize = filesize;
             content = fileContents;
-
-            Lex_TokenizerSetFetchCallback(localTokenizerPtr, LineBuffer_TokenizerFileFetcher);
+            Lex_TokenizerSetFetchCallback(localTokenizerPtr,
+                                        LineBuffer_TokenizerFileFetcher);
 
             Lex_LineProcess(fileContents, filesize, LineBuffer_LineProcessor,
                             0, &lineBufferTokenizer, true);
@@ -1324,6 +1324,7 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
             content = nullptr;
 
             Lex_TokenizerSetFetchCallback(localTokenizerPtr, nullptr);
+
             // release the caller, just in case we haven't released it before
             dispatcher->DispatchHost();
         });
@@ -1508,6 +1509,7 @@ void LineBuffer_CopyLineTokens(LineBuffer *lineBuffer, uint lineNo,
 void LineBuffer_Free(LineBuffer *lineBuffer){
     if(lineBuffer){
 #if defined(MEMORY_DEBUG)
+        printf("[MEM] Freeing linebuffer %p\n", lineBuffer);
         if(lineBuffer->lines && lineBuffer->size == 0){
             printf("[MEM] Linebuffer has lines but 0 size\n");
             getchar();

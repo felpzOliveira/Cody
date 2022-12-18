@@ -1640,7 +1640,6 @@ FONS_DEF int fonsGetGlyphIndex(FONScontext* cstash, int codepoint){
 	return fons__tt_getGlyphIndex(&font->font, codepoint);
 }
 
-
 FONS_DEF float fonsStashMultiTextColor(FONScontext* cstash,
                                        float x, float y, unsigned int color,
                                        const char* str, const char* end,
@@ -1682,7 +1681,9 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* cstash,
 	}
 	// Align vertically.
 	y += fons__getVertAlign(cstash, font, state->align, isize);
+    unsigned int tmpColor = color;
     while(str != end){
+        color = tmpColor;
         char target = *str;
         if(target == '\t'){
             target = ' ';
@@ -1708,10 +1709,13 @@ FONS_DEF float fonsStashMultiTextColor(FONScontext* cstash,
                 prevGlyphIndex = glyph != NULL ? glyph->index : -1;
             }
         }else{
-            if (fons__decutf8(&utf8state, &codepoint, (const unsigned char)target)){
+            unsigned int utf8dec = fons__decutf8(&utf8state, &codepoint,
+                                            (const unsigned char)target);
+            if(utf8dec){
                 ++str;
                 continue;
             }
+
             glyph = fons__getGlyph(cstash, font, codepoint, isize, iblur);
             if (glyph != NULL) {
                 fons__getQuad(cstash, font, prevGlyphIndex, glyph,

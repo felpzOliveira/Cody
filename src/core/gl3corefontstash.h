@@ -115,7 +115,7 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
         GL_CHK(glGenBuffers(1, &gl->vertexBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->vertexBuffer));
         GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * 2 * sizeof(float),
-        NULL, GL_DYNAMIC_DRAW));
+                            NULL, GL_DYNAMIC_DRAW));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
 
@@ -125,7 +125,7 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
         GL_CHK(glGenBuffers(1, &gl->tcoordBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->tcoordBuffer));
         GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * 2 * sizeof(float),
-        NULL, GL_DYNAMIC_DRAW));
+                            NULL, GL_DYNAMIC_DRAW));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
     if (!gl->tcoordBuffer) return 0;
@@ -134,7 +134,7 @@ static int glfons__renderCreate(void* userPtr, int width, int height)
         GL_CHK(glGenBuffers(1, &gl->colorBuffer));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, gl->colorBuffer));
         GL_CHK(glBufferData(GL_ARRAY_BUFFER, FONS_VERTEX_COUNT * sizeof(unsigned int),
-        NULL, GL_DYNAMIC_DRAW));
+                            NULL, GL_DYNAMIC_DRAW));
         GL_CHK(glBindBuffer(GL_ARRAY_BUFFER, 0));
     }
     if (!gl->colorBuffer) return 0;
@@ -320,7 +320,7 @@ FONS_DEF void glfonsDeleteContext(FONScontext* ctx){
     }
 }
 
-// TODO: Note this is creating a new context that shared GPU memory
+// TODO: Note this is creating a new context that shares GPU memory
 //       it does not share the data in the context. So things like
 //       fonts and colors are still separated.
 FONS_DEF FONScontext* glfonsCreateFrom(FONScontext* other){

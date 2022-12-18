@@ -1216,7 +1216,7 @@ LEX_TOKENIZER_EXEC_CONTEXT(Lex_TokenizeExecCodePreprocessor){
     return rv;
 }
 
-/* (char **p, uint n, Token *token, Tokenizer *tokenizer, int process_tab, uint bufferId) */
+/* (char **p, uint n, Token *token, Tokenizer *tokenizer) */
 LEX_TOKENIZER(Lex_TokenizeNext){
     uint offset = 0;
     uint len = 0;
@@ -1376,7 +1376,7 @@ void Lex_LineProcess(char *text, uint textsize, Lex_LineProcessorCallback *proce
     char *lineStart = p;
     uint lineSize = 0;
     uint lineNr = refLine+1;
-    while(p != NULL && *p != EOF && processed < textsize){
+    while(p != NULL && processed < textsize){
         if(*p == '\r'){
             p++;
             processed++;

@@ -8,6 +8,8 @@
 #include <storage.h>
 #include <sstream>
 
+#define REJECT_BINARY_FILES 1
+
 typedef struct FileProvider{
     FileBufferList fileBuffer;
     SymbolTable symbolTable;
@@ -288,7 +290,7 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
     if(lTokenizer) *lTokenizer = tokenizer;
 }
 
-void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
+bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
                        bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
@@ -300,6 +302,17 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
 
     if(device){
         content = device->GetContentsOf(targetPath, &fileSize);
+        double decode_ratio = ComputeDecodeRatio(content, fileSize);
+        if(!(decode_ratio < kMaximumDecodeRatio)){
+            if(REJECT_BINARY_FILES){
+                printf("[Warning] * File ( %s ) is possibly binary.\n"
+                       "            Cody does not supported  such files under current build.\n",
+                    targetPath);
+                AllocatorFree(content);
+                content = nullptr;
+                return false;
+            }
+        }
     }
 
     lBuffer = AllocatorGetN(LineBuffer, 1);
@@ -342,6 +355,8 @@ void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     if(lineBuffer){
         *lineBuffer = lBuffer;
     }
+
+    return true;
 }
 
 int FileProvider_IsLineBufferDirty(char *hint_name, uint len){

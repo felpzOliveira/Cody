@@ -90,8 +90,9 @@ int FileProvider_IsFileOpened(char *path, uint len);
 * be available. Settings 'mustFinish' to false allows for asynchronous load and
 * faster return, this allows for rendering the file wihout it being fully loaded,
 * usefull for large files but dangerous for loading files in sequence, use with care.
+* Returns whether or not it was possible to load the file.
 */
-void FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
+bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
                        bool mustFinish=true);
 
 /*

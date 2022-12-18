@@ -23,7 +23,7 @@ TokenizerSupport litSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Nov 29 2022 17:07:11 ) */
+/* Auto generated file ( Dec 18 2022 11:49:12 ) */
 
 std::vector<std::vector<GToken>> litReservedPreprocessor = {
 };
@@ -105,7 +105,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "rayleigh", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "emission", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "geometry", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "Material", .identifier = TOKEN_ID_DATATYPE }, },
+		{ .value = "Material", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "exposure", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "luminance", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "wireframe", .identifier = TOKEN_ID_OPERATOR },

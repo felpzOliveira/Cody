@@ -18,7 +18,7 @@ static bool Git_TryOpenRepo(git_repository **repo, git_reference **head, std::st
 
     rv = git_repository_open(repo, root.c_str());
     if(rv != 0){
-        DEBUG_MSG("Failed to open repository at [%s]\n", root.c_str());
+        //DEBUG_MSG("Failed to open repository at [%s]\n", root.c_str());
         git_error_clear();
         return false;
     }else{

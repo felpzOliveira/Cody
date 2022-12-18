@@ -102,6 +102,7 @@ translate OPERATOR
 subsurface OPERATOR
 integrator OPERATOR
 resolution OPERATOR
+exposure OPERATOR
 dispersion OPERATOR
 anisotropic OPERATOR
 reflectance OPERATOR

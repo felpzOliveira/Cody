@@ -91,6 +91,37 @@ std::string StringTrim(std::string s){
     return s;
 }
 
+#define DEBUG_RATIO 1
+double ComputeDecodeRatio(char *data, uint size){
+    uint where = 0;
+    Float ratio = 0.0;
+    uint64_t total = 0, failed = 0;
+#if DEBUG_RATIO
+    StopWatch watch;
+    watch.Start();
+#endif
+    while(where < size && ratio < kMaximumDecodeRatio){
+        int off = 0;
+        int rv = StringToCodepoint(&data[where], size-where, &off);
+        if(rv < 0){
+            failed += 1;
+            where ++;
+        }else{
+            where += off;
+        }
+
+        total += 1;
+        ratio = (Float)failed / (Float)(total);
+    }
+
+#if DEBUG_RATIO
+    watch.Stop();
+    Float interval = watch.Interval();
+    printf("[DEBUG] Decode ratio = {%g %g}\n", ratio, interval);
+#endif
+    return ratio;
+}
+
 std::string ExpandFilePath(char *path, uint size, char *folder){
     // for now a soft test solves our problems
     // TODO: PathCchCanonicalize

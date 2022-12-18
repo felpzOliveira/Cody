@@ -205,6 +205,11 @@ QueryBar *View_GetQueryBar(View *view);
 FileOpener *View_GetFileOpener(View *view);
 
 /*
+* Gets a string representing the view state, basically for debug purposes.
+*/
+const char *View_GetStateString(ViewState state);
+
+/*
 * Release resources taken by a view.
 */
 void View_Free(View *view);
