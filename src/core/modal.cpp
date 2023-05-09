@@ -3,6 +3,8 @@
 #include <lex.h>
 #include <timing.h>
 
+bool ENABLE_MODAL_MODE = true;
+
 // grab some utilities
 void AppRestoreAllViews();
 void AppSetMouseHook(std::function<void(void)> hook);
@@ -36,7 +38,8 @@ void DualModeExit(){
 }
 
 void DualModeEnter(){
-    return;
+    if(!ENABLE_MODAL_MODE)
+        return;
     AppRestoreAllViews();
     AppSetMouseHook(DualModeSetKeyboard);
     modalControl.lastMapping = KeyboardGetActiveMapping();
@@ -70,6 +73,9 @@ void DualModeSwapView(){
 }
 
 void DualModeInit(){
+    if(!ENABLE_MODAL_MODE)
+        return;
+
     BindingMap *mapping = KeyboardCreateMapping();
     RegisterKeyboardDefaultEntry(mapping, DualModeDefaultEntry, nullptr);
 

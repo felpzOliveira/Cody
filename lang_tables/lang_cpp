@@ -103,6 +103,7 @@ defined OPERATOR
 warning PREPROCESSOR
 mutable OPERATOR
 uint8_t DATATYPE
+uint16_t DATATYPE
 int16_t DATATYPE
 int32_t DATATYPE
 int64_t DATATYPE
@@ -264,6 +265,7 @@ nullptr OPERATOR
 alignas OPERATOR
 wchar_t DATATYPE
 uint8_t DATATYPE
+uint16_t DATATYPE
 int16_t DATATYPE
 int32_t DATATYPE
 int64_t DATATYPE

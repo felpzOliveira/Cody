@@ -4,7 +4,9 @@ uniform sampler2D diffuse;
 varying vec2 interpolatedTexCoord;
 varying vec4 interpolatedColor;
 
-uniform int enable_contrast = 0;
+uniform float brightness = 0.15;
+uniform float contrast = 0.8;
+uniform float saturation = 1.5;
 
 mat4 brightnessMatrix(float brightness){
     return mat4(1, 0, 0, 0,
@@ -36,23 +38,12 @@ mat4 saturationMatrix(float saturation){
                 0, 0, 0, 1 );
 }
 
-
-const float brightness = 0.15;
-const float contrast = 0.8;
-const float saturation = 1.5;
-
 void main() {
     float alpha = texture2D(diffuse, interpolatedTexCoord).a;
     vec4 textColor = clamp(interpolatedColor, 0.0, 1.0);
     // Premultiplied alpha.
     vec4 col = vec4(textColor.rgb * textColor.a, textColor.a) * alpha;
-    if(enable_contrast < -100){
-        gl_FragColor = brightnessMatrix( brightness ) *
-                       contrastMatrix( contrast ) * 
-                       saturationMatrix( saturation ) * col;
-    }else{
-        alpha = col.a;
-        //col *= 1.3;
-        gl_FragColor = vec4(col.rgb, alpha);
-    }
+    gl_FragColor = brightnessMatrix( brightness ) *
+                   contrastMatrix( contrast ) *
+                   saturationMatrix( saturation ) * col;
 }

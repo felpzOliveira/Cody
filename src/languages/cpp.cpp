@@ -14,7 +14,7 @@ TokenizerSupport cppSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 18 2022 11:49:12 ) */
+/* Auto generated file ( Dec 26 2022 11:07:05 ) */
 
 std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 	{
@@ -129,6 +129,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
 	{
+		{ .value = "uint16_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "intptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUstream", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUtexref", .identifier = TOKEN_ID_DATATYPE },
@@ -307,6 +308,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
 	{
+		{ .value = "uint16_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "intptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUstream", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUtexref", .identifier = TOKEN_ID_DATATYPE },

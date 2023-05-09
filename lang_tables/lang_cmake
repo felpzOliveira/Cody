@@ -64,6 +64,7 @@ CMAKE_COMMAND OPERATOR
 enable_testing OPERATOR
 add_executable OPERATOR
 target_compile_definitions OPERATOR
+set_source_files_properties OPERATOR
 configure_file OPERATOR
 add_definitions OPERATOR
 execute_process OPERATOR

@@ -41,6 +41,13 @@ typedef enum{
     UIDbgLineHighlightColor,
 }UIElement;
 
+
+typedef struct ThemeVisuals{
+    Float brightness;
+    Float saturation;
+    Float contrast;
+}ThemeVisuals;
+
 typedef struct{
     // the main background color for the editor
     vec4i backgroundColor;
@@ -148,6 +155,8 @@ typedef struct{
     // this helps better select what icons are to be used and make decisions
     // on components that have different colors on dark/light modes
     bool isLight;
+    // effect values for the theme, i.e.: brightness, saturation and contrast
+    ThemeVisuals visuals;
 }Theme;
 
 typedef struct{
@@ -171,8 +180,11 @@ Float GetLineBorderWidth(Theme *theme);
 short GetBackTextCount(Theme *theme);
 void GetThemeList(std::vector<ThemeDescription> **themes);
 void SwapDefaultTheme(char *name, uint len);
-int ThemeNeedsEffect(Theme *theme);
 int GetSelectorBorderWidth(Theme *theme);
 bool CurrentThemeIsLight();
 void CurrentThemeSetDimm(int dim);
+void CurrentThemeSetBrightness(Float value);
+void CurrentThemeSetSaturation(Float value);
+void CurrentThemeSetContrast(Float value);
+void CurrentThemeGetVisuals(ThemeVisuals &visuals);
 #endif //THEME_H

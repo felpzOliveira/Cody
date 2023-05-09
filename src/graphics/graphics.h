@@ -335,6 +335,23 @@ uint Graphics_GetFontSize();
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize,
                           Float reference=FONT_UPSCALE_DEFAULT_SIZE);
 
+/*
+* Sets the default font size, this routine updates the global OpenGLState, be aware that
+* changing these will take effect on all components. It is a convenience for the
+* fontsize command to allow for global changes.
+*/
+void Graphics_SetDefaultFontSize(uint fontSize);
+
+/*
+* Consultes the global OpenGLState for the current line height being used.
+*/
+uint Graphics_GetDefaultLineHeight();
+
+/*
+* Computes the transformation required to apply the given fontsize. This routines also
+* adjusts the values inside the given font to be compatible with the transformation
+* but does NOT change the inner transforms of any OpenGLState.
+*/
 void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize, Transform *model,
                                            Float reference=FONT_UPSCALE_DEFAULT_SIZE);
 

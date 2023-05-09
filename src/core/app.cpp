@@ -150,6 +150,34 @@ int AppGetRenderViewIndices(){
     return appGlobalConfig.displayViewIndices;
 }
 
+uint AppGetFontSize(){
+    return appGlobalConfig.defaultFontSize;
+}
+
+void AppSetFontSize(uint size){
+    /*
+    * Small check: make sure whatever we are doing we are not breaking the
+    *              interface in geometry terms.
+    */
+    View *view = AppGetActiveView();
+    appGlobalConfig.defaultFontSize = Min(Max(1, size), view->geometry.Height()-5);
+    Graphics_SetDefaultFontSize(appGlobalConfig.defaultFontSize);
+    /*
+    * Now we need to pass the line height information for all views in order to sync
+    * line viewing range computation and scrolling otherwise everything will get clipped.
+    */
+    uint lineHeight = Graphics_GetDefaultLineHeight();
+    auto fn = [&](ViewNode *node) -> int{
+        View *view = node->view;
+        if(view){
+            View_SetGeometry(view, view->geometry, lineHeight);
+        }
+        return 0;
+    };
+
+    ViewTree_ForAllViews(fn);
+}
+
 void AppEarlyInitialize(bool use_tabs){
     View *view = nullptr;
     StorageDevice *storage = FetchStorageDevice();
@@ -160,6 +188,7 @@ void AppEarlyInitialize(bool use_tabs){
     appGlobalConfig.displayWrongIdent = 0;
     appGlobalConfig.displayViewIndices = 0;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
+    appGlobalConfig.defaultFontSize = 19;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
 
@@ -1909,6 +1938,16 @@ void AppCommandIndentRegion(BufferView *view, vec2ui start, vec2ui end){
     AllocatorFree(lineHelper);
 }
 
+void AppCommandIndentCurrent(){
+    BufferView *view = AppGetActiveBufferView();
+    NullRet(view->lineBuffer);
+    NullRet(LineBuffer_IsWrittable(view->lineBuffer));
+    if(view->lineBuffer->lineCount > 0){
+        AppCommandIndentRegion(view, vec2ui(0,0), vec2ui(view->lineBuffer->lineCount, 0));
+        BufferView_Dirty(view);
+    }
+}
+
 void AppCommandIndent(){
     vec2ui start, end;
     BufferView *view = AppGetActiveBufferView();
@@ -2400,7 +2439,7 @@ void AppInitialize(){
           DbgApp_RegisterBreakpointFeedbackCallback(DbgSupportBreakpointFeedback, nullptr);
 
     AppRemoveMouseHook();
-    DualModeEnter();
+    //DualModeEnter();
 }
 
 void AppInitializeQueryBarBindings(){

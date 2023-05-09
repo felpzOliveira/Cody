@@ -4,6 +4,7 @@
 #include <symbol.h>
 #include <file_provider.h>
 #include <sstream>
+#include <storage.h>
 
 #define CMD_EXIT "__internal_exit__"
 
@@ -126,6 +127,14 @@ void PushBuildErrors(BuildError *err){
 static bool IsBuildCommand(std::string cmd){
     bool is_build = false;
     std::vector<std::string> splitted;
+
+    // check if the device is local because if it is not we actually
+    // want a RPC command for this
+    // TODO: implement an RPC version of the make thingy?
+    StorageDevice *device = FetchStorageDevice();
+    if(!device->IsLocallyStored())
+        return false;
+
     StringSplit(cmd, splitted);
     // TODO: Add as needed
     for(std::string &str : splitted){

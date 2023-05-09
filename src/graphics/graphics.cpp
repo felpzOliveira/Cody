@@ -393,9 +393,17 @@ void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize,
     *model = Scale(fMath->reduceScale, fMath->reduceScale, 1);
 }
 
+uint Graphics_GetDefaultLineHeight(){
+    return GlobalGLState.font.fontMath.fontSizeAtDisplay;
+}
+
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
     OpenGLFont *font = &state->font;
     Graphics_ComputeTransformsForFontSize(font, fontSize, &state->scale, reference);
+}
+
+void Graphics_SetDefaultFontSize(uint fontSize){
+    Graphics_SetFontSize(&GlobalGLState, fontSize);
 }
 
 int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
@@ -837,7 +845,7 @@ void OpenGLFontSetup(OpenGLState *state){
                                      (uint8 *)fontfileContents, filesize, 0,
                                      font->sdfSettings);
     AssertA(font->fontId != FONS_INVALID, "Failed to create font");
-    Graphics_SetFontSize(state, 19); // TODO: User
+    Graphics_SetFontSize(state, AppGetFontSize());
 }
 
 void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
@@ -1343,11 +1351,15 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
     OpenGLState *state = &GlobalGLState;
     OpenGLFont *font = &state->font;
     int animating = 0;
+    ThemeVisuals visuals;
     AppUpdateViews();
 
+    CurrentThemeGetVisuals(visuals);
+
     glUseProgram(font->shader.id);
-    Shader_UniformInteger(font->shader, "enable_contrast",
-                          ThemeNeedsEffect(defaultTheme));
+    Shader_UniformFloat(font->shader, "contrast", visuals.contrast);
+    Shader_UniformFloat(font->shader, "brightness", visuals.brightness);
+    Shader_UniformFloat(font->shader, "saturation", visuals.saturation);
 
     ViewTreeIterator iterator;
     ViewTree_Begin(&iterator);

@@ -21,6 +21,12 @@
 #define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
+/*
+* NOTE: Make sure the build in fact supports binary files before
+* attempting to set this to zero.
+*/
+#define REJECT_BINARY_FILES 1
+
 //#define BUG_HUNT
 
 /*
@@ -152,6 +158,15 @@ int StringFirstNonEmpty(char *s0, uint s0len);
 * the word in the output 'size', in case a word is found.
 */
 char *StringNextWord(char *s0, uint s0len, uint *size);
+
+/*
+* NOTE: For some unknown reason std::stof and std::stod are not working
+* whenever we split a command it keeps returning 1 for 1.5, it is breaking
+* conversion it might be because it wants a ',' instead of a '.' which is absurd
+* so we'll implement our own.
+* Converts a string to float.
+*/
+bool StringToFloat(char *s, char *s_end, Float *result);
 
 /*
 * Checks if the string starts with an integer as a first word.

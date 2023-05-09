@@ -8,8 +8,6 @@
 #include <storage.h>
 #include <sstream>
 
-#define REJECT_BINARY_FILES 1
-
 typedef struct FileProvider{
     FileBufferList fileBuffer;
     SymbolTable symbolTable;

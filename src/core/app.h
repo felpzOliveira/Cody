@@ -32,6 +32,7 @@ typedef struct{
     int pathCompression;
     int displayWrongIdent;
     int displayViewIndices;
+    uint defaultFontSize;
     std::string rootFolder;
     std::string configFile;
     std::string configFolder;
@@ -64,6 +65,16 @@ BindingMap *AppGetFreetypingBinding();
 * 1 in case the editor is using tabs or 0 in case it is offseting with spaces.
 */
 int AppGetTabLength(int *using_tab);
+
+/*
+* Get the editor's chosen font size.
+*/
+uint AppGetFontSize();
+
+/*
+* Sets the editor's font size.
+*/
+void AppSetFontSize(uint size);
 
 /*
 * Sets the style for rendering the cursor.
@@ -328,6 +339,7 @@ void AppCommandRightArrow();
 void AppCommandUpArrow();
 void AppCommandDownArrow();
 void AppCommandIndent();
+void AppCommandIndentCurrent();
 void AppCommandPaste();
 void AppCommandSplitHorizontal();
 void AppCommandSplitVertical();

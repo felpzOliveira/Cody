@@ -18,7 +18,7 @@ TokenizerSupport cmakeSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 18 2022 11:49:12 ) */
+/* Auto generated file ( Dec 26 2022 11:07:05 ) */
 
 std::vector<std::vector<GToken>> cmakeReservedPreprocessor = {
 };
@@ -114,6 +114,8 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 	{
 		{ .value = "target_compile_definitions", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "target_include_directories", .identifier = TOKEN_ID_OPERATOR }, },
+	{
+		{ .value = "set_source_files_properties", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "CMAKE_RUNTIME_OUTPUT_DIRECTORY", .identifier = TOKEN_ID_DATATYPE }, },
 };

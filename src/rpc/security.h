@@ -28,7 +28,7 @@ namespace SecurityServices{
 
     /*
      * Wrappers for AES-256 that contains both the encrypted/decrypted data
-     * and the iv used (for encryption only). Use this when send/recv messages.
+     * and the iv used (for encryption only). Use this as send/recv interface.
      */
     bool Encrypt(Context *ctx, uint8_t *input, size_t len, std::vector<uint8_t> &out);
     bool Decrypt(Context *ctx, uint8_t *input, size_t len, std::vector<uint8_t> &out);

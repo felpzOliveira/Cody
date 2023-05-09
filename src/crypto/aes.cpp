@@ -5,6 +5,9 @@
 #include <stdio.h>
 #include <cryptoutil.h>
 
+#define LOG_MODULE "AES"
+#include <log.h>
+
 #define AES_BLOCK_SIZE_WINDOW 4
 #define AES_BLOCK_SIZE_IN_BITS  (AES_BLOCK_SIZE_IN_BYTES << 3)
 #define AES_MAX_STATE_SIZE 32
@@ -387,7 +390,7 @@ static void AES_BlockDecrypt(uint8_t *block, uint8_t *output, AesContext *ctx){
 bool AES_GenerateKey(void *buffer, AesKeyLength length){
     unsigned int size = AES_KeySizeInBytes(length);
     if(size == 0){
-        printf("Invalid key size\n");
+        LOG_ERR("Invalid key size");
         return false;
     }
     return Crypto_SecureRNG(buffer, size);
@@ -418,7 +421,7 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
     }
 
     if(len % AES_BLOCK_SIZE_IN_BYTES != 0 || len == 0){
-        printf("PKCS#7 padding is not compatible\n");
+        LOG_ERR("PKCS#7 padding is not compatible");
         return false;
     }
 
@@ -447,14 +450,14 @@ bool AES_CBC_Decrypt(uint8_t *input, size_t len, uint8_t *key, uint8_t *iv,
     bool rv = false;
     uint8_t lastByte = dec[AES_BLOCK_SIZE_IN_BYTES-1];
     if(lastByte < 0x01 || lastByte > 0x10){
-        printf("Invalid padding scheme ( %x )\n", lastByte);
+        LOG_ERR("Invalid padding scheme ( " << lastByte << " )");
         out.clear();
         goto __ret;
     }
 
     for(size_t i = out.size()-1; i >= out.size()-lastByte; i--){
         if(out[i] != lastByte){
-            printf("Invalid byte on padding\n");
+            LOG_ERR("Invalid byte on padding");
             out.clear();
             goto __ret;
         }

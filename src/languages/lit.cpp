@@ -23,7 +23,7 @@ TokenizerSupport litSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 18 2022 11:49:12 ) */
+/* Auto generated file ( Dec 26 2022 11:07:05 ) */
 
 std::vector<std::vector<GToken>> litReservedPreprocessor = {
 };
@@ -42,9 +42,11 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "mat", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "Zirr", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "zirr", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "Oidn", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "OIDN", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "oidn", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "path", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "path", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "type", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "flip", .identifier = TOKEN_ID_OPERATOR },
@@ -87,6 +89,8 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "center", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "Filter", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "Average", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "average", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "density", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "scatter", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "sigma_a", .identifier = TOKEN_ID_OPERATOR },
@@ -108,6 +112,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "Material", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "exposure", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "direction", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "luminance", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "wireframe", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "sheenTint", .identifier = TOKEN_ID_OPERATOR },
@@ -122,6 +127,7 @@ std::vector<std::vector<GToken>> litReservedTable = {
 		{ .value = "resolution", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "dispersion", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "DirectLight", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "anisotropic", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "reflectance", .identifier = TOKEN_ID_OPERATOR }, },
 	{

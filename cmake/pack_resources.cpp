@@ -70,8 +70,25 @@ std::string path_without_ext(std::string path){
     return path.substr(0, index);
 }
 
+std::string read_file(std::string path){
+    std::string resp;
+    FILE *fp = fopen(path.c_str(), "rb");
+    if(fp){
+        fseek(fp, 0, SEEK_END);
+        long size = ftell(fp);
+        char *mem = new char[size];
+        rewind(fp);
+        long n = fread(mem, 1, size, fp);
+        resp = std::string(mem, n);
+        delete[] mem;
+        fclose(fp);
+    }
+
+    return resp;
+}
+
 template<typename Fn>
-int ForAllFiles(const char *dir, const Fn &fn){
+int ForAllFiles(const char *dir, const Fn &fn, int debug=0){
     const fs::path targetPath{ dir };
     int r = 0;
     for(const auto &entry : fs::directory_iterator(targetPath)){
@@ -79,6 +96,11 @@ int ForAllFiles(const char *dir, const Fn &fn){
         if(entry.is_directory()){
 
         }else if(entry.is_regular_file()){
+            if(debug){
+                std::string value = read_file(entry.path());
+                std::cout << "******************** READ:" << std::endl;
+                std::cout << value << std::endl;
+            }
             std::ifstream ifs(entry.path());
             if(ifs.is_open()){
                 r = fn(entry, filename, &ifs);
@@ -228,7 +250,7 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
         vars->push_back(v);
 
         return 0;
-    });
+    }, 0);
 
     if(r != 0){
         std::cout << "Error reading directory" << std::endl;

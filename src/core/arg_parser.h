@@ -39,7 +39,7 @@ inline void ArgumentProcess(std::map<const char *, ArgDesc> argument_map,
             int solved = 0;
             std::string arg(argv[i]);
             std::map<const char *, ArgDesc>::iterator it;
-            if(arg == "--help" || arg == "help"){
+            if(arg == "--help" || arg == "help" || arg == "-h"){
                 PrintHelpAndQuit(caller, argument_map);
             }
             for(it = argument_map.begin(); it != argument_map.end(); it++){

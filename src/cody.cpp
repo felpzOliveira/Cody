@@ -11,6 +11,7 @@
 #include <arg_parser.h>
 #include <storage.h>
 #include <security.h>
+#include <modal.h>
 
 typedef struct{
     bool is_remote;
@@ -21,6 +22,12 @@ typedef struct{
     bool has_key;
     std::string unknownPath;
 }CmdLineArgs;
+
+/* global options for the editor, can be changed based on command line tho */
+void InitGlobals(){
+    ENABLE_MODAL_MODE = true; /* change with --no-modal */
+    LEX_DISABLE_PROC_STACK = false; /* change with --no-proc */
+}
 
 void DefaultArgs(CmdLineArgs *args){
     args->is_remote = false;
@@ -102,6 +109,11 @@ ARGUMENT_PROCESS(disable_proc_stack){
     return ARG_OK;
 }
 
+ARGUMENT_PROCESS(disable_dual_mode){
+    ENABLE_MODAL_MODE = false;
+    return ARG_OK;
+}
+
 std::map<const char *, ArgDesc> arg_map = {
     {"--remote",
         { .processor = remote_flags,
@@ -117,11 +129,15 @@ std::map<const char *, ArgDesc> arg_map = {
     },
     {"--no-proc",
         { .processor = disable_proc_stack,
-            .help = "Disable interpretation of complex synthax (struct/typedef/...)." }
+            .help = "Disable interpretation of complex syntax (struct/typedef/...)." }
     },
     {"--use-tabs",
         { .processor = use_tabs_flags,
-          .help = "Sets the editor to use tabs instead of spaces for identation." }
+          .help = "Sets the editor to use tabs instead of spaces for indentation." }
+    },
+    {"--no-modal",
+        { .processor = disable_dual_mode,
+          .help = "Disable modal mode for the editor." }
     }
 };
 
@@ -214,6 +230,10 @@ void StartWithFile(const char *path=nullptr){
     Graphics_Initialize();
 }
 
+void DEVEL_MSG(){
+    printf("\n* Cody - Built %s at %s *\n", __DATE__, __TIME__);
+}
+
 int main(int argc, char **argv){
 #if 0
     Git_Initialize();
@@ -231,9 +251,11 @@ int main(int argc, char **argv){
     testMP();
     return 0;
 #endif
+    //DEVEL_MSG();
     SecurityServices::Context context;
     CmdLineArgs args;
     DefaultArgs(&args);
+    InitGlobals();
 
     StorageDeviceEarlyInit();
 

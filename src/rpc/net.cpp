@@ -544,6 +544,7 @@ int LinuxNetwork_CreateClientSocket(const char *ip, int port){
             goto err_close;
         }
 
+        LOG_INFO("Connecting to server ... ");
         rv = connect(sock, ref->ai_addr, (int)ref->ai_addrlen);
         if(rv != 0){
             LOG_ERR("Failed to connect to target");

@@ -17,7 +17,7 @@
 #define ACK 0x3f
 #define NACK 0x4f
 
-typedef uint32_t RPCCommandCode;
+typedef uint64_t RPCCommandCode;
 
 class RPCBuffer{
     public:

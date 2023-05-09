@@ -1,6 +1,168 @@
 #include <theme.h>
 #include <utilities.h>
 
+Theme themeDarkVim = {
+    .backgroundColor = ColorFromHex(0xFF0D1018),
+    .hoverableItemForegroundColor = ColorFromHex(0xCCD9DFE3),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFF2F2E3E),
+    .selectorBackground = ColorFromHex(0xFF101220),
+    .searchBackgroundColor = ColorFromHex(0xFFFFB815),
+    .selectableListBackground = ColorFromHex(0xFF101220),
+    .searchWordColor = ColorFromHex(0xFF0D1018),
+    .backgroundLineNumbers = ColorFromHex(0xFF0D1018),
+    .lineNumberColor = ColorFromHex(0xFF7F6E63),
+    .lineNumberHighlitedColor = ColorFromHex(0xFFFFB815),
+    .cursorLineHighlight = ColorFromHex(0xFF0D1018),
+    .operatorColor   = ColorFromHex(0xCCFF7300),
+
+    .datatypeColor   = ColorFromHex(0xCC76A698),
+    .commentColor    = ColorFromHex(0xCC9F947D),
+    .commentTodoColor = ColorFromHex(0xFFA8181F),
+    .commentNoteColor = ColorFromHex(0XFF18A81F),
+    .stringColor     = ColorFromHex(0xFFF2DAB1),
+    .numberColor     = ColorFromHex(0xFFFF7400),
+    .reservedColor   = ColorFromHex(0xFFBBBA0F),
+    /////////////////////////////////////////////
+    .functionColor   = ColorFromHex(0xCC78C9FB),
+    .includeColor    = ColorFromHex(0xCC98DCB2),
+    /////////////////////////////////////////////
+    .mathColor       = ColorFromHex(0xCCACC4D3),
+    .tokensColor     = ColorFromHex(0xFFF2DAB1),
+    .tokensOverCursorColor = ColorFromHex(0xFF0D1018),
+
+    /////////////////////////////////////////////////////
+    .preprocessorColor = ColorFromHex(0xCCfff0ba),
+    .preprocessorDefineColor = ColorFromHex(0xCCfff0ba),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    /////////////////////////////////////////////////////
+
+    .braces = ColorFromHex(0xFFE6977D),
+    .cursorColor = ColorFromHex(0xFFFFFFFF),
+
+    .querybarCursorColor = ColorFromHex(0xFFFF4040),
+    .ghostCursorColor = ColorFromHex(0xFFDADAE8),
+    .parenthesis = {
+        ColorFromHex(0xFFFFB815),
+        ColorFromHex(0xFFFFB815),
+        ColorFromHex(0xFFFFB815),
+        ColorFromHex(0xFFFFB815),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFF0D1018),
+        ColorFromHex(0xFF0D1018),
+        ColorFromHex(0xFF0D1018),
+        ColorFromHex(0xFF0D1018),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xCC76A698),
+
+    ///////////////////////////////////////////////////
+    .userDatatypeEnum = ColorFromHex(0xCCffffe1),
+    ///////////////////////////////////////////////////
+
+    .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff25253f),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFCB9401),
+    .userDefineColor = ColorFromHex(0xCCff628a),
+
+    .backTextCount = 4,
+    .lineBorderWidth = 0,
+    .alphaDimm = 0,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFF232333),
+    .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
+};
+
+Theme themeCatppuccin = {
+    .backgroundColor = ColorFromHex(0xFF1E1E2E),
+    .hoverableItemForegroundColor = ColorFromHex(0xCCD9DFE3),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFF2F2E3E),
+    .selectorBackground = ColorFromHex(0xFF1C1C2C),
+    .searchBackgroundColor = ColorFromHex(0xFF383747),
+    .selectableListBackground = ColorFromHex(0xFF1C1C2C),
+    .searchWordColor = ColorFromHex(0xFFF28FAD),
+    .backgroundLineNumbers = ColorFromHex(0xFF1E1E2E),
+    .lineNumberColor = ColorFromHex(0xFF42404E),
+    .lineNumberHighlitedColor = ColorFromHex(0xFFD9E0EC),
+    .cursorLineHighlight = ColorFromHex(0xFF282B3C),
+    .operatorColor   = ColorFromHex(0xCCF7B472),
+
+    .datatypeColor   = ColorFromHex(0xCCF0899D),
+    .commentColor    = ColorFromHex(0xFF69676A),
+    .commentTodoColor = ColorFromHex(0xFFA8181F),
+    .commentNoteColor = ColorFromHex(0XFF18A81F),
+    .stringColor     = ColorFromHex(0xCC98DCB2),
+    .numberColor     = ColorFromHex(0xCC88DBE7),
+    .reservedColor   = ColorFromHex(0xCCd0ad81),
+    .functionColor   = ColorFromHex(0xCC78C9FB),
+    .includeColor    = ColorFromHex(0xCC98DCB2),
+    .mathColor       = ColorFromHex(0xCCACC4D3),
+    .tokensColor     = ColorFromHex(0xCCACC4D3),
+    .tokensOverCursorColor = ColorFromHex(0xFF262D49),
+
+    /////////////////////////////////////////////////////
+    .preprocessorColor = ColorFromHex(0xCCfff0ba),
+    .preprocessorDefineColor = ColorFromHex(0xCCfff0ba),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    /////////////////////////////////////////////////////
+
+    .braces = ColorFromHex(0xFFE6977D),
+    .cursorColor = ColorFromHex(0xFFDADAE8),
+
+    .querybarCursorColor = ColorFromHex(0xFFFF4040),
+    .ghostCursorColor = ColorFromHex(0xFFDADAE8),
+    .parenthesis = {
+        ColorFromHex(0xFFFF0000),
+        ColorFromHex(0xFF00FF00),
+        ColorFromHex(0xFF0000FF),
+        ColorFromHex(0xFFAAAA00),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFF1E1E2E),
+        ColorFromHex(0xFF1E1E2E),
+        ColorFromHex(0xFF1E1E2E),
+        ColorFromHex(0xFF1E1E2E),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xCCDF8E1D),
+
+    ///////////////////////////////////////////////////
+    .userDatatypeEnum = ColorFromHex(0xCCffffe1),
+    ///////////////////////////////////////////////////
+
+    .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xff25253f),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
+    .selectorLoadedColor = ColorFromHex(0xFFF5BD96),
+    .userDefineColor = ColorFromHex(0xCCff628a),
+
+    .backTextCount = 4,
+    .lineBorderWidth = 0,
+    .alphaDimm = 0,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFF232333),
+    .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.5,
+    },
+};
+
 Theme themeTerminal = {
     .backgroundColor = ColorFromHex(0xff2C001e),
     .hoverableItemForegroundColor = ColorFromHex(0xffd7d7d3),
@@ -66,6 +228,11 @@ Theme themeTerminal = {
     .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
     .mouseSelectionColor = ColorFromHex(0xff2e084a),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.15,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme themeGruvboxLight = {
@@ -133,6 +300,11 @@ Theme themeGruvboxLight = {
     .dbgLinehighlightColor = ColorFromHex(0xFFfbdbb2),
     .mouseSelectionColor = ColorFromHex(0xFFebdbb2),
     .isLight = true,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme themeDracula = {
@@ -193,6 +365,11 @@ Theme themeDracula = {
     .dbgLinehighlightColor = ColorFromHex(0xFF44476a),
     .mouseSelectionColor = ColorFromHex(0xFF44475a),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme themeYavid = {
@@ -210,8 +387,10 @@ Theme themeYavid = {
     .operatorColor   = ColorFromHex(0xCCD38545),
     .datatypeColor   = ColorFromHex(0xCC719FAE),
     .commentColor    = ColorFromHex(0xFF7D7D7D),
-    .commentTodoColor = ColorFromHex(0xFFDFDA77),
-    .commentNoteColor = ColorFromHex(0xFFDFDA77),
+    .commentTodoColor = ColorFromHex(0xFFA8181F),
+    .commentNoteColor = ColorFromHex(0XFF18A81F),
+    //.commentTodoColor = ColorFromHex(0xFFDFDA77),
+    //.commentNoteColor = ColorFromHex(0xFFDFDA77),
     .stringColor     = ColorFromHex(0xFF6B8E23),
     .numberColor     = ColorFromHex(0xFF6B8E23),
     .reservedColor   = ColorFromHex(0xFF6B8E23),
@@ -254,6 +433,11 @@ Theme themeYavid = {
     .dbgLinehighlightColor = ColorFromHex(0xFF272739),
     .mouseSelectionColor = ColorFromHex(0xFF272729),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme themeRadical = {
@@ -268,10 +452,9 @@ Theme themeRadical = {
     .searchWordColor = ColorFromHex(0xCCce0b95),
     .backgroundLineNumbers = ColorFromHex(0xFF141323),
     .lineNumberColor = ColorFromHex(0xFF767585),
-    .lineNumberHighlitedColor = ColorFromHex(0xFF767585),
+    .lineNumberHighlitedColor = ColorFromHex(0xFFD9E0EC),
     .cursorLineHighlight = ColorFromHex(0xFF241630),
-    //.operatorColor   = ColorFromHex(0xCCfc78ad),
-    //.operatorColor = ColorFromHex(0xCCfaaf05),
+
     .operatorColor = ColorFromHex(0xCCc7ff00),
 
     .datatypeColor   = ColorFromHex(0xCCf67397),
@@ -321,6 +504,11 @@ Theme themeRadical = {
     .dbgLinehighlightColor = ColorFromHex(0xFF241640),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme theme4Coder = {
@@ -393,6 +581,11 @@ Theme theme4Coder = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
 Theme themeNoah = {
@@ -456,10 +649,18 @@ Theme themeNoah = {
     .dbgLinehighlightColor = ColorFromHex(0xff252848),
     .mouseSelectionColor = ColorFromHex(0xff252838),
     .isLight = false,
+    .visuals = {
+        .brightness = 0.05,
+        .saturation = 1.0,
+        .contrast = 1.0,
+    },
 };
 
+// swap this to make the default theme, i.e.: theme enabled when opening
+Theme *defaultTheme = &themeDarkVim;
+//Theme *defaultTheme = &themeCatppuccin;
 //Theme *defaultTheme = &themeRadical;
-Theme *defaultTheme = &theme4Coder;
+//Theme *defaultTheme = &theme4Coder;
 //Theme *defaultTheme = &themeDracula;
 //Theme *defaultTheme = &themeYavid;
 //Theme *defaultTheme = &themeTerminal;
@@ -474,6 +675,8 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "Yavid", .theme = &themeYavid, },
     { .name = "Terminal", .theme = &themeTerminal, },
     { .name = "Noah", .theme = &themeNoah, },
+    { .name = "Catppuccin", .theme = &themeCatppuccin, },
+    { .name = "DarkVim", .theme = &themeDarkVim, },
 };
 
 static int globalActive = 0;
@@ -656,18 +859,28 @@ int GetSelectorBorderWidth(Theme *theme){
     return theme->borderWidth;
 }
 
-int ThemeNeedsEffect(Theme *theme){
-    if(theme == &theme4Coder){
-        return 1;
-    }
-
-    return 0;
-}
-
 bool CurrentThemeIsLight(){
     return defaultTheme->isLight;
 }
 
 void CurrentThemeSetDimm(int dim){
     defaultTheme->alphaDimm = dim != 0 ? 1 : 0;
+}
+
+void CurrentThemeSetBrightness(Float value){
+    defaultTheme->visuals.brightness = Max(value, 0.01);
+}
+
+void CurrentThemeSetSaturation(Float value){
+    defaultTheme->visuals.saturation = Max(value, 0.01);
+}
+
+void CurrentThemeSetContrast(Float value){
+    defaultTheme->visuals.contrast = Max(value, 0.01);
+}
+
+void CurrentThemeGetVisuals(ThemeVisuals &out){
+    out.brightness = defaultTheme->visuals.brightness;
+    out.contrast = defaultTheme->visuals.contrast;
+    out.saturation = defaultTheme->visuals.saturation;
 }

@@ -12,6 +12,7 @@
 #include <dbgapp.h>
 #include <graphics.h>
 #include <storage.h>
+#include <theme.h>
 
 struct CmdInformation{
     std::string help;
@@ -58,7 +59,7 @@ static void InitializeMathSymbolList(){
         mathSymbolMap["delta"] = "δ"; mathSymbolMap["Delta"] = "Δ";
         mathSymbolMap["epsilon"] = "ε"; mathSymbolMap["Epsilon"] = "E";
         mathSymbolMap["partial"] = "∂"; mathSymbolMap["int"] = "∫";
-        mathSymbolMap["inf"] = "∞";
+        mathSymbolMap["inf"] = "∞"; mathSymbolMap["approx"] = "≈";
         mathSymbolMap["or"] = "||";    mathSymbolMap["dash"] = "\\";
         is_math_symbol_inited = true;
     }
@@ -202,7 +203,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
     linearResults.res.clear();
 
     uint max_written_len = 60;
-    int pathCompression = 2;
+    int pathCompression = 1;
     for(int tid = 0; tid < MAX_THREADS; tid++){
         GlobalSearch *res = &results[tid];
         for(uint i = 0; i < res->count; i++){
@@ -261,7 +262,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
             buffer->data[end_loc] = 0;
             uint filename_start = StringCompressPath(pptr, pptr_size, pathCompression);
             if(filename_start > 0){
-                len = snprintf(m, sizeof(m), "../");
+                //len = snprintf(m, sizeof(m), "../");
             }
 
             if(start_loc == 0 || pickId == fid){
@@ -592,6 +593,49 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
     return r;
 }
 
+int BaseCommand_ChangeFontSize(char *cmd, uint size, View *){
+    uint len = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringIsDigits(arg, len)){
+        uint size = StringToUnsigned(arg, len);
+        AppSetFontSize(size);
+    }
+    return 1;
+}
+
+int BaseCommand_ChangeBrightness(char *cmd, uint size, View *){
+    uint len = 0;
+    Float fvalue = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringToFloat(arg, arg+len, &fvalue)){
+        CurrentThemeSetBrightness(fvalue);
+    }
+
+    return 1;
+}
+
+int BaseCommand_ChangeContrast(char *cmd, uint size, View *){
+    uint len = 0;
+    Float fvalue = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringToFloat(arg, arg+len, &fvalue)){
+        CurrentThemeSetContrast(fvalue);
+    }
+
+    return 1;
+}
+
+int BaseCommand_ChangeSaturation(char *cmd, uint size, View *){
+    uint len = 0;
+    Float fvalue = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+    if(StringToFloat(arg, arg+len, &fvalue)){
+        CurrentThemeSetSaturation(fvalue);
+    }
+
+    return 1;
+}
+
 int BaseCommand_PathCompression(char *cmd, uint size, View *){
     int r = 1;
     uint len = 0;
@@ -761,6 +805,16 @@ int BaseCommand_ToogleWrongIdent(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_IndentFile(char *, uint, View *){
+    AppCommandIndentCurrent();
+    return 1;
+}
+
+int BaseCommand_IndentRegion(char *, uint, View *){
+    AppCommandIndent();
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
@@ -782,6 +836,12 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_CURSORSET_STR] = {CMD_CURSORSET_HELP, BaseCommand_CursorSetFormat};
     cmdMap[CMD_PATH_COMPRESSION_STR] = {CMD_PATH_COMPRESSION_HELP, BaseCommand_PathCompression};
     cmdMap[CMD_WRONGIDENT_DISPLAY_STR] = {CMD_WRONGIDENT_DISPLAY_HELP, BaseCommand_ToogleWrongIdent};
+    cmdMap[CMD_CHANGE_FONTSIZE_STR] = {CMD_CHANGE_FONTSIZE_HELP, BaseCommand_ChangeFontSize};
+    cmdMap[CMD_CHANGE_CONTRAST_STR] = {CMD_CHANGE_CONTRAST_HELP, BaseCommand_ChangeContrast};
+    cmdMap[CMD_CHANGE_BRIGHTNESS_STR] = {CMD_CHANGE_BRIGHTNESS_HELP, BaseCommand_ChangeBrightness};
+    cmdMap[CMD_CHANGE_SATURATION_STR] = {CMD_CHANGE_SATURATION_HELP, BaseCommand_ChangeSaturation};
+    cmdMap[CMD_INDENT_FILE_STR] = {CMD_INDENT_FILE_HELP, BaseCommand_IndentFile};
+    cmdMap[CMD_INDENT_REGION_STR] = {CMD_INDENT_REGION_HELP, BaseCommand_IndentRegion};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

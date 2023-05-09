@@ -1,6 +1,8 @@
 /* date = November 29th 2022 17:02 */
 #pragma once
 
+extern bool ENABLE_MODAL_MODE;
+
 /*
 * Initializes the dual mode inner keyboard binding.
 */
