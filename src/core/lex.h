@@ -165,7 +165,9 @@ typedef struct{
 */
 struct LogicalProcessor{
     Lex_LogicalExec *proc;
-    uint nestedLevel;
+    uint nestedLevelBrace;
+    uint nestedLevelParent;
+    uint nestedLevelSg;
     uint currentState;
     vec2ui range;
 };
@@ -270,6 +272,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupMatch);
 LEX_PROCESSOR_TABLE(Lex_TokenLookupAny);
 LEX_LOGICAL_PROCESSOR(Lex_StructProcessor);
 LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor);
+LEX_LOGICAL_PROCESSOR(Lex_NamespaceProcessor);
 LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor);
 LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor);
 

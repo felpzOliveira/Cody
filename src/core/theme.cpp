@@ -2,17 +2,17 @@
 #include <utilities.h>
 
 Theme themeDarkVim = {
-    .backgroundColor = ColorFromHex(0xFF0D1018),
+    .backgroundColor = ColorFromHex(0xFF0A0613),
     .hoverableItemForegroundColor = ColorFromHex(0xCCD9DFE3),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF2F2E3E),
-    .selectorBackground = ColorFromHex(0xFF101220),
+    .selectorBackground = ColorFromHex(0xFF060816),
     .searchBackgroundColor = ColorFromHex(0xFFFFB815),
     .selectableListBackground = ColorFromHex(0xFF101220),
-    .searchWordColor = ColorFromHex(0xFF0D1018),
-    .backgroundLineNumbers = ColorFromHex(0xFF0D1018),
+    .searchWordColor = ColorFromHex(0xFF0A0613),
+    .backgroundLineNumbers = ColorFromHex(0xFF0A0613),
     .lineNumberColor = ColorFromHex(0xFF7F6E63),
     .lineNumberHighlitedColor = ColorFromHex(0xFFFFB815),
-    .cursorLineHighlight = ColorFromHex(0xFF0D1018),
+    .cursorLineHighlight = ColorFromHex(0xFF0A0613),
     .operatorColor   = ColorFromHex(0xCCFF7300),
 
     .datatypeColor   = ColorFromHex(0xCC76A698),
@@ -28,7 +28,7 @@ Theme themeDarkVim = {
     /////////////////////////////////////////////
     .mathColor       = ColorFromHex(0xCCACC4D3),
     .tokensColor     = ColorFromHex(0xFFF2DAB1),
-    .tokensOverCursorColor = ColorFromHex(0xFF0D1018),
+    .tokensOverCursorColor = ColorFromHex(0xFF0A0613),
 
     /////////////////////////////////////////////////////
     .preprocessorColor = ColorFromHex(0xCCfff0ba),
@@ -48,10 +48,10 @@ Theme themeDarkVim = {
         ColorFromHex(0xFFFFB815),
     },
     .backTextColors = {
-        ColorFromHex(0xFF0D1018),
-        ColorFromHex(0xFF0D1018),
-        ColorFromHex(0xFF0D1018),
-        ColorFromHex(0xFF0D1018),
+        ColorFromHex(0xFF0A0613),
+        ColorFromHex(0xFF0A0613),
+        ColorFromHex(0xFF0A0613),
+        ColorFromHex(0xFF0A0613),
     },
 
     .userDatatypeColor = ColorFromHex(0xCC76A698),
@@ -79,22 +79,22 @@ Theme themeDarkVim = {
     .visuals = {
         .brightness = 0.05,
         .saturation = 1.0,
-        .contrast = 1.0,
+        .contrast = 1.2,
     },
 };
 
 Theme themeCatppuccin = {
-    .backgroundColor = ColorFromHex(0xFF1E1E2E),
+    .backgroundColor = ColorFromHex(0xFF111121),
     .hoverableItemForegroundColor = ColorFromHex(0xCCD9DFE3),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF2F2E3E),
-    .selectorBackground = ColorFromHex(0xFF1C1C2C),
+    .selectorBackground = ColorFromHex(0xFF111121),
     .searchBackgroundColor = ColorFromHex(0xFF383747),
     .selectableListBackground = ColorFromHex(0xFF1C1C2C),
     .searchWordColor = ColorFromHex(0xFFF28FAD),
-    .backgroundLineNumbers = ColorFromHex(0xFF1E1E2E),
+    .backgroundLineNumbers = ColorFromHex(0xFF111121),
     .lineNumberColor = ColorFromHex(0xFF42404E),
     .lineNumberHighlitedColor = ColorFromHex(0xFFD9E0EC),
-    .cursorLineHighlight = ColorFromHex(0xFF282B3C),
+    .cursorLineHighlight = ColorFromHex(0xFF151525),
     .operatorColor   = ColorFromHex(0xCCF7B472),
 
     .datatypeColor   = ColorFromHex(0xCCF0899D),
@@ -128,10 +128,7 @@ Theme themeCatppuccin = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0xFF1E1E2E),
-        ColorFromHex(0xFF1E1E2E),
-        ColorFromHex(0xFF1E1E2E),
-        ColorFromHex(0xFF1E1E2E),
+        ColorFromHex(0xFF111121),
     },
 
     .userDatatypeColor = ColorFromHex(0xCCDF8E1D),
@@ -146,7 +143,7 @@ Theme themeCatppuccin = {
     .selectorLoadedColor = ColorFromHex(0xFFF5BD96),
     .userDefineColor = ColorFromHex(0xCCff628a),
 
-    .backTextCount = 4,
+    .backTextCount = 1,
     .lineBorderWidth = 0,
     .alphaDimm = 0,
     .dynamicCursor = false,
@@ -159,7 +156,7 @@ Theme themeCatppuccin = {
     .visuals = {
         .brightness = 0.05,
         .saturation = 1.0,
-        .contrast = 1.5,
+        .contrast = 1.75,
     },
 };
 
@@ -441,19 +438,19 @@ Theme themeYavid = {
 };
 
 Theme themeRadical = {
-    .backgroundColor = ColorFromHex(0xFF141323),
+    .backgroundColor = ColorFromHex(0xFF090817),
     .hoverableItemForegroundColor = ColorFromHex(0xffa2fa9f),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF241630),
-    .selectorBackground = ColorFromHex(0xFF131220),
+    .selectorBackground = ColorFromHex(0xFF080716),
     .searchBackgroundColor = ColorFromHex(0xFF342640),
 
     .selectableListBackground = ColorFromHex(0x082f317c),
 
     .searchWordColor = ColorFromHex(0xCCce0b95),
-    .backgroundLineNumbers = ColorFromHex(0xFF141323),
+    .backgroundLineNumbers = ColorFromHex(0xFF090817),
     .lineNumberColor = ColorFromHex(0xFF767585),
     .lineNumberHighlitedColor = ColorFromHex(0xFFD9E0EC),
-    .cursorLineHighlight = ColorFromHex(0xFF241630),
+    .cursorLineHighlight = ColorFromHex(0xFF191124),
 
     .operatorColor = ColorFromHex(0xCCc7ff00),
 
@@ -484,7 +481,7 @@ Theme themeRadical = {
         ColorFromHex(0xFFAAAA00),
     },
     .backTextColors = {
-        ColorFromHex(0xFF190A25),
+        ColorFromHex(0xff0f091c),
     },
 
     .userDatatypeColor = ColorFromHex(0xCCf67397),
@@ -507,22 +504,22 @@ Theme themeRadical = {
     .visuals = {
         .brightness = 0.05,
         .saturation = 1.0,
-        .contrast = 1.0,
+        .contrast = 1.5,
     },
 };
 
 Theme theme4Coder = {
-    .backgroundColor = ColorFromHex(0xFF0C0C0C),
+    .backgroundColor = ColorFromHex(0xFF040404),
     .hoverableItemForegroundColor = ColorFromHex(0xCCfffc7f),
     .hoverableItemBackgroundColor = ColorFromHex(0xFF232330),
-    .selectorBackground = ColorFromHex(0xFF17171D),
+    .selectorBackground = ColorFromHex(0xFF040404),
     .searchBackgroundColor = ColorFromHex(0xff87ffaf),
     .selectableListBackground = ColorFromHex(0xFF1C1C1C),
     .searchWordColor = ColorFromHex(0xFF0C0C0C),
     .backgroundLineNumbers = ColorFromHex(0xFF171717),
     .lineNumberColor = ColorFromHex(0xFF4C4D4E),
     .lineNumberHighlitedColor = ColorFromHex(0xFF7a7c7d),
-    .cursorLineHighlight = ColorFromHex(0xFF232330),
+    .cursorLineHighlight = ColorFromHex(0xFF181824),
     .operatorColor   = ColorFromHex(0xCCffc110),
 
     .datatypeColor   = ColorFromHex(0xCCffc110),
@@ -555,10 +552,10 @@ Theme theme4Coder = {
     },
     .backTextColors = {
         //ColorFromHex(0xFFAAAAAA),
-        ColorFromHex(0xFF130707),
-        ColorFromHex(0xFF071307),
-        ColorFromHex(0xFF070713),
-        ColorFromHex(0xFF131307),
+        ColorFromHex(0xFF080202),
+        ColorFromHex(0xFF020802),
+        ColorFromHex(0xFF020208),
+        ColorFromHex(0xFF080802),
     },
 
     //.userDatatypeColor = ColorFromHex(0xCC8EE7BF),
@@ -584,7 +581,7 @@ Theme theme4Coder = {
     .visuals = {
         .brightness = 0.05,
         .saturation = 1.0,
-        .contrast = 1.0,
+        .contrast = 1.35,
     },
 };
 
@@ -761,6 +758,7 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_DATATYPE_STRUCT_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_TYPEDEF_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_CLASS_DEF, operatorColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_NAMESPACE_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_DATATYPE_ENUM_DEF, operatorColor);
         COLOR_RET(TOKEN_ID_MORE, mathColor);
         COLOR_RET(TOKEN_ID_LESS, mathColor);
@@ -778,6 +776,7 @@ vec4i GetColor(Theme *theme, TokenId id){
         COLOR_RET(TOKEN_ID_DATATYPE_USER_DATATYPE, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_TYPEDEF, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_CLASS, userDatatypeColor);
+        COLOR_RET(TOKEN_ID_DATATYPE_USER_NAMESPACE, userDatatypeColor);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM_VALUE, userDatatypeEnum);
         COLOR_RET(TOKEN_ID_DATATYPE_USER_ENUM, preprocessorDefineColor);
 

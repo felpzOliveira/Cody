@@ -149,7 +149,7 @@ uintptr_t DATATYPE
 threadIdx RESERVED
 constexpr OPERATOR
 protected OPERATOR
-namespace OPERATOR
+namespace DATATYPE_NAMESPACE_DEF
 CUfunction DATATYPE
 const_cast OPERATOR
 __device__ RESERVED
@@ -308,7 +308,7 @@ uintptr_t DATATYPE
 threadIdx RESERVED
 constexpr OPERATOR
 protected OPERATOR
-namespace OPERATOR
+namespace DATATYPE_NAMESPACE_DEF
 CUfunction DATATYPE
 const_cast OPERATOR
 __device__ RESERVED

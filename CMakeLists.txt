@@ -1,8 +1,7 @@
+cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 cmake_policy(SET CMP0048 NEW)
 
 project(Cody VERSION 1.0.0 LANGUAGES CXX C)
-
-cmake_minimum_required(VERSION 3.8 FATAL_ERROR)
 
 set(CODY "cody")
 set(SERVER "server")
@@ -32,9 +31,9 @@ elseif(${BUILD_TYPE} STREQUAL "Release")
 endif()
 
 if(CODY_BUILD)
-    find_library(PCRE_LIB NAMES pcre libpcre)
+	find_library(PCRE_LIB NAMES pcre libpcre)
     find_library(X11_LIB NAMES X11)
-    find_library(Z_LIB NAMES z)
+	find_library(Z_LIB NAMES z)
     find_library(PTHREAD_LIB NAMES pthread)
 
     set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
@@ -114,7 +113,7 @@ if(CODY_BUILD)
     target_link_directories(${CODY} PRIVATE
                             ${CMAKE_CURRENT_BINARY_DIR}/external/libgit2
                             ${CMAKE_CURRENT_BINARY_DIR}/external/libmigdb)
-    target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})
+    target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES};z)
 endif()
 
 add_executable(${SERVER} ${SV_SRCS})

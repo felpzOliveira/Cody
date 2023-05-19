@@ -1,4 +1,4 @@
-/* Build from '/home/felipe/Documents/Cody/lang_tables/lang_cpp' */
+/* Build from '/home/felpz/Documents/Cody/lang_tables/lang_cpp' */
 /* Contextual content */
 /////////////////////////////////
 #include <languages.h>
@@ -14,7 +14,7 @@ TokenizerSupport cppSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 26 2022 11:07:05 ) */
+/* Auto generated file ( May 16 2023 17:09:30 ) */
 
 std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 	{
@@ -164,7 +164,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
+		{ .value = "namespace", .identifier = TOKEN_ID_DATATYPE_NAMESPACE_DEF }, },
 	{
 		{ .value = "CUfunction", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
@@ -343,7 +343,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "constexpr", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "namespace", .identifier = TOKEN_ID_OPERATOR }, },
+		{ .value = "namespace", .identifier = TOKEN_ID_DATATYPE_NAMESPACE_DEF }, },
 	{
 		{ .value = "CUfunction", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
