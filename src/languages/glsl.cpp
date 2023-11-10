@@ -160,9 +160,11 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 		{ .value = "gl_FragCoord", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_PointSize", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "samplerBuffer", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontColor", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_ClipVertex", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "sampler2DArray", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontFacing", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "sampler1DShadow", .identifier = TOKEN_ID_DATATYPE },
@@ -331,9 +333,11 @@ std::vector<std::vector<GToken>> glslReservedTable = {
 		{ .value = "gl_FragCoord", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_PointSize", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "samplerBuffer", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontColor", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_ClipVertex", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "sampler2DArray", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontFacing", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "sampler1DShadow", .identifier = TOKEN_ID_DATATYPE },

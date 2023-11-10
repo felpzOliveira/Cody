@@ -178,6 +178,13 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     return added;
 }
 
+// TODO: This is not actually correct, recall that sometimes (like enums)
+//       we can have stuff like:
+//        val = 1 << 3,
+//        };
+//        This will trigger nestedLevelSg to not be zero and then this will not return
+//        true even if the } makes nestedLevelBrace be zero. However for functions
+//        we need to consider all. So we are doomed, we actually need a lexer/parser.
 bool LogicalProcessorNestLevelIsZero(LogicalProcessor *proc){
     return proc->nestedLevelBrace == 0 && proc->nestedLevelParent == 0 &&
            proc->nestedLevelSg == 0;
@@ -403,7 +410,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_ENUM_DEF, p);
 
-    bool nest_is_zero = LogicalProcessorNestLevelIsZero(proc);
+    bool nest_is_zero = proc->nestedLevelBrace == 0;
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
             if(nest_is_zero){
@@ -846,12 +853,16 @@ LEX_PROCESSOR(Lex_String){
 
 /* when inside a comment detect specific keywords, this could be by the tokenizer support */
 TokenId Lex_CommentInnerID(char *head, size_t len){
-    if(len != 4) return TOKEN_ID_IGNORE;
     TokenId ret = TOKEN_ID_IGNORE;
+    if(len != 4 && len != 9)
+        return TOKEN_ID_IGNORE;
+
     if(StringEqual(head, (char *)"TODO", 4))
         ret = TOKEN_ID_COMMENT_TODO;
     if(StringEqual(head, (char *)"NOTE", 4))
         ret = TOKEN_ID_COMMENT_NOTE;
+    if(StringEqual(head, (char *)"IMPORTANT", 9))
+        ret = TOKEN_ID_COMMENT_IMPORTANT;
 
     return ret;
 }

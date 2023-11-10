@@ -187,13 +187,16 @@ void OpenGLRenderCursorSegment(OpenGLState *state, View *view, vec4f color, uint
 void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
                              Float y1, vec4f color, uint thickness, int isActive)
 {
+    OpenGLState *state = Graphics_GetGlobalContext();
     if(isActive){
         if(appGlobalConfig.cStyle == CURSOR_RECT){
-            Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x1, y1), color);
+            if(state->cursorVisible)
+                Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x1, y1), color);
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
-            OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x0+3, y1),
-                                        color, thickness);
+            if(state->cursorVisible)
+                OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x0+3, y1),
+                                            color, thickness);
             //Graphics_QuadPush(state, vec2ui(x0, y0), vec2ui(x0+3, y1), color);
         }else if(appGlobalConfig.cStyle == CURSOR_QUAD){
             Float thick = 3;
@@ -452,18 +455,20 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
         // TODO: Why do we need to flush the quad buffer here in order to render
         //       the last character?
         Graphics_QuadFlush(state);
-        if(cursor->textPos.y < buffer->count && appGlobalConfig.cStyle == CURSOR_RECT){
-            vec2f p = state->glCursor.pMin;
-            pGlyph = state->glCursor.pGlyph;
-            int len = 0;
-            uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len);
-            char *chr = &buffer->data[rawp];
-            if(*chr != '\t'){
-                Graphics_PrepareTextRendering(state, projection, &state->model);
-                vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
-                fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
-                                        chr, chr+len, &pGlyph);
-                Graphics_FlushText(state);
+        if(state->cursorVisible){
+            if(cursor->textPos.y < buffer->count && appGlobalConfig.cStyle == CURSOR_RECT){
+                vec2f p = state->glCursor.pMin;
+                pGlyph = state->glCursor.pGlyph;
+                int len = 0;
+                uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len);
+                char *chr = &buffer->data[rawp];
+                if(*chr != '\t'){
+                    Graphics_PrepareTextRendering(state, projection, &state->model);
+                    vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
+                    fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
+                    chr, chr+len, &pGlyph);
+                    Graphics_FlushText(state);
+                }
             }
         }
     }else{
@@ -1162,7 +1167,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
 
     Float x = a0.x;
     Float y = a0.y;
-    vec4i c = GetColor(theme, TOKEN_ID_DATATYPE);
+    vec4i c = GetUIColor(theme, UIFileHeader);
     fonsStashMultiTextColor(font->fsContext, x, y, c.ToUnsigned(),
                             desc, NULL, &dummyGlyph);
     int n = strlen(enddesc);
@@ -1284,8 +1289,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     if(view->renderLineNbs){
         view->lineOffset = fonsComputeStringAdvance(font->fsContext, linen, n, &pGlyph);
     }else{
-        view->lineOffset = fonsComputeStringAdvance(font->fsContext, " ",
-                                                    1, &pGlyph) * 0.5;
+        view->lineOffset = fonsComputeStringAdvance(font->fsContext, " ", 1, &pGlyph) * 0.5;
     }
 
     ActivateViewportAndProjection(state, vview, ViewportAllView);

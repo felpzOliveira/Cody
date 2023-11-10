@@ -19,6 +19,10 @@ struct Buffer;
 #define ENTRY_MODE_FREE 0
 #define ENTRY_MODE_LOCK 1
 
+#define MOUSE_ACTIVE_EVENT(name) void name()
+
+typedef MOUSE_ACTIVE_EVENT(MouseEventCallback);
+
 typedef enum{
     CURSOR_RECT,
     CURSOR_DASH,
@@ -328,6 +332,17 @@ std::optional<vec2ui> AppGetTextPosition(int x, int y, View *view,
 * make your final changes.
 */
 void AppSetDelayedCall(std::function<void(void)> fn);
+
+/*
+* Register a callback to be called when mouse events happen, i.e.: press and scroll.
+* DO NOT put heavy code in this routine.
+*/
+uint AppRegisterOnMouseEventCallback(MouseEventCallback *cb);
+
+/*
+* Unregister a previously registerd routine to the mouse events.
+*/
+void AppReleaseOnMouseEventCallback(uint handle);
 
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();

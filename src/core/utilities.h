@@ -363,10 +363,39 @@ void Memcpy(void *dst, void *src, uint size);
 /* Standard memset */
 void Memset(void *dst, unsigned char v, uint size);
 
+/*
+* Utility for reading string line-by-line.
+*/
+template<typename Fn> inline
+void ReadStringLineByLine(char *content, uint contentSize, Fn fn){
+    uint iterator = 0;
+    char *head = nullptr;
+
+    if(!content || contentSize == 0)
+        goto __end;
+
+    head = content;
+    while(iterator < contentSize){
+        if(content[iterator] == '\n'){
+            uint len = &content[iterator] - head;
+            content[iterator] = 0;
+            fn(head, len);
+
+            content[iterator] = '\n';
+            head = &content[iterator+1];
+        }
+
+        iterator += 1;
+    }
+
+__end:
+    return;
+}
 
 /*
 * Utilities for measuring the time a function takes to execute,
-* this is mostly for debug, not a reliable measurement.
+* this is mostly for debug, not a reliable measurement. Each line has '\n' replaced
+* with '\0'.
 */
 template<typename Fn>
 inline double MeasureInterval(const Fn &fn){

@@ -124,6 +124,7 @@ struct OpenGLTexture{
 struct EventHandler{
     std::function<bool(void)> fn;
     double interval;
+    double lastCalled;
 };
 
 // enables/disables rendering stuff
@@ -156,6 +157,12 @@ struct OpenGLState{
     uint texBinds;
     Shader imageShader;
     Mouse mouse;
+    double cursorBlinkLastTime;
+    bool cursorBlinking;
+    bool cursorVisible;
+    bool enableCursorBlink;
+    uint cursorBlinkKeyboardHandle;
+    uint cursorBlinkMouseHandle;
     int running, width, height;
     Float renderLineWidth;
     Transform projection;
@@ -163,6 +170,8 @@ struct OpenGLState{
     Transform model;
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
+    double lastEventTime;
+    double maxSamplingRate;
     Shader buttonShader;
     GlobalWidgets gWidgets;
 
@@ -211,6 +220,11 @@ void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len,
 * Toogles the rendering of the cursor segments.
 */
 void Graphics_ToogleCursorSegment();
+
+/*
+* Toogles the events and rendering of cursor blinking.
+*/
+void Graphics_ToogleCursorBlinking();
 
 /*
 * Initializes a openglbuffer to the current binding context.

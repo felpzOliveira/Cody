@@ -230,12 +230,21 @@ void build_process_line(std::string line, BuildParseCtx &parseCtx){
         if(line.find(": error:") != std::string::npos){
             parseCtx.currMessage += line;
             parseCtx.pstate = 1;
+        }if(line.find(": fatal error:") != std::string::npos){
+            parseCtx.currMessage += line;
+            parseCtx.pstate = 1;
         }else if(line.find(": warning:") != std::string::npos){
             parseCtx.currMessage += line;
             parseCtx.pstate = 2;
         }
     }else{
         if(line.find(": error:") != std::string::npos){
+            print_state(parseCtx.currMessage, parseCtx);
+
+            parseCtx.currMessage = line;
+            parseCtx.lastState = parseCtx.pstate;
+            parseCtx.pstate = 1;
+        }if(line.find(": fatal error:") != std::string::npos){
             print_state(parseCtx.currMessage, parseCtx);
 
             parseCtx.currMessage = line;

@@ -126,6 +126,8 @@ gl_Vertex RESERVED
 gl_Normal RESERVED
 sampler1D DATATYPE
 sampler2D DATATYPE
+sampler2DArray DATATYPE
+samplerBuffer DATATYPE
 sampler3D DATATYPE
 attribute OPERATOR
 extension PREPROCESSOR
@@ -270,6 +272,8 @@ gl_Vertex RESERVED
 gl_Normal RESERVED
 sampler1D DATATYPE
 sampler2D DATATYPE
+sampler2DArray DATATYPE
+samplerBuffer DATATYPE
 sampler3D DATATYPE
 attribute OPERATOR
 invariant OPERATOR

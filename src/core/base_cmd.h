@@ -59,6 +59,9 @@ struct FileEntry;
 #define CMD_HSPLIT_STR "hsplit"
 #define CMD_HSPLIT_HELP "Split the current view horizontally."
 
+#define CMD_CURSOR_BLINK_STR "cursor-blink"
+#define CMD_CURSOR_BLINK_HELP "Toogles cursor blinking"
+
 #define CMD_VSPLIT_STR "vsplit"
 #define CMD_VSPLIT_HELP "Split the current view vertically."
 

@@ -93,9 +93,14 @@ std::vector<std::vector<GToken>> pyReservedTable = {
 		{ .value = "assert", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "global", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "__len__", .identifier = TOKEN_ID_RESERVED }, },
+	{
 		{ .value = "finnally", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "nonlocal", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "continue", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "__init__", .identifier = TOKEN_ID_RESERVED }, },
+		{ .value = "__init__", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "__call__", .identifier = TOKEN_ID_RESERVED }, },
+	{
+		{ .value = "__getitem__", .identifier = TOKEN_ID_RESERVED }, },
 };
 

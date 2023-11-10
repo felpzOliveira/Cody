@@ -13,9 +13,12 @@
 #define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size, void *priv)
 #define KEY_ENTRY_RAW_EVENT(name) void name(int rawKeyCode)
 
+#define KEYBOARD_ACTIVE_EVENT(name) void name()
+
 typedef KEYSET_EVENT(KeySetEventCallback);
 typedef KEY_ENTRY_EVENT(KeyEntryCallback);
 typedef KEY_ENTRY_RAW_EVENT(KeyRawEntryCallback);
+typedef KEYBOARD_ACTIVE_EVENT(KeyboardActiveCallback);
 
 #define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, callback, __VA_ARGS__, -1)
 
@@ -147,6 +150,17 @@ BindingMap *KeyboardCreateMapping(void *refWindow);
 * Sets the active mapping to handle key events.
 */
 void KeyboardSetActiveMapping(BindingMap *mapping);
+
+/*
+* Register a callback to be called everytime the keyboard is active,
+* do not do heavy work in here please.
+*/
+int KeyboardRegisterActiveEvent(KeyboardActiveCallback *cb);
+
+/*
+* Remove a callback from the list of active callbacks for the keyboard.
+*/
+void KeyboardReleaseActiveEvent(int handle);
 
 /*
 * Sets the window where the mapping should be applied. If a keyboard event

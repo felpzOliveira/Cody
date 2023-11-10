@@ -37,6 +37,7 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
     QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
 
     QueryBar_GetWrittenContent(queryBar, &search, &searchLen);
+
     if(searchLen > 0 || fromEnter){
         if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_SEARCH && searchLen > 0){
             AssertA(searchLen < sizeof(replace->toLocate), "Query is too big");
@@ -71,6 +72,7 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
                     replace->searchCallback(queryBar, view, 1);
                 }else if(search[0] == 'n' || search[0] == 'N'){
                     replace->searchCallback(queryBar, view, 0);
+                    queryBar->searchCmd.position += Max(1, replace->toLocateLen);
                 }else{
                     toNext = 0;
                     r = 0;
@@ -695,8 +697,20 @@ void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath
     }
 
     if(content && fileSize > 0){
+    #if 0
+        ReadStringLineByLine(content, fileSize, [&](char *line, uint len) -> void{
+            if(len > 0){
+                QueryBarHistoryItem item;
+                item.value = std::string(line);
+                CircularStack_Push(qHistory->history, &item);
+            }
+        });
+
+        AllocatorFree(content);
+    #else
         Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
                         0, qHistory, true);
+    #endif
     }else if(content){
         AllocatorFree(content);
     }
@@ -717,7 +731,9 @@ void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePa
     for(uint i = 0; i < CircularStack_Size(history); i++){
         QueryBarHistoryItem *item = CircularStack_At(history, i);
         if(item->value.size() > 0){
-            storage->StreamWriteString(&file, item->value.c_str());
+            // Raw value needs '\n' so we can easily parse it later
+            std::string rawValue = item->value + std::string("\n");
+            storage->StreamWriteString(&file, rawValue.c_str());
             //printf(" Writing %s\n", item->value.c_str());
         }
     }

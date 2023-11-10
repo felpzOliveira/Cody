@@ -488,13 +488,12 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
 
 vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
     // account for dual mode
+    vec4f col;
     UIElement element = UICursor;
     int dualMode = DualModeGetState();
-    if(dualMode == ENTRY_MODE_LOCK)
-        element = UIQueryBarCursor;
 
-    if(!theme->dynamicCursor || dualMode == ENTRY_MODE_LOCK){
-        return GetUIColorf(theme, element);
+    if(!theme->dynamicCursor){
+        col = GetUIColorf(theme, element);
     }else{
         vec4i color;
         vec2ui cursor;
@@ -528,12 +527,19 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
 
         r = Graphics_ComputeTokenColor(str, token, symTable, theme, cursor.x,
                                        token->identifier, nullptr, &color);
-        if(r == -1){
-            return GetUIColorf(theme, element);
-        }
-
-        return ColorFromInt(color);
+        if(r == -1)
+            col = GetUIColorf(theme, element);
+        else
+            col = ColorFromInt(color);
     }
+
+    if(dualMode == ENTRY_MODE_LOCK){
+        // TODO: do we need a theme option for this?
+        Float w = col.w;
+        col *= 0.7;
+        col.w = w;
+    }
+    return col;
 }
 
 void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
@@ -709,12 +715,15 @@ static void _OpenGLInitGlobalWidgets(OpenGLState *state){
 static void _OpenGLStateInitialize(OpenGLState *state){
     int targetWidth = 1600;
     int targetHeight = 900;
-    state->eventInterval = MIN_EVENT_SAMPLING_INTERVAL;
+    state->eventInterval = Infinity;
     state->font.fsContext = nullptr;
     state->font.fontId = -1;
     state->window = nullptr;
     state->width = targetWidth;
     state->height = targetHeight;
+    state->cursorVisible = true;
+    state->cursorBlinkLastTime = 0;
+    state->maxSamplingRate = 1.f / 120.f; // based on 120 fps
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
     state->params.cursorSegments = true;
 }
@@ -1276,11 +1285,50 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH){
         GlobalGLState.eventInterval = stateInterval;
     }
 
-    GlobalGLState.eventHandlers.push_back({.fn = eH, .interval = stateInterval});
     Timing_Update();
+    GlobalGLState.eventHandlers.push_back({eH, stateInterval, lastTime});
 }
 
-void UpdateEventsAndHandleRequests(int animating){
+void CursorEventActionCallback(){
+    GlobalGLState.cursorBlinkLastTime = GetElapsedTime();
+    GlobalGLState.cursorBlinking = false;
+    GlobalGLState.cursorVisible = true;
+}
+
+static bool BlinkingCursorEvent(){
+    OpenGLState *state = &GlobalGLState;
+    double currTime = GetElapsedTime();
+    double interval = currTime - state->cursorBlinkLastTime;
+    if(!state->cursorBlinking){
+        if(interval >= 1.49){
+            state->cursorBlinking = true;
+        }
+    }
+
+    if(state->cursorBlinking){
+        state->cursorVisible = !state->cursorVisible;
+        state->cursorBlinkLastTime = currTime;
+    }
+
+    return state->enableCursorBlink;
+}
+
+void Graphics_ToogleCursorBlinking(){
+    TOOGLE_VAR(GlobalGLState.enableCursorBlink);
+    if(GlobalGLState.enableCursorBlink){
+        GlobalGLState.cursorBlinkKeyboardHandle =
+                KeyboardRegisterActiveEvent(CursorEventActionCallback);
+        GlobalGLState.cursorBlinkMouseHandle =
+                AppRegisterOnMouseEventCallback(CursorEventActionCallback);
+
+        Graphics_AddEventHandler(0.5, BlinkingCursorEvent);
+    }else{
+        KeyboardReleaseActiveEvent(GlobalGLState.cursorBlinkKeyboardHandle);
+        AppReleaseOnMouseEventCallback(GlobalGLState.cursorBlinkMouseHandle);
+    }
+}
+
+void UpdateEventsAndHandleRequests(int animating, double frameInterval){
     OpenGLState *state = &GlobalGLState;
     // check if we are handling custom events outside
     // the UI that require live update, for these we
@@ -1292,28 +1340,43 @@ void UpdateEventsAndHandleRequests(int animating){
         // pool the UI first
         PoolEventsX11();
         if(state->eventHandlers.size() > 0){
-            bool any_rems = false;
+            double pTime = GetElapsedTime();
+            // check if we actually have to any work
+            if(pTime - state->lastEventTime < state->eventInterval){
+                // we sampled at a smaller interval, check against max sampling rate
+                // so we don't waste CPU on high frequency sampling
+                double dif = state->maxSamplingRate - frameInterval;
+                if(dif > 0){
+                    int idif = dif * 1000.0;
+                    //printf("FPS %g - Dif = %d ( %g )\n", 1.f / frameInterval, idif, dif);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(idif));
+                }
+                return;
+            }
+
             // pool the events and update next event interval in case anyone bails out
             std::vector<EventHandler>::iterator it;
             double expected_ival = Infinity;
+            bool any_rems = false;
+            state->lastEventTime = pTime;
+
             for(it = state->eventHandlers.begin(); it != state->eventHandlers.end(); ){
                 EventHandler handler = *it;
-                if(!handler.fn()){
-                    it = state->eventHandlers.erase(it);
-                    any_rems = true;
+                double interval = pTime - handler.lastCalled;
+                if(interval > handler.interval){
+                    if(!handler.fn()){
+                        it = state->eventHandlers.erase(it);
+                        any_rems = true;
+                    }else{
+                        handler.lastCalled = pTime;
+                        *it = handler;
+                        it++;
+                    }
                 }else{
                     it++;
-                    expected_ival = Min(expected_ival, handler.interval);
                 }
-            }
 
-            // sleep untill the next event
-            double pTime = GetElapsedTime();
-            double fdt = pTime - lastTime;
-
-            if(!IsZero(fdt) && fdt < state->eventInterval){
-                int dif = (state->eventInterval - fdt) * 1000.0;
-                std::this_thread::sleep_for(std::chrono::milliseconds(dif));
+                expected_ival = Min(expected_ival, handler.interval);
             }
 
             // in case someone exited we need to update the iterval
@@ -1374,7 +1437,8 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
         // TODO: quick hack to disable dimm for build buffer
         int dim = view->isActive ? 0 : 1;
         if(bView->lineBuffer){
-            if(bView->lineBuffer->filePathSize == 0) dim = 0;
+            if(bView->lineBuffer->filePathSize == 0)
+                dim = 0;
         }
 
         SetAlpha(dim);
@@ -1414,6 +1478,10 @@ void OpenGLEntry(){
 
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
+    state->lastEventTime = lastTime;
+
+    //KeyboardRegisterActiveEvent(CursorEventActionCallback);
+    //Graphics_AddEventHandler(0.5, BlinkingCursorEvent);
 
     //_debugger_memory_usage();
     //state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
@@ -1445,7 +1513,7 @@ void OpenGLEntry(){
             }
         }
 
-        UpdateEventsAndHandleRequests(animating);
+        UpdateEventsAndHandleRequests(animating, dt);
     }
 
     if(Dbg_IsRunning()){

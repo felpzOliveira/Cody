@@ -12,9 +12,29 @@ static BindingMap *activeMapping = nullptr;
 static int *keyStates;
 static int unmappedKeyState = KEYBOARD_EVENT_RELEASE;
 static std::unordered_map<void *, BindingMap *> activeWindowMapping;
+static std::unordered_map<uint, KeyboardActiveCallback *> keyboardActiveCbMapping;
 
 const char *KeyboardGetKeyName(Key key);
 const char *KeyboardGetStateName(int state);
+
+int KeyboardRegisterActiveEvent(KeyboardActiveCallback *cb){
+    uint handle = Bad_RNG16();
+    bool got_handle = true;
+    do{
+        got_handle = true;
+        if(keyboardActiveCbMapping.find(handle) != keyboardActiveCbMapping.end()){
+            got_handle = false;
+            handle = Bad_RNG16();
+        }
+    }while(!got_handle);
+
+    keyboardActiveCbMapping[handle] = cb;
+    return (int)handle;
+}
+
+void KeyboardReleaseActiveEvent(int handle){
+    keyboardActiveCbMapping.erase((uint)handle);
+}
 
 void KeyboardSetActiveMapping(BindingMap *mapping){
     if(mapping->refWindow){
@@ -149,6 +169,10 @@ void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
         if(mapping->entryRawCallback){
             mapping->entryRawCallback(rawKeyCode);
         }
+    }
+
+    for(auto it : keyboardActiveCbMapping){
+        it.second();
     }
 }
 

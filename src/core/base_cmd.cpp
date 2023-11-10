@@ -529,7 +529,7 @@ int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
         cmd[size] = vv;
 
         aliasMap[targetStr] = valueStr;
-        printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
+        //printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
     }
 
     return r;
@@ -815,6 +815,11 @@ int BaseCommand_IndentRegion(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_CursorBlink(char *, uint, View *){
+    Graphics_ToogleCursorBlinking();
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
@@ -842,6 +847,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_CHANGE_SATURATION_STR] = {CMD_CHANGE_SATURATION_HELP, BaseCommand_ChangeSaturation};
     cmdMap[CMD_INDENT_FILE_STR] = {CMD_INDENT_FILE_HELP, BaseCommand_IndentFile};
     cmdMap[CMD_INDENT_REGION_STR] = {CMD_INDENT_REGION_HELP, BaseCommand_IndentRegion};
+    cmdMap[CMD_CURSOR_BLINK_STR] = {CMD_CURSOR_BLINK_HELP, BaseCommand_CursorBlink};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
@@ -849,6 +855,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: create a standard for this, a json or at least something like bubbles
     int rv = -1;
     if(BaseCommand_Interpret_AliasInsert(cmd, size, view)){
+        QueryBar_EnableInputToHistory(View_GetQueryBar(view));
         return 0;
     }else if(BaseCommand_SetExecPath(cmd, size)){
         return 0;

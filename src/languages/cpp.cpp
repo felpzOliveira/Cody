@@ -70,6 +70,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "enum", .identifier = TOKEN_ID_DATATYPE_ENUM_DEF },
 		{ .value = "auto", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "GLint", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "short", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "undef", .identifier = TOKEN_ID_PREPROCESSOR },
@@ -87,6 +88,10 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "while", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "break", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "GLenum", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLvoid", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLbyte", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLuint", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "define", .identifier = TOKEN_ID_PREPROCESSOR_DEFINE },
 		{ .value = "ifndef", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "pragma", .identifier = TOKEN_ID_PREPROCESSOR },
@@ -108,6 +113,10 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
 	{
+		{ .value = "GLshort", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLfloat", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLubyte", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLsizei", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "va_list", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
@@ -129,6 +138,10 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
 	{
+		{ .value = "GLushort", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLclampf", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLdouble", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLclampd", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "uint16_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "intptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUstream", .identifier = TOKEN_ID_DATATYPE },
@@ -159,6 +172,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "warpSize", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "continue", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "GLboolean", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUcontext", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "uintptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
@@ -166,6 +180,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "namespace", .identifier = TOKEN_ID_DATATYPE_NAMESPACE_DEF }, },
 	{
+		{ .value = "GLbitfield", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUfunction", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "__device__", .identifier = TOKEN_ID_RESERVED },
@@ -259,6 +274,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "enum", .identifier = TOKEN_ID_DATATYPE_ENUM_DEF },
 		{ .value = "auto", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "GLint", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "short", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "union", .identifier = TOKEN_ID_OPERATOR },
@@ -272,6 +288,10 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "while", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "break", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "GLenum", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLvoid", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLbyte", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLuint", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "friend", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "int8_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "size_t", .identifier = TOKEN_ID_DATATYPE },
@@ -290,6 +310,10 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
 	{
+		{ .value = "GLshort", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLfloat", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLubyte", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLsizei", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "va_list", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "ssize_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "clock_t", .identifier = TOKEN_ID_DATATYPE },
@@ -308,6 +332,10 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
 	{
+		{ .value = "GLushort", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLclampf", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLdouble", .identifier = TOKEN_ID_DATATYPE },
+		{ .value = "GLclampd", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "uint16_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "intptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUstream", .identifier = TOKEN_ID_DATATYPE },
@@ -338,6 +366,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "warpSize", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "continue", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "GLboolean", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUcontext", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "uintptr_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "threadIdx", .identifier = TOKEN_ID_RESERVED },
@@ -345,6 +374,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "protected", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "namespace", .identifier = TOKEN_ID_DATATYPE_NAMESPACE_DEF }, },
 	{
+		{ .value = "GLbitfield", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CUfunction", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "const_cast", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "__device__", .identifier = TOKEN_ID_RESERVED },

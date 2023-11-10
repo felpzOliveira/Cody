@@ -23,6 +23,7 @@
 #include <storage.h>
 #include <modal.h>
 #include <functional>
+#include <unordered_map>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -42,6 +43,7 @@ typedef struct{
     uint dbgHandle;
     uint dbgBkptHandle;
     std::function<void(void)> mouseHook;
+    std::unordered_map<uint, MouseEventCallback *> mouseEventMap;
 
     char cwd[PATH_MAX];
     Geometry currentGeometry;
@@ -393,6 +395,25 @@ void AppRestoreCurrentBufferViewState(){
     }
 }
 
+uint AppRegisterOnMouseEventCallback(MouseEventCallback *cb){
+    uint handle = Bad_RNG16();
+    bool got_handle = true;
+    do{
+        got_handle = true;
+        if(appContext.mouseEventMap.find(handle) != appContext.mouseEventMap.end()){
+            got_handle = false;
+            handle = Bad_RNG16();
+        }
+    }while(!got_handle);
+
+    appContext.mouseEventMap[handle] = cb;
+    return handle;
+}
+
+void AppReleaseOnMouseEventCallback(uint handle){
+    appContext.mouseEventMap.erase(handle);
+}
+
 void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
     View *oview = AppGetActiveView();
     View *view = oview;
@@ -403,6 +424,10 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
         NullRet(view);
         if(view != oview){
             AppResetBufferViewRangeVisible(oview);
+        }
+
+        for(auto it : appContext.mouseEventMap){
+            it.second();
         }
     }else{
         Geometry geo;
@@ -705,6 +730,10 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
 
         Timing_Update();
     }
+
+    for(auto it : appContext.mouseEventMap){
+        it.second();
+    }
 }
 
 void AppCommandFreeTypingJumpToDirection(int direction){
@@ -939,7 +968,8 @@ void AppDefaultRemoveOne(){
             Buffer_EraseSymbols(buffer, symTable);
 
             LineBuffer_MergeConsecutiveLines(bufferView->lineBuffer, cursor.x-1);
-            LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(cursor.x, OPERATION_REMOVE_LINE));
+            LineBuffer_SetActiveBuffer(bufferView->lineBuffer,
+                                    vec2i(cursor.x, OPERATION_REMOVE_LINE));
             buffer = BufferView_GetBufferAt(bufferView, cursor.x-1);
             RemountTokensBasedOn(bufferView, cursor.x-1);
 
