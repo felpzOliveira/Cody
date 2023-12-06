@@ -21,6 +21,7 @@
 #include <dbgwidget.h>
 #include <popupwindow.h>
 #include <modal.h>
+#include <timer.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -30,7 +31,8 @@
 
 #define GLFONTSTASH_IMPLEMENTATION
 #include <gl3corefontstash.h>
-#include <unistd.h>
+
+//#include <unistd.h>
 
 #define MODULE_NAME "Render"
 
@@ -48,6 +50,9 @@ static OpenGLState GlobalGLState;
 
 #define TOOGLE_VAR(var) (var) = !(var)
 
+DisplayWindow *Graphics_GetGlobalWindow(){
+    return GlobalGLState.window;
+}
 
 std::string translateGLError(int errorCode){
     std::string error;
@@ -786,7 +791,7 @@ void WindowOnScroll(int is_up, void *){
     int x = 0, y = 0;
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
-    GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
+    GetLastRecordedMousePosition(GlobalGLState.window, &x, &y);
     if(!MouseEventFilter(x, y)){
         AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
     }
@@ -814,7 +819,7 @@ int Font_SupportsCodepoint(int codepoint){
     return g != 0;
 }
 
-void RegisterInputs(WindowX11 *window){
+void RegisterInputs(DisplayWindow *window){
     RegisterOnScrollCallback(window, WindowOnScroll, nullptr);
     RegisterOnMouseLeftClickCallback(window, WindowOnMouseClick, nullptr);
     RegisterOnMousePressedCallback(window, WindowOnPress, nullptr);
@@ -837,7 +842,7 @@ void OpenGLFontSetup(OpenGLState *state){
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
     uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
     uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
-
+    
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
@@ -899,12 +904,14 @@ void OpenGLInitialize(OpenGLState *state){
     int width = state->width;
     int height = state->height;
 
-    InitializeX11();
-    SetSamplesX11(16);
-    SetOpenGLVersionX11(3, 3);
+    InitializeDisplay();
+    SetSamples(16);
+    SetOpenGLVersion(3, 3);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
-    state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
+    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
+
+    SetWindowIcon(state->window, "C:\\Users\\Felpz\\Documents\\Cody\\icons\\logo.ico");
 
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
@@ -916,9 +923,11 @@ void OpenGLInitialize(OpenGLState *state){
     OpenGLTextureInitialize(state);
     AppInitialize();
 
-    SwapIntervalX11(state->window, 0);
+    SwapInterval(state->window, 0);
     RegisterInputs(state->window);
     OpenGLLoadIcons(state);
+
+    WindowOnSizeChange(width, height, nullptr);
 }
 
 int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid){
@@ -1338,7 +1347,7 @@ void UpdateEventsAndHandleRequests(int animating, double frameInterval){
     // with concurrent events, yikes...
     if(state->eventHandlers.size() > 0 || animating){
         // pool the UI first
-        PoolEventsX11();
+        PoolEvents();
         if(state->eventHandlers.size() > 0){
             double pTime = GetElapsedTime();
             // check if we actually have to any work
@@ -1388,7 +1397,7 @@ void UpdateEventsAndHandleRequests(int animating, double frameInterval){
     }else{
         // if we are not handling custom events than simply wait for the
         // next UI event. This is fine because Cody is UI-driven
-        WaitForEventsX11();
+        WaitForEvents();
     }
 }
 
@@ -1486,8 +1495,8 @@ void OpenGLEntry(){
     //_debugger_memory_usage();
     //state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
 
-    while(!WindowShouldCloseX11(state->window)){
-        MakeContextX11(state->window);
+    while(!WindowShouldClose(state->window)){
+        MakeContextCurrent(state->window);
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
@@ -1503,7 +1512,7 @@ void OpenGLEntry(){
             animating |= state->gWidgets.wwindow->DispatchRender(&wctx);
         }
 
-        SwapBuffersX11(state->window);
+        SwapBuffers(state->window);
 
         // render popups and other windows
         for(std::shared_ptr<WidgetWindow> &sww : state->widgetWindows){
@@ -1522,7 +1531,7 @@ void OpenGLEntry(){
         // to send the message, response might take longer
         // because it depends on its state, however it should
         // not be our problem anymore as we are not going to answer it
-        sleep(1);
+        SLEEP(1);
     }
 
     state->widgetWindows.clear();
@@ -1530,8 +1539,8 @@ void OpenGLEntry(){
     delete state->gWidgets.wwindow;
     delete state->gWidgets.wdbgVw;
 
-    DestroyWindowX11(state->window);
-    TerminateX11();
+    DestroyWindow(state->window);
+    TerminateDisplay();
     state->running = 0;
     state->window = nullptr;
     FinishExecutor();

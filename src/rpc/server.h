@@ -4,8 +4,8 @@
 #include <parallel.h>
 #include <map>
 #include <vector>
-#include <rpc.h>
-#include <security.h>
+#include <rpc_services.h>
+#include <security_services.h>
 
 #define MAX_TRANSPORT_SMALL_TIMEOUT_SECONDS 0.005
 #define MAX_TRANSPORT_TIMEOUT_SECONDS 0.05
@@ -20,7 +20,7 @@
 #endif
 
 typedef enum{
-    NO_ERROR=0,
+    P_NO_ERROR=0,
     READ_TIMEDOUT,
     SEND_FAILURE,
     CONNECTION_CLOSED,

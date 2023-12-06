@@ -1,6 +1,6 @@
 #include <storage.h>
 #include <utilities.h>
-#include <rpc.h>
+#include <rpc_services.h>
 
 #define LOG_MODULE "STORAGE"
 #include <log.h>
@@ -103,9 +103,8 @@ RemoteStorageDevice::RemoteStorageDevice(const char *ip, int port,
                                          SecurityServices::Context *ctx)
 {
     client.SetSecurityContext(ctx);
-    if(!client.ConnectTo(ip, port)){
+    if(!client.ConnectTo(ip, port))
         exit(0);
-    }
 }
 
 int RemoteStorageDevice::Chdir(const char *path){

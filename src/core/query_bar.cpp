@@ -21,8 +21,8 @@ static int QueryBar_EmptySearchReplaceCallback(QueryBar *bar, View *view, int ac
 
 std::string QueryBarHistory_GetPath(){
     std::string path(AppGetConfigDirectory());
-    if(path[path.size()-1] != '/'){
-        path += "/";
+    if(path[path.size()-1] != '/' && path[path.size()-1] != '\\'){
+        path += SEPARATOR_STRING;
     }
     path += QUERY_BAR_HISTORY_PATH;
     return path;
@@ -401,15 +401,15 @@ uint QueryBar_GetRenderContent(QueryBar *queryBar, std::string &str){
         }
     }
 
-    StringSplit(possiblePaths, splitted, '/');
+    StringSplit(possiblePaths, splitted, SEPARATOR_CHAR);
     if((int)splitted.size() > compression){
-        bool is_folder = content[contentLen-1] == '/';
-        str = " ../";
+        bool is_folder = content[contentLen-1] == SEPARATOR_CHAR;
+        str = " .." SEPARATOR_STRING;
         for(uint i = splitted.size()-compression-1; i < splitted.size(); i++){
             str += splitted[i];
-            if(i < splitted.size() - 1) str += "/";
+            if(i < splitted.size() - 1) str += SEPARATOR_STRING;
         }
-        if(is_folder) str += "/";
+        if(is_folder) str += SEPARATOR_STRING;
         diff = contentLen - str.size();
     }else{
         str = std::string(content, contentLen);

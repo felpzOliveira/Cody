@@ -5,6 +5,7 @@
 #include <timing.h>
 #include <view_tree.h>
 #include <stack>
+#include <timer.h>
 
 typedef struct ControlCmds{
     BindingMap *mapping;

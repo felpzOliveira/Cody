@@ -4,7 +4,7 @@
 #include <utilities.h>
 #include <font.h>
 #include <bufferview.h>
-#include <x11_display.h>
+#include <display.h>
 #include <undo.h>
 #include <view.h>
 #include <string.h>
@@ -15,8 +15,6 @@
 #include <control_cmds.h>
 #include <parallel.h>
 #include <timing.h>
-#include <gitbase.h>
-#include <gitbuffer.h>
 #include <dbgapp.h>
 #include <widgets.h>
 #include <dbgwidget.h>
@@ -55,8 +53,8 @@ typedef struct{
 }App;
 
 static App appContext = {
-    .freeTypeMapping = nullptr,
-    .activeView = nullptr,
+    nullptr,
+    nullptr,
 };
 
 AppConfig appGlobalConfig;
@@ -190,7 +188,7 @@ void AppEarlyInitialize(bool use_tabs){
     appGlobalConfig.displayWrongIdent = 0;
     appGlobalConfig.displayViewIndices = 0;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
-    appGlobalConfig.defaultFontSize = 19;
+    appGlobalConfig.defaultFontSize = 18;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
 
@@ -210,27 +208,18 @@ void AppEarlyInitialize(bool use_tabs){
 
     appContext.autoCompleteMapping = AutoComplete_Initialize();
     std::string dir(appContext.cwd);
-    if(dir[dir.size()-1] != '/'){
-        dir += "/";
+    if(dir[dir.size()-1] != '/' && dir[dir.size()-1] != '\\'){
+        dir += SEPARATOR_STRING;
     }
     dir += ".cody";
     appGlobalConfig.configFolder = dir;
     appGlobalConfig.rootFolder = appContext.cwd;
-    appGlobalConfig.configFile = dir + std::string("/.config");
+    appGlobalConfig.configFile = dir + std::string(SEPARATOR_STRING ".config");
 
     // TODO: Configurable number of entries?/init function?
     appContext.queryBarHistory.history = CircularStack_Create<QueryBarHistoryItem>(64);
     QueryBarHistory_DetachedLoad(&appContext.queryBarHistory,
                                  QueryBarHistory_GetPath().c_str());
-
-    if(storage->IsLocallyStored()){
-        Git_Initialize();
-        Git_OpenRootRepository();
-    }else{
-        Git_Disable();
-    }
-
-    GitBuffer_InitializeInternalBuffer();
 
     BaseCommand_InitializeCommandMap();
 }
@@ -244,7 +233,7 @@ int AppGetTabLength(int *using_tab){
 }
 
 void AppAddStoredFile(std::string basePath){
-    std::string fullPath = appGlobalConfig.rootFolder + std::string("/") + basePath;
+    std::string fullPath = appGlobalConfig.rootFolder + std::string(SEPARATOR_STRING) + basePath;
     appGlobalConfig.filesStored.push_back(fullPath);
 }
 
@@ -377,7 +366,7 @@ void AppRestoreAllViews(){
         BufferView *bView = &view->bufferView;
         ViewType type = BufferView_GetViewType(bView);
         if(type == GitDiffView){
-            AppCommandGitDiff(bView);
+            //AppCommandGitDiff(bView);
         }
 
         ViewTree_Next(&iterator);
@@ -390,7 +379,7 @@ void AppRestoreCurrentBufferViewState(){
         ViewType type = BufferView_GetViewType(view);
         // TODO: Add as needed
         if(type == GitDiffView){
-            AppCommandGitDiffCurrent();
+            //AppCommandGitDiffCurrent();
         }
     }
 }
@@ -905,7 +894,7 @@ void AppHandleRegionCut(bool toClipboard=true){
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
         if(toClipboard){
-            ClipboardSetStringX11(ptr, size);
+            ClipboardSetString(ptr, size);
         }
 
         UndoRedoUndoPushInsertBlock(&view->lineBuffer->undoRedo, start, ptr, size);
@@ -917,6 +906,11 @@ void AppHandleRegionCut(bool toClipboard=true){
         BufferView_Dirty(view);
         BufferView_SetRangeVisible(view, 0);
     }
+}
+
+DisplayWindow *Graphics_GetGlobalWindow();
+void AppTerminate(){
+    SetWindowShouldClose(Graphics_GetGlobalWindow());
 }
 
 void AppDefaultRemoveOne(){
@@ -1201,47 +1195,6 @@ void AppCommandNewLine(){
     BufferView_AdjustGhostCursorIfOut(bufferView);
     LineBuffer_SetActiveBuffer(bufferView->lineBuffer, vec2i(cursor.x-1, OPERATION_INSERT_LINE));
     BufferView_Dirty(bufferView);
-}
-
-void AppCommandGitStatusChangeBuffer(){
-    BufferView *bView = AppGetActiveBufferView();
-    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
-    LineBuffer *lBuffer = nullptr;
-    NullRet(lineBuffer);
-    AppOnTypeChange();
-
-    vec2ui cursor = BufferView_GetCursorPosition(bView);
-    Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, cursor.x);
-    NullRet(buffer);
-
-    if(buffer->taken < GIT_LABEL_SIZE) return;
-    std::string root = Git_GetRepositoryRoot();
-    if(root.size() == 0) return;
-
-    char *ptr = &buffer->data[GIT_LABEL_SIZE];
-    root += "/"; root += std::string(ptr);
-
-    FileBufferList *fList = FileProvider_GetBufferList();
-    if(FileBufferList_FindByPath(fList, &lBuffer,
-                        (char *)root.c_str(), root.size()))
-    {
-        if(lBuffer){
-            BufferView_SwapBuffer(bView, lBuffer, CodeView);
-            AppCommandGitDiffCurrent();
-        }
-    }else{
-        // is the file closed?
-        char folder[PATH_MAX];
-        FileEntry entry;
-        int r = GuessFileEntry((char *)root.c_str(), root.size(), &entry, folder);
-        if(!(r < 0) && entry.type == DescriptorFile){
-            FileProvider_Load((char *)root.c_str(), root.size(), &lBuffer, false);
-            if(lBuffer){
-                BufferView_SwapBuffer(bView, lBuffer, CodeView);
-                AppCommandGitDiffCurrent();
-            }
-        }
-    }
 }
 
 //TODO
@@ -1719,7 +1672,7 @@ void AppCommandCopy(){
 
     if(BufferView_GetCursorSelectionRange(view, &start, &end)){
         uint size = LineBuffer_GetTextFromRange(view->lineBuffer, &ptr, start, end);
-        ClipboardSetStringX11(ptr, size);
+        ClipboardSetString(ptr, size);
     }
 }
 
@@ -1776,13 +1729,11 @@ void AppPasteString(const char *p, uint size, bool force_view){
             uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size,
             cursor.x, cursor.y, &off);
 
-            section = {
-                .start = cursor,
-                .end = vec2ui(cursor.x + n, off),
-                .currTime = 0,
-                .interval = kTransitionCopyFadeIn,
-                .active = 1,
-            };
+            section.start = cursor;
+            section.end = vec2ui(cursor.x + n, off);
+            section.currTime = 0;
+            section.interval = kTransitionCopyFadeIn;
+            section.active = 1;
 
             uint endx = cursor.x + n;
             uint endy = off;
@@ -1819,7 +1770,7 @@ void AppPasteString(const char *p, uint size, bool force_view){
 
 void AppCommandPaste(){
     uint size = 0;
-    const char *p = ClipboardGetStringX11(&size);
+    const char *p = ClipboardGetString(&size);
     AppPasteString(p, size);
 }
 
@@ -2153,107 +2104,13 @@ vec2ui AppActivateViewAt(int x, int y, bool force_binding){
     return r;
 }
 
-void AppCommandGitOpenRoot(char *path){
-    Git_OpenDirectory(path);
-}
-
-void AppCommandGitStatus(){
-    AppRestoreCurrentBufferViewState();
-    BufferView *bView = AppGetActiveBufferView();
-    std::vector<std::string> data;
-    if(Git_FetchStatus(&data)){
-        LineBuffer *gitbuf = GitBuffer_GetLineBuffer();
-        GitBuffer_Clear();
-
-        for(std::string v : data){
-            GitBuffer_PushLine((char *)v.c_str(), v.size());
-        }
-
-        BufferView_SwapBuffer(bView, gitbuf, GitStatusView);
-    }
-}
-
-void AppCommandGitDiff(BufferView *bView){
-    bool allow_write = true;
-    NullRet(bView->lineBuffer);
-
-    // only compute diffs for actual editable linebuffers.
-    NullRet(BufferView_GetViewType(bView) == CodeView ||
-            BufferView_GetViewType(bView) == GitDiffView);
-    AppOnTypeChange();
-
-    std::vector<LineHighlightInfo> *dif = LineBuffer_GetLineHighlightPtr(bView->lineBuffer, 0);
-    if(dif){
-        int is_dif_start = 0;
-        vec2ui range;
-        if(dif->size() == 0 && BufferView_GetViewType(bView) == GitDiffView){
-            BufferView_SetViewType(bView, CodeView);
-            return;
-        }
-
-        if(dif->size() > 0){
-            std::vector<vec2ui> *ptr = &bView->lineBuffer->props.diffLines;
-            LineBuffer_EraseDiffContent(bView->lineBuffer);
-            range = vec2ui(ptr->at(0).x, ptr->at(ptr->size()-1).x);
-            dif->clear();
-            // removed the diff, make the state code again
-            BufferView_SetViewType(bView, CodeView);
-        }else{
-            bool difStatus = false;
-            is_dif_start = 1;
-            dif->clear();
-            allow_write = false;
-            std::string path = AppGetRootDirectory();
-            std::string target = LineBuffer_GetStoragePath(bView->lineBuffer);
-            std::string gitName = target;
-            if(StringStartsWith((char *)target.c_str(), target.size(),
-                                (char *)path.c_str(), path.size()))
-            {
-                gitName = target.substr(path.size()+1);
-            }
-
-            MeasureTime("GitFetchFor", {
-                difStatus = Git_FetchDiffFor((char *)gitName.c_str(), dif);
-            });
-            if(!difStatus) return;
-            if(dif->size() == 0) return;
-
-            MeasureTime("DiffInsertion", {
-                LineBuffer_InsertDiffContent(bView->lineBuffer, range);
-            });
-
-            BufferView_SetViewType(bView, GitDiffView);
-        }
-
-        if(range.x <= range.y){
-            RemountTokensBasedOn(bView, range.x, range.y - range.x);
-            LineBuffer_SetWrittable(bView->lineBuffer, allow_write);
-            if(is_dif_start){
-                bool any = false;
-                std::vector<vec2ui> *ptr = nullptr;
-
-                ptr = LineBuffer_GetDiffRangePtr(bView->lineBuffer, &any);
-                if(any && ptr->size() > 0){
-                    vec2ui val = ptr->at(0);
-                    CursorToRegion(bView, val.x);
-                }
-            }
-        }
-    }
-}
-
-void AppCommandGitDiffCurrent(){
-    BufferView *bView = AppGetActiveBufferView();
-    AppCommandGitDiff(bView);
-}
-
 void AppCommandEnterKey(){
     AppOnTypeChange();
     BufferView *bufferView = AppGetActiveBufferView();
     ViewType type = BufferView_GetViewType(bufferView);
     switch(type){
         case CodeView: AppCommandNewLine(); break;
-        case GitStatusView: AppCommandGitStatusChangeBuffer(); break;
+        //case GitStatusView: AppCommandGitStatusChangeBuffer(); break;
         default: {
             printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
         }
@@ -2528,6 +2385,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterKeyboardDefaultEntry(mapping, AppDefaultEntry, nullptr);
     RegisterRepeatableEvent(mapping, AppDefaultReturn, Key_Escape);
     RegisterRepeatableEvent(mapping, AppDefaultRemoveOne, Key_Backspace);
+    RegisterRepeatableEvent(mapping, AppTerminate, Key_LeftAlt, Key_F4);
 
     //DEBUG KEYS
     RegisterRepeatableEvent(mapping, AppMemoryDebugFreeze, Key_LeftControl, Key_1);
@@ -2582,7 +2440,7 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearch, Key_LeftControl, Key_S);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarSearchAndReplace, Key_LeftControl, Key_O);
-    RegisterRepeatableEvent(mapping, AppCommandGitDiffCurrent, Key_LeftAlt, Key_O);
+    //RegisterRepeatableEvent(mapping, AppCommandGitDiffCurrent, Key_LeftAlt, Key_O);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftControl, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarGotoLine, Key_LeftAlt, Key_G);
     RegisterRepeatableEvent(mapping, AppCommandQueryBarRevSearch, Key_LeftControl, Key_R);

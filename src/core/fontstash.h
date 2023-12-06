@@ -40,6 +40,10 @@ extern "C" {
 
 #define FONS_INVALID -1
 
+#if defined(_WIN32)
+	#include <Windows.h>
+#endif
+
     enum FONSflags {
         FONS_ZERO_TOPLEFT = 1,
         FONS_ZERO_BOTTOMLEFT = 2,
@@ -613,7 +617,7 @@ static FONSatlas* fons__allocAtlas(int w, int h, int nnodes)
 	FONSatlas* atlas = NULL;
 
 	// Allocate memory for the font stash.
-	atlas = (FONSatlas*)malloc(sizeof(FONSatlas));
+	atlas = (FONSatlas*)calloc(1, sizeof(FONSatlas));
 	if (atlas == NULL) goto error;
 	memset(atlas, 0, sizeof(FONSatlas));
 
@@ -621,7 +625,7 @@ static FONSatlas* fons__allocAtlas(int w, int h, int nnodes)
 	atlas->height = h;
 
 	// Allocate space for skyline nodes
-	atlas->nodes = (FONSatlasNode*)malloc(sizeof(FONSatlasNode) * nnodes);
+	atlas->nodes = (FONSatlasNode*)calloc(1, sizeof(FONSatlasNode) * nnodes);
 	if (atlas->nodes == NULL) goto error;
 	memset(atlas->nodes, 0, sizeof(FONSatlasNode) * nnodes);
 	atlas->nnodes = 0;
@@ -805,7 +809,7 @@ static void fons__addWhiteRect(FONScontext* cstash, int w, int h)
 
 FONScontext *fonsCreateInternalFrom(FONSparams *params, FONScontext *other){
     FONScontext* cstash = NULL;
-    cstash = (FONScontext*)malloc(sizeof(FONScontext));
+    cstash = (FONScontext*)calloc(1, sizeof(FONScontext));
 	if (cstash == NULL) goto error;
     cstash->params = *params;
     cstash->ctxImpl = other->ctxImpl;
@@ -820,10 +824,10 @@ FONScontext* fonsCreateInternal(FONSparams* params)
 	FONScontext* cstash = NULL;
     FONScontextImpl *stash = NULL;
 	// Allocate memory for the font stash.
-	cstash = (FONScontext*)malloc(sizeof(FONScontext));
+	cstash = (FONScontext*)calloc(1, sizeof(FONScontext));
 	if (cstash == NULL) goto error;
 	memset(cstash, 0, sizeof(FONScontext));
-    cstash->ctxImpl = (FONScontextImpl *)malloc(sizeof(FONScontextImpl));
+    cstash->ctxImpl = (FONScontextImpl *)calloc(1, sizeof(FONScontextImpl));
     if (cstash->ctxImpl == NULL) goto error;
     memset(cstash->ctxImpl, 0, sizeof(FONScontext));
 
@@ -831,7 +835,7 @@ FONScontext* fonsCreateInternal(FONSparams* params)
 	cstash->params = *params;
 
 	// Allocate scratch buffer.
-	stash->scratch = (unsigned char*)malloc(FONS_SCRATCH_BUF_SIZE);
+	stash->scratch = (unsigned char*)calloc(1, FONS_SCRATCH_BUF_SIZE);
 	if (stash->scratch == NULL) goto error;
 
 	// Initialize implementation library
@@ -846,7 +850,7 @@ FONScontext* fonsCreateInternal(FONSparams* params)
 	if (stash->atlas == NULL) goto error;
 
 	// Allocate space for fonts.
-	stash->fonts = (FONSfont**)malloc(sizeof(FONSfont*) * FONS_INIT_FONTS);
+	stash->fonts = (FONSfont**)calloc(1, sizeof(FONSfont*) * FONS_INIT_FONTS);
 	if (stash->fonts == NULL) goto error;
 	memset(stash->fonts, 0, sizeof(FONSfont*) * FONS_INIT_FONTS);
 	stash->cfonts = FONS_INIT_FONTS;
@@ -855,7 +859,7 @@ FONScontext* fonsCreateInternal(FONSparams* params)
 	// Create texture for the cache.
 	stash->itw = 1.0f/cstash->params.width;
 	stash->ith = 1.0f/cstash->params.height;
-	stash->texData = (unsigned char*)malloc(cstash->params.width * cstash->params.height);
+	stash->texData = (unsigned char*)calloc(1, cstash->params.width * cstash->params.height);
 	if (stash->texData == NULL) goto error;
 	memset(stash->texData, 0, cstash->params.width * cstash->params.height);
 
@@ -985,11 +989,11 @@ static int fons__allocFont(FONScontextImpl* stash)
 		if (stash->fonts == NULL)
 			return -1;
 	}
-	font = (FONSfont*)malloc(sizeof(FONSfont));
+	font = (FONSfont*)calloc(1, sizeof(FONSfont));
 	if (font == NULL) goto error;
 	memset(font, 0, sizeof(FONSfont));
 
-	font->glyphs = (FONSglyph*)malloc(sizeof(FONSglyph) * FONS_INIT_GLYPHS);
+	font->glyphs = (FONSglyph*)calloc(1, sizeof(FONSglyph) * FONS_INIT_GLYPHS);
 	if (font->glyphs == NULL) goto error;
 	font->cglyphs = FONS_INIT_GLYPHS;
 	font->nglyphs = 0;
@@ -1053,7 +1057,7 @@ int fonsAddFontSdf(FONScontext* cstash, const char* name, const char* path, FONS
 	fseek(fp,0,SEEK_END);
 	dataSize = (int)ftell(fp);
 	fseek(fp,0,SEEK_SET);
-	data = (unsigned char*)malloc(dataSize);
+	data = (unsigned char*)calloc(1, dataSize);
 	if (data == NULL) goto error;
 	readed = fread(data, 1, dataSize, fp);
 	fclose(fp);
@@ -2166,7 +2170,7 @@ FONS_DEF int fonsExpandAtlas(FONScontext* cstash, int width, int height)
 			return 0;
 	}
 	// Copy old texture data over.
-	data = (unsigned char*)malloc(width * height);
+	data = (unsigned char*)calloc(1, width * height);
 	if (data == NULL)
 		return 0;
 	for (i = 0; i < cstash->params.height; i++) {

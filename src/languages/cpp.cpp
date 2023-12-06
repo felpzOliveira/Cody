@@ -14,7 +14,7 @@ TokenizerSupport cppSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( May 16 2023 17:09:30 ) */
+/* Auto generated file ( Dec  6 2023 12:52:52 ) */
 
 std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 	{
@@ -136,7 +136,8 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "alignof", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
-		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
+		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF },
+		{ .value = "__asm__", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "GLushort", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "GLclampf", .identifier = TOKEN_ID_DATATYPE },
@@ -196,6 +197,7 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "__volatile__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "__FUNCTION__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "__constant__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "__restrict__", .identifier = TOKEN_ID_RESERVED },
@@ -207,6 +209,8 @@ std::vector<std::vector<GToken>> cppReservedPreprocessor = {
 		{ .value = "__CUDA_ARCH__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }, },
+	{
+		{ .value = "cudaDeviceProp", .identifier = TOKEN_ID_DATATYPE }, },
 	{
 		{ .value = "__forceinline__", .identifier = TOKEN_ID_RESERVED }, },
 	{
@@ -330,7 +334,8 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "alignof", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "private", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "gridDim", .identifier = TOKEN_ID_RESERVED },
-		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF }, },
+		{ .value = "typedef", .identifier = TOKEN_ID_DATATYPE_TYPEDEF_DEF },
+		{ .value = "__asm__", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "GLushort", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "GLclampf", .identifier = TOKEN_ID_DATATYPE },
@@ -390,6 +395,7 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "cudaError_t", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "static_cast", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "__volatile__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "CUDA_SUCCESS", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "OptixImage2D", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "__FUNCTION__", .identifier = TOKEN_ID_RESERVED },
@@ -403,6 +409,8 @@ std::vector<std::vector<GToken>> cppReservedTable = {
 		{ .value = "__CUDA_ARCH__", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "static_assert", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "__TIMESTAMP__", .identifier = TOKEN_ID_RESERVED }, },
+	{
+		{ .value = "cudaDeviceProp", .identifier = TOKEN_ID_DATATYPE }, },
 	{
 		{ .value = "__forceinline__", .identifier = TOKEN_ID_RESERVED }, },
 	{

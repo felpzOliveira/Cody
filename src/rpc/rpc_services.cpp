@@ -1,4 +1,4 @@
-#include <rpc.h>
+#include <rpc_services.h>
 #include <storage.h>
 
 #define LOG_MODULE "RPC"

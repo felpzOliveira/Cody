@@ -7,7 +7,6 @@
 #include <undo.h>
 #include <symbol.h>
 #include <vector>
-#include <gitbase.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -63,8 +62,6 @@ struct LineBufferProps{
     FileExtension ext;
     CopySection cpSection;
     bool isWrittable;
-    std::vector<LineHighlightInfo> diffs;
-    std::vector<vec2ui> diffLines;
     bool isInternal;
 };
 
@@ -340,29 +337,6 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
 * to be renderable without needing to perform tokenization and symbol table lookups.
 */
 void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
-
-/*
-* Retrieves the pointer associated to the line highlight inside this linebuffer. Settings
-* clear = 1 makes the ptr be clared before returning. This is intended to be used
-* with the git/dbg interface to avoid array copies. This list should be used by the git
-* interface to register raw deltas and dbg to trigger view on stop points. In order to
-* clearly express changes in file use LineBuffer_InsertDiffContent.
-*/
-std::vector<LineHighlightInfo> *LineBuffer_GetLineHighlightPtr(LineBuffer *lineBuffer, int clear=1);
-
-/*
-* Retrieves the pointer associated to the line highlight range inside this linebuffer.
-* The diff range pointer is a list of pair of values that holds (line, type) of all highlights
-* currently active in the linebuffer. For example a new line might be registered as:
-* (32, GIT_LINE_INSERTED) and a removed one as (64, GIT_LINE_REMOVED). This list
-* can be used to render the linebuffer displaying git diffs or highlight lines for some reason.
-*/
-std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any);
-
-/*
-* Erases the current diff lines from the linebuffer.
-*/
-void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer);
 
 /*
 * Updates the linebuffer to include its diff content. Returns in 'range' the

@@ -1,12 +1,23 @@
 /* date = May 26th 2022 19:56 */
 #pragma once
 #include <types.h>
-#include <utilities.h>
+
 #include <file_details.h>
-#include <rpc.h>
+#include <rpc_services.h>
 #include <mutex>
 #include <condition_variable>
-#include <security.h>
+#include <security_services.h>
+
+#if defined(_WIN32)
+#include <Windows.h>
+#include <direct.h>
+#if !defined(CHDIR)
+    #define CHDIR(x) _chdir(x)
+#endif
+struct FileEntry;
+#else
+#include <utilities.h>
+#endif
 
 struct RPCNetwork{
     // private data for the actual network layer

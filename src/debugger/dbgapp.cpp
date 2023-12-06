@@ -488,7 +488,7 @@ void DbgApp_QueryBarPaste(){
     View *view = AppGetActiveView();
     if(View_IsQueryBarActive(view)){
         uint size = 0;
-        const char *p = ClipboardGetStringX11(&size);
+        const char *p = ClipboardGetString(&size);
         QueryBar *bar = View_GetQueryBar(view);
         int r = QueryBar_AddEntry(bar, view, (char *)p, size);
         if(r == 1){

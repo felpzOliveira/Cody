@@ -15,7 +15,7 @@ TokenizerSupport glslSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( May 16 2023 17:09:30 ) */
+/* Auto generated file ( Dec  6 2023 12:52:52 ) */
 
 std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 	{
@@ -116,7 +116,8 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 		{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "return", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
+		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },
+		{ .value = "layout", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "optmize", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "mediump", .identifier = TOKEN_ID_OPERATOR },
@@ -287,7 +288,8 @@ std::vector<std::vector<GToken>> glslReservedTable = {
 		{ .value = "return", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
+		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },
+		{ .value = "layout", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "mediump", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "varying", .identifier = TOKEN_ID_OPERATOR },

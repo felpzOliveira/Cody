@@ -225,7 +225,7 @@ WidgetWindow::WidgetWindow(int width, int height, const char *name){
     Open(width, height, name, nullptr);
 }
 
-WidgetWindow::WidgetWindow(WindowX11 *other, BindingMap *bmapping,
+WidgetWindow::WidgetWindow(DisplayWindow *other, BindingMap *bmapping,
                            vec2f lower, vec2f upper)
 {
     window = nullptr;
@@ -264,14 +264,14 @@ void WidgetWindow::Resize(int width, int height){
     }
 }
 
-void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *other){
+void WidgetWindow::Open(int width, int height, const char *name, DisplayWindow *other){
     if(window){
         OpenGLBufferContextDelete(&quadBuffer);
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
 
         if(detached){
-            DestroyWindowX11(window);
+            DestroyWindow(window);
         }else{
             for(uint handle : eventHandles){
                 UnregisterCallbackByHandle(window, handle);
@@ -282,16 +282,19 @@ void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *othe
     window = other;
 
     if(detached && !window){
-        WindowX11 *shared = (WindowX11 *)Graphics_GetBaseWindow();
-        window = CreateWindowX11Shared(width, height, name, shared);
+        //DisplayWindow *shared = (DisplayWindow *)Graphics_GetBaseWindow();
+        // TODO: Add shared context for windows
+        window = nullptr;
+        //window = CreateWindowX11Shared(width, height, name, shared);
     }
 
     AssertA(window != nullptr, "Could not get window handle");
 
     MakeContext();
     if(detached){
-        SetNotResizable(window);
-        SwapIntervalX11(window, 0);
+        // TODO: Add resizable for windows
+        //SetNotResizable(window);
+        SwapInterval(window, 0);
         if(!mapping){
             mapping = KeyboardCreateMapping(window);
             RegisterKeyboardDefaultEntry(mapping, WidgetWindowDefaultEntry, this);
@@ -338,7 +341,7 @@ Geometry WidgetWindow::GetGeometry(){
 
 void WidgetWindow::MakeContext(){
     if(window){
-        MakeContextX11(window);
+        MakeContextCurrent(window);
     }
 }
 
@@ -370,13 +373,13 @@ int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
 
 void WidgetWindow::Update(){
     if(window){
-        if(!WindowShouldCloseX11(window)){
-            SwapBuffersX11(window);
+        if(!WindowShouldClose(window)){
+            SwapBuffers(window);
         }else{
             OpenGLBufferContextDelete(&quadBuffer);
             OpenGLBufferContextDelete(&quadImageBuffer);
             glfonsDeleteContext(font.fsContext);
-            DestroyWindowX11(window);
+            DestroyWindow(window);
             window = nullptr;
             Graphics_RequestClose(this);
         }
@@ -389,7 +392,7 @@ WidgetWindow::~WidgetWindow(){
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
         if(detached){
-            DestroyWindowX11(window);
+            DestroyWindow(window);
         }
     }
 }
@@ -597,15 +600,14 @@ void ButtonWidget::OnClick(){
 
 void ButtonWidget::OnEntered(){
     if(!IsEnabled()) return;
-    WidgetTransition transition = {
-        .type = transitionStyle.type,
-        .scale = transitionStyle.scaleUp,
-        .interval = ButtonWidget::kScaleDuration,
-        .dt = 0,
-        .running =  true,
-        .background = transitionStyle.background,
-        .is_out = false,
-    };
+    WidgetTransition transition;
+        transition.type = transitionStyle.type;
+        transition.scale = transitionStyle.scaleUp;
+        transition.interval = ButtonWidget::kScaleDuration;
+        transition.dt = 0;
+        transition.running =  true;
+        transition.background = transitionStyle.background;
+        transition.is_out = false;
 
     Widget::OnEntered();
     Widget::InterruptAnimation();
@@ -620,15 +622,14 @@ void ButtonWidget::OnEntered(){
 void ButtonWidget::OnExited(){
     if(!isScaledUp) return;
     Float invScale = 1.0 / transitionStyle.scaleUp;
-    WidgetTransition transition = {
-        .type = transitionStyle.type,
-        .scale = invScale,
-        .interval = ButtonWidget::kScaleDuration,
-        .dt = 0,
-        .running =  true,
-        .background = transitionStyle.obackground,
-        .is_out = true,
-    };
+    WidgetTransition transition;
+        transition.type = transitionStyle.type;
+        transition.scale = invScale;
+        transition.interval = ButtonWidget::kScaleDuration;
+        transition.dt = 0;
+        transition.running =  true;
+        transition.background = transitionStyle.obackground;
+        transition.is_out = true;
 
     Widget::OnExited();
     Widget::InterruptAnimation();

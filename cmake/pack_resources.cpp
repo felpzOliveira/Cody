@@ -400,7 +400,7 @@ int main(int argc, char **argv){
         std::cout << "No paths specified" << std::endl;
         return -1;
     }else if(argc == 4){
-        c_file = std::string(argv[3]);
+        //c_file = std::string(argv[3]);
     }
 
     std::vector<std::string> vars;

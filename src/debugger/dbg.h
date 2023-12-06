@@ -127,7 +127,7 @@ typedef DBG_USER_EXP_FEEDBACK(DbgUserExpressionFeedback);
 #define DBG_RUN(name) bool name(Dbg *dbg)
 #define DBG_PAUSE(name) bool name(Dbg *dbg)
 #define DBG_TERMINATE(name) bool name(Dbg *dbg)
-#define DBG_CONTINUE(name) bool name(Dbg *dbg)
+#define DBG_CONTINUE_FN(name) bool name(Dbg *dbg)
 #define DBG_WAIT_EVENT(name) bool name(Dbg *dbg, uint ms, DbgStop *stop, char *folder)
 #define DBG_INTERRUPT(name) bool name(Dbg *dbg)
 #define DBG_FINISH(name) bool name(Dbg *dbg)
@@ -142,7 +142,7 @@ typedef DBG_NEXT(DbgPlatformNext);
 typedef DBG_RUN(DbgPlatformRun);
 typedef DBG_PAUSE(DbgPlatformPause);
 typedef DBG_WAIT_EVENT(DbgPlatformWaitEvent);
-typedef DBG_CONTINUE(DbgPlatformContinue);
+typedef DBG_CONTINUE_FN(DbgPlatformContinue);
 typedef DBG_TERMINATE(DbgPlatformTerminate);
 typedef DBG_INTERRUPT(DbgPlatformInterrupt);
 typedef DBG_FINISH(DbgPlatformFinish);

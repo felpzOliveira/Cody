@@ -910,7 +910,7 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
     // Somehow we getting duplicated events lets filter them out
     if(!(window->lastKeyTime < event->xkey.time)) return;
 
-    int mappedKey = TranslateKeyX11(code);
+    int mappedKey = TranslateKey(code);
     count = Xutf8LookupString(window->ic, (XKeyPressedEvent*)event, buf,
                               20, &keysym, &status);
 
@@ -920,7 +920,7 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
     }
 
     KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS,
-                  buf, count, code, (void *)window);
+                  buf, count, code, (void *)window, 1);
 
     window->lastKeyTime = event->xkey.time;
 }
@@ -928,9 +928,9 @@ void ProcessEventKeyPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11
 void ProcessEventKeyReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){
     SkipEventNoWindow(window);
     int code = event->xkey.keycode;
-    int mappedKey = TranslateKeyX11(code);
+    int mappedKey = TranslateKey(code);
     KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_RELEASE,
-                  NULL, 0, code, (void *)window);
+                  NULL, 0, code, (void *)window, 1);
 }
 
 void ProcessEventButtonPressX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11){

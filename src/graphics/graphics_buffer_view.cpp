@@ -5,7 +5,6 @@
 #include <app.h>
 #include <file_provider.h>
 #include <parallel.h>
-#include <gitbase.h>
 #include <iostream>
 #include <dbgapp.h>
 
@@ -113,6 +112,11 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
                                           rawp+utf8Len, &glCursor->pGlyph);
         }
         x0 = Max(0, x0-CursorDefaultPadding);
+        // TODO: Why does this makes sense on windows and not on linux?
+    #if defined(_WIN32)
+        int isZero = x0 == 0;
+        x0 += 3;
+    #endif
 
         rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y, &pUtf8Len);
         rawpp = Buffer_PositionTabCompensation(buffer, rawp, 1);
@@ -466,7 +470,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
                     Graphics_PrepareTextRendering(state, projection, &state->model);
                     vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
                     fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
-                    chr, chr+len, &pGlyph);
+                                            chr, chr+len, &pGlyph);
                     Graphics_FlushText(state);
                 }
             }
@@ -841,15 +845,6 @@ static void Graphics_RenderDbgBreaks(OpenGLState *state, View *vview, Transform 
     }
 }
 
-static vec4f Graphics_GetLineHighlightColor(uint utypes){
-    LineTypes type = (LineTypes)utypes;
-    switch(type){
-        case GIT_LINE_INSERTED: return vec4f(0.1,0.4,0.1,0.5);
-        case GIT_LINE_REMOVED: return vec4f(0.5,0.1,0.1,0.5);
-        default: return vec4f(0.8, 0.0, 0.8, 1.0); // bug, paint it pink
-    }
-}
-
 void Graphics_RenderBuildErrors(OpenGLState *state, View *view, Float lineSpan,
                                 Transform *projection, Transform *model, Theme *theme)
 {
@@ -959,44 +954,12 @@ bool Graphics_RenderLineHighlight(OpenGLState *state, View *vview, Float lineSpa
     bool rendered = false;
     if(view->isActive){
         LineBuffer *lineBuffer = BufferView_GetLineBuffer(view);
-        bool any = false;
         if(lineBuffer){
             ViewType vtype = BufferView_GetViewType(view);
-            vec2ui visibleLines = BufferView_GetViewRange(view);
             // TODO: Make this better
             if(vtype == DbgView && DbgApp_IsStopped()){
                 _Graphics_RenderDbgElements(state, vview, lineSpan, model, projection);
                 return true;
-            }
-
-            std::vector<LineHighlightInfo> *lh =
-                                        LineBuffer_GetLineHighlightPtr(lineBuffer, 0);
-            std::vector<vec2ui> *ptr = LineBuffer_GetDiffRangePtr(lineBuffer, &any);
-            if(!(!any || !ptr || lh->size() < 1)){
-                glUseProgram(font->cursorShader.id);
-                Shader_UniformMatrix4(font->cursorShader, "projection", &projection->m);
-                Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
-                rendered = true;
-                for(vec2ui val : *ptr){
-                    if(!(val.x >= visibleLines.x && val.x <= visibleLines.y)){
-                        continue;
-                    }
-
-                    Float y0 = ((Float)val.x - (Float)visibleLines.x) *
-                    font->fontMath.fontSizeAtRenderCall;
-                    if(vview->descLocation == DescriptionTop){
-                        y0 += font->fontMath.fontSizeAtRenderCall;
-                    }
-
-                    Float y1 = y0 + font->fontMath.fontSizeAtRenderCall;
-                    Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(lineSpan, y1),
-                    Graphics_GetLineHighlightColor(val.y));
-                }
-
-                Graphics_QuadFlush(state);
-
-                Shader_UniformMatrix4(font->cursorShader, "modelView", &model->m);
-                Graphics_LineFlush(state);
             }
         }
 
@@ -1191,17 +1154,12 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     int tabSpace = AppGetTabLength(&is_tab);
     enddesc[0] = 0;
     std::string head, fmt;
-    int k = 0, kk = 0;
+    int k = 0;
 
     if(is_tab){
         k = snprintf(enddesc, sizeof(enddesc), " TAB - %d", tabSpace);
     }else{
         k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d", tabSpace);
-    }
-
-    if(Git_GetReferenceHeadName(head)){
-        kk = snprintf(&enddesc[k], sizeof(enddesc) - k, " %s", head.c_str());
-        k += kk;
     }
 
     Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph);

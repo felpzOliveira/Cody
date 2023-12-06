@@ -18,7 +18,7 @@ TokenizerSupport cmakeSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( May 16 2023 17:09:30 ) */
+/* Auto generated file ( Dec  6 2023 12:52:52 ) */
 
 std::vector<std::vector<GToken>> cmakeReservedPreprocessor = {
 };
@@ -96,12 +96,14 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "CMAKE_SOURCE_DIR", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "CMAKE_BINARY_DIR", .identifier = TOKEN_ID_DATATYPE }, },
 	{
+		{ .value = "CMAKE_SYSTEM_NAME", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "add_custom_target", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "CMAKE_CXX_COMPILER", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "add_custom_command", .identifier = TOKEN_ID_OPERATOR }, },
 	{
-		{ .value = "include_directories", .identifier = TOKEN_ID_OPERATOR }, },
+		{ .value = "include_directories", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "target_link_options", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "target_link_libraries", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "set_target_properties", .identifier = TOKEN_ID_OPERATOR }, },
@@ -117,6 +119,6 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 	{
 		{ .value = "set_source_files_properties", .identifier = TOKEN_ID_OPERATOR }, },
 	{
-		{ .value = "CMAKE_RUNTIME_OUTPUT_DIRECTORY", .identifier = TOKEN_ID_DATATYPE }, },
+		{ .value = "CMAKE_RUNTIME_OUTPUT_DIRECTORY", .identifier = TOKEN_ID_OPERATOR }, },
 };
 

@@ -109,6 +109,7 @@ optmize PREPROCESSOR
 mediump OPERATOR
 varying OPERATOR
 uniform OPERATOR
+layout OPERATOR
 discard OPERATOR
 include INCLUDE_SEL
 defined OPERATOR
@@ -257,6 +258,7 @@ struct DATATYPE_STRUCT_DEF
 mediump OPERATOR
 varying OPERATOR
 uniform OPERATOR
+layout OPERATOR
 discard OPERATOR
 typedef DATATYPE_TYPEDEF_DEF
 gl_Point RESERVED

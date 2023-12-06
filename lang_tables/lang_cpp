@@ -122,6 +122,7 @@ uint16_t DATATYPE
 int16_t DATATYPE
 int32_t DATATYPE
 int64_t DATATYPE
+cudaDeviceProp DATATYPE
 nullptr OPERATOR
 alignas OPERATOR
 wchar_t DATATYPE
@@ -142,6 +143,8 @@ uint32_t DATATYPE
 uint64_t DATATYPE
 operator OPERATOR
 template OPERATOR
+__asm__ RESERVED
+__volatile__ RESERVED
 __func__ RESERVED
 __FILE__ RESERVED
 __LINE__ RESERVED
@@ -299,6 +302,7 @@ uint16_t DATATYPE
 int16_t DATATYPE
 int32_t DATATYPE
 int64_t DATATYPE
+cudaDeviceProp DATATYPE
 virtual OPERATOR
 default OPERATOR
 alignof OPERATOR
@@ -316,6 +320,8 @@ uint32_t DATATYPE
 uint64_t DATATYPE
 operator OPERATOR
 template OPERATOR
+__asm__ RESERVED
+__volatile__ RESERVED
 __func__ RESERVED
 __FILE__ RESERVED
 __LINE__ RESERVED

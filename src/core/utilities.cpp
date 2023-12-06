@@ -3,15 +3,155 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <stdint.h>
-#include <unistd.h>
-#include <sys/stat.h>
 #include <string.h>
 #include <lex.h>
 #include <limits.h>
-#include <dirent.h>
+#include <sys/stat.h>
 #include <sstream>
+#if !defined(_WIN32)
+#include <unistd.h>
+#include <dirent.h>
+
+FileType SymlinkGetType(const char *path){
+    char tmp[2048];
+    ssize_t r = readlink(path, tmp, 2048);
+    if(r < 0){
+        return DescriptorFile;
+    }
+
+    struct stat st;
+    if(stat(tmp, &st) == 0){
+        if(st.st_mode & S_IFDIR) return DescriptorDirectory;
+    }
+
+    return DescriptorFile;
+}
+#else
+#include <Windows.h>
+
+char* realpath(const char* path, char* resolved_path) {
+    if (path == NULL) {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+
+    DWORD length = GetFullPathNameA(path, 0, NULL, NULL);
+    if (length == 0) {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+
+    char* buffer = (char*)malloc(length * sizeof(char));
+    if (buffer == NULL) {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return NULL;
+    }
+
+    DWORD result = GetFullPathNameA(path, length, buffer, NULL);
+    if (result == 0 || result >= length) {
+        free(buffer);
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+
+    if (resolved_path != NULL) {
+        strcpy(resolved_path, buffer);
+        free(buffer);
+        return resolved_path;
+    }
+
+    return buffer;
+}
+
+#define DT_DIR 1
+#define DT_REG -1
+#define DT_LNK 2
+
+typedef struct {
+    HANDLE handle;
+    WIN32_FIND_DATAA findData;
+} DIR;
+
+struct dirent {
+    char d_name[MAX_PATH];
+    int d_type;
+};
+
+DIR* opendir(const char* path) {
+    DIR* dir = (DIR*)malloc(sizeof(DIR));
+
+    char searchPath[MAX_PATH];
+    snprintf(searchPath, MAX_PATH, "%s\\*", path);
+
+    dir->handle = FindFirstFileA(searchPath, &dir->findData);
+
+    if (dir->handle == INVALID_HANDLE_VALUE) {
+        free(dir);
+        return NULL;
+    }
+
+    return dir;
+}
+
+struct dirent* readdir(DIR* dir) {
+    if (dir == NULL || dir->handle == INVALID_HANDLE_VALUE) {
+        return NULL;
+    }
+
+    if (FindNextFileA(dir->handle, &dir->findData) != 0) {
+        static struct dirent entry;
+        strncpy(entry.d_name, (const char *)dir->findData.cFileName, sizeof(entry.d_name));
+        if (dir->findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+            entry.d_type = 1;
+        else
+            entry.d_type = 2;
+        return &entry;
+    }
+
+    return NULL;
+}
+
+void closedir(DIR* dir) {
+    if (dir != NULL && dir->handle != INVALID_HANDLE_VALUE) {
+        FindClose(dir->handle);
+        free(dir);
+    }
+}
+
+char *getcwd(char *dir, uint len){
+    if(GetCurrentDirectoryA(len, dir) == 0)
+        return nullptr;
+    return dir;
+}
+
+// TODO
+FileType SymlinkGetType(const char *path){
+    return DescriptorFile;
+}
+
+#endif
 
 #define IS_DIGIT(x) (static_cast<unsigned int>((x) - '0') < static_cast<unsigned int>(10))
+
+void SwapPathDelimiter(std::string &path){
+    for(uint i = 0; i < path.size(); i++){
+        if(path[i] == '/' || path[i] == '\\'){
+            path[i] = SEPARATOR_CHAR;
+        }
+    }
+}
+
+int Mkdir(const char *path){
+#if defined(_WIN32)
+    return _mkdir(path);
+#else
+    return mkdir(path, 0777);
+#endif
+}
+
+char* __realpath(const char* path, char* resolved_path){
+    return realpath(path, resolved_path);
+}
 
 uint Bad_RNG16(){
     return rand() % 0x0000FFFF;
@@ -93,16 +233,12 @@ std::string StringTrim(std::string s){
     return s;
 }
 
-#define DEBUG_RATIO 1
 double ComputeDecodeRatio(char *data, uint size){
     return 0;
     uint where = 0;
     Float ratio = 0.0;
     uint64_t total = 0, failed = 0;
-#if DEBUG_RATIO
-    StopWatch watch;
-    watch.Start();
-#endif
+
     while(where < size && ratio < kMaximumDecodeRatio){
         int off = 0;
         int rv = StringToCodepoint(&data[where], size-where, &off);
@@ -117,11 +253,6 @@ double ComputeDecodeRatio(char *data, uint size){
         ratio = (Float)failed / (Float)(total);
     }
 
-#if DEBUG_RATIO
-    watch.Stop();
-    Float interval = watch.Interval();
-    printf("[DEBUG] Decode ratio = {%g %g}\n", ratio, interval);
-#endif
     return ratio;
 }
 
@@ -137,7 +268,7 @@ std::string ExpandFilePath(char *path, uint size, char *folder){
     std::string res(folder);
     char last = res[res.size()-1];
     if(last != '/' && last != '\\'){
-        res += "/";
+        res += SEPARATOR_STRING;
     }
 
     res += path;
@@ -149,21 +280,6 @@ int FileExists(char *path){
     bool exists = fp != nullptr;
     if(fp) fclose(fp);
     return exists;
-}
-
-FileType SymlinkGetType(const char *path){
-    char tmp[2048];
-    ssize_t r = readlink(path, tmp, 2048);
-    if(r < 0){
-        return DescriptorFile;
-    }
-
-    struct stat st;
-    if(stat(tmp, &st) == 0){
-        if(st.st_mode & S_IFDIR) return DescriptorDirectory;
-    }
-
-    return DescriptorFile;
 }
 
 //TODO: Windows
@@ -290,6 +406,7 @@ int ListFileEntries(char *basePath, FileEntry **entries, uint *n, uint *size){
                         //printf("Directory %s (len = %d)\n", entry->d_name, (int) reclen);
                     }else if(entry->d_type == DT_LNK){
                         lEntries[count].type = SymlinkGetType(p);
+                        //printf("File %s\n", entry->d_name);
                     }else{
                         lEntries[count].type = DescriptorFile;
                         //printf("File %s\n", entry->d_name);
@@ -533,7 +650,7 @@ uint StringCompressPath(char *path, uint size, uint width){
     uint at = 0;
     uint counter = 0;
     for(at = size-1; at > 0 && counter < width; at--){
-        if(path[at] == '/') counter++;
+        if(path[at] == '/' || path[at] == '\\') counter++;
     }
 
     // at + 1 => '/'
@@ -922,7 +1039,7 @@ int TerminatorChar(char v){
 
 // TODO: Add as needed
 int StopChar(char v){
-    return (v == ' ' || v == '+' || v == '-' || v == '/' || v == '.' ||
+    return (v == ' ' || v == '+' || v == '-' || v == '/' ||  v == '.' ||
             v == '\"' || v == '\'' || v == '*' || v == '&' || v == '!' ||
             v == '|' || v == '(' || v == ')' || v == '{' || v == '}' ||
             v == '[' || v == ']' || v == ';' || v == ',' || v == '<' ||
@@ -972,37 +1089,28 @@ int GetRightmostSplitter(const char *path, uint size){
 }
 
 char *GetFileContents(const char *path, uint *size){
-    struct stat st;
-    uint filesize = 0, bytes = 0;
     char *ret = nullptr;
+    FILE *fp = fopen(path, "rb");
+    if(fp == nullptr)
+        return nullptr;
 
-    int fd = open(path, O_RDONLY);
-    if(fd == -1) goto _error;
+    fseek(fp, 0, SEEK_END);
+    long memsize = ftell(fp);
+    rewind(fp);
 
-    stat(path, &st);
-    filesize = st.st_size;
+    ret = (char *)AllocatorGet(memsize+1);
+    long readN = fread(ret, 1, memsize, fp);
 
-    //TODO: Refactor or make cross-platform implementation
-    posix_fadvise(fd, 0, 0, 1);
+    if(readN != memsize)
+        goto _error_memory;
 
-    ret = (char *)AllocatorGet(filesize+1); // make sure it has null terminator
-    if(!ret) goto _error_memory;
-
-    bytes = read(fd, ret, filesize);
-    if(bytes != filesize) goto _error_memory;
-
-    close(fd);
-    *size = bytes;
+    *size = memsize;
     return ret;
-
-    _error_memory:
+_error_memory:
     if(ret){
         AllocatorFree(ret);
         ret = nullptr;
     }
-
-    _error:
-    if(fd >= 0) close(fd);
     return ret;
 }
 

@@ -4,13 +4,10 @@
 #include <parallel.h>
 #include <app.h>
 #include <file_provider.h>
-#include <bignum.h>
 #include <cryptoutil.h>
-#include <mp.h>
-#include <gitbase.h>
 #include <arg_parser.h>
 #include <storage.h>
-#include <security.h>
+#include <security_services.h>
 #include <modal.h>
 
 typedef struct{
@@ -141,53 +138,31 @@ std::map<const char *, ArgDesc> arg_map = {
     }
 };
 
-void testMP(){
-    MPI val32 = MPI::FromI64(32);
-    MPI val64 = MPI::FromU64(922337203685477580);
-    std::string v("C34FFFFFFFFFFFF3CB00");
-    std::string v2("922337203685477580");
-    Bignum b, b1, b2;
-    Bignum_FromString(&b, v.c_str(), 16);
-    Bignum_FromString(&b1, v2.c_str(), 10);
-
-    MPI mpit = MPI::FromHex(v);
-    MPI mp = val64 + mpit;
-
-    Bignum_Add(&b2, &b1, &b);
-    std::cout << mp.ToRadix(16) << std::endl;
-#if 1
-    char ss[4096];
-    size_t olen = 4096;
-    Bignum_ToString(&b2, ss, 4096, &olen, 16);
-
-    std::cout << ss << std::endl;
-#endif
-
-    //exit(0);
-}
-
 void LoadStaticFilesOnStart(){
     // TODO: Port to storage arch
     std::string path = AppGetConfigFilePath();
     FILE *fp = fopen(path.c_str(), "r");
     if(fp){
-        char *line = nullptr;
-        size_t lineSize = 0;
-        int read = -1;
+        char line[256];
         char folder[PATH_MAX];
         FileEntry entry;
         std::string rootPath = AppGetRootDirectory();
-        while((read = getline(&line, &lineSize, fp)) != -1){
-            if(read > 0){
-                line[read-1] = 0; // remove \n
-                std::string p = rootPath + std::string("/") + std::string(line);
+        while (fgets(line, sizeof(line), fp) != NULL){
+            {
+                uint n = strlen(line);
+                line[n-1] = 0;
+
+                std::string lineStr(line);
+                SwapPathDelimiter(lineStr);
+
+                std::string p = rootPath + std::string(SEPARATOR_STRING) + lineStr;
 
                 if(AppIsStoredFile(p)) continue;
 
                 int r = GuessFileEntry((char *)p.c_str(), p.size(), &entry, folder);
                 if(!(r < 0) && entry.type == DescriptorFile){
                     if(FileProvider_Load((char *)p.c_str(), p.size()))
-                        AppAddStoredFile(line);
+                        AppAddStoredFile(lineStr);
                 }
             }
         }
@@ -234,23 +209,7 @@ void DEVEL_MSG(){
     printf("\n* Cody - Built %s at %s *\n", __DATE__, __TIME__);
 }
 
-int main(int argc, char **argv){
-#if 0
-    Git_Initialize();
-
-    Git_OpenDirectory("/home/felipe/Documents/Lit");
-    double interval = MeasureInterval([&](){
-        Git_LogGraph();
-    });
-
-    printf("Graph generation took: %g ms\n", interval * 1000.0);
-
-    Git_Finalize();
-    return 0;
-
-    testMP();
-    return 0;
-#endif
+int cody_entry(int argc, char **argv){
     //DEVEL_MSG();
     SecurityServices::Context context;
     CmdLineArgs args;
@@ -281,9 +240,6 @@ int main(int argc, char **argv){
                          args.port, &context);
     }
 
-    //client_test();
-    //return 0;
-
     DebuggerRoutines();
 
     CommandExecutorInit();
@@ -291,12 +247,12 @@ int main(int argc, char **argv){
     if(!args.is_remote){
         if(args.unknownPath.size() > 0){
             char folder[PATH_MAX];
-            char *p = (char *)args.unknownPath.c_str();
+            char* p = (char*)args.unknownPath.c_str();
             uint len = strlen(p);
             FileEntry entry;
             int r = GuessFileEntry(p, len, &entry, folder);
 
-            if(r == -1){
+            if (r == -1) {
                 printf("Unknown argument, attempting to open as file\n");
                 AppEarlyInitialize(args.use_tabs);
                 StartWithNewFile(p);
@@ -326,3 +282,56 @@ int main(int argc, char **argv){
 
     return 0;
 }
+
+#if defined(_WIN32)
+//#if 0
+#include <Windows.h>
+#include <ShlObj.h>
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    LPWSTR* lpArgv;
+    int argc;
+    int addBaseDir = 0;
+
+    LPWSTR wideCmdLine = GetCommandLineW();
+    lpArgv = CommandLineToArgvW(wideCmdLine, &argc);
+
+    int totalArgc = argc;
+
+    if (argc == 1) {
+        totalArgc += 1;
+        addBaseDir = 1;
+    }
+
+    char** argv = new char* [totalArgc];
+    for (int i = 0; i < argc; ++i) {
+        int size_needed = WideCharToMultiByte(CP_UTF8, 0, lpArgv[i], -1, NULL, 0, NULL, NULL);
+        argv[i] = new char[size_needed];
+        WideCharToMultiByte(CP_UTF8, 0, lpArgv[i], -1, argv[i], size_needed, NULL, NULL);
+    }
+
+    if (addBaseDir) {
+        PWSTR userProfile = nullptr;
+        HRESULT result = SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &userProfile);
+        int bufferSize = WideCharToMultiByte(CP_UTF8, 0, userProfile, -1, NULL, 0, NULL, NULL);
+        char* userProfileChar = new char[bufferSize];
+        WideCharToMultiByte(CP_UTF8, 0, userProfile, -1, userProfileChar, bufferSize, NULL, NULL);
+
+        argv[totalArgc - 1] = userProfileChar;
+        CoTaskMemFree(userProfile);
+    }
+
+    int rv = cody_entry(totalArgc, argv);
+
+    for (int i = 0; i < totalArgc; ++i) {
+        delete[] argv[i];
+    }
+    delete[] argv;
+    LocalFree(lpArgv);
+    return rv;
+}
+#else
+int main(int argc, char** argv) {
+    return cody_entry(argc, argv);
+}
+#endif

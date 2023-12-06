@@ -9,7 +9,7 @@
 #include <bufferview.h>
 #include <theme.h>
 #include <fontstash.h>
-#include <x11_display.h>
+#include <display.h>
 #include <map>
 #include <file_provider.h>
 #include <functional>
@@ -28,8 +28,13 @@
 // Our OpenGL rendering renders everything in very high resolution and
 // than reduce scaling to get simple AA. This could potentially be slow
 // but it is working fine for me.
-#define FONT_UPSCALE_DEFAULT_SIZE 65
-#define FONT_UPSCALE_DEFAULT_OFFSET 47
+#if !defined(_WIN32)
+    #define FONT_UPSCALE_DEFAULT_SIZE 65
+    #define FONT_UPSCALE_DEFAULT_OFFSET 47
+#else
+    #define FONT_UPSCALE_DEFAULT_SIZE 25
+    #define FONT_UPSCALE_DEFAULT_OFFSET 10
+#endif
 
 #if 1
     #define OpenGLCHK(fn) do{\
@@ -146,7 +151,7 @@ struct GlobalWidgets{
 };
 
 struct OpenGLState{
-    WindowX11 *window;
+    DisplayWindow *window;
     RenderProps params;
     OpenGLFont font;
     OpenGLBuffer glQuadBuffer;
@@ -215,6 +220,9 @@ void Graphics_TextureInit(OpenGLState *state, const char *path,
                           const char *key, FileExtension type = FILE_EXTENSION_NONE);
 void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len,
                           const char *key, FileExtension type = FILE_EXTENSION_NONE);
+
+
+DisplayWindow *Graphics_GetGlobalWindow();
 
 /*
 * Toogles the rendering of the cursor segments.

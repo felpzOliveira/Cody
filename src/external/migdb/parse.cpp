@@ -2,17 +2,17 @@
 
   GDB/MI interface library
   Copyright (c) 2004-2007 by Salvador E. Tropea.
- 
+
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
   the Free Software Foundation; either version 2 of the License, or
   (at your option) any later version.
- 
+
   This program is distributed in the hope that it will be useful,
   but WITHOUT ANY WARRANTY; without even the implied warranty of
   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   GNU General Public License for more details.
- 
+
   You should have received a copy of the GNU General Public License
   along with this program; if not, write to the Free Software
   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
@@ -21,7 +21,7 @@
   Comments:
   Parses the output of gdb. It basically converts the text from gdb into a
 tree (could be a complex one) that we can easily interpret using C code.
-  
+
 ***************************************************************************/
 
 #include <ctype.h>
@@ -489,7 +489,7 @@ mi_output *mi_parse_gdb_output(const char *str)
          return mi_target_stream(r,str);
     case '&':
          return mi_log_stream(r,str);
-   }   
+   }
  mi_error=MI_PARSER;
  return NULL;
 }
@@ -1178,7 +1178,7 @@ int mi_get_children(mi_results *ch, mi_gvar *v)
                {
                 cur->value=r->v.cstr;
                 r->v.cstr=NULL;
-               }                     
+               }
              else if (strcmp(r->var,"numchild")==0)
                {
                 cur->numchild=atoi(r->v.cstr);
@@ -1456,7 +1456,7 @@ const char *mi_reason_enum_to_str(enum mi_stop_reason r)
 
  if (r==sr_unknown)
     return "Unknown (temp bkp?)";
- for (i=0; i<sizeof(reason_values)/sizeof(char *); i++)
+ for (i=0; i<sizeof(reason_values)/sizeof(reason_values[0]); i++)
      if (reason_values[i]==r)
         return reason_expl[i];
  return NULL;

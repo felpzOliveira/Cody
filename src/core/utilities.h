@@ -1,24 +1,37 @@
 /* date = January 10th 2021 11:58 am */
-
-#ifndef UTILITIES_H
-#define UTILITIES_H
+#pragma once
 #include <types.h>
 #include <geometry.h>
 #include <string>
 #include <fstream>
 #include <signal.h>
 #include <limits.h>
-#include <unistd.h>
 #include <functional>
 #include <sys/stat.h>
 #include <vector>
-#include <sys/time.h>
+
+#if defined(_WIN32)
+    #include <Windows.h>
+    #include <direct.h>
+    #include <stdlib.h>
+    #define PATH_MAX 256
+    #define CHDIR(x) _chdir(x)
+    #define MKDIR(x) _mkdir(x)
+    #define SEPARATOR_CHAR '\\'
+    #define SEPARATOR_STRING "\\"
+    #define SLEEP(n) Sleep(n)
+#else
+    #include <unistd.h>
+    #define CHDIR(x) chdir(x)
+    #define MKDIR(x) mkdir(x, 0777)
+    #define SEPARATOR_CHAR '/'
+    #define SEPARATOR_STRING "/"
+    #define SLEEP(n) sleep(n)
+#endif
 
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
-#define DebugBreak() raise(SIGTRAP)
 #define MAX_DESCRIPTOR_LENGTH 256
-#define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
 /*
@@ -80,6 +93,12 @@ struct FileEntry{
     FileType type;
     int isLoaded;
 };
+
+/* Changes a string to make sure that it contains the current path delimiter of the system */
+void SwapPathDelimiter(std::string &path);
+
+/* Wrapper for mkdir */
+int Mkdir(const char *path);
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
@@ -414,40 +433,6 @@ inline double MeasureInterval(const Fn &fn){
 #else
     #define MeasureTime(msg, ...) __VA_ARGS__
 #endif
-
-class StopWatch{
-    public:
-    bool isStarted = false;
-    struct timeval tbegin, tend;
-    Float interval = 0.f;
-
-    StopWatch(){}
-    void Start(int reset=1){
-        gettimeofday(&tbegin, nullptr);
-        isStarted = true;
-        if(reset)
-            interval = 0;
-    }
-
-    void Stop(){
-        if(!isStarted) return;
-        gettimeofday(&tend, nullptr);
-        Float interval_ms = (tend.tv_sec - tbegin.tv_sec) * 1000.0;
-        interval_ms += (tend.tv_usec - tbegin.tv_usec) / 1000.0;
-        interval += interval_ms;
-    }
-
-    void Reset(){
-        isStarted = false;
-        interval = 0.f;
-    }
-
-    Float Interval(){
-        return interval >= 0.0 ? interval : 0.f;
-    }
-
-    bool IsRunning(){ return isStarted; }
-};
 
 /* Data structures - Structures create their own copy of the item so you can free yours*/
 
@@ -906,5 +891,3 @@ template<typename T> inline void FixedStack_Pop(FixedStack<T> *stack){
         stack->top--;
     }
 }
-
-#endif //UTILITIES_H

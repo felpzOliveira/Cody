@@ -1,5 +1,7 @@
 #include <rng.h>
 #include <stdlib.h>
+
+#if !defined(_WIN32)
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>
@@ -65,3 +67,12 @@ bool Crypto_SecureRNG(void *buffer, size_t size){
     int rv = linux_rng_safe(buffer, size);
     return rv == 0;
 }
+#else
+bool Crypto_SecureRNG(void *buffer, size_t size){
+    // TODO: IMPLEMENT WINDOWS
+    unsigned char *ptr = (unsigned char *)buffer;
+    for(size_t i = 0; i < size; i++)
+        ptr[i] = rand() % 255;
+    return true;
+}
+#endif

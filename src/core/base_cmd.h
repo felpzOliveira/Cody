@@ -53,9 +53,6 @@ struct FileEntry;
 #define CMD_FUNCTIONS_STR "functions"
 #define CMD_FUNCTIONS_HELP "List all functions found on all opened files."
 
-#define CMD_GIT_STR "git "
-#define CMD_GIT_HELP "Perform git operations (choices: diff, status, open)."
-
 #define CMD_HSPLIT_STR "hsplit"
 #define CMD_HSPLIT_HELP "Split the current view horizontally."
 

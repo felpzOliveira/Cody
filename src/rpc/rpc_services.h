@@ -6,6 +6,8 @@
 #include <storage.h>
 #include <file_details.h>
 
+#define MAX_DESCRIPTOR_LENGTH 256
+
 #define RPC_COMMAND_READ_FILE     (1 << 0)
 #define RPC_COMMAND_STREAM_WRITE  (1 << 1)
 #define RPC_COMMAND_CHDIR         (1 << 2)
