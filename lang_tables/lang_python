@@ -83,4 +83,7 @@ global OPERATOR
 pass OPERATOR
 self OPERATOR
 __init__ RESERVED
+__len__ RESERVED
+__getitem__ RESERVED
+__call__ RESERVED
 END
