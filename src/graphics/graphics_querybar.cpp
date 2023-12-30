@@ -182,17 +182,24 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         Transform model = state->scale * scroll->horizontal;
 
         // 3- Compute coordinates
+        Float padding = 0;
+    #if defined(_WIN32)
+        padding = 3;
+    #endif
         Float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
         uint orawp = 0;
         int len8 = 1;
         int pGlyph = -1;
         int oGlyph = -1;
+
         if(p8 > 0){
             orawp = Buffer_Utf8PositionToRawPosition(buffer, p8-1, &len8);
             x0 = fonsComputeStringAdvance(state->font.fsContext, buffer->data,
                                           orawp+len8, &pGlyph);
             oGlyph = pGlyph;
         }
+
+        x0 += padding;
 
         // since there is a match we don't actually need to compute the raw position
         // for the searched string, we can simply copy the already filled string

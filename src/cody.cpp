@@ -283,6 +283,7 @@ int cody_entry(int argc, char **argv){
     return 0;
 }
 
+// for debug builds we should probably compile this under console subsystem and use main instead
 #if defined(_WIN32)
 //#if 0
 #include <Windows.h>

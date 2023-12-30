@@ -2210,6 +2210,45 @@ void AppCommandSwitchBuffer(){
         AppSetBindingsForState(View_SelectableList);
 }
 
+void AppDragAndDrop(char **paths, int count, int x, int y, void*){
+    if(count == 0)
+        return;
+
+    char folder[PATH_MAX];
+    StorageDevice *storage = FetchStorageDevice();
+    if(!storage->IsLocallyStored()) // don't do drag and drop on remote filesystems
+        return;
+
+    bool insert_into_view = true;
+    OpenGLState *state = Graphics_GetGlobalContext();
+
+    View *view = AppGetViewAt(x, state->height - y);
+    ViewState vstate = View_GetState(view);
+    insert_into_view = vstate == View_FreeTyping;
+
+    AppSetActiveView(view, true);
+
+    for(int i = 0; i < count; i++){
+        FileEntry entry;
+        std::string value(paths[i]);
+        SwapPathDelimiter(value);
+        uint len = value.size();
+        char *valuec = (char *)value.c_str();
+        int r = GuessFileEntry(valuec, len, &entry, folder);
+        if(!(r < 0) && entry.type == DescriptorFile){
+            if(!FileProvider_IsFileLoaded(valuec, len)){
+                LineBuffer *lineBuffer = nullptr;
+                // NOTE: We can't async here as there might be multiple files being dropped
+                //       I'm not sure the lexer can handle parallel requests under the same
+                //       tokenizer
+                r = FileProvider_Load((char *)valuec, len, &lineBuffer, false);
+                if(r && i == 0 && insert_into_view)
+                    BufferView_SwapBuffer(View_GetBufferView(view), lineBuffer, CodeView);
+            }
+        }
+    }
+}
+
 void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
     AppRestoreCurrentBufferViewState();
     View *view = AppGetActiveView();
@@ -2392,6 +2431,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppMemoryDebugCmp, Key_LeftControl, Key_2);
 
     //FILE MANAGEMENT KEYS
+    RegisterOnDragAndDropCallback(Graphics_GetGlobalWindow(), AppDragAndDrop, nullptr);
     RegisterRepeatableEvent(mapping, AppCommandOpenFile, Key_LeftAlt, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandKillView, Key_LeftControl,
                             Key_LeftAlt, Key_K);

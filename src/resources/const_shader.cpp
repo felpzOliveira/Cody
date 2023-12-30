@@ -1,26 +1,22 @@
-/* Auto generated file ( Dec  6 2023 12:52:52 ) */
+/* Auto generated file ( Dec  8 2023 11:59:35 ) */
 #define MULTILINE_STRING(a) #a
 #define MULTILINE_STRING_V(v, a) "#" #v "\n" #a
 
 
-/*****************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/cursor.v.glsl
-/*****************************************************************/
-const char *shader_cursor_v = MULTILINE_STRING(
-uniform mat4 modelView;
-uniform mat4 projection;
-attribute vec4 vertexPosition;
-attribute vec4 vertexColor;
+/******************/
+// Instanced from C
+/******************/
+const char *shader_button_f = MULTILINE_STRING_V(version 120,
 varying vec4 interpolatedColor;
-void main() {
-    interpolatedColor = vertexColor;
-    gl_Position = projection * modelView * vertexPosition;
+void main(){
+    vec3 color = interpolatedColor.rgb;
+    gl_FragColor = vec4(color, interpolatedColor.a);
 }
 );
 
-/*****************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/button.v.glsl
-/*****************************************************************/
+/******************/
+// Instanced from C
+/******************/
 const char *shader_button_v = MULTILINE_STRING(
 uniform mat4 modelView;
 uniform mat4 projection;
@@ -36,9 +32,34 @@ void main(){
 }
 );
 
-/***************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/icon.f.glsl
-/***************************************************************/
+/******************/
+// Instanced from C
+/******************/
+const char *shader_cursor_f = MULTILINE_STRING_V(version 120,
+varying vec4 interpolatedColor;
+void main(){
+    gl_FragColor = interpolatedColor;
+}
+);
+
+/******************/
+// Instanced from C
+/******************/
+const char *shader_cursor_v = MULTILINE_STRING(
+uniform mat4 modelView;
+uniform mat4 projection;
+attribute vec4 vertexPosition;
+attribute vec4 vertexColor;
+varying vec4 interpolatedColor;
+void main() {
+    interpolatedColor = vertexColor;
+    gl_Position = projection * modelView * vertexPosition;
+}
+);
+
+/******************/
+// Instanced from C
+/******************/
 const char *shader_icon_f = MULTILINE_STRING_V(version 450,
 uniform sampler2D image0;
 uniform sampler2D image1;
@@ -70,62 +91,9 @@ void main(){
 }
 );
 
-/***************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/text.v.glsl
-/***************************************************************/
-const char *shader_text_v = MULTILINE_STRING(
-uniform mat4 modelView;
-uniform mat4 projection;
-attribute vec4 vertexPosition;
-attribute vec2 vertexTexCoord;
-attribute vec4 vertexColor;
-varying vec2 interpolatedTexCoord;
-varying vec4 interpolatedColor;
-void main() {
-    interpolatedColor = vertexColor;
-    interpolatedTexCoord = vertexTexCoord;
-    gl_Position = projection * modelView * vertexPosition;
-}
-);
-
-/*****************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/cursor.f.glsl
-/*****************************************************************/
-const char *shader_cursor_f = MULTILINE_STRING_V(version 120,
-varying vec4 interpolatedColor;
-void main(){
-    gl_FragColor = interpolatedColor;
-}
-);
-
-/*****************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/button.f.glsl
-/*****************************************************************/
-const char *shader_button_f = MULTILINE_STRING_V(version 120,
-#if 0
-    uniform vec2 buttonResolution = vec2(600, 400);
-    uniform vec4 backgroundColor = vec4(0);
-    varying vec2 coords;
-#endif
-varying vec4 interpolatedColor;
-void main(){
-#if 0
-    float maxv = pow(.2, 4.0);
-    vec2 pos = coords / buttonResolution;
-    float vig = pos.x * pos.y * (1.0 - pos.x) * (1.0 - pos.y);
-    float fv = smoothstep(0.0, maxv, vig);
-    vec3 color = mix(interpolatedColor.rgb, backgroundColor.rgb, 1.0 - fv);
-    gl_FragColor = vec4(color, 0.4 - fv);
-#else
-    vec3 color = interpolatedColor.rgb;
-    gl_FragColor = vec4(color, interpolatedColor.a);
-#endif
-}
-);
-
-/***************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/icon.v.glsl
-/***************************************************************/
+/******************/
+// Instanced from C
+/******************/
 const char *shader_icon_v = MULTILINE_STRING_V(version 450,
 layout(location=0) in vec3 position;
 layout(location=1) in vec2 tex;
@@ -140,9 +108,9 @@ void main(){
 }
 );
 
-/***************************************************************/
-// Instanced from /home/felpz/Documents/Cody/shaders/text.f.glsl
-/***************************************************************/
+/******************/
+// Instanced from C
+/******************/
 const char *shader_text_f = MULTILINE_STRING_V(version 120,
 uniform sampler2D diffuse;
 varying vec2 interpolatedTexCoord;
@@ -185,6 +153,24 @@ void main() {
     gl_FragColor = brightnessMatrix( brightness ) *
                    contrastMatrix( contrast ) *
                    saturationMatrix( saturation ) * col;
+}
+);
+
+/******************/
+// Instanced from C
+/******************/
+const char *shader_text_v = MULTILINE_STRING(
+uniform mat4 modelView;
+uniform mat4 projection;
+attribute vec4 vertexPosition;
+attribute vec2 vertexTexCoord;
+attribute vec4 vertexColor;
+varying vec2 interpolatedTexCoord;
+varying vec4 interpolatedColor;
+void main() {
+    interpolatedColor = vertexColor;
+    interpolatedTexCoord = vertexTexCoord;
+    gl_Position = projection * modelView * vertexPosition;
 }
 );
 

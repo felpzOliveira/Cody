@@ -3,9 +3,20 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <sstream>
 #include <algorithm>
 #include <vector>
 #include <map>
+
+typedef unsigned int uint;
+
+#define LOG_MSG(...)do{\
+    FILE *__fp = fopen("pack.log", "a+");\
+    if(__fp){\
+        fprintf(__fp, __VA_ARGS__);\
+        fclose(__fp);\
+    }\
+}while(0)
 
 namespace fs = std::filesystem;
 
@@ -97,7 +108,8 @@ int ForAllFiles(const char *dir, const Fn &fn, int debug=0){
 
         }else if(entry.is_regular_file()){
             if(debug){
-                std::string value = read_file(entry.path());
+                std::string value =
+                        read_file(reinterpret_cast<const char*>(entry.path().c_str()));
                 std::cout << "******************** READ:" << std::endl;
                 std::cout << value << std::endl;
             }
@@ -106,7 +118,7 @@ int ForAllFiles(const char *dir, const Fn &fn, int debug=0){
                 r = fn(entry, filename, &ifs);
                 ifs.close();
             }else{
-                std::cout << "Failed to open " << filename << std::endl;
+                LOG_MSG("Failed to open %s\n", filename.c_str());
                 r = -1;
             }
 
@@ -132,38 +144,42 @@ int PackIcons(std::vector<std::string> *vars, std::string baseDir, std::string b
         std::string filekey = filenameStr;
         std::replace(filekey.begin(), filekey.end(), '.', '_');
         // re-open file for byte handling
-        FILE *fp = fopen(entry.path().c_str(), "r");
-        if(!fp){
+        std::string value = dir + "/" + filenameStr;
+        std::ifstream inputFile(value, std::ios::binary);
+        if(!inputFile.is_open()){
             return -1;
         }
 
-        fseek(fp, 0, SEEK_END);
-        long size = ftell(fp);
-        rewind(fp);
-        unsigned char *buffer = new unsigned char[size];
+        inputFile.seekg(0, std::ios::end);
+        std::streampos fileSize = inputFile.tellg();
+        inputFile.seekg(0, std::ios::beg);
 
-        long n = fread(buffer, 1, size, fp);
-        int rv = -1;
-        if(n == size){
-            rv = 0;
+        std::vector<unsigned char> bufferVec(fileSize);
+        if(!inputFile.read(reinterpret_cast<char*>(bufferVec.data()), fileSize)){
+            return -1;
+        }
+
+        unsigned char *buffer = bufferVec.data();
+
+        if(1){
             std::string ptmp("// Instanced from ");
-            ptmp += entry.path();
+            ptmp += value;
             int len = ptmp.size() - 1;
             ss << "/"; for(int k = 0; k < len; k++) ss << "*"; ss << "/\n";
             ss << ptmp << std::endl;
             ss << "/"; for(int k = 0; k < len; k++) ss << "*"; ss << "/\n";
 
-            ss << "unsigned int " << filekey << "_len = " << size << ";\n";
+            ss << "unsigned int " << filekey << "_len = " << fileSize << ";\n";
             ss << "unsigned char "<< filekey << "[] = {\n";
             //printf("================== %s => %ld\n", entry.path().c_str(), size);
             char mem[16];
-            for(int i = 0; i < size; i++){
+            for(int i = 0; i < fileSize; i++){
                 snprintf(mem, sizeof(mem), "%s%x%s",
                          (int)buffer[i] <= 0xF ? "0x0" : "0x",
                          (int)buffer[i], (i+1) % 12 == 0 ? ",\n" : ", ");
                 ss << std::string(mem);
             }
-            ss << " };" << std::endl;
+            ss << " };\n" << std::endl;
             std::string v("extern unsigned char "); v += filekey;
             v += "[];";
             vars->push_back(v);
@@ -173,16 +189,14 @@ int PackIcons(std::vector<std::string> *vars, std::string baseDir, std::string b
             vars->push_back(v);
         }
 
-        delete[] buffer;
-        fclose(fp);
-        return rv;
+        return 0;
     });
 
     if(r != 0) return r;
     std::string f = ss.str();
 
     if(f.size() == 0){
-        std::cout << "No icons found\n" << std::endl;
+        LOG_MSG("No icons found\n");
         return -1;
     }
 
@@ -192,7 +206,7 @@ int PackIcons(std::vector<std::string> *vars, std::string baseDir, std::string b
         ofsc_file << f;
         ofsc_file.close();
     }else{
-        std::cout << "Failed to open output file" << std::endl;
+        LOG_MSG("Failed to open output file");
         return -1;
     }
 
@@ -233,7 +247,7 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
         }
 
         std::string ptmp("// Instanced from ");
-        ptmp += entry.path();
+        ptmp += reinterpret_cast<const char*>(entry.path().c_str());
         int len = ptmp.size() - 1;
         ss << "/"; for(int k = 0; k < len; k++) ss << "*"; ss << "/\n";
         ss << ptmp << std::endl;
@@ -253,14 +267,14 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
     }, 0);
 
     if(r != 0){
-        std::cout << "Error reading directory" << std::endl;
+        LOG_MSG("Error reading directory\n");
         return -1;
     }
 
     std::string f = ss.str();
 
     if(f.size() == 0){
-        std::cout << "No shader code found\n" << std::endl;
+        LOG_MSG("No shader code found\n");
         return -1;
     }
 
@@ -270,7 +284,7 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
         ofsc_file << f;
         ofsc_file.close();
     }else{
-        std::cout << "Failed to open output file" << std::endl;
+        LOG_MSG("Failed to open output file\n");
         return -1;
     }
 
@@ -295,7 +309,7 @@ int language_table_gen(std::string path){
 
     std::ifstream ifs(path);
     if(!ifs.is_open()){
-        printf(" ** Could not open %s\n", path.c_str());
+        LOG_MSG(" ** Could not open %s\n", path.c_str());
         return -1;
     }
 
@@ -324,7 +338,7 @@ int language_table_gen(std::string path){
                 std::vector<std::string> splitted;
                 split(line, splitted, ' ');
                 if(splitted.size() != split_count){
-                    printf(" ** Invalid line %s\n", line.c_str());
+                    LOG_MSG(" ** Invalid line %s\n", line.c_str());
                     ifs.close();
                     return -1;
                 }
@@ -394,10 +408,9 @@ int PackLanguages(std::string baseDir){
 }
 
 int main(int argc, char **argv){
-
     std::string c_file("../src/resources");
     if(argc != 3 && argc != 4){
-        std::cout << "No paths specified" << std::endl;
+        LOG_MSG("No paths specified\n");
         return -1;
     }else if(argc == 4){
         //c_file = std::string(argv[3]);
@@ -443,7 +456,7 @@ int main(int argc, char **argv){
         if(res_ofs.is_open()){
             res_ofs << res_str;
         }else{
-            std::cout << "Failed to open resource files" << std::endl;
+            LOG_MSG("Failed to open resource files\n");
             return -1;
         }
     }

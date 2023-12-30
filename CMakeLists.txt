@@ -19,8 +19,17 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 if(CODY_BUILD)
-    set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
-    execute_process(COMMAND ${CMAKE_CXX_COMPILER} -std=c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources)
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources.exe)
+        # TODO: This is working, however it would be best if we could specify ${CMAKE_CXX_COMPILER}
+        # also these flags are only ok for cl. It seems that using ${CMAKE_CXX_COMPILER} instead of cl
+        # when compiling with visual studio generates an error. I have no idea why, but it does...
+        execute_process(COMMAND cl /EHsc /std:c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
+    else()
+        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
+        execute_process(COMMAND ${CMAKE_CXX_COMPILER} -std=c++17
+                        ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources)
+    endif()
     execute_process(COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR}
                         ${CMAKE_SOURCE_DIR}/src/resources
                         ${CMAKE_BINARY_DIR}
@@ -140,6 +149,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows
                         ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows)
     list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows/win_keyboard.cpp
+                           ${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows/timer.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows/win_display.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows/wgl_helper.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/debugger/dbg_windows.cpp)
@@ -147,6 +157,8 @@ if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set (LINK_OPTS "/DEBUG:FULL")
     endif()
+    # prevent subsystem to be console
+    set(SUBSYSTEM WIN32)
 else()
     find_library(PTHREAD_LIB NAMES pthread)
     if(CODY_BUILD)
@@ -191,7 +203,7 @@ if(CODY_BUILD)
     set(EDITOR_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/cody.cpp)
 
     add_library(corelib OBJECT ${CORE_FILES})
-    add_executable(${CODY} ${EDITOR_FILES} $<TARGET_OBJECTS:corelib>)
+    add_executable(${CODY} ${SUBSYSTEM} ${EDITOR_FILES} $<TARGET_OBJECTS:corelib>)
 
     add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
                             ${CMAKE_SOURCE_DIR}

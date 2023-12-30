@@ -93,7 +93,21 @@ void KeyboardSetReferenceWindow(BindingMap *mapping, void *window){
     }
 }
 
-int KeyboardProcessBindingEventsExactly(int keyHintId, BindingMap *mapping){
+int KeyboardIsKeyInBinding(Key eventKey, Binding *binding){
+    if(!binding)
+        return 0;
+
+    for(int k = 0; k < binding->keySetSize; k++){
+        if(binding->keySet[k] == eventKey)
+            return 1;
+    }
+
+    return 0;
+}
+
+int KeyboardProcessBindingEventsExactly(int keyHintId, BindingMap *mapping,
+                                        Binding **target)
+{
     int runned = 0;
     Binding *bestBinding = nullptr;
     int bestScore = -1;
@@ -127,6 +141,7 @@ int KeyboardProcessBindingEventsExactly(int keyHintId, BindingMap *mapping){
 
     if(bestBinding){
         bestBinding->callback();
+        *target = bestBinding;
         runned = 1;
     }
 
@@ -227,14 +242,14 @@ void KeyboardRegisterKeyState(Key eventKey, int eventType){
     }
 }
 
-int KeyboardAttemptToConsumeKey(Key eventKey, void *window){
+int KeyboardAttemptToConsumeKey(Key eventKey, void *window, Binding **target){
     int kid = GetKeyID(eventKey);
     BindingMap *mapping = KeyboardMappingForWindow(window);
     if(!mapping)
         return 0;
 
     if(eventKey != Key_Unmapped){
-        return KeyboardProcessBindingEventsExactly(kid, mapping);
+        return KeyboardProcessBindingEventsExactly(kid, mapping, target);
     }else
         return 0;
 }

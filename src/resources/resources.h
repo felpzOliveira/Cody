@@ -38,3 +38,7 @@ extern const char *shader_button_f;
 extern unsigned char py_png[];
 extern unsigned int py_png_len;
 extern const char *shader__text_f_glsl;
+extern unsigned char logo_ico[];
+extern unsigned int logo_ico_len;
+extern unsigned char logo_png[];
+extern unsigned int logo_png_len;
