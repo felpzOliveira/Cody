@@ -40,8 +40,8 @@ inline Float Max(Float a, Float b){ return a < b ? b : a; }
 inline Float Min(Float a, Float b){ return a < b ? a : b; }
 inline Float Absf(Float v){ return v > 0 ? v : -v; }
 inline bool IsNaN(Float v){ return v != v; }
-inline Float Radians(Float deg) { return (Pi / 180) * deg; }
-inline Float Degrees(Float rad) { return (rad * 180 / Pi); }
+inline Float Radians(Float deg) { return (Float)(Pi / 180.0f) * deg; }
+inline Float Degrees(Float rad) { return (rad * 180.0f / (Float)Pi); }
 inline bool IsZero(Float a){ return Absf(a) < 1e-8; }
 inline bool IsHighpZero(Float a) { return Absf(a) < 1e-22; }
 inline bool IsUnsafeHit(Float a){ return Absf(a) < 1e-6; }
@@ -57,7 +57,7 @@ inline Float LinearRemap(Float x, Float a, Float b, Float A, Float B){
 }
 
 inline Float Log2(Float x){
-    const Float invLog2 = 1.442695040888963387004650940071;
+    const Float invLog2 = 1.442695040888f;
     return std::log(x) * invLog2;
 }
 
@@ -78,8 +78,8 @@ inline bool Quadratic(Float a, Float b, Float c, Float *t0, Float *t1){
         q = -0.5 * (b - root);
     else
         q = -0.5 * (b + root);
-    *t0 = q / a;
-    *t1 = c / q;
+    *t0 = (Float)(q / a);
+    *t1 = (Float)(c / q);
     if(*t0 > *t1) Swap(t0, t1);
     return true;
 }
@@ -116,7 +116,7 @@ template<typename T> class vec2{
     }
 
     bool HasNaN() const{
-        return IsNaN(x) || IsNaN(y);
+        return IsNaN((Float)x) || IsNaN((Float)y);
     }
 
     int Dimensions() const{ return 2; }
@@ -225,7 +225,7 @@ template<typename T> class vec3{
     }
 
     bool HasNaN(){
-        return IsNaN(x) || IsNaN(y) || IsNaN(z);
+        return IsNaN((Float)x) || IsNaN((Float)y) || IsNaN((Float)z);
     }
 
     bool HasNaN() const{
@@ -983,11 +983,11 @@ class Geometry{
     }
 
     Float Width(){
-        return upper.x - lower.x;
+        return (Float)(upper.x - lower.x);
     }
 
     Float Height(){
-        return upper.y - lower.y;
+        return (Float)(upper.y - lower.y);
     }
 
     bool Overlaps(const Geometry &g2){
@@ -997,15 +997,15 @@ class Geometry{
     }
 
     void PrintSelf(){
-        Float w = upper.x - lower.x;
-        Float h = upper.y - lower.y;
+        Float w = (Float)(upper.x - lower.x);
+        Float h = (Float)(upper.y - lower.y);
         printf("Lower %u %u, Upper: %u %u, Width = %g, Height = %g\n",
                 lower.x, lower.y, upper.x, upper.y, w, h);
     }
 
     void PrintSelf() const{
-        Float w = upper.x - lower.x;
-        Float h = upper.y - lower.y;
+        Float w = (Float)upper.x - (Float)lower.x;
+        Float h = (Float)upper.y - (Float)lower.y;
         printf("Lower %u %u, Upper: %u %u, Width = %g, Height = %g\n",
                 lower.x, lower.y, upper.x, upper.y, w, h);
     }

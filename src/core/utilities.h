@@ -62,19 +62,19 @@
 /*
 * Some constants that are used through the code.
 */
-const Float kInv255 = 0.003921569;
-const Float kAlphaReduceDefault = 1.0;
-const Float kAlphaReduceInactive = 0.6;
+const Float kInv255 = 0.003921569f;
+const Float kAlphaReduceDefault = 1.0f;
+const Float kAlphaReduceInactive = 0.6f;
 const int kMaximumIndentEmptySearch = 9;
-const Float kTransitionScrollInterval = 0.15;
-const Float kTransitionJumpInterval = 0.1;
-const Float kViewSelectableListScaling = 2.0;
-const Float kAutoCompleteListScaling = 1.2;
-const Float kAutoCompleteMaxHeightFraction = 0.35;
-const Float kViewSelectableListOffset = 0.05;
-const Float kTransitionControlIndices = 1.5;
-const Float kTransitionCopyFadeIn = 0.28;
-const Float kOnes[] = {1,1,1,1};
+const Float kTransitionScrollInterval = 0.15f;
+const Float kTransitionJumpInterval = 0.1f;
+const Float kViewSelectableListScaling = 2.0f;
+const Float kAutoCompleteListScaling = 1.2f;
+const Float kAutoCompleteMaxHeightFraction = 0.35f;
+const Float kViewSelectableListOffset = 0.05f;
+const Float kTransitionControlIndices = 1.5f;
+const Float kTransitionCopyFadeIn = 0.28f;
+const Float kOnes[] = {1.0f,1.0f,1.0f,1.0f};
 const double kMaximumDecodeRatio = 0.05;
 
 typedef enum{

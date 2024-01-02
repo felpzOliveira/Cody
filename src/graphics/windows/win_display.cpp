@@ -9,6 +9,7 @@
 #include <iostream>
 #include <wgl_helper.h>
 #include <timer.h>
+#include <shellapi.h>
 
 #define DISPLAY_CLASS_NAME L"SomeClassName"
 #define SkipEventNoWindow(window) do{ if(!window) return; }while(0)
@@ -573,6 +574,18 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
                     return 0;
                 }
 
+                if(window->binding &&
+                    KeyboardIsKeyInBinding((Key)mappedKey, (Binding *)window->binding))
+                {
+                    // NOTE: Observed in windows that sometimes we get a bad key insert, it seems
+                    //       it happens because some binding just run (Ctrl+s/ Ctrl+v/ ...) and
+                    //       if the user release the Ctrl before the other and the timing is just
+                    //       right the other key is captured as an insert. I'm gonna eat the input
+                    //       if it comes < 100 ms after a binding that contains this key was executed.
+                    if(dif < 100)
+                        return 0;
+                }
+
                 KeyboardEvent((Key)mappedKey, KEYBOARD_EVENT_PRESS, buf, count,
                              scancode, (void*)window, 1);
             }
@@ -727,7 +740,8 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
 
                 KeyboardRegisterKeyState((Key)key, KEYBOARD_EVENT_PRESS);
                 window->lastKeyScancode = 0;
-                if(KeyboardAttemptToConsumeKey((Key)key, window)){
+                window->binding = nullptr;
+                if(KeyboardAttemptToConsumeKey((Key)key, window, (Binding **)&window->binding)){
                     window->lastKeyTime = GetMessageTime();
                     window->lastKeyScancode = scancode;
                 }
@@ -845,6 +859,34 @@ static LRESULT CALLBACK windowProc(HWND hWnd, UINT uMsg,
         }
 
         case WM_DROPFILES:{
+            HDROP drop = (HDROP) wParam;
+            POINT pt;
+            int i;
+
+            const int count = DragQueryFileW(drop, 0xffffffff, NULL, 0);
+            char **paths = (char **)calloc(count, sizeof(char*));
+
+            // Move the mouse to the position of the drop
+            DragQueryPoint(drop, &pt);
+            ProcessEventMotionWin32(window, &win32Helper, pt.x, pt.y);
+
+            for(int i = 0; i < count; i++){
+                const UINT length = DragQueryFileW(drop, i, NULL, 0);
+                WCHAR *buffer = (WCHAR*)calloc((size_t) length + 1, sizeof(WCHAR));
+                DragQueryFileW(drop, i, buffer, length + 1);
+                paths[i] = CreateUTF8FromWideStringWin32(buffer);
+                free(buffer);
+            }
+
+            List_ForAllItems(&window->onDragAndDropCall, [=](OnDragAndDropCallback* sc){
+                sc->fn(paths, count, pt.x, pt.y, sc->priv);
+            });
+
+            for(int i = 0; i < count; i++)
+                free(paths[i]);
+            free(paths);
+
+            DragFinish(drop);
             return 0;
         }
     }
@@ -1032,6 +1074,8 @@ static int createNativeWindow(int width, int height, const char* title,
         ChangeWindowMessageFilterEx(window->handle, WM_COPYGLOBALDATA, MSGFLT_ALLOW, NULL);
     }
 
+    DragAcceptFiles(window->handle, TRUE);
+
     return true;
 }
 
@@ -1191,6 +1235,7 @@ void TerminateWin32(){
 void DestroyWindowWin32(WindowWin32* window){
     RemovePropW(window->handle, DISPLAY_CLASS_NAME);
     DestroyWindow(window->handle);
+    AllocatorFree(window);
 }
 
 void SetWindowTitleWin32(WindowWin32* window, const char* title){
@@ -1245,6 +1290,10 @@ uint RegisterOnMouseDoubleClickCallback(WindowWin32* window, onMouseDClickCallba
     RegisterCallback(window, callback, priv, onMouseDClickCall, OnMouseDClickCallback, EventMaskDoubleClick);
 }
 
+uint RegisterOnDragAndDropCallback(WindowWin32* window, onDragAndDropCallback* callback, void* priv){
+    RegisterCallback(window, callback, priv, onDragAndDropCall, OnDragAndDropCallback, EventMaskDragAndDrop);
+}
+
 void UnregisterCallbackByHandle(WindowWin32* wnd, uint hnd) {
     uint bits = hnd >> 8;
     switch (bits) {
@@ -1275,6 +1324,9 @@ void UnregisterCallbackByHandle(WindowWin32* wnd, uint hnd) {
         case EventMaskDoubleClick: {
             UnregisterCallback(wnd, hnd, onMouseDClickCall, OnMouseDClickCallback);
         } break;
+        case EventMaskDragAndDrop: {
+            UnregisterCallback(wnd, hnd, onDragAndDropCall, OnDragAndDropCallback);
+        } break;
         default: {
             printf("Unkown mask value %u\n", bits);
         }
@@ -1290,6 +1342,7 @@ static void InitWindowCallbackListX11(WindowWin32* window) {
     List_Init(&window->onMouseMotionCall);
     List_Init(&window->onSizeChangeCall);
     List_Init(&window->onFocusChangeCall);
+    List_Init(&window->onDragAndDropCall);
 }
 
 static void ClearWindowCallbackListX11(WindowWin32* window) {
@@ -1301,4 +1354,5 @@ static void ClearWindowCallbackListX11(WindowWin32* window) {
     List_Clear(&window->onMouseMotionCall);
     List_Clear(&window->onSizeChangeCall);
     List_Clear(&window->onFocusChangeCall);
+    List_Clear(&window->onDragAndDropCall);
 }

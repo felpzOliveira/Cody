@@ -38,6 +38,7 @@
 #define EventMaskFocusChange (1 << 6)
 #define EventMaskMotion      (1 << 7)
 #define EventMaskDoubleClick (1 << 8)
+#define EventMaskDragAndDrop (1 << 9)
 
 typedef XID GLXWindow;
 typedef XID GLXDrawable;
@@ -100,6 +101,7 @@ typedef struct{
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
 #define ON_FOCUS_CHANGE_CALLBACK(name) void name(bool in, long unsigned int id, void *priv)
 #define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_DRAG_AND_DROP_CALLBACK(name) void name(char **paths, int count, int x, int y, void *priv)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
 typedef ON_MOUSE_LCLICK_CALLBACK(onMouseLClickCallback);
@@ -110,6 +112,7 @@ typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
 typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDClickCallback);
 typedef ON_MOUSE_PRESS_CALLBACK(onMousePressedCallback);
 typedef ON_MOUSE_RELEASE_CALLBACK(onMouseReleasedCallback);
+typedef ON_DRAG_AND_DROP_CALLBACK(onDragAndDropCallback);
 
 template<typename Fn>
 struct CallbackX11{
@@ -127,6 +130,7 @@ typedef CallbackX11<onMouseDClickCallback> OnMouseDClickCallback;
 typedef CallbackX11<onMouseMotionCallback> OnMouseMotionCallback;
 typedef CallbackX11<onSizeChangeCallback> OnSizeChangeCallback;
 typedef CallbackX11<onFocusChangeCallback> OnFocusChangeCallback;
+typedef CallbackX11<onDragAndDropCallback> OnDragAndDropCallback;
 
 typedef struct WindowX11{
     Colormap colormap;
@@ -155,6 +159,7 @@ typedef struct WindowX11{
     List<OnMouseMotionCallback> onMouseMotionCall;
     List<OnSizeChangeCallback> onSizeChangeCall;
     List<OnFocusChangeCallback> onFocusChangeCall;
+    List<OnDragAndDropCallback> onDragAndDropCall;
 }WindowX11;
 
 typedef struct{
@@ -239,6 +244,7 @@ uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDClickCallback
 uint RegisterOnSizeChangeCallback(WindowX11 *window, onSizeChangeCallback *callback, void *priv);
 uint RegisterOnFocusChangeCallback(WindowX11 *window, onFocusChangeCallback *callback, void *priv);
 uint RegisterOnMouseMotionCallback(WindowX11 *window, onMouseMotionCallback *callback, void *priv);
+uint RegisterOnDragAndDropCallback(WindowX11* window, onDragAndDropCallback* callback, void* priv);
 
 void UnregisterCallbackByHandle(WindowX11 *window, uint handle);
 

@@ -1,4 +1,4 @@
-/* Auto generated file ( Dec 28 2023 18:15:49 ) */
+/* Auto generated file ( Jan  2 2024 09:38:59 ) */
 #define MULTILINE_STRING(a) #a
 #define MULTILINE_STRING_V(v, a) "#" #v "\n" #a
 
@@ -150,24 +150,10 @@ void main() {
 // Instanced from /home/felipe/Documents/Cody/shaders/button.f.glsl
 /******************************************************************/
 const char *shader_button_f = MULTILINE_STRING_V(version 120,
-#if 0
-    uniform vec2 buttonResolution = vec2(600, 400);
-    uniform vec4 backgroundColor = vec4(0);
-    varying vec2 coords;
-#endif
 varying vec4 interpolatedColor;
 void main(){
-#if 0
-    float maxv = pow(.2, 4.0);
-    vec2 pos = coords / buttonResolution;
-    float vig = pos.x * pos.y * (1.0 - pos.x) * (1.0 - pos.y);
-    float fv = smoothstep(0.0, maxv, vig);
-    vec3 color = mix(interpolatedColor.rgb, backgroundColor.rgb, 1.0 - fv);
-    gl_FragColor = vec4(color, 0.4 - fv);
-#else
     vec3 color = interpolatedColor.rgb;
     gl_FragColor = vec4(color, interpolatedColor.a);
-#endif
 }
 );
 

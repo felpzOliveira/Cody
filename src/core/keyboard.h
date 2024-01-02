@@ -231,7 +231,9 @@ int IsKeySpecialBinding(Key key);
 
 void KeyboardRegisterKeyState(Key eventKey, int eventType);
 
-int KeyboardAttemptToConsumeKey(Key eventKey, void *window);
+int KeyboardAttemptToConsumeKey(Key eventKey, void *window, Binding **target);
+
+int KeyboardIsKeyInBinding(Key eventKey, Binding *target);
 
 // NOTE: These should be defined somewhere else
 int CreateKeyTable();

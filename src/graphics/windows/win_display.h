@@ -41,6 +41,7 @@
 #define EventMaskFocusChange (1 << 6)
 #define EventMaskMotion      (1 << 7)
 #define EventMaskDoubleClick (1 << 8)
+#define EventMaskDragAndDrop (1 << 9)
 
 #ifndef WM_COPYGLOBALDATA
     #define WM_COPYGLOBALDATA 0x0049
@@ -166,6 +167,7 @@ typedef LONG(WINAPI* PFN_RtlVerifyVersionInfo)(OSVERSIONINFOEXW*, ULONG, ULONGLO
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
 #define ON_FOCUS_CHANGE_CALLBACK(name) void name(bool in, long unsigned int id, void *priv)
 #define ON_MOUSE_MOTION_CALLBACK(name) void name(int x, int y, void *priv)
+#define ON_DRAG_AND_DROP_CALLBACK(name) void name(char **paths, int count, int x, int y, void *priv)
 
 typedef ON_SCROLL_CALLBACK(onScrollCallback);
 typedef ON_MOUSE_LCLICK_CALLBACK(onMouseLClickCallback);
@@ -176,6 +178,7 @@ typedef ON_MOUSE_MOTION_CALLBACK(onMouseMotionCallback);
 typedef ON_MOUSE_DCLICK_CALLBACK(onMouseDClickCallback);
 typedef ON_MOUSE_PRESS_CALLBACK(onMousePressedCallback);
 typedef ON_MOUSE_RELEASE_CALLBACK(onMouseReleasedCallback);
+typedef ON_DRAG_AND_DROP_CALLBACK(onDragAndDropCallback);
 
 template<typename Fn>
 struct CallbackWin32 {
@@ -193,6 +196,7 @@ typedef CallbackWin32<onMouseDClickCallback> OnMouseDClickCallback;
 typedef CallbackWin32<onMouseMotionCallback> OnMouseMotionCallback;
 typedef CallbackWin32<onSizeChangeCallback> OnSizeChangeCallback;
 typedef CallbackWin32<onFocusChangeCallback> OnFocusChangeCallback;
+typedef CallbackWin32<onDragAndDropCallback> OnDragAndDropCallback;
 
 typedef struct {
     int redBits;
@@ -235,6 +239,7 @@ typedef struct WindowWin32{
     int lastKeyScancode;
     DWORD lastClickTime;
     contextWGL wgl;
+    void *binding;
     List<OnScrollCallback> onScrollCall;
     List<OnMouseLClickCallback> onMouseLClickCall;
     List<OnMouseRClickCallback> onMouseRClickCall;
@@ -244,6 +249,7 @@ typedef struct WindowWin32{
     List<OnMouseMotionCallback> onMouseMotionCall;
     List<OnSizeChangeCallback> onSizeChangeCall;
     List<OnFocusChangeCallback> onFocusChangeCall;
+    List<OnDragAndDropCallback> onDragAndDropCall;
 }WindowWin32;
 
 typedef struct {
@@ -331,5 +337,6 @@ uint RegisterOnMouseDoubleClickCallback(WindowWin32* window, onMouseDClickCallba
 uint RegisterOnSizeChangeCallback(WindowWin32* window, onSizeChangeCallback* callback, void* priv);
 uint RegisterOnFocusChangeCallback(WindowWin32* window, onFocusChangeCallback* callback, void* priv);
 uint RegisterOnMouseMotionCallback(WindowWin32* window, onMouseMotionCallback* callback, void* priv);
+uint RegisterOnDragAndDropCallback(WindowWin32* window, onDragAndDropCallback* callback, void* priv);
 
 void UnregisterCallbackByHandle(WindowWin32* window, uint handle);

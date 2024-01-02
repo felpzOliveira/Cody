@@ -91,7 +91,12 @@ void OpenGLComputeCursor(OpenGLFont *font, OpenGLCursor *glCursor, const char *b
     glCursor->pMax = vec2f(x1, y1);
 }
 
-#define CursorDefaultPadding 2
+#if defined(_WIN32)
+    #define CursorDefaultPadding 0
+#else
+    #define CursorDefaultPadding 2
+#endif
+
 void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
                          Buffer *buffer, vec2ui cursor, Float cursorOffset,
                          Float baseHeight, vec2ui visibleLines, EncoderDecoder *encoder)

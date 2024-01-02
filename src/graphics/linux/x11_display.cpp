@@ -451,6 +451,10 @@ uint RegisterOnMouseDoubleClickCallback(WindowX11 *window, onMouseDClickCallback
                      OnMouseDClickCallback, EventMaskDoubleClick);
 }
 
+uint RegisterOnDragAndDropCallback(WindowX11* window, onDragAndDropCallback* callback, void* priv){
+    RegisterCallback(window, callback, priv, onDragAndDropCall, OnDragAndDropCallback, EventMaskDragAndDrop);
+}
+
 void UnregisterCallbackByHandle(WindowX11 *wnd, uint hnd){
     uint bits = hnd >> 8;
     switch(bits){
@@ -481,6 +485,9 @@ void UnregisterCallbackByHandle(WindowX11 *wnd, uint hnd){
         case EventMaskDoubleClick:{
             UnregisterCallback(wnd, hnd, onMouseDClickCall, OnMouseDClickCallback);
         } break;
+        case EventMaskDragAndDrop: {
+            UnregisterCallback(wnd, hnd, onDragAndDropCall, OnDragAndDropCallback);
+        } break;
         default:{
             printf("Unkown mask value %u\n", bits);
         }
@@ -496,6 +503,7 @@ static void InitWindowCallbackListX11(WindowX11 *window){
     List_Init(&window->onMouseMotionCall);
     List_Init(&window->onSizeChangeCall);
     List_Init(&window->onFocusChangeCall);
+    List_Init(&window->onDragAndDropCall);
 }
 
 static void ClearWindowCallbackListX11(WindowX11 *window){
@@ -507,6 +515,7 @@ static void ClearWindowCallbackListX11(WindowX11 *window){
     List_Clear(&window->onMouseMotionCall);
     List_Clear(&window->onSizeChangeCall);
     List_Clear(&window->onFocusChangeCall);
+    List_Clear(&window->onDragAndDropCall);
 }
 
 WindowX11 *CreateWindowX11Shared(int width, int height,
@@ -1106,6 +1115,7 @@ void ProcessEventDestroyX11(XEvent *event, WindowX11 *window, LibHelperX11 *x11)
     //printf("Destroy Notify\n");
 }
 
+// TODO: We need to add support for Xdnd so we can get drag and drop working for linux
 void ProcessEventX11(XEvent *event){
     WindowX11 *window = NULL;
     int filtered = XFilterEvent(event, None);

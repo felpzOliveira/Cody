@@ -110,7 +110,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                 size -= off;
                 #if defined(_WIN32)
                     vec2ui p = vec2ui(20, (uint)ym-10);
-                    if (off < 0) size *= .75;
+                    if (off < 0) size *= .65;
                 #else
                     vec2ui p = vec2ui(50, (uint)ym-20);
                 #endif
