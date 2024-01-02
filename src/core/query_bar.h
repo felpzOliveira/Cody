@@ -8,6 +8,7 @@
 #include <keyboard.h>
 #include <functional>
 #include <vector>
+#include <encoding.h>
 
 #define OnQueryBarEntry  std::function<int(QueryBar *, View*)>
 #define OnQueryBarCancel std::function<int(QueryBar *, View*)>
@@ -42,6 +43,7 @@ struct QueryBarHistory{
 struct QueryBar{
     Geometry geometry;
     Buffer buffer;
+    EncoderDecoder encoder;
     DoubleCursor cursor;
     vec2ui cursorBackup;
     int isActive;

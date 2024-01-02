@@ -28,6 +28,7 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
     uint currFontSize = state->font.fontMath.fontSizeAtDisplay;
     uint fontSize = currFontSize + 16;
+    EncoderDecoder *encoder = UTF8Encoder();
 
     ActivateViewportAndProjection(state, view, ViewportAllView);
     glClearBufferfv(GL_COLOR, 0, fcol);
@@ -35,13 +36,14 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
     Graphics_SetFontSize(state, fontSize);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
-    vec2f p = Graphics_ComputeCenteringStart(font, line0, line0len, &geometry, true);
+    vec2f p = Graphics_ComputeCenteringStart(font, line0, line0len,
+                                             &geometry, true, encoder);
     pGlyph = -1;
 
     // move it a line up
     p.y -= font->fontMath.fontSizeAtRenderCall;
 
-    Graphics_PushText(state, p.x, p.y, (char *)line0, line0len, color, &pGlyph);
+    Graphics_PushText(state, p.x, p.y, (char *)line0, line0len, color, &pGlyph, encoder);
 
     Graphics_FlushText(state);
     Graphics_SetFontSize(state, currFontSize);

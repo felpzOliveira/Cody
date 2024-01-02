@@ -300,6 +300,7 @@ bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
 
     if(device){
         content = device->GetContentsOf(targetPath, &fileSize);
+    #if 0 // TODO: We need to do something about binary files
         double decode_ratio = ComputeDecodeRatio(content, fileSize);
         if(!(decode_ratio < kMaximumDecodeRatio)){
             if(REJECT_BINARY_FILES){
@@ -311,6 +312,7 @@ bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
                 return false;
             }
         }
+    #endif
     }
 
     lBuffer = AllocatorGetN(LineBuffer, 1);

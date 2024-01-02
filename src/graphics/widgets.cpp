@@ -225,7 +225,7 @@ WidgetWindow::WidgetWindow(int width, int height, const char *name){
     Open(width, height, name, nullptr);
 }
 
-WidgetWindow::WidgetWindow(WindowX11 *other, BindingMap *bmapping,
+WidgetWindow::WidgetWindow(DisplayWindow *other, BindingMap *bmapping,
                            vec2f lower, vec2f upper)
 {
     window = nullptr;
@@ -264,14 +264,14 @@ void WidgetWindow::Resize(int width, int height){
     }
 }
 
-void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *other){
+void WidgetWindow::Open(int width, int height, const char *name, DisplayWindow *other){
     if(window){
         OpenGLBufferContextDelete(&quadBuffer);
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
 
         if(detached){
-            DestroyWindowX11(window);
+            DestroyWindow(window);
         }else{
             for(uint handle : eventHandles){
                 UnregisterCallbackByHandle(window, handle);
@@ -282,16 +282,19 @@ void WidgetWindow::Open(int width, int height, const char *name, WindowX11 *othe
     window = other;
 
     if(detached && !window){
-        WindowX11 *shared = (WindowX11 *)Graphics_GetBaseWindow();
-        window = CreateWindowX11Shared(width, height, name, shared);
+        //DisplayWindow *shared = (DisplayWindow *)Graphics_GetBaseWindow();
+        // TODO: Add shared context for windows
+        window = nullptr;
+        //window = CreateWindowX11Shared(width, height, name, shared);
     }
 
     AssertA(window != nullptr, "Could not get window handle");
 
     MakeContext();
     if(detached){
-        SetNotResizable(window);
-        SwapIntervalX11(window, 0);
+        // TODO: Add resizable for windows
+        //SetNotResizable(window);
+        SwapInterval(window, 0);
         if(!mapping){
             mapping = KeyboardCreateMapping(window);
             RegisterKeyboardDefaultEntry(mapping, WidgetWindowDefaultEntry, this);
@@ -338,7 +341,7 @@ Geometry WidgetWindow::GetGeometry(){
 
 void WidgetWindow::MakeContext(){
     if(window){
-        MakeContextX11(window);
+        MakeContextCurrent(window);
     }
 }
 
@@ -370,13 +373,13 @@ int WidgetWindow::DispatchRender(WidgetRenderContext *wctx){
 
 void WidgetWindow::Update(){
     if(window){
-        if(!WindowShouldCloseX11(window)){
-            SwapBuffersX11(window);
+        if(!WindowShouldClose(window)){
+            SwapBuffers(window);
         }else{
             OpenGLBufferContextDelete(&quadBuffer);
             OpenGLBufferContextDelete(&quadImageBuffer);
             glfonsDeleteContext(font.fsContext);
-            DestroyWindowX11(window);
+            DestroyWindow(window);
             window = nullptr;
             Graphics_RequestClose(this);
         }
@@ -389,7 +392,7 @@ WidgetWindow::~WidgetWindow(){
         OpenGLBufferContextDelete(&quadImageBuffer);
         glfonsDeleteContext(font.fsContext);
         if(detached){
-            DestroyWindowX11(window);
+            DestroyWindow(window);
         }
     }
 }
@@ -597,15 +600,14 @@ void ButtonWidget::OnClick(){
 
 void ButtonWidget::OnEntered(){
     if(!IsEnabled()) return;
-    WidgetTransition transition = {
-        .type = transitionStyle.type,
-        .scale = transitionStyle.scaleUp,
-        .interval = ButtonWidget::kScaleDuration,
-        .dt = 0,
-        .running =  true,
-        .background = transitionStyle.background,
-        .is_out = false,
-    };
+    WidgetTransition transition;
+        transition.type = transitionStyle.type;
+        transition.scale = transitionStyle.scaleUp;
+        transition.interval = ButtonWidget::kScaleDuration;
+        transition.dt = 0;
+        transition.running =  true;
+        transition.background = transitionStyle.background;
+        transition.is_out = false;
 
     Widget::OnEntered();
     Widget::InterruptAnimation();
@@ -620,15 +622,14 @@ void ButtonWidget::OnEntered(){
 void ButtonWidget::OnExited(){
     if(!isScaledUp) return;
     Float invScale = 1.0 / transitionStyle.scaleUp;
-    WidgetTransition transition = {
-        .type = transitionStyle.type,
-        .scale = invScale,
-        .interval = ButtonWidget::kScaleDuration,
-        .dt = 0,
-        .running =  true,
-        .background = transitionStyle.obackground,
-        .is_out = true,
-    };
+    WidgetTransition transition;
+        transition.type = transitionStyle.type;
+        transition.scale = invScale;
+        transition.interval = ButtonWidget::kScaleDuration;
+        transition.dt = 0;
+        transition.running =  true;
+        transition.background = transitionStyle.obackground;
+        transition.is_out = true;
 
     Widget::OnExited();
     Widget::InterruptAnimation();
@@ -741,7 +742,8 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
         Graphics_ComputeTransformsForFontSize(font, fSize, &model);
         Graphics_PrepareTextRendering(font, &gl->projection, &model);
         vec2f p = Graphics_ComputeCenteringStart(font, text.c_str(),
-                                                text.size(), &geometry, true);
+                                                text.size(), &geometry, true,
+                                                UTF8Encoder());
 
         p = transform.Point(p + vec2f(xoff, 0));
         vec4i color(255);
@@ -754,7 +756,7 @@ int ButtonWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform
         }
         int pGlyph = -1;
         Graphics_PushText(font, p.x, p.y, (char *)text.c_str(),
-                          text.size(), color, &pGlyph);
+                          text.size(), color, &pGlyph, UTF8Encoder());
         Graphics_FlushText(font);
     }
 
@@ -845,11 +847,11 @@ int TextWidget::OnRender(WidgetRenderContext *wctx, const Transform &transform){
         if(str.size() > 0){
             uint size = str.size();
             char *text = (char *)str.c_str();
-            vec2f p = Graphics_ComputeCenteringStart(font, text, size, &geo);
+            vec2f p = Graphics_ComputeCenteringStart(font, text, size, &geo, false, UTF8Encoder());
             if(alignment & TextWidget::kAlignLeft){
                 p.x = 0;
             }
-            Graphics_PushText(font, p.x, p.y, text, size, color, &pGlyph);
+            Graphics_PushText(font, p.x, p.y, text, size, color, &pGlyph, UTF8Encoder());
         }
         ypos += py;
     }
@@ -904,9 +906,9 @@ int TextTableWidget::OnRender(WidgetRenderContext *wctx, const Transform &transf
             if(data.size() > 0){
                 uint size = data.size();
                 char *text = (char *)data.c_str();
-                vec2f p = Graphics_ComputeCenteringStart(font, text, size, &geo);
+                vec2f p = Graphics_ComputeCenteringStart(font, text, size, &geo, false, UTF8Encoder());
                 if(in_focus) pLoc = p;
-                Graphics_PushText(font, p.x, p.y, text, size, color, &pGlyph);
+                Graphics_PushText(font, p.x, p.y, text, size, color, &pGlyph, UTF8Encoder());
             }
 
             xpos += px;
@@ -965,8 +967,9 @@ int TextTableWidget::OnRender(WidgetRenderContext *wctx, const Transform &transf
         OpenGLCursor cursor;
         std::string val = focusedRow->At(focus.y);
 
+        // TODO: NEEDS ENCODER_DECODER!!
         OpenGLComputeCursor(font, &cursor, (char *)val.c_str(),
-                            val.size(), cpos, pLoc.x, pLoc.y);
+                            val.size(), cpos, pLoc.x, pLoc.y, nullptr);
 
         Float x0 = cursor.pMin.x, x1 = cursor.pMax.x;
         Float y0 = cursor.pMin.y, y1 = cursor.pMax.y;

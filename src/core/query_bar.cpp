@@ -21,8 +21,8 @@ static int QueryBar_EmptySearchReplaceCallback(QueryBar *bar, View *view, int ac
 
 std::string QueryBarHistory_GetPath(){
     std::string path(AppGetConfigDirectory());
-    if(path[path.size()-1] != '/'){
-        path += "/";
+    if(path[path.size()-1] != '/' && path[path.size()-1] != '\\'){
+        path += SEPARATOR_STRING;
     }
     path += QUERY_BAR_HISTORY_PATH;
     return path;
@@ -37,6 +37,7 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
     QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
 
     QueryBar_GetWrittenContent(queryBar, &search, &searchLen);
+
     if(searchLen > 0 || fromEnter){
         if(replace->state == QUERY_BAR_SEARCH_AND_REPLACE_SEARCH && searchLen > 0){
             AssertA(searchLen < sizeof(replace->toLocate), "Query is too big");
@@ -71,6 +72,7 @@ static int QueryBar_SearchAndReplaceProcess(QueryBar *queryBar, View *view, int 
                     replace->searchCallback(queryBar, view, 1);
                 }else if(search[0] == 'n' || search[0] == 'N'){
                     replace->searchCallback(queryBar, view, 0);
+                    queryBar->searchCmd.position += Max(1, replace->toLocateLen);
                 }else{
                     toNext = 0;
                     r = 0;
@@ -187,15 +189,16 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
     }
 
     if(!QueryBar_AreCommandsContinuous(queryBar, cmd)){
-        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count);
+        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count, &queryBar->encoder);
         lastp = 0;
     }else{
-        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->writePosU8);
+        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->writePosU8, &queryBar->encoder);
     }
 
-    queryBar->writePos = Buffer_InsertStringAt(&queryBar->buffer, 0, title, len);
-    queryBar->writePosU8 = Buffer_Utf8RawPositionToPosition(&queryBar->buffer,
-                                                            queryBar->writePos);
+    queryBar->writePos = Buffer_InsertStringAt(&queryBar->buffer, 0, title, len, &queryBar->encoder);
+    queryBar->writePosU8 =
+            Buffer_Utf8RawPositionToPosition(&queryBar->buffer, queryBar->writePos,
+                                             &queryBar->encoder);
     queryBar->cursor.textPosition.y = queryBar->writePosU8 + lastp;
     queryBar->cursor.textPosition.x = 0;
     queryBar->cmd = cmd;
@@ -269,6 +272,7 @@ void QueryBar_Initialize(QueryBar *queryBar){
     queryBar->filter.toHistory = false;
     queryBar->filter.allowCursorJump = false;
     Buffer_Init(&queryBar->buffer, DefaultAllocatorSize);
+    EncoderDecoder_InitFor(&queryBar->encoder, ENCODER_DECODER_UTF8);
 }
 
 /* Moves cursor left */
@@ -294,7 +298,7 @@ void QueryBar_JumpToPrevious(QueryBar *queryBar){
     if(queryBar->filter.allowCursorJump){
         uint u8 = queryBar->cursor.textPosition.y;
         u8 = Buffer_FindPreviousWordU8(&queryBar->buffer, u8, QUERY_BAR_DEFAULT_JUMP_STR,
-                                       QUERY_BAR_DEFAULT_JUMP_STR_LEN);
+                                       QUERY_BAR_DEFAULT_JUMP_STR_LEN, &queryBar->encoder);
         queryBar->cursor.textPosition.y = Max(u8, queryBar->writePosU8);
     }
 }
@@ -304,7 +308,7 @@ void QueryBar_JumpToNext(QueryBar *queryBar){
     if(queryBar->filter.allowCursorJump){
         uint u8 = queryBar->cursor.textPosition.y;
         u8 = Buffer_FindNextWord8(&queryBar->buffer, u8, QUERY_BAR_DEFAULT_JUMP_STR,
-                                  QUERY_BAR_DEFAULT_JUMP_STR_LEN);
+                                  QUERY_BAR_DEFAULT_JUMP_STR_LEN, &queryBar->encoder);
         queryBar->cursor.textPosition.y = Min(u8, queryBar->buffer.count);
     }
 }
@@ -399,15 +403,15 @@ uint QueryBar_GetRenderContent(QueryBar *queryBar, std::string &str){
         }
     }
 
-    StringSplit(possiblePaths, splitted, '/');
+    StringSplit(possiblePaths, splitted, SEPARATOR_CHAR);
     if((int)splitted.size() > compression){
-        bool is_folder = content[contentLen-1] == '/';
-        str = " ../";
+        bool is_folder = content[contentLen-1] == SEPARATOR_CHAR;
+        str = " .." SEPARATOR_STRING;
         for(uint i = splitted.size()-compression-1; i < splitted.size(); i++){
             str += splitted[i];
-            if(i < splitted.size() - 1) str += "/";
+            if(i < splitted.size() - 1) str += SEPARATOR_STRING;
         }
-        if(is_folder) str += "/";
+        if(is_folder) str += SEPARATOR_STRING;
         diff = contentLen - str.size();
     }else{
         str = std::string(content, contentLen);
@@ -427,13 +431,14 @@ void QueryBar_SetEntry(QueryBar *queryBar, View *view, char *str, uint len){
     if(QueryBar_AcceptInput(queryBar, str, len)){
         uint p = queryBar->writePosU8;
         uint rawP = queryBar->writePos;
-        Buffer_RemoveRangeRaw(&queryBar->buffer, rawP, queryBar->buffer.taken);
+        Buffer_RemoveRangeRaw(&queryBar->buffer, rawP, queryBar->buffer.taken,
+                              &queryBar->encoder);
         if(len > 0){
-            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len);
+            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, &queryBar->encoder);
         }
 
         queryBar->cursor.textPosition.y =
-                        Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);
+                        Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP, &queryBar->encoder);
     }
 }
 
@@ -443,11 +448,12 @@ int QueryBar_AddEntry(QueryBar *queryBar, View *view, char *str, uint len){
 
     if(QueryBar_AcceptInput(queryBar, str, len)){
         uint p = queryBar->cursor.textPosition.y;
-        uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p);
-        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len);
+        uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p,
+                                                nullptr, &queryBar->encoder);
+        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, &queryBar->encoder);
 
         queryBar->cursor.textPosition.y =
-            Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP);
+            Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP, &queryBar->encoder);
         return QueryBar_DynamicUpdate(queryBar, view);
     }
 
@@ -458,7 +464,7 @@ int QueryBar_RemoveOne(QueryBar *queryBar, View *view){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
     uint pos = queryBar->cursor.textPosition.y;
     if(pos > queryBar->writePosU8){
-        Buffer_RemoveRange(&queryBar->buffer, pos-1, pos);
+        Buffer_RemoveRange(&queryBar->buffer, pos-1, pos, &queryBar->encoder);
         pos -= 1;
         queryBar->cursor.textPosition.y = pos;
         return QueryBar_DynamicUpdate(queryBar, view);
@@ -471,7 +477,7 @@ void QueryBar_RemoveAllFromCursor(QueryBar *queryBar){
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
     uint pos = queryBar->cursor.textPosition.y;
     if(pos > queryBar->writePosU8){
-        Buffer_RemoveRange(&queryBar->buffer, queryBar->writePosU8, pos);
+        Buffer_RemoveRange(&queryBar->buffer, queryBar->writePosU8, pos, &queryBar->encoder);
         queryBar->cursor.textPosition.y = queryBar->writePosU8;
         //NOTE: Since this one clears the query bar we dont need to actually check for updates
     }
@@ -614,8 +620,9 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
             case QUERY_BAR_CMD_REVERSE_SEARCH:{
                 if(queryBar->searchCmd.valid){
                     Buffer *buf = BufferView_GetBufferAt(bView, queryBar->searchCmd.lineNo);
-                    uint p = Buffer_Utf8RawPositionToPosition(buf,
-                                                              queryBar->searchCmd.position);
+                    uint p =
+                        Buffer_Utf8RawPositionToPosition(buf, queryBar->searchCmd.position,
+                                                         &queryBar->encoder);
                     BufferView_CursorToPosition(bView, queryBar->searchCmd.lineNo, p);
                 }
             } break;
@@ -655,7 +662,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
     if(r != 0){
         QueryBarCmdSearchAndReplace *replace = &queryBar->replaceCmd;
         queryBar->cmd = QUERY_BAR_CMD_NONE;
-        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count);
+        Buffer_RemoveRange(&queryBar->buffer, 0, queryBar->buffer.count, &queryBar->encoder);
         queryBar->writePosU8 = 0;
         queryBar->writePos = 0;
         queryBar->qHistoryAt = -1;
@@ -695,8 +702,20 @@ void QueryBarHistory_DetachedLoad(QueryBarHistory *history, const char *basePath
     }
 
     if(content && fileSize > 0){
+    #if 0
+        ReadStringLineByLine(content, fileSize, [&](char *line, uint len) -> void{
+            if(len > 0){
+                QueryBarHistoryItem item;
+                item.value = std::string(line);
+                CircularStack_Push(qHistory->history, &item);
+            }
+        });
+
+        AllocatorFree(content);
+    #else
         Lex_LineProcess(content, fileSize, QueryBarHistory_LineProcessor,
                         0, qHistory, true);
+    #endif
     }else if(content){
         AllocatorFree(content);
     }
@@ -717,7 +736,9 @@ void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePa
     for(uint i = 0; i < CircularStack_Size(history); i++){
         QueryBarHistoryItem *item = CircularStack_At(history, i);
         if(item->value.size() > 0){
-            storage->StreamWriteString(&file, item->value.c_str());
+            // Raw value needs '\n' so we can easily parse it later
+            std::string rawValue = item->value + std::string("\n");
+            storage->StreamWriteString(&file, rawValue.c_str());
             //printf(" Writing %s\n", item->value.c_str());
         }
     }

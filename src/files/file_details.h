@@ -2,7 +2,7 @@
 #pragma once
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <errno.h>
 #define UNIMPLEMENTED() printf("Unimplemented {%s}\n", __FUNCTION__)
 
 typedef enum{

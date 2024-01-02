@@ -4,7 +4,7 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include <x11_display.h>
+#include <display.h>
 #include <keyboard.h>
 #include <shaders.h>
 #include <graphics.h>
@@ -142,7 +142,7 @@ void ActivateShaderAndProjections(Shader &shader, OpenGLState *state,
 */
 class WidgetWindow{
     public:
-    WindowX11 *window; // the main window for the widgets
+    DisplayWindow *window; // the main window for the widgets
     BindingMap *mapping; // keyboard event handling
     vec2f resolution; // window resolution
     vec2f start; // lower point of the rendering window
@@ -179,7 +179,7 @@ class WidgetWindow{
     * Input entries (i.e.: typing) must be carried out outside. We do however
     * handle mouse events.
     */
-    WidgetWindow(WindowX11 *other, BindingMap *bmapping, vec2f lower, vec2f upper);
+    WidgetWindow(DisplayWindow *other, BindingMap *bmapping, vec2f lower, vec2f upper);
 
     /*
     * Triggers a resize of the widget window and all of its widgets.
@@ -220,14 +220,14 @@ class WidgetWindow{
     /*
     * Get the window handler for the widget.
     */
-    WindowX11 *GetWindowHandler(){ return window; }
+    DisplayWindow *GetWindowHandler(){ return window; }
 
     /*
     * Opens the window for this component. Note that this is meant to be
     * used for components that wish to not initialize the window during
     * declaration.
     */
-    void Open(int width, int height, const char *name, WindowX11 *other);
+    void Open(int width, int height, const char *name, DisplayWindow *other);
 
     /*
     * Get a geometry instance reference that describes this window.

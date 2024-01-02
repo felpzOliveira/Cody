@@ -50,14 +50,17 @@ struct FileEntry;
 #define CMD_SEARCH_STR "search "
 #define CMD_SEARCH_HELP "Perform a full search on all opened files (usage: search <value>)."
 
+#define CMD_ENCODING_STR "encoding"
+#define CMD_ENCODING_HELP "Changes the encoding for the given file"
+
 #define CMD_FUNCTIONS_STR "functions"
 #define CMD_FUNCTIONS_HELP "List all functions found on all opened files."
 
-#define CMD_GIT_STR "git "
-#define CMD_GIT_HELP "Perform git operations (choices: diff, status, open)."
-
 #define CMD_HSPLIT_STR "hsplit"
 #define CMD_HSPLIT_HELP "Split the current view horizontally."
+
+#define CMD_CURSOR_BLINK_STR "cursor-blink"
+#define CMD_CURSOR_BLINK_HELP "Toogles cursor blinking"
 
 #define CMD_VSPLIT_STR "vsplit"
 #define CMD_VSPLIT_HELP "Split the current view vertically."

@@ -54,6 +54,7 @@ BindingMap *AutoComplete_Initialize(){
 
     autoComplete.mapping = mapping;
     autoComplete.root = TRIE_NODE_INITIALIZER;
+    EncoderDecoder_InitFor(&autoComplete.root.encoder, ENCODER_DECODER_UTF8);
     return mapping;
 }
 

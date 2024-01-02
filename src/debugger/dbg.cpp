@@ -6,7 +6,7 @@
 
 #define MODULE_NAME "DBG"
 
-void Dbg_GetFunctions(Dbg *dbg);
+int Dbg_GetFunctions(Dbg *dbg);
 void Dbg_Free(Dbg *dbg);
 
 bool is_running = false;
@@ -87,6 +87,7 @@ static void Dbg_Cleanup(Dbg *dbg){
     Dbg_Free(dbg);
 }
 
+[[maybe_unused]]
 static void Dbg_PrintTree(ExpressionTree *tree){
     struct node_value{
         ExpressionTreeNode *node;
@@ -145,6 +146,7 @@ static void Dbg_PrintTree(ExpressionTree *tree){
     printf("\n");
 }
 
+[[maybe_unused]]
 static void Dbg_PrintTreeByLevel(ExpressionTree *tree){
     std::queue<ExpressionTreeNode *> nodeQ;
     nodeQ.push(tree->root);
@@ -174,14 +176,16 @@ static void Dbg_Entry(std::string binaryPath, std::string args){
     char *eptr = binaryPath.size() > 0 ? (char *)binaryPath.c_str() : nullptr;
     constexpr uint wait_timeout_ms = 20;
     bool rv = true;
+    int r = 0;
     int wait_event = 0;
 
     Dbg_LockedSetRun();
     dbg.priv = nullptr;
 
-    Dbg_GetFunctions(&dbg);
+    if(!Dbg_GetFunctions(&dbg))
+        goto __terminate;
 
-    int r = GuessFileEntry(eptr, binaryPath.size(), &entry, folder);
+    r = GuessFileEntry(eptr, binaryPath.size(), &entry, folder);
     if(r == -1){
         DEBUG_MSG("Cannot translate file %s\n", eptr);
         dbg.fn_terminate(&dbg);

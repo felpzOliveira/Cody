@@ -7,14 +7,14 @@ static int keycodes[256];
 
 extern LibHelperX11 x11Helper;
 
-int TranslateKeyX11(int scancode){
+int TranslateKey(int scancode){
     if(scancode < 0 || scancode > 255){
         return Key_Unmapped;
     }
     return keycodes[scancode];
 }
 
-int TranslateKeyCodeX11(int scancode){
+int TranslateKeyCode(int scancode){
     int keySym = Key_Unmapped;
     if(scancode < 8 || scancode > 255) return keySym;
 
@@ -147,13 +147,13 @@ int TranslateKeyCodeX11(int scancode){
     return Key_Unmapped;
 }
 
-int GetMappedKeysCountX11(){
+int GetMappedKeysCount(){
     return 256;
 }
 
-int CreateKeyTableX11(){
+int CreateKeyTable(){
     for(int scancode = 0; scancode < 256; scancode++){
-        keycodes[scancode] = TranslateKeyCodeX11(scancode);
+        keycodes[scancode] = TranslateKeyCode(scancode);
     }
 
     return 256;

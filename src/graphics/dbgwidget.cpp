@@ -243,7 +243,7 @@ int DbgWidgetExpressionViewer::OnRender(WidgetRenderContext *wctx,
         p0 = transform.Point(lower);
 
         Graphics_PushText(font, p0.x, p0.y, (char *)text.c_str(),
-                          text.size(), color, &pGlyph);
+                          text.size(), color, &pGlyph, UTF8Encoder());
         return 1;
     };
 
@@ -515,10 +515,11 @@ void DbgWidgetButtons::SetGeometry(const Geometry &geo, vec2f aspectX, vec2f asp
                     int pGlyph = -1;
                     std::string text("-►");
                     vec2f p0 = Graphics_ComputeCenteringStart(font, text.c_str(),
-                                                              text.size(), &geo, true);
+                                                              text.size(), &geo, true,
+                                                              UTF8Encoder());
                     p0 = transform.Point(p0);
                     Graphics_PushText(font, p0.x, p0.y, (char *)text.c_str(),
-                                      text.size(), ColorFromRGBA(cc), &pGlyph);
+                                      text.size(), ColorFromRGBA(cc), &pGlyph, UTF8Encoder());
                     Graphics_FlushText(font);
                     font->fontMath = fMath;
                 });

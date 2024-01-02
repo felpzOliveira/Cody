@@ -15,7 +15,7 @@ TokenizerSupport glslSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 26 2022 11:07:05 ) */
+/* Auto generated file ( Dec 28 2023 18:15:49 ) */
 
 std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 	{
@@ -116,7 +116,8 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 		{ .value = "switch", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "return", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
+		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },
+		{ .value = "layout", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "optmize", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "mediump", .identifier = TOKEN_ID_OPERATOR },
@@ -160,9 +161,11 @@ std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 		{ .value = "gl_FragCoord", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_PointSize", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "samplerBuffer", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontColor", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_ClipVertex", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "sampler2DArray", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontFacing", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "sampler1DShadow", .identifier = TOKEN_ID_DATATYPE },
@@ -285,7 +288,8 @@ std::vector<std::vector<GToken>> glslReservedTable = {
 		{ .value = "return", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "extern", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "double", .identifier = TOKEN_ID_DATATYPE },
-		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF }, },
+		{ .value = "struct", .identifier = TOKEN_ID_DATATYPE_STRUCT_DEF },
+		{ .value = "layout", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "mediump", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "varying", .identifier = TOKEN_ID_OPERATOR },
@@ -331,9 +335,11 @@ std::vector<std::vector<GToken>> glslReservedTable = {
 		{ .value = "gl_FragCoord", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_PointSize", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "samplerBuffer", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontColor", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "gl_ClipVertex", .identifier = TOKEN_ID_RESERVED }, },
 	{
+		{ .value = "sampler2DArray", .identifier = TOKEN_ID_DATATYPE },
 		{ .value = "gl_FrontFacing", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "sampler1DShadow", .identifier = TOKEN_ID_DATATYPE },

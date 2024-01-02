@@ -1,24 +1,38 @@
 /* date = January 10th 2021 11:58 am */
-
-#ifndef UTILITIES_H
-#define UTILITIES_H
+#pragma once
 #include <types.h>
 #include <geometry.h>
 #include <string>
 #include <fstream>
 #include <signal.h>
 #include <limits.h>
-#include <unistd.h>
 #include <functional>
 #include <sys/stat.h>
 #include <vector>
-#include <sys/time.h>
+#include <encoding.h>
+
+#if defined(_WIN32)
+    #include <Windows.h>
+    #include <direct.h>
+    #include <stdlib.h>
+    #define PATH_MAX 256
+    #define CHDIR(x) _chdir(x)
+    #define MKDIR(x) _mkdir(x)
+    #define SEPARATOR_CHAR '\\'
+    #define SEPARATOR_STRING "\\"
+    #define SLEEP(n) Sleep(n)
+#else
+    #include <unistd.h>
+    #define CHDIR(x) chdir(x)
+    #define MKDIR(x) mkdir(x, 0777)
+    #define SEPARATOR_CHAR '/'
+    #define SEPARATOR_STRING "/"
+    #define SLEEP(n) sleep(n)
+#endif
 
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
-#define DebugBreak() raise(SIGTRAP)
 #define MAX_DESCRIPTOR_LENGTH 256
-#define CHDIR(x) chdir(x)
 #define IGNORE(x) (void)!(x)
 
 /*
@@ -80,6 +94,12 @@ struct FileEntry{
     FileType type;
     int isLoaded;
 };
+
+/* Changes a string to make sure that it contains the current path delimiter of the system */
+void SwapPathDelimiter(std::string &path);
+
+/* Wrapper for mkdir */
+int Mkdir(const char *path);
 
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
@@ -244,17 +264,6 @@ int GuessFileEntry(char *path, uint size, FileEntry *entry, char *folder);
 int FileExists(char *path);
 
 /*
-* Computes the ratio of values in 'data' that are actually repsentable under
-* the encoding providing by 'StringToCodepoint'. This returns the ratio:
-*                 ratio = failed / (succeeded + failed)
-* This routine is computed while ratio is less than 'kMaximumDecodeRatio',
-* it can be used to perform a simple detection for binary files or files that
-* are potentially dangerous to open or need special handling as the default handlers
-* won't work on them.
-*/
-double ComputeDecodeRatio(char *data, uint size);
-
-/*
 * Concatenate the path + folder into a string if the path does not look like
 * a full path. If it does return the original path.
 */
@@ -296,19 +305,19 @@ uint GetSimplifiedPathName(char *fullPath, uint len);
 * hold its size. In case 'len' = -1 this routine uses standard methods to detect
 * the size of the string 's0'.
 */
-uint StringComputeCharU8At(char *s0, CharU8 *chr, uint at, int len=-1);
+uint StringComputeCharU8At(EncoderDecoder *encoder, char *s0, CharU8 *chr, uint at, int len=-1);
 
 /*
 * Computes the amount of UTF-8 characters inside the string 's0'.
 */
-uint StringComputeU8Count(char *s0, uint len);
+uint StringComputeU8Count(EncoderDecoder *encoder, char *s0, uint len);
 
 /*
 * Computes the raw position inside string 's0' with size 'len' that correspondes
 * to the encoded character located at 'u8p'. Optionally can pass a 'size' parameter
 * to return the size in bytes of the encoded character.
 */
-uint StringComputeRawPosition(char *s0, uint len, uint u8p, int *size);
+uint StringComputeRawPosition(EncoderDecoder *encoder, char *s0, uint len, uint u8p, int *size);
 
 /*
 * Returns the address in 'path' where printing should start in order to display
@@ -335,18 +344,11 @@ vec4f ColorFromInt(vec4i col);
 uint DigitCount(uint value);
 
 /*
-* Convert a codepoint to sequence of chars, i.e.: string,
-* chars are written to 'c' and 'c' must be a vector with minimum size = 5.
-* Returns the amount of bytes written into 'c'.
-*/
-int CodepointToString(int cp, char *c);
-
-/*
 * Gets the first codepoint in the string given by 'u' with size 'size'
 * and return its integer value, returns the number of bytes taken to generate
 * the codepoint in 'off'.
 */
-int StringToCodepoint(char *u, int size, int *off);
+int _StringToCodepoint(char *u, int size, int *off);
 
 /*
 * Checks if a string contains an extension, mostly for GLX/GL stuff
@@ -363,10 +365,39 @@ void Memcpy(void *dst, void *src, uint size);
 /* Standard memset */
 void Memset(void *dst, unsigned char v, uint size);
 
+/*
+* Utility for reading string line-by-line.
+*/
+template<typename Fn> inline
+void ReadStringLineByLine(char *content, uint contentSize, Fn fn){
+    uint iterator = 0;
+    char *head = nullptr;
+
+    if(!content || contentSize == 0)
+        goto __end;
+
+    head = content;
+    while(iterator < contentSize){
+        if(content[iterator] == '\n'){
+            uint len = &content[iterator] - head;
+            content[iterator] = 0;
+            fn(head, len);
+
+            content[iterator] = '\n';
+            head = &content[iterator+1];
+        }
+
+        iterator += 1;
+    }
+
+__end:
+    return;
+}
 
 /*
 * Utilities for measuring the time a function takes to execute,
-* this is mostly for debug, not a reliable measurement.
+* this is mostly for debug, not a reliable measurement. Each line has '\n' replaced
+* with '\0'.
 */
 template<typename Fn>
 inline double MeasureInterval(const Fn &fn){
@@ -385,40 +416,6 @@ inline double MeasureInterval(const Fn &fn){
 #else
     #define MeasureTime(msg, ...) __VA_ARGS__
 #endif
-
-class StopWatch{
-    public:
-    bool isStarted = false;
-    struct timeval tbegin, tend;
-    Float interval = 0.f;
-
-    StopWatch(){}
-    void Start(int reset=1){
-        gettimeofday(&tbegin, nullptr);
-        isStarted = true;
-        if(reset)
-            interval = 0;
-    }
-
-    void Stop(){
-        if(!isStarted) return;
-        gettimeofday(&tend, nullptr);
-        Float interval_ms = (tend.tv_sec - tbegin.tv_sec) * 1000.0;
-        interval_ms += (tend.tv_usec - tbegin.tv_usec) / 1000.0;
-        interval += interval_ms;
-    }
-
-    void Reset(){
-        isStarted = false;
-        interval = 0.f;
-    }
-
-    Float Interval(){
-        return interval >= 0.0 ? interval : 0.f;
-    }
-
-    bool IsRunning(){ return isStarted; }
-};
 
 /* Data structures - Structures create their own copy of the item so you can free yours*/
 
@@ -877,5 +874,3 @@ template<typename T> inline void FixedStack_Pop(FixedStack<T> *stack){
         stack->top--;
     }
 }
-
-#endif //UTILITIES_H

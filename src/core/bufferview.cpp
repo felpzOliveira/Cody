@@ -131,9 +131,11 @@ int BufferView_LocateNextCursorToken(BufferView *view, Token **targetToken){
     AssertA(view != nullptr, "Invalid bufferview pointer");
     Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer,
                                             view->sController.cursor.textPosition.x);
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
     int tokenID = -1;
     uint pos = Buffer_Utf8PositionToRawPosition(buffer,
-                                                view->sController.cursor.textPosition.y);
+                                                view->sController.cursor.textPosition.y,
+                                                nullptr, encoder);
     if(pos < buffer->taken){
         for(int i = 0; i < (int)buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
@@ -156,8 +158,10 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     Buffer *buffer = LineBuffer_GetBufferAt(view->lineBuffer,
                                             view->sController.cursor.textPosition.x);
     int tokenID = -1;
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
     uint pos = Buffer_Utf8PositionToRawPosition(buffer,
-                                                view->sController.cursor.textPosition.y);
+                                                view->sController.cursor.textPosition.y,
+                                                nullptr, encoder);
     if(pos > 0){
         for(int i = (int)buffer->tokenCount-1; i >= 0; i--){
             Token *token = &buffer->tokens[i];
@@ -401,7 +405,8 @@ bool BufferView_FindFirstForward(BufferView *view, TokenId id, TokenId cid,
     int done = 0;
     int depth = 0;
     uint bid = start.x;
-    uint startAt = Buffer_GetTokenAt(buffer, bid);
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
+    uint startAt = Buffer_GetTokenAt(buffer, bid, encoder);
 
     do{
         int r = (int)buffer->tokenCount;
@@ -446,7 +451,8 @@ int BufferView_FindNestsForward(BufferView *view, vec2ui start, TokenId *ids,
 
     uint k = 0;
     uint bid = start.x;
-    uint startAt = Buffer_GetTokenAt(buffer, start.y);
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
+    uint startAt = Buffer_GetTokenAt(buffer, start.y, encoder);
     int done = 0;
     int is_first = 1;
     uint zeroContext = 0;
@@ -511,7 +517,8 @@ int BufferView_FindNestsBackwards(BufferView *view, vec2ui start, TokenId *ids,
     uint k = 0;
     int is_first = 1;
     uint bid = start.x;
-    uint startAt = Buffer_GetTokenAt(buffer, start.y);
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
+    uint startAt = Buffer_GetTokenAt(buffer, start.y, encoder);
     int done = 0;
     uint zeroContext = 0;
 

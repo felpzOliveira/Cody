@@ -7,7 +7,7 @@
 #include <undo.h>
 #include <symbol.h>
 #include <vector>
-#include <gitbase.h>
+#include <encoding.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -63,9 +63,8 @@ struct LineBufferProps{
     FileExtension ext;
     CopySection cpSection;
     bool isWrittable;
-    std::vector<LineHighlightInfo> diffs;
-    std::vector<vec2ui> diffLines;
     bool isInternal;
+    EncoderDecoder encoder;
 };
 
 /*
@@ -123,14 +122,14 @@ uint Buffer_FindFirstNonEmptyLocation(Buffer *buffer);
 * Initializes a previously allocated Buffer from a string pointer given in 'head'
 * with size 'len'.
 */
-void Buffer_InitSet(Buffer *buffer, char *head, uint len);
+void Buffer_InitSet(Buffer *buffer, char *head, uint len, EncoderDecoder *encoder);
 
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
 * and must have length 'len'. The position 'at' is a UTF-8
 * encoded position. Returns the amount of bytes actually inserted after tab expansion.
 */
-uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len);
+uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len, EncoderDecoder *encoder);
 
 /*
 * Inserts a new string in a Buffer at a fixed position 'at'. String is given in 'str'
@@ -138,7 +137,7 @@ uint Buffer_InsertStringAt(Buffer *buffer, uint at, char *str, uint len);
 * must know where is correct to start the writing in the buffer.
 * Returns the amount of bytes actually inserted after tab expansion.
 */
-uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len);
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len, EncoderDecoder *encoder);
 
 /*
 * Updates the curret token list inside the buffer given. This function copies
@@ -150,7 +149,7 @@ void Buffer_UpdateTokens(Buffer *buffer, Token *tokens, uint size);
 * Removes a range of the given Buffer. Indexes are given by 'start' and 'end' such
 * that start < end. Range is given in UTF-8 positions.
 */
-void Buffer_RemoveRange(Buffer *buffer, uint start, uint end);
+void Buffer_RemoveRange(Buffer *buffer, uint start, uint end, EncoderDecoder *encoder);
 
 /*
 * Logically erase the contents of the buffer, i.e.: erase the contents of the
@@ -158,19 +157,19 @@ void Buffer_RemoveRange(Buffer *buffer, uint start, uint end);
 *        Buffer_RemoveRangeRaw(buffer,  0, buffer->taken);
 * but this also handles zeroing tokens.
 */
-void Buffer_SoftClear(Buffer *buffer);
+void Buffer_SoftClear(Buffer *buffer, EncoderDecoder *encoder);
 
 /*
 * Removes the last token from a buffer. Erases both the token and the data
 * related to the token.
 */
-void Buffer_RemoveLastToken(Buffer *buffer);
+void Buffer_RemoveLastToken(Buffer *buffer, EncoderDecoder *encoder);
 
 /*
 * Removes a range of the given Buffer. Range is given in raw position inside the
 * buffer.
 */
-void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end);
+void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end, EncoderDecoder *encoder);
 
 /*
 * Checks if a buffer is visually empty when rendering.
@@ -182,12 +181,14 @@ int Buffer_IsBlank(Buffer *buffer);
 * This routine computes the next jump point for iterating the buffer based
 * on the terminators given in 'term'.
 */
-uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len);
+uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term,
+                          uint len, EncoderDecoder *encoder);
 
 /*
 * Locates the previous valid position for jumping locations in utf-8 positions.
 */
-uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len);
+uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term,
+                               uint len, EncoderDecoder *encoder);
 
 /*
 * Locates the previous valid position for jumping separators.
@@ -206,14 +207,14 @@ uint Buffer_FindNextSeparator(Buffer *buffer, uint rawp);
 void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable);
 
 /*
-* Count the amount of UTF-8 characters.
+* Count the amount of encoded characters.
 */
-uint Buffer_GetUtf8Count(Buffer *buffer);
+uint Buffer_GetUtf8Count(Buffer *buffer, EncoderDecoder *encoder);
 
 /*
 * Get the id of the token that contains position 'u8'.
 */
-uint Buffer_GetTokenAt(Buffer *buffer, uint u8);
+uint Buffer_GetTokenAt(Buffer *buffer, uint u8, EncoderDecoder *encoder);
 
 /*
 * Get the raw position inside the buffer corresponding to a UTF-8 position,
@@ -221,14 +222,14 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8);
 * UTF-8 encoded position. The position returned can be seen as a starting position
 * for printing or looping a UTF-8 character.
 */
-uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len=nullptr);
+uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len, EncoderDecoder *encoder);
 
 /*
 * Get the UTF-8 position inside this buffer matching a raw position. This is mostly
 * usefull if you want to get the rendering position of a token or adjust a cursor
 * movement based on the rendering property of a encoded character.
 */
-uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp);
+uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp, EncoderDecoder *encoder);
 
 /*
 * Adjust the position to **make sure** it does not lie inside a tab expansion.
@@ -342,29 +343,6 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
 void LineBuffer_FastTokenGen(LineBuffer *lineBuffer, uint base, uint offset);
 
 /*
-* Retrieves the pointer associated to the line highlight inside this linebuffer. Settings
-* clear = 1 makes the ptr be clared before returning. This is intended to be used
-* with the git/dbg interface to avoid array copies. This list should be used by the git
-* interface to register raw deltas and dbg to trigger view on stop points. In order to
-* clearly express changes in file use LineBuffer_InsertDiffContent.
-*/
-std::vector<LineHighlightInfo> *LineBuffer_GetLineHighlightPtr(LineBuffer *lineBuffer, int clear=1);
-
-/*
-* Retrieves the pointer associated to the line highlight range inside this linebuffer.
-* The diff range pointer is a list of pair of values that holds (line, type) of all highlights
-* currently active in the linebuffer. For example a new line might be registered as:
-* (32, GIT_LINE_INSERTED) and a removed one as (64, GIT_LINE_REMOVED). This list
-* can be used to render the linebuffer displaying git diffs or highlight lines for some reason.
-*/
-std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any);
-
-/*
-* Erases the current diff lines from the linebuffer.
-*/
-void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer);
-
-/*
 * Updates the linebuffer to include its diff content. Returns in 'range' the
 * range of modified lines as (start, end). This routine processes the raw deltas
 * contained in the linebuffer and transforms it into displayable text that can be rendered.
@@ -453,6 +431,17 @@ int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid);
 * Advances the copy section (if required) of a given linebuffer by dt.
 */
 void LineBuffer_AdvanceCopySection(LineBuffer *lineBuffer, double dt);
+
+/*
+* Gets a pointer to the encoder for this linebuffer.
+*/
+EncoderDecoder *LineBuffer_GetEncoderDecoder(LineBuffer *lineBuffer);
+
+/*
+* Informs the linebuffer it needs to update its lines because the encoder it was bounded
+* to changed.
+*/
+void LineBuffer_UpdateEncoding(LineBuffer *lineBuffer);
 
 /*
 * Releases memory taken by a LineBuffer.

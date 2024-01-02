@@ -9,13 +9,14 @@
 #include <bufferview.h>
 #include <theme.h>
 #include <fontstash.h>
-#include <x11_display.h>
+#include <display.h>
 #include <map>
 #include <file_provider.h>
 #include <functional>
 #include <vector>
 #include <memory>
 #include <parallel.h>
+#include <encoding.h>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -28,8 +29,13 @@
 // Our OpenGL rendering renders everything in very high resolution and
 // than reduce scaling to get simple AA. This could potentially be slow
 // but it is working fine for me.
-#define FONT_UPSCALE_DEFAULT_SIZE 65
-#define FONT_UPSCALE_DEFAULT_OFFSET 47
+#if !defined(_WIN32)
+    #define FONT_UPSCALE_DEFAULT_SIZE 65
+    #define FONT_UPSCALE_DEFAULT_OFFSET 47
+#else
+    #define FONT_UPSCALE_DEFAULT_SIZE 25
+    #define FONT_UPSCALE_DEFAULT_OFFSET 10
+#endif
 
 #if 1
     #define OpenGLCHK(fn) do{\
@@ -124,6 +130,7 @@ struct OpenGLTexture{
 struct EventHandler{
     std::function<bool(void)> fn;
     double interval;
+    double lastCalled;
 };
 
 // enables/disables rendering stuff
@@ -145,7 +152,7 @@ struct GlobalWidgets{
 };
 
 struct OpenGLState{
-    WindowX11 *window;
+    DisplayWindow *window;
     RenderProps params;
     OpenGLFont font;
     OpenGLBuffer glQuadBuffer;
@@ -156,6 +163,12 @@ struct OpenGLState{
     uint texBinds;
     Shader imageShader;
     Mouse mouse;
+    double cursorBlinkLastTime;
+    bool cursorBlinking;
+    bool cursorVisible;
+    bool enableCursorBlink;
+    uint cursorBlinkKeyboardHandle;
+    uint cursorBlinkMouseHandle;
     int running, width, height;
     Float renderLineWidth;
     Transform projection;
@@ -163,6 +176,8 @@ struct OpenGLState{
     Transform model;
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
+    double lastEventTime;
+    double maxSamplingRate;
     Shader buttonShader;
     GlobalWidgets gWidgets;
 
@@ -207,10 +222,18 @@ void Graphics_TextureInit(OpenGLState *state, const char *path,
 void Graphics_TextureInit(OpenGLState *state, uint8 *data, uint len,
                           const char *key, FileExtension type = FILE_EXTENSION_NONE);
 
+
+DisplayWindow *Graphics_GetGlobalWindow();
+
 /*
 * Toogles the rendering of the cursor segments.
 */
 void Graphics_ToogleCursorSegment();
+
+/*
+* Toogles the events and rendering of cursor blinking.
+*/
+void Graphics_ToogleCursorBlinking();
 
 /*
 * Initializes a openglbuffer to the current binding context.
@@ -229,7 +252,8 @@ void OpenGLComputeProjection(vec2ui lower, vec2ui upper, Transform *transform);
 * Computes the viweing geometry of the cursor.
 */
 void OpenGLComputeCursor(OpenGLFont *font, OpenGLCursor *glCursor, const char *buffer,
-                         uint len, Float x, Float cursorOffset, Float baseHeight);
+                         uint len, Float x, Float cursorOffset, Float baseHeight,
+                         EncoderDecoder *encoder);
 
 /*
 * Deletes the context-aware information from the OpenGLBuffer. This does not
@@ -372,13 +396,13 @@ vec2f Graphics_GetLineYPos(OpenGLState *state, vec2ui visible, uint i, View *vie
 * given buffer.
 */
 Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
-                            uint upto, int &previousGlyph);
+                            uint upto, int &previousGlyph, EncoderDecoder *encoder);
 
 /*
 * Returns the size a token takes when rendering.
 */
 Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
-                             int &previousGlyph);
+                             int &previousGlyph, EncoderDecoder *encoder);
 
 /*
 * Computes the color a token should have according to the current given theme
@@ -480,9 +504,9 @@ void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
 * Batches text to perform rendering.
 */
 void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
-                       uint len, vec4i col, int *pGlyph);
+                       uint len, vec4i col, int *pGlyph, EncoderDecoder *encoder);
 void Graphics_PushText(OpenGLFont *font, Float &x, Float &y, char *text,
-                       uint len, vec4i col, int *pGlyph);
+                       uint len, vec4i col, int *pGlyph, EncoderDecoder *encoder);
 
 /*
 * Triggers a render call for all batched texts pushed.
@@ -502,7 +526,8 @@ vec2i Graphics_ComputeSelectableListItem(OpenGLState *state, uint y, View *view)
 * be used to compute the center against [0,0] [w,h].
 */
 vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
-                                     uint len, Geometry *geometry, bool in_place=false);
+                                     uint len, Geometry *geometry, bool in_place,
+                                     EncoderDecoder *encoder);
 
 /*
 * Bind all image units in the quad image buffer using the global rendering state.

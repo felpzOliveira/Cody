@@ -21,6 +21,7 @@
 #include <dbgwidget.h>
 #include <popupwindow.h>
 #include <modal.h>
+#include <timer.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -30,7 +31,8 @@
 
 #define GLFONTSTASH_IMPLEMENTATION
 #include <gl3corefontstash.h>
-#include <unistd.h>
+
+//#include <unistd.h>
 
 #define MODULE_NAME "Render"
 
@@ -48,6 +50,9 @@ static OpenGLState GlobalGLState;
 
 #define TOOGLE_VAR(var) (var) = !(var)
 
+DisplayWindow *Graphics_GetGlobalWindow(){
+    return GlobalGLState.window;
+}
 
 std::string translateGLError(int errorCode){
     std::string error;
@@ -295,14 +300,15 @@ Float GLToScreen(Float x, OpenGLState *state){
 }
 
 vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
-                                     uint len, Geometry *geometry, bool in_place)
+                                     uint len, Geometry *geometry, bool in_place,
+                                     EncoderDecoder *encoder)
 {
     int pGlyph = -1;
     Float x0 = geometry->lower.x * font->fontMath.invReduceScale;
     Float y0 = geometry->lower.y * font->fontMath.invReduceScale;
     Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
     Float x = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale * 0.5;
-    Float dx = fonsComputeStringAdvance(font->fsContext, (char *)text, len, &pGlyph) * 0.5;
+    Float dx = fonsComputeStringAdvance(font->fsContext, (char *)text, len, &pGlyph, encoder) * 0.5;
 
     x -= dx;
     y -= font->fontMath.fontSizeAtRenderCall * 0.5;
@@ -315,17 +321,17 @@ vec2f Graphics_ComputeCenteringStart(OpenGLFont *font, const char *text,
 }
 
 Float Graphics_GetTokenXSize(OpenGLState *state, Buffer *buffer, uint at,
-                             int &previousGlyph)
+                             int &previousGlyph, EncoderDecoder *encoder)
 {
     OpenGLFont *font = &state->font;
     if(buffer->taken == 0 || buffer->tokenCount <= at) return 0;
     Token *token = &buffer->tokens[at];
     char *p = &buffer->data[token->position];
-    return fonsComputeStringAdvance(font->fsContext, p, token->size, &previousGlyph);
+    return fonsComputeStringAdvance(font->fsContext, p, token->size, &previousGlyph, encoder);
 }
 
 Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
-                            uint upto, int &previousGlyph)
+                            uint upto, int &previousGlyph, EncoderDecoder *encoder)
 {
     Float x = 0;
     OpenGLFont *font = &state->font;
@@ -344,7 +350,7 @@ Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
 
             if(v == ' ' || v == '\t'){
                 x += fonsComputeStringAdvance(font->fsContext, (char *)&v, 1,
-                                              &previousGlyph);
+                                              &previousGlyph, encoder);
                 pos ++;
                 continue;
             }
@@ -364,7 +370,7 @@ Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
             char *e = &buffer->data[token->position + token->size];
 
             pos += token->size;
-            x += fonsComputeStringAdvance(font->fsContext, p, e-p, &previousGlyph);
+            x += fonsComputeStringAdvance(font->fsContext, p, e-p, &previousGlyph, encoder);
         }
     }
 
@@ -488,17 +494,17 @@ int Graphics_ComputeTokenColor(char *str, Token *token, SymbolTable *symTable,
 
 vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
     // account for dual mode
+    vec4f col;
     UIElement element = UICursor;
     int dualMode = DualModeGetState();
-    if(dualMode == ENTRY_MODE_LOCK)
-        element = UIQueryBarCursor;
 
-    if(!theme->dynamicCursor || dualMode == ENTRY_MODE_LOCK){
-        return GetUIColorf(theme, element);
+    if(!theme->dynamicCursor){
+        col = GetUIColorf(theme, element);
     }else{
         vec4i color;
         vec2ui cursor;
         int r = -1;
+        EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
         Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(view->lineBuffer);
         SymbolTable *symTable = tokenizer->symbolTable;
 
@@ -510,7 +516,7 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
 
         Buffer *buffer = BufferView_GetBufferAt(view, cursor.x);
 
-        uint tid = Buffer_GetTokenAt(buffer, cursor.y);
+        uint tid = Buffer_GetTokenAt(buffer, cursor.y, encoder);
         if(tid >= buffer->tokenCount){
             return GetUIColorf(theme, element);
         }
@@ -528,12 +534,19 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
 
         r = Graphics_ComputeTokenColor(str, token, symTable, theme, cursor.x,
                                        token->identifier, nullptr, &color);
-        if(r == -1){
-            return GetUIColorf(theme, element);
-        }
-
-        return ColorFromInt(color);
+        if(r == -1)
+            col = GetUIColorf(theme, element);
+        else
+            col = ColorFromInt(color);
     }
+
+    if(dualMode == ENTRY_MODE_LOCK){
+        // TODO: do we need a theme option for this?
+        Float w = col.w;
+        col *= 0.7;
+        col.w = w;
+    }
+    return col;
 }
 
 void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
@@ -552,10 +565,10 @@ void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
 }
 
 void Graphics_PushText(OpenGLFont *font, Float &x, Float &y, char *text,
-                       uint len, vec4i col, int *pGlyph)
+                       uint len, vec4i col, int *pGlyph, EncoderDecoder *encoder)
 {
     x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
-                                text, text+len, pGlyph);
+                                text, text+len, pGlyph, encoder);
 }
 
 void Graphics_FlushText(OpenGLFont *font){
@@ -572,10 +585,10 @@ void Graphics_PrepareTextRendering(OpenGLState *state, Transform *projection,
 }
 
 void Graphics_PushText(OpenGLState *state, Float &x, Float &y, char *text,
-                       uint len, vec4i col, int *pGlyph)
+                       uint len, vec4i col, int *pGlyph, EncoderDecoder *encoder)
 {
     OpenGLFont *font = &state->font;
-    Graphics_PushText(font, x, y, text, len, col, pGlyph);
+    Graphics_PushText(font, x, y, text, len, col, pGlyph, encoder);
 }
 
 void Graphics_FlushText(OpenGLState *state){
@@ -709,12 +722,15 @@ static void _OpenGLInitGlobalWidgets(OpenGLState *state){
 static void _OpenGLStateInitialize(OpenGLState *state){
     int targetWidth = 1600;
     int targetHeight = 900;
-    state->eventInterval = MIN_EVENT_SAMPLING_INTERVAL;
+    state->eventInterval = Infinity;
     state->font.fsContext = nullptr;
     state->font.fontId = -1;
     state->window = nullptr;
     state->width = targetWidth;
     state->height = targetHeight;
+    state->cursorVisible = true;
+    state->cursorBlinkLastTime = 0;
+    state->maxSamplingRate = 1.f / 120.f; // based on 120 fps
     memset(&state->font.sdfSettings, 0x00, sizeof(FONSsdfSettings));
     state->params.cursorSegments = true;
 }
@@ -777,7 +793,7 @@ void WindowOnScroll(int is_up, void *){
     int x = 0, y = 0;
     //TODO: When view is not active this is triggering cursor jump
     //      when going up, debug it!
-    GetLastRecordedMousePositionX11(GlobalGLState.window, &x, &y);
+    GetLastRecordedMousePosition(GlobalGLState.window, &x, &y);
     if(!MouseEventFilter(x, y)){
         AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
     }
@@ -805,7 +821,7 @@ int Font_SupportsCodepoint(int codepoint){
     return g != 0;
 }
 
-void RegisterInputs(WindowX11 *window){
+void RegisterInputs(DisplayWindow *window){
     RegisterOnScrollCallback(window, WindowOnScroll, nullptr);
     RegisterOnMouseLeftClickCallback(window, WindowOnMouseClick, nullptr);
     RegisterOnMousePressedCallback(window, WindowOnPress, nullptr);
@@ -828,7 +844,7 @@ void OpenGLFontSetup(OpenGLState *state){
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
     uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
     uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
-
+    
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
@@ -890,12 +906,14 @@ void OpenGLInitialize(OpenGLState *state){
     int width = state->width;
     int height = state->height;
 
-    InitializeX11();
-    SetSamplesX11(16);
-    SetOpenGLVersionX11(3, 3);
+    InitializeDisplay();
+    SetSamples(16);
+    SetOpenGLVersion(3, 3);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
-    state->window = CreateWindowX11(width, height, "Cody - 0.0.1");
+    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
+
+    SetWindowIcon(state->window, "C:\\Users\\Felpz\\Documents\\Cody\\icons\\logo.ico");
 
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();
@@ -907,9 +925,11 @@ void OpenGLInitialize(OpenGLState *state){
     OpenGLTextureInitialize(state);
     AppInitialize();
 
-    SwapIntervalX11(state->window, 0);
+    SwapInterval(state->window, 0);
     RegisterInputs(state->window);
     OpenGLLoadIcons(state);
+
+    WindowOnSizeChange(width, height, nullptr);
 }
 
 int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid){
@@ -1276,11 +1296,50 @@ void Graphics_AddEventHandler(double ival, std::function<bool(void)> eH){
         GlobalGLState.eventInterval = stateInterval;
     }
 
-    GlobalGLState.eventHandlers.push_back({.fn = eH, .interval = stateInterval});
     Timing_Update();
+    GlobalGLState.eventHandlers.push_back({eH, stateInterval, lastTime});
 }
 
-void UpdateEventsAndHandleRequests(int animating){
+void CursorEventActionCallback(){
+    GlobalGLState.cursorBlinkLastTime = GetElapsedTime();
+    GlobalGLState.cursorBlinking = false;
+    GlobalGLState.cursorVisible = true;
+}
+
+static bool BlinkingCursorEvent(){
+    OpenGLState *state = &GlobalGLState;
+    double currTime = GetElapsedTime();
+    double interval = currTime - state->cursorBlinkLastTime;
+    if(!state->cursorBlinking){
+        if(interval >= 1.49){
+            state->cursorBlinking = true;
+        }
+    }
+
+    if(state->cursorBlinking){
+        state->cursorVisible = !state->cursorVisible;
+        state->cursorBlinkLastTime = currTime;
+    }
+
+    return state->enableCursorBlink;
+}
+
+void Graphics_ToogleCursorBlinking(){
+    TOOGLE_VAR(GlobalGLState.enableCursorBlink);
+    if(GlobalGLState.enableCursorBlink){
+        GlobalGLState.cursorBlinkKeyboardHandle =
+                KeyboardRegisterActiveEvent(CursorEventActionCallback);
+        GlobalGLState.cursorBlinkMouseHandle =
+                AppRegisterOnMouseEventCallback(CursorEventActionCallback);
+
+        Graphics_AddEventHandler(0.5, BlinkingCursorEvent);
+    }else{
+        KeyboardReleaseActiveEvent(GlobalGLState.cursorBlinkKeyboardHandle);
+        AppReleaseOnMouseEventCallback(GlobalGLState.cursorBlinkMouseHandle);
+    }
+}
+
+void UpdateEventsAndHandleRequests(int animating, double frameInterval){
     OpenGLState *state = &GlobalGLState;
     // check if we are handling custom events outside
     // the UI that require live update, for these we
@@ -1290,30 +1349,45 @@ void UpdateEventsAndHandleRequests(int animating){
     // with concurrent events, yikes...
     if(state->eventHandlers.size() > 0 || animating){
         // pool the UI first
-        PoolEventsX11();
+        PoolEvents();
         if(state->eventHandlers.size() > 0){
-            bool any_rems = false;
+            double pTime = GetElapsedTime();
+            // check if we actually have to any work
+            if(pTime - state->lastEventTime < state->eventInterval){
+                // we sampled at a smaller interval, check against max sampling rate
+                // so we don't waste CPU on high frequency sampling
+                double dif = state->maxSamplingRate - frameInterval;
+                if(dif > 0){
+                    int idif = dif * 1000.0;
+                    //printf("FPS %g - Dif = %d ( %g )\n", 1.f / frameInterval, idif, dif);
+                    std::this_thread::sleep_for(std::chrono::milliseconds(idif));
+                }
+                return;
+            }
+
             // pool the events and update next event interval in case anyone bails out
             std::vector<EventHandler>::iterator it;
             double expected_ival = Infinity;
+            bool any_rems = false;
+            state->lastEventTime = pTime;
+
             for(it = state->eventHandlers.begin(); it != state->eventHandlers.end(); ){
                 EventHandler handler = *it;
-                if(!handler.fn()){
-                    it = state->eventHandlers.erase(it);
-                    any_rems = true;
+                double interval = pTime - handler.lastCalled;
+                if(interval > handler.interval){
+                    if(!handler.fn()){
+                        it = state->eventHandlers.erase(it);
+                        any_rems = true;
+                    }else{
+                        handler.lastCalled = pTime;
+                        *it = handler;
+                        it++;
+                    }
                 }else{
                     it++;
-                    expected_ival = Min(expected_ival, handler.interval);
                 }
-            }
 
-            // sleep untill the next event
-            double pTime = GetElapsedTime();
-            double fdt = pTime - lastTime;
-
-            if(!IsZero(fdt) && fdt < state->eventInterval){
-                int dif = (state->eventInterval - fdt) * 1000.0;
-                std::this_thread::sleep_for(std::chrono::milliseconds(dif));
+                expected_ival = Min(expected_ival, handler.interval);
             }
 
             // in case someone exited we need to update the iterval
@@ -1325,7 +1399,7 @@ void UpdateEventsAndHandleRequests(int animating){
     }else{
         // if we are not handling custom events than simply wait for the
         // next UI event. This is fine because Cody is UI-driven
-        WaitForEventsX11();
+        WaitForEvents();
     }
 }
 
@@ -1374,7 +1448,8 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
         // TODO: quick hack to disable dimm for build buffer
         int dim = view->isActive ? 0 : 1;
         if(bView->lineBuffer){
-            if(bView->lineBuffer->filePathSize == 0) dim = 0;
+            if(bView->lineBuffer->filePathSize == 0)
+                dim = 0;
         }
 
         SetAlpha(dim);
@@ -1414,12 +1489,16 @@ void OpenGLEntry(){
 
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();
+    state->lastEventTime = lastTime;
+
+    //KeyboardRegisterActiveEvent(CursorEventActionCallback);
+    //Graphics_AddEventHandler(0.5, BlinkingCursorEvent);
 
     //_debugger_memory_usage();
     //state->widgetWindows.push_back(std::shared_ptr<WidgetWindow>(new PopupWindow));
 
-    while(!WindowShouldCloseX11(state->window)){
-        MakeContextX11(state->window);
+    while(!WindowShouldClose(state->window)){
+        MakeContextCurrent(state->window);
         double currTime = GetElapsedTime();
         double dt = currTime - lastTime;
         int animating = 0;
@@ -1435,7 +1514,7 @@ void OpenGLEntry(){
             animating |= state->gWidgets.wwindow->DispatchRender(&wctx);
         }
 
-        SwapBuffersX11(state->window);
+        SwapBuffers(state->window);
 
         // render popups and other windows
         for(std::shared_ptr<WidgetWindow> &sww : state->widgetWindows){
@@ -1445,7 +1524,7 @@ void OpenGLEntry(){
             }
         }
 
-        UpdateEventsAndHandleRequests(animating);
+        UpdateEventsAndHandleRequests(animating, dt);
     }
 
     if(Dbg_IsRunning()){
@@ -1454,7 +1533,7 @@ void OpenGLEntry(){
         // to send the message, response might take longer
         // because it depends on its state, however it should
         // not be our problem anymore as we are not going to answer it
-        sleep(1);
+        SLEEP(1);
     }
 
     state->widgetWindows.clear();
@@ -1462,8 +1541,8 @@ void OpenGLEntry(){
     delete state->gWidgets.wwindow;
     delete state->gWidgets.wdbgVw;
 
-    DestroyWindowX11(state->window);
-    TerminateX11();
+    DestroyWindow(state->window);
+    TerminateDisplay();
     state->running = 0;
     state->window = nullptr;
     FinishExecutor();

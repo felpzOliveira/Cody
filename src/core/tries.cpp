@@ -1,16 +1,18 @@
 #include <tries.h>
 #include <utilities.h>
+#include <encoding.h>
 
 #define MAX_WORD_SIZE 128
 
 int Trie_Insert(Trie *root, char *value, uint valuelen){
+    EncoderDecoder *encoder = &root->encoder;
     Trie *current = nullptr;
     char *chr = value;
     int chrlen = 0;
     uint consumed = 0;
     if(!value || valuelen < 2 || !root) return -1;
 
-    int cp = StringToCodepoint(chr, valuelen, &chrlen);
+    int cp = StringToCodepoint(encoder, chr, valuelen, &chrlen);
     int done = 0;
     if(cp == -1) return -1;
 
@@ -35,7 +37,8 @@ int Trie_Insert(Trie *root, char *value, uint valuelen){
             done = 1;
         }
 
-        cp = StringToCodepoint(&chr[consumed], valuelen - consumed, &chrlen);
+        cp = StringToCodepoint(encoder, &chr[consumed], valuelen - consumed, &chrlen);
+        if(cp == -1) return -1;
     }
 
     return 0;
@@ -43,6 +46,7 @@ int Trie_Insert(Trie *root, char *value, uint valuelen){
 
 int Trie_Remove(Trie *root, char *value, uint valuelen){
     Trie *current = nullptr;
+    EncoderDecoder *encoder = &root->encoder;
     char *chr = value;
     int chrlen = 0;
     uint consumed = 0;
@@ -50,7 +54,7 @@ int Trie_Remove(Trie *root, char *value, uint valuelen){
     uint stackAt = 0;
     if(!value || valuelen < 2 || !root || valuelen > MAX_WORD_SIZE) return -1;
 
-    int cp = StringToCodepoint(chr, valuelen, &chrlen);
+    int cp = StringToCodepoint(encoder, chr, valuelen, &chrlen);
     if(cp == -1) return -1;
 
     current = root;
@@ -87,7 +91,8 @@ int Trie_Remove(Trie *root, char *value, uint valuelen){
             return 0;
         }
 
-        cp = StringToCodepoint(&chr[consumed], valuelen - consumed, &chrlen);
+        cp = StringToCodepoint(encoder, &chr[consumed], valuelen - consumed, &chrlen);
+        if(cp == -1) return -1;
     }
 }
 
@@ -124,9 +129,10 @@ void Trie_Search(Trie *root, char *value, uint valuelen,
     char *chr = value;
     int chrlen = 0;
     uint consumed = 0;
+    EncoderDecoder *encoder = &root->encoder;
     if(!root || !value || valuelen == 0 || valuelen > MAX_WORD_SIZE) return;
 
-    int cp = StringToCodepoint(chr, valuelen, &chrlen);
+    int cp = StringToCodepoint(encoder, chr, valuelen, &chrlen);
     int done = 0;
     if(cp == -1) return;
 
@@ -149,15 +155,7 @@ void Trie_Search(Trie *root, char *value, uint valuelen,
             return;
         }
 
-        cp = StringToCodepoint(&chr[consumed], valuelen - consumed, &chrlen);
+        cp = StringToCodepoint(encoder, &chr[consumed], valuelen - consumed, &chrlen);
+        if(cp == -1) return;
     }
-}
-
-
-void Trie_Transverse(Trie *root, std::function<void(char *, uint, Trie *)> fn){
-    char value[256];
-    uint at = 0;
-    if(!root) return;
-
-    _Trie_Transverse(root, fn, value, &at);
 }

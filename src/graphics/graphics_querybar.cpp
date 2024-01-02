@@ -7,11 +7,11 @@
 
 static void _Graphics_RenderTextAt(OpenGLState *state, Float &x, Float &y,
                                    char *string, uint len, vec4i color,
-                                   int *pGlyph)
+                                   int *pGlyph, EncoderDecoder *encoder)
 {
     OpenGLFont *font = &state->font;
     x = fonsStashMultiTextColor(font->fsContext, x, y, color.ToUnsigned(),
-                                string, string+len, pGlyph);
+                                string, string+len, pGlyph, encoder);
 }
 
 static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, vec4f data){
@@ -20,6 +20,7 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
     int pGlyph = -1;
     QueryBar *bar = View_GetQueryBar(view);
     Buffer *buffer = &bar->buffer;
+    EncoderDecoder *encoder = &bar->encoder;
     OpenGLFont *font = &state->font;
     char *header = nullptr;
     uint headerLen = 0;
@@ -41,7 +42,7 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
 
     if(header){
         vec4i col = GetColor(theme, TOKEN_ID_NONE);
-        _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph);
+        _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph, encoder);
     }
 
     //QueryBar_GetWrittenContent(bar, &header, &headerLen);
@@ -51,7 +52,7 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
 
     if(headerLen > 0 && header){
         vec4i col = GetColor(theme, TOKEN_ID_NONE);
-        _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph);
+        _Graphics_RenderTextAt(state, x, y, header, headerLen, col, &pGlyph, encoder);
     }
 
 #if 0
@@ -98,7 +99,7 @@ static void _Graphics_RenderText(OpenGLState *state, View *view, Theme *theme, v
         vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
         char *chr = &buffer->data[rawp];
         fonsStashMultiTextColor(font->fsContext, x0, y0, cc.ToUnsigned(),
-                                chr, chr+1, &baseGlyph);
+                                chr, chr+1, &baseGlyph, encoder);
         Graphics_FlushText(state);
     }
 }
@@ -115,20 +116,21 @@ static vec4f Graphics_RenderQueryBarCursor(OpenGLState *state, QueryBar *bar, ve
     char *ptr = buffer->data;
     uint pos = bar->cursor.textPosition.y;
     int baseGlyph = -1;
+    EncoderDecoder *encoder = &bar->encoder;
 
     uint diff = QueryBar_GetRenderContent(bar, headerstr);
 
-    rawp = Buffer_Utf8PositionToRawPosition(buffer, pos-1, &utf8Len);
+    rawp = Buffer_Utf8PositionToRawPosition(buffer, pos-1, &utf8Len, encoder);
     rawp -= diff;
 
-    x0 = fonsComputeStringAdvance(state->font.fsContext, ptr, rawp+utf8Len, &pGlyph);
+    x0 = fonsComputeStringAdvance(state->font.fsContext, ptr, rawp+utf8Len, &pGlyph, encoder);
     x0 += 10;
 
     baseGlyph = pGlyph;
 
-    rawp = Buffer_Utf8PositionToRawPosition(buffer, pos, &pUtf8Len);
+    rawp = Buffer_Utf8PositionToRawPosition(buffer, pos, &pUtf8Len, encoder);
     x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &ptr[rawp],
-                                       pUtf8Len, &pGlyph);
+                                       pUtf8Len, &pGlyph, encoder);
 
     y1 = y0 + state->font.fontMath.fontSizeAtRenderCall;
 
@@ -172,7 +174,8 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         BufferView *bView = View_GetBufferView(view);
         vec2ui lines = BufferView_GetViewRange(bView);
         Buffer *buffer = BufferView_GetBufferAt(bView, result->lineNo);
-        uint p8 = Buffer_Utf8RawPositionToPosition(buffer, result->position);
+        EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(bView->lineBuffer);
+        uint p8 = Buffer_Utf8RawPositionToPosition(buffer, result->position, encoder);
 
         // 2- I think this model is correct because cursor will jump
         //    to the line when the QueryBar triggers a search. This means
@@ -188,9 +191,9 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         int pGlyph = -1;
         int oGlyph = -1;
         if(p8 > 0){
-            orawp = Buffer_Utf8PositionToRawPosition(buffer, p8-1, &len8);
+            orawp = Buffer_Utf8PositionToRawPosition(buffer, p8-1, &len8, encoder);
             x0 = fonsComputeStringAdvance(state->font.fsContext, buffer->data,
-                                          orawp+len8, &pGlyph);
+                                          orawp+len8, &pGlyph, encoder);
             oGlyph = pGlyph;
         }
 
@@ -199,7 +202,7 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
         // from the search context which is better since it starts at 0 and is null
         // terminated
         x1 = x0 + fonsComputeStringAdvance(state->font.fsContext, &searched[0],
-                                           result->length, &pGlyph);
+                                           result->length, &pGlyph, encoder);
 
         y0 = (result->lineNo - lines.x) * state->font.fontMath.fontSizeAtRenderCall;
         if(view->descLocation == DescriptionTop){
@@ -225,7 +228,7 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
                 //p8, slen, (uint)strlen(searched));
 
         Graphics_PrepareTextRendering(state, &state->projection, &model);
-        Graphics_PushText(state, x0, y0, searched, slen, wcolor, &oGlyph);
+        Graphics_PushText(state, x0, y0, searched, slen, wcolor, &oGlyph, encoder);
         Graphics_FlushText(state);
     }
 }

@@ -58,11 +58,14 @@ int Graphics_RenderControlCmdsIndices(View *view, OpenGLState *state,
 
     Float y = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale * 0.5;
     Float x = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale * 0.5;
-    Float dx = fonsComputeStringAdvance(font->fsContext, line, len, &pGlyph) * 0.5;
+
+    // NOTE: This renders the numbers tmux-like we don't really care about encoders here
+    Float dx = fonsComputeStringAdvance(font->fsContext, line,
+                                        len, &pGlyph, UTF8Encoder()) * 0.5;
     x = x - dx;
     y -= font->fontMath.fontSizeAtRenderCall;
 
-    Graphics_PushText(state, x, y, (char *)line, len, color, &pGlyph);
+    Graphics_PushText(state, x, y, (char *)line, len, color, &pGlyph, UTF8Encoder());
     Graphics_FlushText(state);
     Graphics_SetFontSize(state, currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);

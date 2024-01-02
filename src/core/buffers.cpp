@@ -42,8 +42,8 @@ inline void CopyToken(Token *dst, Token *src){
     dst->reserved = src->reserved;
 }
 
-void Buffer_SoftClear(Buffer *buffer){
-    Buffer_RemoveRangeRaw(buffer,  0, buffer->taken);
+void Buffer_SoftClear(Buffer *buffer, EncoderDecoder *encoder){
+    Buffer_RemoveRangeRaw(buffer,  0, buffer->taken, encoder);
     for(uint i = 0; i < buffer->tokenCount; i++){
         Token *token = &buffer->tokens[i];
         if(token->reserved){
@@ -60,7 +60,7 @@ void Buffer_SoftClear(Buffer *buffer){
     buffer->tokenCount = 0;
 }
 
-void Buffer_RemoveExcessSpace(Buffer *buffer){
+void Buffer_RemoveExcessSpace(Buffer *buffer, EncoderDecoder *encoder){
     uint tid = 0;
     Token *target = nullptr;
     return;
@@ -87,7 +87,7 @@ void Buffer_RemoveExcessSpace(Buffer *buffer){
         }
         buffer->taken = target->position;
         buffer->tokenCount = tid;
-        buffer->count = Buffer_GetUtf8Count(buffer);
+        buffer->count = Buffer_GetUtf8Count(buffer, encoder);
     }
 }
 
@@ -180,8 +180,8 @@ uint Buffer_FindFirstNonEmptyLocation(Buffer *buffer){
     return buffer->tokens[index].position;
 }
 
-uint Buffer_GetTokenAt(Buffer *buffer, uint u8){
-    uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8);
+uint Buffer_GetTokenAt(Buffer *buffer, uint u8, EncoderDecoder *encoder){
+    uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8, nullptr, encoder);
     for(uint i = 0; i < buffer->tokenCount; i++){
         Token *token = &buffer->tokens[i];
 		uint p = token->position < 0 ? 0 : token->position;
@@ -225,7 +225,7 @@ uint Buffer_PositionTabCompensation(Buffer *buffer, uint rawp, int direction){
     return rawp;
 }
 
-uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
+uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp, EncoderDecoder *encoder){
     if(!(rawp <= buffer->taken)){
         BUG();
         BUG_PRINT("BUG tracked:\n");
@@ -247,7 +247,7 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp){
         int of = 0;
         while(c != (int)rawp && (int)buffer->taken > c){
             of = 0;
-            int rv = StringToCodepoint(&p[c], buffer->taken - c, &of);
+            int rv = StringToCodepoint(encoder, &p[c], buffer->taken - c, &of);
             if(rv == -1) break;
             c += of;
             r++;
@@ -290,7 +290,7 @@ void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
 }
 
 //TODO: Review, this might be showing some issues with lexer
-uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
+uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len, EncoderDecoder *encoder){
     if(!(u8p <= buffer->taken)){
         BUG();
         BUG_PRINT("BUG tracked:\n");
@@ -304,7 +304,7 @@ uint Buffer_Utf8PositionToRawPosition(Buffer *buffer, uint u8p, int *len){
 
     uint r = 0;
     if(buffer->taken > 0){
-        r = StringComputeRawPosition(buffer->data, buffer->taken, u8p, len);
+        r = StringComputeRawPosition(encoder, buffer->data, buffer->taken, u8p, len);
     }else{
         if(len) *len = 1;
     }
@@ -318,15 +318,15 @@ void Buffer_Claim(Buffer *buffer){
     }
 }
 
-uint Buffer_GetUtf8Count(Buffer *buffer){
-    return StringComputeU8Count(buffer->data, buffer->taken);
+uint Buffer_GetUtf8Count(Buffer *buffer, EncoderDecoder *encoder){
+    return StringComputeU8Count(encoder, buffer->data, buffer->taken);
 }
 
-void Buffer_RemoveLastToken(Buffer *buffer){
+void Buffer_RemoveLastToken(Buffer *buffer, EncoderDecoder *encoder){
     if(buffer){
         if(buffer->tokenCount < 1) return;
         Token *token = &buffer->tokens[buffer->tokenCount-1];
-        Buffer_RemoveRangeRaw(buffer, token->position, buffer->taken);
+        Buffer_RemoveRangeRaw(buffer, token->position, buffer->taken, encoder);
         if(token->reserved) AllocatorFree(token->reserved);
         if(buffer->tokenCount > 1){
             buffer->tokens = AllocatorExpand(Token, buffer->tokens,
@@ -401,7 +401,7 @@ void Buffer_Init(Buffer *buffer, uint size){
     buffer->is_ours = false;
 }
 
-void Buffer_InitSet(Buffer *buffer, char *head, uint leno){
+void Buffer_InitSet(Buffer *buffer, char *head, uint leno, EncoderDecoder *encoder){
     uint len = leno;
 
     if(buffer->data == nullptr){
@@ -430,7 +430,7 @@ void Buffer_InitSet(Buffer *buffer, char *head, uint leno){
     buffer->stateContext.activeWorkProcessor = -1;
     buffer->stateContext.backTrack = 0;
     buffer->stateContext.forwardTrack = 0;
-    buffer->count = Buffer_GetUtf8Count(buffer);
+    buffer->count = Buffer_GetUtf8Count(buffer, encoder);
     buffer->is_ours = false;
 }
 
@@ -493,8 +493,10 @@ uint Buffer_FindNextSeparator(Buffer *buffer, uint rawp){
     return n;
 }
 
-uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint len){
-    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
+uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term,
+                               uint len, EncoderDecoder *encoder)
+{
+    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8, nullptr, encoder);
     if(raw > buffer->taken){
         BUG();
         BUG_PRINT("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
@@ -508,7 +510,7 @@ uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint l
     for(int i = (int)raw-1; i >= 0 && !done; i--){
         for(uint k = 0; k < len && !done; k++){
             if(buffer->data[i] == term[k]){
-                res = Buffer_Utf8RawPositionToPosition(buffer, i);
+                res = Buffer_Utf8RawPositionToPosition(buffer, i, encoder);
                 done = true;
                 break;
             }
@@ -517,8 +519,10 @@ uint Buffer_FindPreviousWordU8(Buffer *buffer, uint u8, const char *term, uint l
     return res;
 }
 
-uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len){
-    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8);
+uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term,
+                          uint len, EncoderDecoder *encoder)
+{
+    uint raw = Buffer_Utf8PositionToRawPosition(buffer, u8, nullptr, encoder);
     if(raw > buffer->taken){
         BUG();
         BUG_PRINT("BUG tracked: Attempted to query buffer outside of valid range (%u > %u)\n",
@@ -538,10 +542,10 @@ uint Buffer_FindNextWord8(Buffer *buffer, uint u8, const char *term, uint len){
             }
         }
     }
-    return Buffer_Utf8RawPositionToPosition(buffer, res);
+    return Buffer_Utf8RawPositionToPosition(buffer, res, encoder);
 }
 
-void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end){
+void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end, EncoderDecoder *encoder){
     if(end > start){
         uint endLoc = Min(buffer->taken, end);
         uint rangeLen = endLoc - start;
@@ -551,7 +555,7 @@ void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end){
             }
 
             buffer->taken -= rangeLen;
-            buffer->count = Buffer_GetUtf8Count(buffer);
+            buffer->count = Buffer_GetUtf8Count(buffer, encoder);
         }else{
             buffer->taken = 0;
             buffer->count = 0;
@@ -561,10 +565,10 @@ void Buffer_RemoveRangeRaw(Buffer *buffer, uint start, uint end){
     }
 }
 
-void Buffer_RemoveRange(Buffer *buffer, uint u8start, uint u8end){
+void Buffer_RemoveRange(Buffer *buffer, uint u8start, uint u8end, EncoderDecoder *encoder){
     if(u8end > u8start){
-        uint start = Buffer_Utf8PositionToRawPosition(buffer, u8start, nullptr);
-        uint end = Buffer_Utf8PositionToRawPosition(buffer, u8end, nullptr);
+        uint start = Buffer_Utf8PositionToRawPosition(buffer, u8start, nullptr, encoder);
+        uint end = Buffer_Utf8PositionToRawPosition(buffer, u8end, nullptr, encoder);
         uint endLoc = Min(buffer->taken, end);
         uint rangeLen = endLoc - start;
         if(buffer->taken > rangeLen){
@@ -573,7 +577,7 @@ void Buffer_RemoveRange(Buffer *buffer, uint u8start, uint u8end){
             }
 
             buffer->taken -= rangeLen;
-            buffer->count = Buffer_GetUtf8Count(buffer);
+            buffer->count = Buffer_GetUtf8Count(buffer, encoder);
         }else{
             buffer->taken = 0;
             buffer->count = 0;
@@ -583,7 +587,7 @@ void Buffer_RemoveRange(Buffer *buffer, uint u8start, uint u8end){
     }
 }
 
-uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len){
+uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len, EncoderDecoder *encoder){
     uint ic = 0;
     uint osize = len;
     if(len > 0){
@@ -613,7 +617,7 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len){
         }
 
         buffer->taken += len;
-        buffer->count = Buffer_GetUtf8Count(buffer);
+        buffer->count = Buffer_GetUtf8Count(buffer, encoder);
         buffer->data[buffer->taken] = 0;
 
         if(buffer->size > buffer->taken){
@@ -628,9 +632,9 @@ uint Buffer_InsertRawStringAt(Buffer *buffer, uint at, char *str, uint len){
     return ic;
 }
 
-uint Buffer_InsertStringAt(Buffer *buffer, uint rap, char *str, uint len){
-    uint at = Buffer_Utf8PositionToRawPosition(buffer, rap);
-    return Buffer_InsertRawStringAt(buffer, at, str, len);
+uint Buffer_InsertStringAt(Buffer *buffer, uint rap, char *str, uint len, EncoderDecoder *encoder){
+    uint at = Buffer_Utf8PositionToRawPosition(buffer, rap, nullptr, encoder);
+    return Buffer_InsertRawStringAt(buffer, at, str, len, encoder);
 }
 
 void Buffer_Release(Buffer *buffer){
@@ -733,8 +737,19 @@ uint LineBuffer_InsertRawText(LineBuffer *lineBuffer, char *text, uint size){
                                       u8offset, &dummy, 1);
 }
 
+void LineBuffer_UpdateEncoding(LineBuffer *lineBuffer){
+    if(!lineBuffer) return;
+
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
+    for(uint i = 0; i < lineBuffer->lineCount; i++){
+        Buffer *buffer = lineBuffer->lines[i];
+        buffer->count = Buffer_GetUtf8Count(buffer, encoder);
+    }
+}
+
 void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size){
     AssertA(lineBuffer != nullptr, "Invalid line initialization");
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
         lineBuffer->lines = AllocatorExpand(Buffer *, lineBuffer->lines, newSize,
@@ -748,16 +763,17 @@ void LineBuffer_InsertLine(LineBuffer *lineBuffer, char *line, uint size){
         lineBuffer->size = newSize;
     }
     if(size > 0 && line)
-        Buffer_InitSet(lineBuffer->lines[lineBuffer->lineCount], line, size);
+        Buffer_InitSet(lineBuffer->lines[lineBuffer->lineCount], line, size, encoder);
     else
         Buffer_Init(lineBuffer->lines[lineBuffer->lineCount], DefaultAllocatorSize);
     lineBuffer->lineCount++;
 }
 
 void LineBuffer_SoftClear(LineBuffer *lineBuffer){
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     for(uint i = 0; i < lineBuffer->lineCount; i++){
         Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-        Buffer_SoftClear(buffer);
+        Buffer_SoftClear(buffer, encoder);
         //Buffer_RemoveRangeRaw(buffer, 0, buffer->taken);
     }
     // need to give the empty line address
@@ -784,16 +800,18 @@ void LineBuffer_RemoveLineAt(LineBuffer *lineBuffer, uint at){
 }
 
 void LineBuffer_MergeConsecutiveLines(LineBuffer *lineBuffer, uint base){
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     if(base+1 < lineBuffer->lineCount){
         Buffer *Li = LineBuffer_GetBufferAt(lineBuffer, base);
         Buffer *Li1 = LineBuffer_GetBufferAt(lineBuffer, base+1);
-        Buffer_InsertStringAt(Li, Li->count, Li1->data, Li1->taken);
+        Buffer_InsertStringAt(Li, Li->count, Li1->data, Li1->taken, encoder);
         LineBuffer_RemoveLineAt(lineBuffer, base+1);
     }
 }
 
 void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint size){
     Buffer *Li = nullptr;
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     // make sure we can hold at least one more line
     if(!(lineBuffer->lineCount < lineBuffer->size)){
         uint newSize = lineBuffer->size + DefaultAllocatorSize;
@@ -829,7 +847,7 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint s
     }
 
     if(line && size > 0)
-        Buffer_InitSet(Li, line, size);
+        Buffer_InitSet(Li, line, size, encoder);
     else
         Buffer_Init(Li, DefaultAllocatorSize);
     lineBuffer->lineCount++;
@@ -854,6 +872,9 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
 
     lineBuffer->props.isWrittable = true;
     lineBuffer->props.isInternal = false;
+
+    EncoderDecoder_InitFor(&lineBuffer->props.encoder, ENCODER_DECODER_UTF8);
+    //EncoderDecoder_InitFor(&lineBuffer->props.encoder, ENCODER_DECODER_LATIN1);
 
     for(uint i = 0; i < DefaultAllocatorSize; i++){
         lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));
@@ -1046,95 +1067,6 @@ static void LineBuffer_RemountBuffer(LineBuffer *lineBuffer, Buffer *buffer,
         AssertA(base >= r, "Overflow during forwardtrack computation");
         Buffer *b = LineBuffer_GetBufferAt(lineBuffer, base - r);
         b->stateContext.forwardTrack = r+2;
-    }
-}
-
-std::vector<vec2ui> *LineBuffer_GetDiffRangePtr(LineBuffer *lineBuffer, bool *any){
-    std::vector<vec2ui> *ptr = nullptr;
-    *any = false;
-    if(lineBuffer){
-        ptr = &lineBuffer->props.diffLines;
-        *any = ptr->size() > 0;
-    }
-
-    return ptr;
-}
-
-
-std::vector<LineHighlightInfo> *LineBuffer_GetLineHighlightPtr(LineBuffer *lineBuffer, int clear){
-    std::vector<LineHighlightInfo> *ptr = nullptr;
-    if(lineBuffer){
-        ptr = &lineBuffer->props.diffs;
-        if(clear){
-            ptr->clear();
-        }
-    }
-    return ptr;
-}
-
-void LineBuffer_EraseDiffContent(LineBuffer *lineBuffer){
-    if(lineBuffer){
-        std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
-        for(int i = ptr->size()-1; i >= 0; i--){
-            vec2ui v = ptr->at(i);
-            if(v.y == GIT_LINE_REMOVED){
-                LineBuffer_RemoveLineAt(lineBuffer, v.x);
-            }
-        }
-    }
-}
-
-void LineBuffer_InsertDiffContent(LineBuffer *lineBuffer, vec2ui &range){
-    if(lineBuffer){
-        std::vector<vec2ui> *ptr = &lineBuffer->props.diffLines;
-        std::vector<LineHighlightInfo> *dif = &lineBuffer->props.diffs;
-        ptr->clear();
-        /*
-        * Line computation: Whenever we look at a delta we need to keep
-        * in mind that for lines that were removed their number are relating
-        * to the old file, while for new lines they are referred to the new file.
-        * In the editor, new lines are always correct because the file is already
-        * completed. If we wish to merge both views in the same file we need to
-        * concatenate the removed lines in the correct position. Every time we
-        * insert a removed line, we push all the file down so even for the new lines
-        * they get position n += 1. For the following removed lines we need to consider
-        * the new lines that entered. If a removed line was at position k (old file)
-        * but before it were s new lines, than in the new file the position is actually
-        * k+s. These direct translates into the following loop where we accumulate
-        * the amount of removed lines to push the new lines down, and accumulate the
-        * new lines in order to push the removed lines based on the deltas that entered.
-        */
-
-        uint start = lineBuffer->lineCount, end = 0;
-        uint adds = 0, rems = 0;
-        for(uint i = 0; i < dif->size(); i++){
-            LineHighlightInfo line = dif->at(i);
-            uint n = line.lineno-1;
-
-            //std::string p("+");
-            if(line.ctype == GIT_LINE_REMOVED){
-                n += rems;
-                LineBuffer_InsertLineAt(lineBuffer, n, (char *)line.content.c_str(),
-                                        line.content.size());
-                adds += 1;
-                //p = "-";
-            }else if(line.ctype == GIT_LINE_INSERTED){
-                n += adds;
-                rems += 1;
-            }else{
-                AssertA(0, "Invalid delta type");
-            }
-
-            //printf("[%d - %d] => %s %s\n", (int)n, (int)line.lineno-1,
-                    //p.c_str(), line.content.c_str());
-
-            start = Min(start, n);
-            end = Max(end, n);
-
-            ptr->push_back(vec2ui(n, (uint)line.ctype));
-        }
-
-        range = vec2ui(start, end);
     }
 }
 
@@ -1348,6 +1280,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     // 1 - Count the amount of lines so we can shift the file in a single pass
     //     the amount of lines is given by the text and not the buffer so its ok
     //     to check for that only.
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     uint nLines = 0;
     uint bId = base;
     Buffer *lastBuffer = lineBuffer->lines[base];
@@ -1415,13 +1348,13 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             //Buffer *buffer = lineBuffer->lines[base];
             text[proc] = 0;
             lastBuffer = lineBuffer->lines[base];
-            Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize);
+            Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, encoder);
             //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
             if(pp < 0){
-                uint rpos = Buffer_Utf8PositionToRawPosition(lastBuffer, at);
+                uint rpos = Buffer_Utf8PositionToRawPosition(lastBuffer, at, nullptr, encoder);
                 firstP = rpos;
                 toCopy -= rpos;
-                Buffer_RemoveRangeRaw(lastBuffer, firstP+lineSize, lastBuffer->taken);
+                Buffer_RemoveRangeRaw(lastBuffer, firstP+lineSize, lastBuffer->taken, encoder);
                 pp = 0;
             }
 
@@ -1441,7 +1374,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
     // If we did not finish at '\n' than manually copy the missing content
     if(lineSize > 0){
         lastBuffer = lineBuffer->lines[base];
-        uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize);
+        uint n = Buffer_InsertStringAt(lastBuffer, at, lineStart, lineSize, encoder);
         Buffer_Claim(lastBuffer);
         at += n;
         //printf("Inserting block %s at %u ( %u )\n", lineStart, at, base);
@@ -1455,7 +1388,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
             // if we inserted a new line than this must be copied to the final buffer
             at = lastBuffer->taken;
             Buffer_InsertRawStringAt(lastBuffer, lastBuffer->taken,
-                                     &firstLine[firstP], toCopy);
+                                     &firstLine[firstP], toCopy, encoder);
             Buffer_Claim(lastBuffer);
         }
     }
@@ -1480,7 +1413,7 @@ uint LineBuffer_InsertRawTextAt(LineBuffer *lineBuffer, char *text, uint size,
         if(b->data == nullptr) Buffer_Init(b, DefaultAllocatorSize);
     }
 
-    *offset = Buffer_Utf8RawPositionToPosition(lastBuffer, at);
+    *offset = Buffer_Utf8RawPositionToPosition(lastBuffer, at, encoder);
 
     AllocatorFree(firstLine);
 
@@ -1586,13 +1519,14 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
     uint spi = 0;
     uint maxi = 0;
 	uint size = 0;
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     Buffer *b = LineBuffer_GetBufferAt(lineBuffer, si);
-    uint pi = Buffer_Utf8PositionToRawPosition(b, start.y);
+    uint pi = Buffer_Utf8PositionToRawPosition(b, start.y, nullptr, encoder);
     spi = pi;
     do{
         unprocessedSize += b->taken - pi + 1;
         if(si == ei){
-            pi = Buffer_Utf8PositionToRawPosition(b, end.y);
+            pi = Buffer_Utf8PositionToRawPosition(b, end.y, nullptr, encoder);
             maxi = pi;
         }
 
@@ -1656,10 +1590,11 @@ Buffer *LineBuffer_ReplaceBufferAt(LineBuffer *lineBuffer, Buffer *buffer, uint 
 }
 
 void LineBuffer_SetActiveBuffer(LineBuffer *lineBuffer, vec2i bufId, int safe){
+    EncoderDecoder *encoder = &lineBuffer->props.encoder;
     uint i = lineBuffer->activeBuffer.x;
     Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
     if(buffer && (int)i != bufId.x && safe){
-        Buffer_RemoveExcessSpace(buffer);
+        Buffer_RemoveExcessSpace(buffer, encoder);
     }
     lineBuffer->activeBuffer = bufId;
 }
@@ -1794,6 +1729,7 @@ int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){
     int rv = 0;
     if(lineBuffer){
         CopySection *section = &lineBuffer->props.cpSection;
+        EncoderDecoder *encoder = &lineBuffer->props.encoder;
         if(section->active && bid >= section->start.x && bid <= section->end.x){
             if(bid < section->end.x) return 1;
 
@@ -1801,8 +1737,8 @@ int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){
             if(id < buffer->tokenCount){
                 Token *token = &buffer->tokens[id];
                 uint s = token->position + token->size;
-                uint ps = Buffer_Utf8RawPositionToPosition(buffer, token->position);
-                uint pe = Buffer_Utf8RawPositionToPosition(buffer, s);
+                uint ps = Buffer_Utf8RawPositionToPosition(buffer, token->position, encoder);
+                uint pe = Buffer_Utf8RawPositionToPosition(buffer, s, encoder);
                 uint start = section->start.x == section->end.x ? section->start.y : 0;
                 uint end = section->end.x == bid ? section->end.y : buffer->count;
                 if(ps >= start && pe <= end){
@@ -1893,6 +1829,11 @@ void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section){
     if(lineBuffer && section){
         *section = lineBuffer->props.cpSection;
     }
+}
+
+EncoderDecoder *LineBuffer_GetEncoderDecoder(LineBuffer *lineBuffer){
+    AssertA(lineBuffer != nullptr, "Invalid linebuffer given");
+    return &lineBuffer->props.encoder;
 }
 
 /* Debug stuff */

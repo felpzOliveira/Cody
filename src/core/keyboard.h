@@ -3,6 +3,8 @@
 #ifndef KEYBOARD_H
 #define KEYBOARD_H
 
+#include <types.h>
+
 #define KEYBOARD_EVENT_RELEASE 0
 #define KEYBOARD_EVENT_PRESS   1
 #define KEYBOARD_EVENT_REPEAT  2
@@ -13,11 +15,14 @@
 #define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size, void *priv)
 #define KEY_ENTRY_RAW_EVENT(name) void name(int rawKeyCode)
 
+#define KEYBOARD_ACTIVE_EVENT(name) void name()
+
 typedef KEYSET_EVENT(KeySetEventCallback);
 typedef KEY_ENTRY_EVENT(KeyEntryCallback);
 typedef KEY_ENTRY_RAW_EVENT(KeyRawEntryCallback);
+typedef KEYBOARD_ACTIVE_EVENT(KeyboardActiveCallback);
 
-#define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, callback, __VA_ARGS__, -1)
+#define RegisterEvent(map, callback, ...) RegisterKeyboardEventEx(map, 0, #callback, callback, __VA_ARGS__, -1)
 
 #define RegisterRepeatableEvent(map, callback, ...) RegisterKeyboardEventEx(map, 1, #callback, callback, __VA_ARGS__, -1)
 
@@ -149,6 +154,17 @@ BindingMap *KeyboardCreateMapping(void *refWindow);
 void KeyboardSetActiveMapping(BindingMap *mapping);
 
 /*
+* Register a callback to be called everytime the keyboard is active,
+* do not do heavy work in here please.
+*/
+int KeyboardRegisterActiveEvent(KeyboardActiveCallback *cb);
+
+/*
+* Remove a callback from the list of active callbacks for the keyboard.
+*/
+void KeyboardReleaseActiveEvent(int handle);
+
+/*
 * Sets the window where the mapping should be applied. If a keyboard event
 * happens and the active binding does not have a reference window than
 * it is applied globally. Use this routine to tell cody to only call
@@ -165,6 +181,7 @@ BindingMap *KeyboardGetActiveMapping();
 * Get the state of a given key _right_now_.
 */
 int KeyboardGetKeyState(Key key);
+int KeyboardGetKeyActive(Key key);
 
 /*
 * Queries the keyboard API for the current active mapping for a specific window.
@@ -195,11 +212,30 @@ void RegisterKeyboardEventEx(BindingMap *mapping, int repeat, const char *name,
 * Reports a key event. This should be called by the underlying OS keyboard system.
 */
 void KeyboardEvent(Key eventKey, int eventType, char *utf8Data, int utf8Size,
-                   int rawKeyCode, void *window);
+                   int rawKeyCode, void *window, int allowEntryCallback);
+/*
+* Dedicated event reporting for INPUT text only, this routine does not trigger events registered with
+* RegisterEvent*, it is meant for windows so it can split its message.
+*/
+void KeyboardEntryEvent(Key eventKey, int eventType, char* utf8Data, int utf8Size,
+                        int rawKeyCode, void* window);
 
 /*
 * Forces the keyboard API table to restore all key states, no callbacks are triggered.
 */
 void KeyboardResetState();
+
+int IsKeyModifier(Key key);
+
+int IsKeySpecialBinding(Key key);
+
+void KeyboardRegisterKeyState(Key eventKey, int eventType);
+
+int KeyboardAttemptToConsumeKey(Key eventKey, void *window);
+
+// NOTE: These should be defined somewhere else
+int CreateKeyTable();
+int TranslateKey(int scancode);
+int GetMappedKeysCount();
 
 #endif //KEYBOARD_H

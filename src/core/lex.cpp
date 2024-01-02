@@ -121,7 +121,9 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     if(token->identifier == TOKEN_ID_DATATYPE_STRUCT_DEF){
         LogicalProcessor proc = {
             .proc = Lex_StructProcessor,
-            .nestedLevel = 0,
+            .nestedLevelBrace = 0,
+            .nestedLevelParent = 0,
+            .nestedLevelSg = 0,
             .currentState = 0,
         };
 
@@ -130,7 +132,9 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     }else if(token->identifier == TOKEN_ID_DATATYPE_TYPEDEF_DEF){
         LogicalProcessor proc = {
             .proc = Lex_TypedefProcessor,
-            .nestedLevel = 0,
+            .nestedLevelBrace = 0,
+            .nestedLevelParent = 0,
+            .nestedLevelSg = 0,
             .currentState = 0,
         };
 
@@ -139,7 +143,20 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     }else if(token->identifier == TOKEN_ID_DATATYPE_ENUM_DEF){
         LogicalProcessor proc = {
             .proc = Lex_EnumProcessor,
-            .nestedLevel = 0,
+            .nestedLevelBrace = 0,
+            .nestedLevelParent = 0,
+            .nestedLevelSg = 0,
+            .currentState = 0,
+        };
+
+        BoundedStack_Push(tokenizer->procStack, &proc);
+        added = 1;
+    }else if(token->identifier == TOKEN_ID_DATATYPE_NAMESPACE_DEF){
+        LogicalProcessor proc = {
+            .proc = Lex_NamespaceProcessor,
+            .nestedLevelBrace = 0,
+            .nestedLevelParent = 0,
+            .nestedLevelSg = 0,
             .currentState = 0,
         };
 
@@ -148,7 +165,9 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     }else if(token->identifier == TOKEN_ID_DATATYPE_CLASS_DEF){
         LogicalProcessor proc = {
             .proc = Lex_ClassProcessor,
-            .nestedLevel = 0,
+            .nestedLevelBrace = 0,
+            .nestedLevelParent = 0,
+            .nestedLevelSg = 0,
             .currentState = 0,
         };
 
@@ -157,6 +176,18 @@ static int Lex_ProcStackInsert(Tokenizer *tokenizer, Token *token){
     }
 
     return added;
+}
+
+// TODO: This is not actually correct, recall that sometimes (like enums)
+//       we can have stuff like:
+//        val = 1 << 3,
+//        };
+//        This will trigger nestedLevelSg to not be zero and then this will not return
+//        true even if the } makes nestedLevelBrace be zero. However for functions
+//        we need to consider all. So we are doomed, we actually need a lexer/parser.
+bool LogicalProcessorNestLevelIsZero(LogicalProcessor *proc){
+    return proc->nestedLevelBrace == 0 && proc->nestedLevelParent == 0 &&
+           proc->nestedLevelSg == 0;
 }
 
 int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
@@ -170,18 +201,23 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
     int filtered = 1;
     switch(token->identifier){
         /* templates */
-        // TODO: We need to split tokens dividers here otherwise a { can be resolved by ) <
-        //case TOKEN_ID_LESS: proc->nestedLevel++; break;
-        //case TOKEN_ID_MORE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
+        case TOKEN_ID_LESS:
+            proc->nestedLevelSg++; break;
+        case TOKEN_ID_MORE:
+            proc->nestedLevelSg > 0 ? proc->nestedLevelSg-- : 0; break;
         /* definition */
-        case TOKEN_ID_BRACE_OPEN: proc->nestedLevel++; break;
-        case TOKEN_ID_BRACE_CLOSE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
+        case TOKEN_ID_BRACE_OPEN:
+            proc->nestedLevelBrace++; break;
+        case TOKEN_ID_BRACE_CLOSE:
+            proc->nestedLevelBrace > 0 ? proc->nestedLevelBrace-- : 0; break;
         /* function */
-        case TOKEN_ID_PARENTHESE_OPEN: proc->nestedLevel++; break;
-        case TOKEN_ID_PARENTHESE_CLOSE: proc->nestedLevel > 0 ? proc->nestedLevel-- : 0; break;
+        case TOKEN_ID_PARENTHESE_OPEN:
+            proc->nestedLevelParent++; break;
+        case TOKEN_ID_PARENTHESE_CLOSE:
+            proc->nestedLevelParent > 0 ? proc->nestedLevelParent-- : 0; break;
         /* possible end of declaration */
         case TOKEN_ID_SEMICOLON:{
-            if(proc->nestedLevel == 0){ // finished declaration
+            if(LogicalProcessorNestLevelIsZero(proc)){ // finished declaration
                 proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 filtered = 2;
@@ -201,9 +237,9 @@ int Lex_TokenLogicalFilter(Tokenizer *tokenizer, Token *token,
 }
 
 /* (Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p) */
-LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
+LEX_LOGICAL_PROCESSOR(Lex_NamespaceProcessor){
     /*
-    * class A
+    * namespace A
     */
     int emitWarningToken = 0;
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
@@ -211,9 +247,10 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
 
     char *h = (*p) - token->size;
     int grabbed = 0;
+    bool nest_is_zero = LogicalProcessorNestLevelIsZero(proc);
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
-            if(proc->nestedLevel == 0){
+            if(nest_is_zero){
                 proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 1;
@@ -222,13 +259,13 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
         } break;
         /* possible token */
         case TOKEN_ID_NONE:{
-            if(proc->nestedLevel == 0 && proc->currentState == 0){
-                token->identifier = TOKEN_ID_DATATYPE_USER_CLASS;
+            if(nest_is_zero && proc->currentState == 0){
+                token->identifier = TOKEN_ID_DATATYPE_USER_NAMESPACE;
                 proc->range.y = tokenizer->runningLine;
                 proc->currentState = 1;
                 grabbed = 1;
-                PRINT_SAFE("CLASS > ", h, token->size);
-            }else if(proc->nestedLevel == 0 && proc->currentState == 1){
+                PRINT_SAFE("NAMESPACE > ", h, token->size);
+            }else if(nest_is_zero && proc->currentState == 1){
                 /*
                 * This means we already got our token but there is another
                 * this is most likely a construction of either invalid struct
@@ -241,7 +278,88 @@ LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
         } break;
 
         case TOKEN_ID_BRACE_OPEN:{
-            if(proc->nestedLevel == 1 && proc->currentState == 1){
+            if(proc->nestedLevelBrace == 1 && proc->currentState == 1){
+                /*
+                * We got our token but there is a definition following, allow
+                * outter components to process.
+                */
+                BoundedStack_Pop(tokenizer->procStack);
+                emitWarningToken = 2;
+                filter = 2;
+            }
+        } break;
+
+        default: {}
+    }
+
+    if(emitWarningToken){
+        if(!BoundedStack_IsEmpty(tokenizer->procStack)){
+            Token infoToken;
+            infoToken.identifier = TOKEN_ID_IGNORE;
+            LogicalProcessor *nextProc = BoundedStack_Peek(tokenizer->procStack);
+            nextProc->proc(tokenizer, &infoToken, nextProc, p);
+            if(emitWarningToken == 2){ // give real token also
+                nextProc->proc(tokenizer, token, nextProc, p);
+            }
+        }
+    }
+
+    if(grabbed){
+        if(SymbolTable_Insert(tokenizer->symbolTable, h,
+                              token->size, token->identifier) == 0)
+        {
+            token->identifier = TOKEN_ID_NONE;
+        }else{
+            token->reserved = StringDup(h, token->size);
+        }
+    }
+
+    return filter > 1 ? 0 : 1;
+}
+
+/* (Tokenizer *tokenizer, Token *token, LogicalProcessor *proc, char **p) */
+LEX_LOGICAL_PROCESSOR(Lex_ClassProcessor){
+    /*
+    * class A
+    */
+    int emitWarningToken = 0;
+    int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
+                                        TOKEN_ID_DATATYPE_CLASS_DEF, p);
+
+    char *h = (*p) - token->size;
+    int grabbed = 0;
+    bool nest_is_zero = LogicalProcessorNestLevelIsZero(proc);
+    switch(token->identifier){
+        case TOKEN_ID_BRACE_CLOSE:{
+            if(nest_is_zero){
+                proc->range.y = tokenizer->runningLine;
+                BoundedStack_Pop(tokenizer->procStack);
+                emitWarningToken = 1;
+                filter = 2;
+            }
+        } break;
+        /* possible token */
+        case TOKEN_ID_NONE:{
+            if(nest_is_zero && proc->currentState == 0){
+                token->identifier = TOKEN_ID_DATATYPE_USER_CLASS;
+                proc->range.y = tokenizer->runningLine;
+                proc->currentState = 1;
+                grabbed = 1;
+                PRINT_SAFE("CLASS > ", h, token->size);
+            }else if(nest_is_zero && proc->currentState == 1){
+                /*
+                * This means we already got our token but there is another
+                * this is most likely a construction of either invalid struct
+                * or a forward declaration.
+                */
+                BoundedStack_Pop(tokenizer->procStack);
+                emitWarningToken = 2;
+                filter = 2;
+            }
+        } break;
+
+        case TOKEN_ID_BRACE_OPEN:{
+            if(proc->nestedLevelBrace == 1 && proc->currentState == 1){
                 /*
                 * We got our token but there is a definition following, allow
                 * outter components to process.
@@ -292,9 +410,10 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_ENUM_DEF, p);
 
+    bool nest_is_zero = proc->nestedLevelBrace == 0;
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
-            if(proc->nestedLevel == 0){
+            if(nest_is_zero){
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 1;
                 filter = 2;
@@ -302,11 +421,11 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
         } break;
         /* possible token */
         case TOKEN_ID_NONE:{
-            if(proc->nestedLevel == 0 && proc->currentState == 0){
+            if(nest_is_zero && proc->currentState == 0){
                 token->identifier = TOKEN_ID_DATATYPE_USER_ENUM;
                 proc->currentState = 1;
                 PRINT_SAFE("ENUM > ", ((*p) - token->size), token->size);
-            }else if(proc->nestedLevel == 0 && proc->currentState == 1){
+            }else if(nest_is_zero && proc->currentState == 1){
                 /*
                 * This means we already got our token but there is another
                 * this is most likely a construction of either invalid struct
@@ -315,7 +434,7 @@ LEX_LOGICAL_PROCESSOR(Lex_EnumProcessor){
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 2;
                 filter = 2;
-            }else if(proc->nestedLevel == 1){
+            }else if(proc->nestedLevelBrace == 1){
                 /*
                 * We got one of the values inside the enum, this is a very soft test tho
                 */
@@ -360,11 +479,12 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
     int filter = Lex_TokenLogicalFilter(tokenizer, token, proc,
                                         TOKEN_ID_DATATYPE_STRUCT_DEF, p);
 
+    bool nest_is_zero = LogicalProcessorNestLevelIsZero(proc);
     char *h = (*p) - token->size;
     int grabbed = 0;
     switch(token->identifier){
         case TOKEN_ID_BRACE_CLOSE:{
-            if(proc->nestedLevel == 0){
+            if(nest_is_zero){
                 proc->range.y = tokenizer->runningLine;
                 BoundedStack_Pop(tokenizer->procStack);
                 emitWarningToken = 1;
@@ -373,13 +493,13 @@ LEX_LOGICAL_PROCESSOR(Lex_StructProcessor){
         } break;
         /* possible token */
         case TOKEN_ID_NONE:{
-            if(proc->nestedLevel == 0 && proc->currentState == 0){
+            if(nest_is_zero && proc->currentState == 0){
                 proc->range.y = tokenizer->runningLine;
                 token->identifier = TOKEN_ID_DATATYPE_USER_STRUCT;
                 proc->currentState = 1;
                 grabbed = 1;
                 PRINT_SAFE("STRUCT > ", h, token->size);
-            }else if(proc->nestedLevel == 0 && proc->currentState == 1){
+            }else if(nest_is_zero && proc->currentState == 1){
                 /*
                 * This means we already got our token but there is another
                 * this is most likely a construction of either invalid struct
@@ -439,9 +559,10 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
     int grabbed = 0;
     char *h = (*p) - token->size;
 
+    bool nest_is_zero = LogicalProcessorNestLevelIsZero(proc);
     if(token->identifier != TOKEN_ID_DATATYPE_TYPEDEF_DEF){
         if(token->identifier == TOKEN_ID_PARENTHESE_OPEN){
-            if(proc->nestedLevel == 1){
+            if(proc->nestedLevelBrace == 1){
                 proc->currentState = 2;
             }
         }else if(proc->currentState == 2){
@@ -457,7 +578,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             grabbed = 1;
             PRINT_SAFE("TYPEDEF > ", h, token->size);
         }else if(token->identifier == TOKEN_ID_NONE &&
-                 proc->nestedLevel == 0 && proc->currentState == 1)
+                 nest_is_zero && proc->currentState == 1)
         {
             //token->identifier = TOKEN_ID_DATATYPE_USER_TYPEDEF;
             token->identifier = TOKEN_ID_DATATYPE_USER_DATATYPE;
@@ -466,7 +587,7 @@ LEX_LOGICAL_PROCESSOR(Lex_TypedefProcessor){
             PRINT_SAFE("TYPEDEF > ", h, token->size);
         }else if(proc->currentState == 2 && token->identifier == TOKEN_ID_PARENTHESE_CLOSE){
             proc->currentState = 1;
-        }else if(proc->nestedLevel == 0 && proc->currentState == 0){
+        }else if(nest_is_zero && proc->currentState == 0){
             proc->currentState = 1;
         }
     }
@@ -732,12 +853,16 @@ LEX_PROCESSOR(Lex_String){
 
 /* when inside a comment detect specific keywords, this could be by the tokenizer support */
 TokenId Lex_CommentInnerID(char *head, size_t len){
-    if(len != 4) return TOKEN_ID_IGNORE;
     TokenId ret = TOKEN_ID_IGNORE;
+    if(len != 4 && len != 9)
+        return TOKEN_ID_IGNORE;
+
     if(StringEqual(head, (char *)"TODO", 4))
         ret = TOKEN_ID_COMMENT_TODO;
     if(StringEqual(head, (char *)"NOTE", 4))
         ret = TOKEN_ID_COMMENT_NOTE;
+    if(StringEqual(head, (char *)"IMPORTANT", 9))
+        ret = TOKEN_ID_COMMENT_IMPORTANT;
 
     return ret;
 }

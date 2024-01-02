@@ -8,6 +8,73 @@
 
 #define CMD_EXIT "__internal_exit__"
 
+#if defined(_WIN32)
+#include <Windows.h>
+#include <cstdio>
+#include <io.h>
+#include <fcntl.h>
+
+void pclose(FILE *pipe){
+    fclose(pipe);
+    int fd = _fileno(pipe);
+    if(fd != -1){
+        HANDLE handle = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+        if(handle != INVALID_HANDLE_VALUE)
+            CloseHandle(handle);
+    }
+}
+
+FILE *popen(const char *command, const char *mode){
+    SECURITY_ATTRIBUTES saAttr = {};
+    STARTUPINFO si = {};
+    PROCESS_INFORMATION pi = {};
+    FILE *stream = nullptr;
+    HANDLE hChildStdoutRd, hChildStdoutWr;
+    std::string fullCmd("cmd.exe /C ");
+
+    saAttr.nLength = sizeof(SECURITY_ATTRIBUTES);
+    saAttr.bInheritHandle = TRUE;
+    saAttr.lpSecurityDescriptor = nullptr;
+
+    si.cb = sizeof(si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = SW_HIDE;
+
+    si.dwFlags |= STARTF_USESTDHANDLES;
+
+    fullCmd += command;
+
+    if(!CreatePipe(&hChildStdoutRd, &hChildStdoutWr, &saAttr, 0))
+        goto __return;
+
+    si.hStdOutput = hChildStdoutWr;
+    si.hStdError = hChildStdoutWr;
+    if(!CreateProcess(nullptr, (char *)fullCmd.c_str(), nullptr, nullptr,
+                      TRUE, 0, nullptr, nullptr, &si, &pi))
+        goto __close_and_ret;
+
+    CloseHandle(hChildStdoutWr);
+
+    if(strcmp(mode, "r") == 0){
+        stream = _fdopen(_open_osfhandle(reinterpret_cast<intptr_t>(hChildStdoutRd),
+                         _O_RDONLY | _O_TEXT), "r");
+        if(stream == nullptr)
+            CloseHandle(hChildStdoutRd);
+    }
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+    goto __return;
+
+__close_and_ret:
+    CloseHandle(hChildStdoutRd);
+    CloseHandle(hChildStdoutWr);
+__return:
+    return stream;
+}
+
+#endif
+
 struct BuildParseCtx{
     std::string currMessage;
     std::string lastMessage;
@@ -230,12 +297,21 @@ void build_process_line(std::string line, BuildParseCtx &parseCtx){
         if(line.find(": error:") != std::string::npos){
             parseCtx.currMessage += line;
             parseCtx.pstate = 1;
+        }if(line.find(": fatal error:") != std::string::npos){
+            parseCtx.currMessage += line;
+            parseCtx.pstate = 1;
         }else if(line.find(": warning:") != std::string::npos){
             parseCtx.currMessage += line;
             parseCtx.pstate = 2;
         }
     }else{
         if(line.find(": error:") != std::string::npos){
+            print_state(parseCtx.currMessage, parseCtx);
+
+            parseCtx.currMessage = line;
+            parseCtx.lastState = parseCtx.pstate;
+            parseCtx.pstate = 1;
+        }if(line.find(": fatal error:") != std::string::npos){
             print_state(parseCtx.currMessage, parseCtx);
 
             parseCtx.currMessage = line;

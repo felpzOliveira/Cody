@@ -1,3 +1,4 @@
+#if !defined(_WIN32)
 #include <mi_gdb.h>
 #include <stdio.h>
 #include <types.h>
@@ -479,7 +480,7 @@ bool Dbg_LinuxEnableBreakpoint(Dbg *dbg, int bkpno, bool enable){
     return gmi_break_state(dbgLinux->h, bkpno, enable);
 }
 
-void Dbg_GetFunctions(Dbg *dbg){
+int Dbg_GetFunctions(Dbg *dbg){
     dbg->fn_startWith = Dbg_LinuxStartWith;
     dbg->fn_setBkpt = Dbg_LinuxSetBreakpoint;
     dbg->fn_step = Dbg_LinuxStep;
@@ -497,10 +498,12 @@ void Dbg_GetFunctions(Dbg *dbg){
     if(dbg->priv == nullptr){
         dbg->priv = new DbgLinux;
     }
+
+    return 1;
 }
 
 void Dbg_Free(Dbg *dbg){
     DbgLinux *dbgLinux = (DbgLinux *)dbg->priv;
     delete dbgLinux;
 }
-
+#endif

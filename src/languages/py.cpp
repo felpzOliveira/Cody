@@ -27,7 +27,7 @@ TokenizerSupport pythonSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Dec 26 2022 11:07:05 ) */
+/* Auto generated file ( Dec 28 2023 18:15:49 ) */
 
 std::vector<std::vector<GToken>> pyReservedPreprocessor = {
 };
@@ -98,7 +98,8 @@ std::vector<std::vector<GToken>> pyReservedTable = {
 		{ .value = "finnally", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "nonlocal", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "continue", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "__init__", .identifier = TOKEN_ID_RESERVED }, },
+		{ .value = "__init__", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "__call__", .identifier = TOKEN_ID_RESERVED }, },
 	{
 		{ .value = "__getitem__", .identifier = TOKEN_ID_RESERVED }, },
 };

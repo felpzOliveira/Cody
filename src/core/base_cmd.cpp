@@ -14,6 +14,9 @@
 #include <storage.h>
 #include <theme.h>
 
+int Mkdir(const char *path);
+char* __realpath(const char* path, char* resolved_path);
+
 struct CmdInformation{
     std::string help;
     std::function<int(char *, uint, View *)> fn;
@@ -111,8 +114,7 @@ int BaseCommand_CreateCodyFolderIfNeeded(){
     int r = GuessFileEntry((char *)dir.c_str(), dir.size(), &entry, folder);
 
     if(r < 0){
-        //TODO: mkdir
-        rv = mkdir(dir.c_str(), 0777);
+        rv = Mkdir(dir.c_str());
     }else if(entry.type == DescriptorDirectory){
         // already created
         rv = 0;
@@ -225,10 +227,11 @@ int SearchAllFilesCommandStart(View *view, std::string title){
 
             if(StringStartsWith(p, l, rootStr, rootLen)){
                 at = rootLen;
-                while(at < l && p[at] == '/') at ++;
+                while(at < l && (p[at] == '/' || p[at] == '\\')) at ++;
             }
 
             LineBuffer *lBuffer = res->results[i].lineBuffer;
+            EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(lBuffer);
             char *pptr = &(res->results[i].lineBuffer->filePath[at]);
             uint pptr_size = strlen(pptr);
             char m[256];
@@ -245,8 +248,8 @@ int SearchAllFilesCommandStart(View *view, std::string title){
                 start_loc = 0;
             }
 
-            uint sid = Buffer_Utf8RawPositionToPosition(buffer, start_loc);
-            uint tid = Buffer_GetTokenAt(buffer, sid);
+            uint sid = Buffer_Utf8RawPositionToPosition(buffer, start_loc, encoder);
+            uint tid = Buffer_GetTokenAt(buffer, sid, encoder);
             uint fid = Buffer_FindFirstNonEmptyToken(buffer);
             uint pickId = 0;
             for(pickId = tid; pickId < buffer->tokenCount; pickId++){
@@ -318,33 +321,30 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
     return r;
 }
 
-void BaseCommand_GitDiff(char *cmd, uint size){
-    uint len = 0;
-    char *arg = StringNextWord(cmd, size, &len);
-    if(arg == nullptr){
-        AppCommandGitDiffCurrent();
-    }
-}
-
-int BaseCommand_Git(char *cmd, uint size, View *){
+int BaseCommand_EncodingSwap(char *cmd, uint size, View *view){
     int r = 1;
-    uint len = 0;
-    char *gitCmd = StringNextWord(cmd, size, &len);
-    if(StringEqual(gitCmd, (char *)"diff", Min(len, 4))){
-        if(len != 4) return r; // check for ill construted string
-        BaseCommand_GitDiff(gitCmd, size-len);
-    }else if(StringEqual(gitCmd, (char *)"status", Min(len, 6))){
-        AppCommandGitStatus();
-    }else if(StringEqual(gitCmd, (char *)"open", Min(len, 4))){
-        int e = StringFirstNonEmpty(&gitCmd[4], size - 4);
-        std::string val(&gitCmd[4+e]);
-        if(val.size() > 0){
-            char buf[PATH_MAX];
-            char *res = realpath(val.c_str(), buf);
-            (void) res;
-            AppCommandGitOpenRoot(buf);
-        }
-    }
+    std::string search(CMD_ENCODING_STR);
+    int e = StringFirstNonEmpty(&cmd[search.size()], size - search.size());
+    if(e < 0) return r;
+    e += search.size();
+
+    std::string target(&cmd[e]);
+    BufferView *bView = View_GetBufferView(view);
+
+    if(!bView) return r;
+
+    LineBuffer *lineBuffer = BufferView_GetLineBuffer(bView);
+
+    if(!lineBuffer) return r;
+
+    EncoderDecoderType type = EncoderDecoder_GetType(target);
+    if(type == ENCODER_DECODER_NONE)
+        return r;
+
+    EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(lineBuffer);
+    EncoderDecoder_InitFor(encoder, type);
+
+    LineBuffer_UpdateEncoding(lineBuffer);
     return r;
 }
 
@@ -529,15 +529,15 @@ int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
         cmd[size] = vv;
 
         aliasMap[targetStr] = valueStr;
-        printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
+        //printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
     }
 
     return r;
 }
 
 std::string BaseCommand_GetBasePath(){
-    if(envDir.size() > 0) return std::string("/") + envDir;
-    return "/build";
+    if(envDir.size() > 0) return std::string(SEPARATOR_STRING) + envDir;
+    return SEPARATOR_STRING "build";
 }
 
 int BaseCommand_SetExecPath(char *cmd, uint size){
@@ -678,7 +678,7 @@ int BaseCommand_DbgStart(char *cmd, uint size, View *view){
         if(i < splits.size()-1) arg1 += " ";
     }
     printf("Running %s %s\n", arg0.c_str(), arg1.c_str());
-    char *p = realpath(arg0.c_str(), pmax);
+    char *p = __realpath(arg0.c_str(), pmax);
     if(!p){
         printf("Could not translate path [ %s ]\n", arg0.c_str());
         return r;
@@ -744,18 +744,19 @@ int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
         if(!lineBuffer) return r;
 
         uint lineCount = BufferView_GetLineCount(bView);
+        EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(lineBuffer);
         bool any = false;
 
         for(uint i = 0; i < lineCount; i++){
             Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
             if(!buffer) continue;
             if(Buffer_IsBlank(buffer)){
-                Buffer_SoftClear(buffer);
+                Buffer_SoftClear(buffer, encoder);
                 any = true;
             }else if(buffer->tokenCount > 1){
                 Token *lastToken = &buffer->tokens[buffer->tokenCount-1];
                 if(lastToken->identifier == TOKEN_ID_SPACE){
-                    Buffer_RemoveLastToken(buffer);
+                    Buffer_RemoveLastToken(buffer, encoder);
                     any = true;
                 }
             }
@@ -815,12 +816,17 @@ int BaseCommand_IndentRegion(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_CursorBlink(char *, uint, View *){
+    Graphics_ToogleCursorBlinking();
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
     cmdMap[CMD_SEARCH_STR] = {CMD_SEARCH_HELP, BaseCommand_SearchAllFiles};
+    cmdMap[CMD_ENCODING_STR] = {CMD_ENCODING_HELP, BaseCommand_EncodingSwap};
     cmdMap[CMD_FUNCTIONS_STR] = {CMD_FUNCTIONS_HELP, BaseCommand_SearchFunctions};
-    cmdMap[CMD_GIT_STR] = {CMD_GIT_HELP, BaseCommand_Git};
     cmdMap[CMD_HSPLIT_STR] = {CMD_HSPLIT_HELP, BaseCommand_Hsplit};
     cmdMap[CMD_VSPLIT_STR] = {CMD_VSPLIT_HELP, BaseCommand_Vsplit};
     cmdMap[CMD_EXPAND_STR] = {CMD_EXPAND_HELP, BaseCommand_ExpandRestore};
@@ -842,6 +848,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_CHANGE_SATURATION_STR] = {CMD_CHANGE_SATURATION_HELP, BaseCommand_ChangeSaturation};
     cmdMap[CMD_INDENT_FILE_STR] = {CMD_INDENT_FILE_HELP, BaseCommand_IndentFile};
     cmdMap[CMD_INDENT_REGION_STR] = {CMD_INDENT_REGION_HELP, BaseCommand_IndentRegion};
+    cmdMap[CMD_CURSOR_BLINK_STR] = {CMD_CURSOR_BLINK_HELP, BaseCommand_CursorBlink};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
@@ -849,6 +856,7 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: create a standard for this, a json or at least something like bubbles
     int rv = -1;
     if(BaseCommand_Interpret_AliasInsert(cmd, size, view)){
+        QueryBar_EnableInputToHistory(View_GetQueryBar(view));
         return 0;
     }else if(BaseCommand_SetExecPath(cmd, size)){
         return 0;
@@ -910,8 +918,8 @@ static int ListFileEntriesAndCheckLoaded(char *basePath, FileEntry **entries,
 {
     StorageDevice *storage = FetchStorageDevice();
     std::string refPath(basePath);
-    if(refPath[refPath.size()-1] != '/'){
-        refPath += "/";
+    if(refPath[refPath.size()-1] != '/' && refPath[refPath.size()-1] != '\\'){
+        refPath += SEPARATOR_STRING;
     }
 
     if(storage->ListFiles((char *)refPath.c_str(), entries, n, size) < 0){
@@ -962,7 +970,9 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
         StorageDevice *storage = FetchStorageDevice();
         if(len < opener->pathLen){ // its a character remove update
             // check if we can erase the folder path
-            if(opener->basePath[opener->pathLen-1] == '/'){ // change dir
+            if(opener->basePath[opener->pathLen-1] == '/' ||
+               opener->basePath[opener->pathLen-1] == '\\')
+            { // change dir
                 char tmp = 0;
                 uint n = GetSimplifiedPathName(opener->basePath, opener->pathLen-1);
 
@@ -991,9 +1001,10 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                 FileOpenUpdateList(view);
                 search = 0;
             }
-        }else if(entry[len-1] == '/'){ // user typed '/'
+        }else if(entry[len-1] == '/' || entry[len-1] == '\\'){ // user typed '/'
             char *content = nullptr;
             uint contentLen = 0;
+            entry[len-1] = SEPARATOR_CHAR;
             QueryBar_GetWrittenContent(queryBar, &content, &contentLen);
 
             if(storage->Chdir(content) < 0){
@@ -1079,7 +1090,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
         char *p = AppGetContextDirectory();
         char *folder = opener->basePath;
         Memcpy(&folder[opener->pathLen], entry->path, entry->pLen);
-        folder[opener->pathLen + entry->pLen] = '/';
+        folder[opener->pathLen + entry->pLen] = SEPARATOR_CHAR;
         folder[opener->pathLen + entry->pLen + 1] = 0;
         opener->pathLen += entry->pLen + 1;
         if(storage->Chdir(opener->basePath) < 0){
@@ -1142,9 +1153,9 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 
     pEntry = AllocatorGetN(char, len+2);
     lineBuffer = AllocatorGetN(LineBuffer, 1);
-    if(basePath[len-1] != '/'){
-        snprintf(pEntry, len+2, "%s/", basePath);
-        opener->basePath[length] = '/';
+    if(basePath[len-1] != '/' && basePath[len-1] != '\\'){
+        snprintf(pEntry, len+2, "%s%s", basePath, SEPARATOR_STRING);
+        opener->basePath[length] = SEPARATOR_CHAR;
         opener->basePath[length+1] = 0;
         opener->pathLen++;
     }else{

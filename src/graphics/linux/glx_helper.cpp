@@ -320,10 +320,6 @@ int CreateContextGLX(ContextGL *context, Framebuffer *desired, LibHelperX11 *x11
 int ChooseVisualGLX(Framebuffer *desired, LibHelperX11 *x11, Visual **visual, int *depth){
     XVisualInfo *result;
     GLXFBConfig fbConfig;
-    const char *vendor;
-
-    vendor = glXGetClientString(x11->display, GLX_VENDOR);
-    //printf("Vendor: %s\n", vendor);
 
     (void)ChooseGLXFBConfig(desired, x11, &fbConfig);
 

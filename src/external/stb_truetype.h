@@ -463,7 +463,11 @@ int main(int arg, char **argv)
 #define __STB_INCLUDE_STB_TRUETYPE_H__
 
 #ifdef STBTT_STATIC
-#define STBTT_DEF __attribute__((unused)) static
+#if defined(_MSC_VER)
+   #define STBTT_DEF static
+#else
+   #define STBTT_DEF __attribute__((unused)) static
+#endif
 #else
 #define STBTT_DEF extern
 #endif
