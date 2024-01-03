@@ -11,6 +11,13 @@
 #include <climits>
 #include <vector>
 
+// NOTE: Remove if compiling this for other projects or implement a PNG loading function.
+#define INCLUDE_IMAGE_UTILS
+
+#if defined(INCLUDE_IMAGE_UTILS)
+    uint8 *ImageUtils_LoadPixels(uint8 *data, uint len, int *width, int *height, int *channels);
+#endif
+
 LibHelperX11 x11Helper;
 Timer timer;
 Framebuffer x11Framebuffer;
@@ -254,6 +261,7 @@ void InitializeX11(){
 
     x11Helper.WM_DELETE_WINDOW = XInternAtom(x11Helper.display, "WM_DELETE_WINDOW", False);
     x11Helper.NET_WM_PING = XInternAtom(x11Helper.display, "_NET_WM_PING", False);
+    x11Helper.NET_WM_ICON = XInternAtom(x11Helper.display, "_NET_WM_ICON", False);
 
     x11Helper.TARGETS = XInternAtom(x11Helper.display, "TARGETS", False);
     x11Helper.MULTIPLE = XInternAtom(x11Helper.display, "MULTIPLE", False);
@@ -880,6 +888,51 @@ void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y){
         if(x) *x = window->lastCursorPosX;
         if(y) *y = window->lastCursorPosY;
     }
+}
+
+void SetWindowIconX11(WindowX11 *window, unsigned char *png, unsigned int pngLen){
+    uint len = 0;
+    int width = 0;
+    int height = 0;
+    int channels = 0;
+    unsigned long *iconMem = nullptr;
+    unsigned long *ref = nullptr;
+    int longLen = 0;
+
+    uint8 *memory = ImageUtils_LoadPixels(png, pngLen, &width, &height, &channels);
+
+    if(!memory)
+        goto __ret;
+
+    longLen = width * height + 2;
+    iconMem = (unsigned long *)calloc(longLen, sizeof(unsigned long));
+
+    if(!iconMem)
+        goto __ret;
+
+    ref = iconMem;
+
+    *ref++ = width;
+    *ref++ = height;
+
+    // TODO: channels != 4?
+    for(int j = 0;  j < width * height;  j++){
+        *ref++ = (((unsigned long) memory[j * 4 + 0]) << 16) |
+                 (((unsigned long) memory[j * 4 + 1]) <<  8) |
+                 (((unsigned long) memory[j * 4 + 2]) <<  0) |
+                 (((unsigned long) memory[j * 4 + 3]) << 24);
+    }
+
+    XChangeProperty(x11Helper.display, window->handle,
+                    x11Helper.NET_WM_ICON, XA_CARDINAL, 32, PropModeReplace,
+                    (unsigned char *) iconMem, longLen);
+
+    free(iconMem);
+
+    XFlush(x11Helper.display);
+__ret:
+    if(memory)
+        free(memory);
 }
 
 void WaitForEventsX11(){

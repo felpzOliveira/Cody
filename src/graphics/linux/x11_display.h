@@ -180,6 +180,7 @@ typedef struct{
 
     Atom WM_DELETE_WINDOW;
     Atom NET_WM_PING;
+    Atom NET_WM_ICON;
     Atom TARGETS;
     Atom MULTIPLE;
     Atom INCR;
@@ -227,6 +228,7 @@ WindowX11 *CreateWindowX11Shared(int width, int height,
 void DestroyWindowX11(WindowX11 *window);
 void TerminateX11();
 void GetLastRecordedMousePositionX11(WindowX11 *window, int *x, int *y);
+void SetWindowIconX11(WindowX11 *window, unsigned char *png, unsigned int pngLen);
 
 double GetElapsedTime();
 

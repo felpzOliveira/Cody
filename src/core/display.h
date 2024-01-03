@@ -21,7 +21,7 @@ void DestroyWindow(DisplayWindow *window);
 
 void SwapInterval(DisplayWindow *window, int interval);
 
-void SetWindowIcon(DisplayWindow *window, const char *iconPngPath);
+void SetWindowIcon(DisplayWindow *window, unsigned char *png, unsigned int pngLen);
 
 void PoolEvents();
 

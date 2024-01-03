@@ -1,4 +1,4 @@
-/* Build from '/home/felipe/Documents/Cody/lang_tables/lang_cmake' */
+/* Build from '/home/felpz/Documents/Cody/lang_tables/lang_cmake' */
 /* Contextual content */
 /////////////////////////////////
 #include <languages.h>
@@ -18,7 +18,7 @@ TokenizerSupport cmakeSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Jan  2 2024 09:38:59 ) */
+/* Auto generated file ( Jan  2 2024 10:02:55 ) */
 
 std::vector<std::vector<GToken>> cmakeReservedPreprocessor = {
 };
