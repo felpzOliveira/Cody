@@ -32,13 +32,17 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "if", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "NOT", .identifier = TOKEN_ID_PREPROCESSOR },
-		{ .value = "set", .identifier = TOKEN_ID_OPERATOR }, },
+		{ .value = "set", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "SET", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "GLOB", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "list", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "LIST", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "file", .identifier = TOKEN_ID_OPERATOR },
+		{ .value = "FILE", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "else", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "macro", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "EQUAL", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "endif", .identifier = TOKEN_ID_OPERATOR }, },
 	{
@@ -53,6 +57,7 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "option", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "PRIVATE", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "foreach", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "COMMAND", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "MATCHES", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "install", .identifier = TOKEN_ID_OPERATOR },
@@ -60,6 +65,7 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "message", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "PROPERTY", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "endmacro", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "REQUIRED", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "STREQUAL", .identifier = TOKEN_ID_PREPROCESSOR },
 		{ .value = "function", .identifier = TOKEN_ID_OPERATOR }, },
@@ -67,7 +73,8 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 		{ .value = "LANGUAGES", .identifier = TOKEN_ID_RESERVED },
 		{ .value = "find_path", .identifier = TOKEN_ID_OPERATOR }, },
 	{
-		{ .value = "C_STANDARD", .identifier = TOKEN_ID_RESERVED }, },
+		{ .value = "C_STANDARD", .identifier = TOKEN_ID_RESERVED },
+		{ .value = "endforeach", .identifier = TOKEN_ID_OPERATOR }, },
 	{
 		{ .value = "add_library", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "endfunction", .identifier = TOKEN_ID_OPERATOR }, },
@@ -82,6 +89,7 @@ std::vector<std::vector<GToken>> cmakeReservedTable = {
 	{
 		{ .value = "CMAKE_COMMAND", .identifier = TOKEN_ID_OPERATOR }, },
 	{
+		{ .value = "LIST_EXTERNALS", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "enable_testing", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "add_executable", .identifier = TOKEN_ID_OPERATOR },
 		{ .value = "configure_file", .identifier = TOKEN_ID_OPERATOR }, },
