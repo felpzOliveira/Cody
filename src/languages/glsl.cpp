@@ -15,7 +15,7 @@ TokenizerSupport glslSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Jan  4 2024 11:21:37 ) */
+/* Auto generated file ( Jan  4 2024 14:52:07 ) */
 
 std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 	{

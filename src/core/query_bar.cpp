@@ -729,7 +729,7 @@ void QueryBarHistory_DetachedStore(QueryBarHistory *_history, const char *basePa
     StorageDevice *storage = FetchStorageDevice();
     CircularStack<QueryBarHistoryItem> *history = qHistory->history;
     if(!storage->StreamWriteStart(&file, basePath)){
-        printf("Could not open file %s in current storage device\n", basePath);
+        //printf("Could not open file %s in current storage device\n", basePath);
         return;
     }
 

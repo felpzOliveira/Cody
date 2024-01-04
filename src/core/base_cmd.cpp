@@ -891,10 +891,20 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     }else if(BaseCommand_InsertMappedSymbol(cmd, size)){
         return 0;
     }else{
+        uint at = 0;
+        for(uint i = 0; i < size; i++){
+            if(cmd[i] == ' ')
+                break;
+            at++;
+        }
+
         for(auto it = cmdMap.begin(); it != cmdMap.end(); it++){
             std::string val = it->first;
             char *ptr = (char *)val.c_str();
-            if(StringStartsWith(cmd, size, ptr, Min(size, val.size()))){
+            if(at > val.size())
+                continue;
+
+            if(StringStartsWith(cmd, size, ptr, at)){
                 CmdInformation cmdInfo = it->second;
                 /* commands that are explicitly typed should be added to history */
                 QueryBar *targetBar = View_GetQueryBar(view);
