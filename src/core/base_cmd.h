@@ -20,6 +20,9 @@ struct FileEntry;
 #define CMD_CHANGE_FONTSIZE_STR "fontsize"
 #define CMD_CHANGE_FONTSIZE_HELP "Sets the default font size to be used."
 
+#define CMD_CHANGE_FONT_STR "font"
+#define CMD_CHANGE_FONT_HELP "Change the default font being used."
+
 #define CMD_INDENT_FILE_STR "indent-file"
 #define CMD_INDENT_FILE_HELP "(Re)Indent the current opened file."
 

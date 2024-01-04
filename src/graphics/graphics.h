@@ -310,6 +310,11 @@ OpenGLState *Graphics_GetGlobalContext();
 void Graphics_RequestClose(WidgetWindow *w);
 
 /*
+* Sets the font to the given ttf.
+*/
+void Graphics_SetFont(char *ttf, uint len);
+
+/*
 * Pushes a new quad into the current OpenGLState image batch to render a image.
 * Returns whether or not it was possible to render, i.e.: maximum amount of
 * textures was reached and should be flushed. Optinally can also use the image

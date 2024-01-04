@@ -198,7 +198,7 @@ inline void _debugger_trace(int sig){
     if(sig != 0){
         fprintf(stdout, "Error signal %d:\n", sig);
     }
-	__cpu_get_memory_usage(debug_memory_usage);
+    __cpu_get_memory_usage(debug_memory_usage);
     _debugger_memory_usage();
     backtrace_symbols_fd(array, size, STDOUT_FILENO);
     exit(1);
@@ -247,13 +247,13 @@ inline void *_expand_memory(long size, long osize, void *p,
 
     if(debug_memory_map.find(p) != debug_memory_map.end()){
         MemoryEntry e = debug_memory_map[p];
-		debug_memory_usage -= e.size;
+        debug_memory_usage -= e.size;
         debug_memory_map.erase(p);
     }else{
         printf("Realloc of unknown address %p\n", p);
         _debugger_trace(0);
     }
-	__cpu_get_memory_usage(debug_memory_usage);
+    __cpu_get_memory_usage(debug_memory_usage);
 #endif
 
     void *ptr = realloc(p, size);
@@ -301,7 +301,7 @@ inline void _free_memory(void **ptr, const char *filename, uint line){
 
 #if defined(MEMORY_DEBUG)
             MEMORY_PRINT("OK\n");
-			__cpu_get_memory_usage(debug_memory_usage);
+            __cpu_get_memory_usage(debug_memory_usage);
 #endif
             *ptr = nullptr;
         }

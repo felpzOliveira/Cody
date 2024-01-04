@@ -1,4 +1,4 @@
-/* Build from '/home/felpz/Documents/Cody/lang_tables/lang_glsl' */
+/* Build from '/home/felipe/Documents/Cody/lang_tables/lang_glsl' */
 /* Contextual content */
 /////////////////////////////////
 #include <languages.h>
@@ -15,7 +15,7 @@ TokenizerSupport glslSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Jan  2 2024 10:02:55 ) */
+/* Auto generated file ( Jan  4 2024 11:21:37 ) */
 
 std::vector<std::vector<GToken>> glslReservedPreprocessor = {
 	{

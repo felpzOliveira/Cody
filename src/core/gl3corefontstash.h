@@ -280,7 +280,6 @@ static void glfons__renderDelete(void* userPtr)
 		gl->tex = 0;
 	}
 
-    printf("Delete call!\n");
     return;
 #ifndef GLFONTSTASH_IMPLEMENTATION_ES2
 	glBindVertexArray(0);

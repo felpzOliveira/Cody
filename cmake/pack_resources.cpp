@@ -331,7 +331,7 @@ int language_table_gen(std::string path){
                 context += line + "\n";
             }
         }else if(parsing){
-            if(starts_with(line, "END")){
+            if(line == "END"){
                 tokenNamedMaps[runningName] = runningMap;
                 parsing = false;
             }else{

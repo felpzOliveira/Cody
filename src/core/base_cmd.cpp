@@ -13,6 +13,7 @@
 #include <graphics.h>
 #include <storage.h>
 #include <theme.h>
+#include <resources.h>
 
 int Mkdir(const char *path);
 char* __realpath(const char* path, char* resolved_path);
@@ -593,6 +594,32 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
     return r;
 }
 
+int BaseCommand_ChangeFont(char *cmd, uint size, View *){
+    int r = 1;
+    uint len = 0;
+    char *arg = StringNextWord(cmd, size, &len);
+
+    std::string path(arg, len);
+
+    if(path == "default"){
+        Graphics_SetFont((char *)FONT_liberation_mono_ttf, FONT_liberation_mono_ttf_len);
+        return r;
+    }
+
+    if(!FileExists((char *)path.c_str()))
+        return r;
+
+    len = 0;
+    // NOTE: The ttf pointer needs to be alive as it is stored internally
+    //       by the font rendering code.
+    char *ttf = GetFileContents((char *)path.c_str(), &len);
+    if(!ttf)
+        return r;
+
+    Graphics_SetFont(ttf, len);
+    return r;
+}
+
 int BaseCommand_ChangeFontSize(char *cmd, uint size, View *){
     uint len = 0;
     char *arg = StringNextWord(cmd, size, &len);
@@ -843,6 +870,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_PATH_COMPRESSION_STR] = {CMD_PATH_COMPRESSION_HELP, BaseCommand_PathCompression};
     cmdMap[CMD_WRONGIDENT_DISPLAY_STR] = {CMD_WRONGIDENT_DISPLAY_HELP, BaseCommand_ToogleWrongIdent};
     cmdMap[CMD_CHANGE_FONTSIZE_STR] = {CMD_CHANGE_FONTSIZE_HELP, BaseCommand_ChangeFontSize};
+    cmdMap[CMD_CHANGE_FONT_STR] = {CMD_CHANGE_FONT_HELP, BaseCommand_ChangeFont};
     cmdMap[CMD_CHANGE_CONTRAST_STR] = {CMD_CHANGE_CONTRAST_HELP, BaseCommand_ChangeContrast};
     cmdMap[CMD_CHANGE_BRIGHTNESS_STR] = {CMD_CHANGE_BRIGHTNESS_HELP, BaseCommand_ChangeBrightness};
     cmdMap[CMD_CHANGE_SATURATION_STR] = {CMD_CHANGE_SATURATION_HELP, BaseCommand_ChangeSaturation};

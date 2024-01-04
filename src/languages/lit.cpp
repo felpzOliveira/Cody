@@ -1,4 +1,4 @@
-/* Build from '/home/felpz/Documents/Cody/lang_tables/lang_lit' */
+/* Build from '/home/felipe/Documents/Cody/lang_tables/lang_lit' */
 /* Contextual content */
 /////////////////////////////////
 #include <languages.h>
@@ -23,7 +23,7 @@ TokenizerSupport litSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Jan  2 2024 10:02:55 ) */
+/* Auto generated file ( Jan  4 2024 11:21:37 ) */
 
 std::vector<std::vector<GToken>> litReservedPreprocessor = {
 };

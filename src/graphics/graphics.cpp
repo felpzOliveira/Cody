@@ -831,6 +831,36 @@ void RegisterInputs(DisplayWindow *window){
     RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);
 }
 
+// TODO: Should we work with multiple fonts at the same time?
+void Graphics_SetFont(char *ttf, uint len){
+    OpenGLFont *font = &GlobalGLState.font;
+    if(font->fsContext){
+        // NOTE: we need to some minimal checks here to verify we dont attempt to free
+        //       the internal font address
+        FONScontextImpl *stash = font->fsContext->ctxImpl;
+        FONSfont *ffont = stash->fonts[0];
+        if((int *)ffont->data != (int *)FONT_liberation_mono_ttf){
+            free(ffont->data);
+        }
+        glfonsDelete(font->fsContext);
+        glfonsDeleteContext(font->fsContext);
+    }
+
+    font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
+    font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
+                                     (uint8 *)ttf, len, 0, font->sdfSettings);
+
+    // NOTE: Default into internal font so user can actually see something
+    if(font->fontId == FONS_INVALID){
+        font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
+                                     (uint8 *)FONT_liberation_mono_ttf,
+                                     FONT_liberation_mono_ttf_len, 0, font->sdfSettings);
+    }
+
+    AssertA(font->fontId != FONS_INVALID, "Failed to create font");
+    Graphics_SetFontSize(&GlobalGLState, AppGetFontSize());
+}
+
 void OpenGLFontSetup(OpenGLState *state){
     uint filesize = 0;
     char *fontfileContents = nullptr;
@@ -844,24 +874,19 @@ void OpenGLFontSetup(OpenGLState *state){
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
     uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
     uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
-    
+
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
     Shader_Create(state->buttonShader, bvertex, bfragment);
 
     font->sdfSettings.sdfEnabled = 0;
-    font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
 
-    //fontfileContents = GetFileContents(ttf, &filesize);
+    font->fsContext = nullptr;
     fontfileContents = (char *)FONT_liberation_mono_ttf;
     filesize = FONT_liberation_mono_ttf_len;
 
-    font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
-                                     (uint8 *)fontfileContents, filesize, 0,
-                                     font->sdfSettings);
-    AssertA(font->fontId != FONS_INVALID, "Failed to create font");
-    Graphics_SetFontSize(state, AppGetFontSize());
+    Graphics_SetFont(fontfileContents, filesize);
 }
 
 void Graphics_QuadPushBorder(OpenGLBuffer *quadB, Float x0, Float y0,
@@ -1437,6 +1462,8 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
     Shader_UniformFloat(font->shader, "contrast", visuals.contrast);
     Shader_UniformFloat(font->shader, "brightness", visuals.brightness);
     Shader_UniformFloat(font->shader, "saturation", visuals.saturation);
+
+    fonsSetFont(font->fsContext, font->fontId);
 
     ViewTreeIterator iterator;
     ViewTree_Begin(&iterator);
