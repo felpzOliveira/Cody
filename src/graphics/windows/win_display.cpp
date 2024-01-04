@@ -472,6 +472,113 @@ void ProcessEventMotionWin32(WindowWin32* window, LibHelperWin32* win32, int x, 
     });
 }
 
+///////////////////////////////////////////////////////////////////////////////
+// TODO: Test this so we can change the set icon function to work with memory and not
+//       files.
+#include <Windows.h>
+#include <Shlwapi.h>
+#include <wincodec.h>
+#include <iostream>
+
+// Link with "Shlwapi.lib" and "WindowsCodecs.lib"
+
+HICON CreateIconFromPNGMemory(const void* imageData, DWORD imageSize) {
+    IWICImagingFactory *pFactory = NULL;
+    IWICBitmapDecoder *pDecoder = NULL;
+    IWICBitmapFrameDecode *pFrame = NULL;
+    IWICFormatConverter *pConverter = NULL;
+    HICON hIcon = NULL;
+
+    if (CoInitializeEx(NULL, COINIT_MULTITHREADED) != S_OK) {
+        std::cerr << "Failed to initialize COM\n";
+        return NULL;
+    }
+
+    // Create WIC factory
+    if (CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFactory)) != S_OK) {
+        std::cerr << "Failed to create WIC Imaging Factory\n";
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Create decoder for PNG image from memory
+    if (pFactory->CreateDecoderFromStream(
+        SHCreateMemStream(static_cast<BYTE*>(const_cast<void*>(imageData)), imageSize), NULL,
+        WICDecodeMetadataCacheOnLoad, &pDecoder) != S_OK) {
+        std::cerr << "Failed to create decoder for the image\n";
+        pFactory->Release();
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Get the first frame of the image
+    if (pDecoder->GetFrame(0, &pFrame) != S_OK) {
+        std::cerr << "Failed to get frame from the image\n";
+        pDecoder->Release();
+        pFactory->Release();
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Create a format converter
+    if (pFactory->CreateFormatConverter(&pConverter) != S_OK) {
+        std::cerr << "Failed to create format converter\n";
+        pFrame->Release();
+        pDecoder->Release();
+        pFactory->Release();
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Initialize the format converter
+    if (pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA,
+                                WICBitmapDitherTypeNone, NULL, 0.0f,
+                                WICBitmapPaletteTypeCustom) != S_OK) {
+        std::cerr << "Failed to initialize format converter\n";
+        pConverter->Release();
+        pFrame->Release();
+        pDecoder->Release();
+        pFactory->Release();
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Get the image size
+    UINT width, height;
+    pFrame->GetSize(&width, &height);
+
+    // Create an HBITMAP
+    HBITMAP hBitmap = NULL;
+    if (CreateBitmapFromWicBitmap(pConverter, &hBitmap) != S_OK) {
+        std::cerr << "Failed to create HBITMAP from WIC bitmap\n";
+        pConverter->Release();
+        pFrame->Release();
+        pDecoder->Release();
+        pFactory->Release();
+        CoUninitialize();
+        return NULL;
+    }
+
+    // Create an ICON from the bitmap
+    ICONINFO iconInfo = {0};
+    iconInfo.fIcon = TRUE;
+    iconInfo.hbmMask = NULL;  // No bitmap mask for icon
+    iconInfo.hbmColor = hBitmap;
+
+    hIcon = CreateIconIndirect(&iconInfo);
+
+    // Clean up resources
+    DeleteObject(hBitmap);
+    pConverter->Release();
+    pFrame->Release();
+    pDecoder->Release();
+    pFactory->Release();
+    CoUninitialize();
+
+    return hIcon;
+}
+///////////////////////////////////////////////////////////////////////////////
+
 HICON LoadPNGToIcon(const char *path){
     return reinterpret_cast<HICON>(LoadImageA(nullptr, path, IMAGE_ICON,
                                               0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE));

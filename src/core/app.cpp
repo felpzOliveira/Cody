@@ -185,7 +185,7 @@ void AppEarlyInitialize(bool use_tabs){
     // TODO: Configuration file
     appGlobalConfig.tabLength = 4;
     appGlobalConfig.pathCompression = -1;
-    appGlobalConfig.displayWrongIdent = 0;
+    appGlobalConfig.displayWrongIdent = 1;
     appGlobalConfig.displayViewIndices = 0;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
     appGlobalConfig.defaultFontSize = 18;

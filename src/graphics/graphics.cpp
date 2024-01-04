@@ -913,7 +913,10 @@ void OpenGLInitialize(OpenGLState *state){
     state->mouse.isPressed = false;
     state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
 
-    SetWindowIcon(state->window, "C:\\Users\\Felpz\\Documents\\Cody\\icons\\logo.ico");
+    // TODO: We already have these files loaded in resources.h, can't we just use them here?
+    //SetWindowIcon(state->window, "C:\\Users\\Felpz\\Documents\\Cody\\icons\\logo.ico");
+    //SetWindowIcon(state->window, "/home/felpz/Documents/Cody/icons/logo.png");
+    SetWindowIcon(state->window, logo_png, logo_png_len);
 
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
     GLenum error = glGetError();

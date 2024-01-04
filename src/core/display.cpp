@@ -6,8 +6,8 @@ DisplayWindow *CreateDisplayWindow(int width, int height, const char *title){
     return CreateWindowWin32(width, height, title);
 }
 
-void SetWindowIcon(DisplayWindow *window, const char *iconPngPath){
-    SetWindowIconWin32(window, iconPngPath);
+void SetWindowIcon(DisplayWindow *window, unsigned char *png, unsigned int pngLen){
+    SetWindowIconWin32(window, png, pngLen);
 }
 
 void SetOpenGLVersion(int major, int minor){
@@ -75,8 +75,8 @@ DisplayWindow *CreateDisplayWindow(int width, int height, const char *title){
     return CreateWindowX11(width, height, title);
 }
 
-void SetWindowIcon(DisplayWindow *window, const char *iconPngPath){
-    // TODO: Implement this fow linux
+void SetWindowIcon(DisplayWindow *window, unsigned char *png, unsigned int pngLen){
+    SetWindowIconX11(window, png, pngLen);
 }
 
 void SetOpenGLVersion(int major, int minor){
