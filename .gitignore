@@ -1,3 +1,6 @@
 build
 .cody
 todo
+src/languages/*.cpp
+src/resources/const_icons.cpp
+src/resources/const_shader.cpp
