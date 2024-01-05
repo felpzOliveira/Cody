@@ -11,6 +11,10 @@
 #include <timer.h>
 #include <shellapi.h>
 
+#include <gdiplus.h>
+#pragma comment (lib, "Gdiplus.lib")
+
+
 #define DISPLAY_CLASS_NAME L"SomeClassName"
 #define SkipEventNoWindow(window) do{ if(!window) return; }while(0)
 
@@ -472,120 +476,55 @@ void ProcessEventMotionWin32(WindowWin32* window, LibHelperWin32* win32, int x, 
     });
 }
 
-///////////////////////////////////////////////////////////////////////////////
-// TODO: Test this so we can change the set icon function to work with memory and not
-//       files.
-#include <Windows.h>
-#include <Shlwapi.h>
-#include <wincodec.h>
-#include <iostream>
+HICON HICONFromPNG(const void *png, unsigned int pngLen){
+    Gdiplus::GdiplusStartupInput gdiplusStartupInput;
+    ULONG_PTR gdiplusToken;
+    HGLOBAL hGlobal = NULL;
+    HICON icon = NULL;
+    IStream *pStream = nullptr;
+    Gdiplus::Bitmap *bitmap = nullptr;
+    void *pImageBuffer = nullptr;
 
-// Link with "Shlwapi.lib" and "WindowsCodecs.lib"
+    Gdiplus::GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, nullptr);
 
-HICON CreateIconFromPNGMemory(const void* imageData, DWORD imageSize) {
-    IWICImagingFactory *pFactory = NULL;
-    IWICBitmapDecoder *pDecoder = NULL;
-    IWICBitmapFrameDecode *pFrame = NULL;
-    IWICFormatConverter *pConverter = NULL;
-    HICON hIcon = NULL;
+    hGlobal = GlobalAlloc(GMEM_MOVEABLE, pngLen);
+    if(!hGlobal)
+        goto __ret;
 
-    if (CoInitializeEx(NULL, COINIT_MULTITHREADED) != S_OK) {
-        std::cerr << "Failed to initialize COM\n";
-        return NULL;
+    pImageBuffer = GlobalLock(hGlobal);
+    if(!pImageBuffer){
+        ERROR_MSG("Win32: Failed to lock memory");
+        goto __ret;
     }
 
-    // Create WIC factory
-    if (CoCreateInstance(CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFactory)) != S_OK) {
-        std::cerr << "Failed to create WIC Imaging Factory\n";
-        CoUninitialize();
-        return NULL;
+    memcpy(pImageBuffer, png, pngLen);
+    GlobalUnlock(hGlobal);
+
+    if(CreateStreamOnHGlobal(hGlobal, FALSE, &pStream) != S_OK){
+        ERROR_MSG("Win32: Failed to create IStream");
+        goto __ret;
     }
 
-    // Create decoder for PNG image from memory
-    if (pFactory->CreateDecoderFromStream(
-        SHCreateMemStream(static_cast<BYTE*>(const_cast<void*>(imageData)), imageSize), NULL,
-        WICDecodeMetadataCacheOnLoad, &pDecoder) != S_OK) {
-        std::cerr << "Failed to create decoder for the image\n";
-        pFactory->Release();
-        CoUninitialize();
-        return NULL;
+    bitmap = Gdiplus::Bitmap::FromStream(pStream);
+    if(bitmap == nullptr){
+        ERROR_MSG("Win32: Failed to create bitmap");
+        goto __ret;
     }
 
-    // Get the first frame of the image
-    if (pDecoder->GetFrame(0, &pFrame) != S_OK) {
-        std::cerr << "Failed to get frame from the image\n";
-        pDecoder->Release();
-        pFactory->Release();
-        CoUninitialize();
-        return NULL;
-    }
+    bitmap->GetHICON(&icon);
 
-    // Create a format converter
-    if (pFactory->CreateFormatConverter(&pConverter) != S_OK) {
-        std::cerr << "Failed to create format converter\n";
-        pFrame->Release();
-        pDecoder->Release();
-        pFactory->Release();
-        CoUninitialize();
-        return NULL;
-    }
-
-    // Initialize the format converter
-    if (pConverter->Initialize(pFrame, GUID_WICPixelFormat32bppBGRA,
-                                WICBitmapDitherTypeNone, NULL, 0.0f,
-                                WICBitmapPaletteTypeCustom) != S_OK) {
-        std::cerr << "Failed to initialize format converter\n";
-        pConverter->Release();
-        pFrame->Release();
-        pDecoder->Release();
-        pFactory->Release();
-        CoUninitialize();
-        return NULL;
-    }
-
-    // Get the image size
-    UINT width, height;
-    pFrame->GetSize(&width, &height);
-
-    // Create an HBITMAP
-    HBITMAP hBitmap = NULL;
-    if (CreateBitmapFromWicBitmap(pConverter, &hBitmap) != S_OK) {
-        std::cerr << "Failed to create HBITMAP from WIC bitmap\n";
-        pConverter->Release();
-        pFrame->Release();
-        pDecoder->Release();
-        pFactory->Release();
-        CoUninitialize();
-        return NULL;
-    }
-
-    // Create an ICON from the bitmap
-    ICONINFO iconInfo = {0};
-    iconInfo.fIcon = TRUE;
-    iconInfo.hbmMask = NULL;  // No bitmap mask for icon
-    iconInfo.hbmColor = hBitmap;
-
-    hIcon = CreateIconIndirect(&iconInfo);
-
-    // Clean up resources
-    DeleteObject(hBitmap);
-    pConverter->Release();
-    pFrame->Release();
-    pDecoder->Release();
-    pFactory->Release();
-    CoUninitialize();
-
-    return hIcon;
-}
-///////////////////////////////////////////////////////////////////////////////
-
-HICON LoadPNGToIcon(const char *path){
-    return reinterpret_cast<HICON>(LoadImageA(nullptr, path, IMAGE_ICON,
-                                              0, 0, LR_LOADFROMFILE | LR_DEFAULTSIZE));
+__ret:
+    if(pStream)
+        pStream->Release();
+    if(hGlobal)
+        GlobalFree(hGlobal);
+    Gdiplus::GdiplusShutdown(gdiplusToken);
+    return icon;
 }
 
-void SetWindowIconWin32(WindowWin32 *window, const char *iconPngPath){
-    HICON hCustomIcon = LoadPNGToIcon(iconPngPath);
+void SetWindowIconWin32(WindowWin32 *window, unsigned char *png, unsigned int pngLen){
+    HICON hCustomIcon = HICONFromPNG(png, pngLen);
+
     if(hCustomIcon){
         SendMessage(window->handle, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(hCustomIcon));
         SendMessage(window->handle, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(hCustomIcon));

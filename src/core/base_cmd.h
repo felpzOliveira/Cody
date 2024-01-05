@@ -175,9 +175,14 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 int SwitchBufferCommandStart(View *view);
 
 /*
-* Performs setup to start a command theme.
+* Performs setup to start a command for theme swap.
 */
 int SwitchThemeCommandStart(View *view);
+
+/*
+* Performs setup to start a command for font swap.
+*/
+int SwitchFontCommandStart(View *view);
 
 /*
 * Interpret and execute a given command applied to a given view.

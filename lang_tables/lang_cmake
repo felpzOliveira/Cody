@@ -55,6 +55,7 @@ export OPERATOR
 REQUIRED RESERVED
 option OPERATOR
 COMMAND OPERATOR
+DEPENDS OPERATOR
 MATCHES PREPROCESSOR
 install OPERATOR
 project OPERATOR
@@ -90,6 +91,7 @@ CMAKE_CXX_COMPILER DATATYPE
 add_custom_command OPERATOR
 include_directories OPERATOR
 target_link_libraries OPERATOR
+add_dependencies OPERATOR
 target_link_options OPERATOR
 set_target_properties OPERATOR
 target_compile_options OPERATOR

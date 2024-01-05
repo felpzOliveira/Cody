@@ -36,6 +36,12 @@
 
 #define MODULE_NAME "Render"
 
+#if defined(_WIN32)
+constexpr Float iconBlur = 3.0f;
+#else
+constexpr Float iconBlur = 0.0f;
+#endif
+
 static OpenGLState GlobalGLState;
 
 /*
@@ -831,6 +837,15 @@ void RegisterInputs(DisplayWindow *window){
     RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);
 }
 
+bool IsFontInternal(int *fontAddr){
+    return fontAddr == (int *)FONT_consolas_ttf ||
+           fontAddr == (int *)FONT_commit_mono_ttf ||
+           fontAddr == (int *)FONT_ubuntu_mono_ttf ||
+           fontAddr == (int *)FONT_dejavu_sans_ttf ||
+           fontAddr == (int *)FONT_jet_mono_ttf ||
+           fontAddr == (int *)FONT_liberation_mono_ttf;
+}
+
 // TODO: Should we work with multiple fonts at the same time?
 void Graphics_SetFont(char *ttf, uint len){
     OpenGLFont *font = &GlobalGLState.font;
@@ -839,7 +854,7 @@ void Graphics_SetFont(char *ttf, uint len){
         //       the internal font address
         FONScontextImpl *stash = font->fsContext->ctxImpl;
         FONSfont *ffont = stash->fonts[0];
-        if((int *)ffont->data != (int *)FONT_liberation_mono_ttf){
+        if(!IsFontInternal((int *)ffont->data)){
             free(ffont->data);
         }
         glfonsDelete(font->fsContext);
@@ -1022,6 +1037,9 @@ void Graphics_ImageFlush(OpenGLState *state, OpenGLImageQuadBuffer *oquad){
         glUseProgram(state->imageShader.id);
         Shader_UniformMatrix4(state->imageShader, "projection", &state->projection.m);
         Shader_UniformMatrix4(state->imageShader, "modelView", &state->scale.m);
+
+        Shader_UniformFloat(state->imageShader, "blurIntensity", iconBlur);
+
         OpenGLCHK(glBindVertexArray(quad->vertexArray));
         OpenGLCHK(glEnableVertexAttribArray(0));
         OpenGLCHK(glBindBuffer(GL_ARRAY_BUFFER, quad->vertexBuffer));
@@ -1176,6 +1194,7 @@ static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
     glActiveTexture(GL_TEXTURE0 + (int)id);
     OpenGLCHK(glBindTexture(GL_TEXTURE_2D, tex->textureId));
     Shader_UniformInteger(state->imageShader, bindingname, (int)id);
+    Shader_UniformFloat(state->imageShader, "blurIntensity", iconBlur);
 
     //printf("Binding %d = %s (%d)\n", id, tex->bindingname, tex->textureId);
 }

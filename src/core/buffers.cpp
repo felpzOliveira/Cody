@@ -184,8 +184,8 @@ uint Buffer_GetTokenAt(Buffer *buffer, uint u8, EncoderDecoder *encoder){
     uint pos = Buffer_Utf8PositionToRawPosition(buffer, u8, nullptr, encoder);
     for(uint i = 0; i < buffer->tokenCount; i++){
         Token *token = &buffer->tokens[i];
-		uint p = token->position < 0 ? 0 : token->position;
-		uint size = token->size < 0 ? 0 : token->size;
+        uint p = token->position < 0 ? 0 : token->position;
+        uint size = token->size < 0 ? 0 : token->size;
         if(p <= pos && size + p > pos){
             return i;
         }
@@ -1518,7 +1518,7 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
     uint si = start.x;
     uint spi = 0;
     uint maxi = 0;
-	uint size = 0;
+    uint size = 0;
     EncoderDecoder *encoder = &lineBuffer->props.encoder;
     Buffer *b = LineBuffer_GetBufferAt(lineBuffer, si);
     uint pi = Buffer_Utf8PositionToRawPosition(b, start.y, nullptr, encoder);
@@ -1540,7 +1540,7 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
     data = AllocatorGetN(char, unprocessedSize);
     uint ic = 0;
     uint c = spi;
-	size = unprocessedSize;
+    size = unprocessedSize;
     for(uint i = start.x; i <= ei; i++){
         b = LineBuffer_GetBufferAt(lineBuffer, i);
         char *p = &b->data[c];
@@ -1569,10 +1569,10 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
         c = 0;
     }
 
-	if(!(ic < size)){
-		data = AllocatorExpand(char, data, size+DefaultAllocatorSize, size);
-		size += DefaultAllocatorSize;
-	}
+    if(!(ic < size)){
+        data = AllocatorExpand(char, data, size+DefaultAllocatorSize, size);
+        size += DefaultAllocatorSize;
+    }
 
     AssertA(ic < size, "Invalid write size");
     data[ic++] = 0;

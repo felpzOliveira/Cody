@@ -1007,9 +1007,12 @@ char *GetFileContents(const char *path, uint *size){
     if(readN != memsize)
         goto _error_memory;
 
+    fclose(fp);
     *size = memsize;
     return ret;
+
 _error_memory:
+    fclose(fp);
     if(ret){
         AllocatorFree(ret);
         ret = nullptr;

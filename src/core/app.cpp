@@ -2231,6 +2231,13 @@ void AppCommandQueryBarCommit(){
     }
 }
 
+void AppCommandSwitchFont(){
+    View *view = AppGetActiveView();
+    int r = SwitchFontCommandStart(view);
+    if(r >= 0)
+        AppSetBindingsForState(View_SelectableList);
+}
+
 void AppCommandSwitchTheme(){
     View *view = AppGetActiveView();
     int r = SwitchThemeCommandStart(view);
@@ -2482,7 +2489,8 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandSwitchTheme, Key_LeftControl, Key_T);
 
-    RegisterRepeatableEvent(mapping, AppCommandListFunctions, Key_LeftControl, Key_F);
+    RegisterRepeatableEvent(mapping, AppCommandSwitchFont, Key_LeftControl, Key_F);
+    RegisterRepeatableEvent(mapping, AppCommandListFunctions, Key_RightControl, Key_F);
     RegisterRepeatableEvent(mapping, AppCommandJumpLeftArrow, Key_Left, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpRightArrow, Key_Right, Key_LeftControl);
     RegisterRepeatableEvent(mapping, AppCommandJumpUpArrow, Key_Up, Key_LeftControl);

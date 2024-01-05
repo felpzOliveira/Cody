@@ -201,7 +201,7 @@ int PackIcons(std::vector<std::string> *vars, std::string baseDir, std::string b
     }
 
     c_file += std::string("/const_icons.cpp");
-    std::ofstream ofsc_file(c_file);
+    std::ofstream ofsc_file(c_file, std::ios::binary);
     if(ofsc_file.is_open()){
         ofsc_file << f;
         ofsc_file.close();
@@ -279,7 +279,7 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
     }
 
     c_file += std::string("/const_shader.cpp");
-    std::ofstream ofsc_file(c_file);
+    std::ofstream ofsc_file(c_file, std::ios::binary);
     if(ofsc_file.is_open()){
         ofsc_file << f;
         ofsc_file.close();
@@ -360,9 +360,9 @@ int language_table_gen(std::string path){
 
     std::stringstream ss;
     ss << "/* Build from '" << path << "' */\n";
-    ss << "/* Contextual content */" << std::endl;
+    ss << "/* Contextual content */\n";
     ss << "/////////////////////////////////\n";
-    ss << context << std::endl;
+    ss << context << "\n";
     ss << "/////////////////////////////////\n";
 
     ss << "/* Auto generated file ( " << __DATE__ << " " << __TIME__ << " ) */\n";
@@ -371,9 +371,9 @@ int language_table_gen(std::string path){
         for(auto it = bit->second.begin(); it != bit->second.end(); it++){
             unsigned int count = it->second.size();
             unsigned int v = 0;
-            ss << "\t{\n";
+            ss << "    {\n";
             for(token_type tk : it->second){
-                ss << "\t\t{ .value = \"" << tk.value << "\", .identifier = TOKEN_ID_"
+                ss << "        { .value = \"" << tk.value << "\", .identifier = TOKEN_ID_"
                     << tk.type << " },";
                 if(v < count-1){
                     ss << "\n";
@@ -387,9 +387,9 @@ int language_table_gen(std::string path){
     }
 
     if(pathName.size() > 0){
-        std::ofstream ofs(pathName);
+        std::ofstream ofs(pathName, std::ios::binary);
         if(ofs.is_open()){
-            ofs << ss.str() << std::endl;
+            ofs << ss.str() << "\n";
             ofs.close();
         }
     }
@@ -452,7 +452,7 @@ int main(int argc, char **argv){
     }
 
     if(added){
-        std::ofstream res_ofs(resourcepath);
+        std::ofstream res_ofs(resourcepath, std::ios::binary);
         if(res_ofs.is_open()){
             res_ofs << res_str;
         }else{

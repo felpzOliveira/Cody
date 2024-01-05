@@ -314,7 +314,7 @@ void TerminateWin32();
 void WaitEventsWin32();
 void PollEventsWin32();
 
-void SetWindowIconWin32(WindowWin32 *window, const char *iconPngPath);
+void SetWindowIconWin32(WindowWin32 *window, unsigned char *png, unsigned int pngLen);
 int WindowShouldCloseWin32(WindowWin32* window);
 int WindowIsMousePressedWin32(WindowWin32 *window);
 void SetWindowShouldCloseWin32(WindowWin32* window);

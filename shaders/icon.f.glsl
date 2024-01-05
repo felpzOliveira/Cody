@@ -13,6 +13,7 @@ in vec2 texCoords;
 
 out vec4 fragColor;
 flat in int mid;
+uniform float blurIntensity = 0.0;
 
 ivec2 sample_size(float fmid){
     ivec2 iSize;
@@ -47,7 +48,7 @@ void main(){
     float fmid = float(mid);
     ivec2 size = sample_size(fmid);
     vec2 invSize = vec2(1.0 / float(size.x), 1.0 / float(size.y));
-    float blurAmount = 0.0;
+    float blurAmount = blurIntensity;
     vec4 sum = vec4(0.0);
 
     vec4 val = sample_texture(texCoords, fmid);

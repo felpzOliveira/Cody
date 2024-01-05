@@ -1,4 +1,4 @@
-/* Build from '/home/felipe/Documents/Cody/lang_tables/lang_python' */
+/* Build from 'C:/Users/Felpz/Documents/Cody/lang_tables/lang_python' */
 /* Contextual content */
 /////////////////////////////////
 #include <languages.h>
@@ -27,80 +27,80 @@ TokenizerSupport pythonSupport = {
 
 
 /////////////////////////////////
-/* Auto generated file ( Jan  4 2024 14:52:07 ) */
+/* Auto generated file ( Jan  4 2024 23:05:50 ) */
 
 std::vector<std::vector<GToken>> pyReservedPreprocessor = {
 };
 
 std::vector<std::vector<GToken>> pyReservedTable = {
-	{
-		{ .value = "+", .identifier = TOKEN_ID_MATH },
-		{ .value = "-", .identifier = TOKEN_ID_MATH },
-		{ .value = ">", .identifier = TOKEN_ID_MORE },
-		{ .value = "<", .identifier = TOKEN_ID_LESS },
-		{ .value = "/", .identifier = TOKEN_ID_MATH },
-		{ .value = "%", .identifier = TOKEN_ID_MATH },
-		{ .value = "!", .identifier = TOKEN_ID_MATH },
-		{ .value = "=", .identifier = TOKEN_ID_MATH },
-		{ .value = "*", .identifier = TOKEN_ID_ASTERISK },
-		{ .value = "&", .identifier = TOKEN_ID_MATH },
-		{ .value = "|", .identifier = TOKEN_ID_MATH },
-		{ .value = "^", .identifier = TOKEN_ID_MATH },
-		{ .value = "~", .identifier = TOKEN_ID_MATH },
-		{ .value = ",", .identifier = TOKEN_ID_COMMA },
-		{ .value = ".", .identifier = TOKEN_ID_MATH },
-		{ .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN },
-		{ .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
-		{ .value = "{", .identifier = TOKEN_ID_BRACE_OPEN },
-		{ .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
-		{ .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN },
-		{ .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE },
-		{ .value = ":", .identifier = TOKEN_ID_MATH }, },
-	{
-		{ .value = "if", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "in", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "is", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "as", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "or", .identifier = TOKEN_ID_OPERATOR }, },
-	{
-		{ .value = "def", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "try", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "del", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "and", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "for", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "not", .identifier = TOKEN_ID_OPERATOR }, },
-	{
-		{ .value = "True", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "None", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "elif", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "else", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "with", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "from", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "pass", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "self", .identifier = TOKEN_ID_OPERATOR }, },
-	{
-		{ .value = "raise", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "False", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "while", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "yield", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "break", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "class", .identifier = TOKEN_ID_OPERATOR }, },
-	{
-		{ .value = "import", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "return", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "except", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "lambda", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "assert", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "global", .identifier = TOKEN_ID_OPERATOR }, },
-	{
-		{ .value = "__len__", .identifier = TOKEN_ID_RESERVED }, },
-	{
-		{ .value = "finnally", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "nonlocal", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "continue", .identifier = TOKEN_ID_OPERATOR },
-		{ .value = "__init__", .identifier = TOKEN_ID_RESERVED },
-		{ .value = "__call__", .identifier = TOKEN_ID_RESERVED }, },
-	{
-		{ .value = "__getitem__", .identifier = TOKEN_ID_RESERVED }, },
+    {
+        { .value = "+", .identifier = TOKEN_ID_MATH },
+        { .value = "-", .identifier = TOKEN_ID_MATH },
+        { .value = ">", .identifier = TOKEN_ID_MORE },
+        { .value = "<", .identifier = TOKEN_ID_LESS },
+        { .value = "/", .identifier = TOKEN_ID_MATH },
+        { .value = "%", .identifier = TOKEN_ID_MATH },
+        { .value = "!", .identifier = TOKEN_ID_MATH },
+        { .value = "=", .identifier = TOKEN_ID_MATH },
+        { .value = "*", .identifier = TOKEN_ID_ASTERISK },
+        { .value = "&", .identifier = TOKEN_ID_MATH },
+        { .value = "|", .identifier = TOKEN_ID_MATH },
+        { .value = "^", .identifier = TOKEN_ID_MATH },
+        { .value = "~", .identifier = TOKEN_ID_MATH },
+        { .value = ",", .identifier = TOKEN_ID_COMMA },
+        { .value = ".", .identifier = TOKEN_ID_MATH },
+        { .value = "(", .identifier = TOKEN_ID_PARENTHESE_OPEN },
+        { .value = ")", .identifier = TOKEN_ID_PARENTHESE_CLOSE },
+        { .value = "{", .identifier = TOKEN_ID_BRACE_OPEN },
+        { .value = "}", .identifier = TOKEN_ID_BRACE_CLOSE },
+        { .value = "[", .identifier = TOKEN_ID_BRACKET_OPEN },
+        { .value = "]", .identifier = TOKEN_ID_BRACKET_CLOSE },
+        { .value = ":", .identifier = TOKEN_ID_MATH }, },
+    {
+        { .value = "if", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "in", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "is", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "as", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "or", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "def", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "try", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "del", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "and", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "for", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "not", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "True", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "None", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "elif", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "else", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "with", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "from", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "pass", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "self", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "raise", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "False", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "while", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "yield", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "break", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "class", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "import", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "return", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "except", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "lambda", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "assert", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "global", .identifier = TOKEN_ID_OPERATOR }, },
+    {
+        { .value = "__len__", .identifier = TOKEN_ID_RESERVED }, },
+    {
+        { .value = "finnally", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "nonlocal", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "continue", .identifier = TOKEN_ID_OPERATOR },
+        { .value = "__init__", .identifier = TOKEN_ID_RESERVED },
+        { .value = "__call__", .identifier = TOKEN_ID_RESERVED }, },
+    {
+        { .value = "__getitem__", .identifier = TOKEN_ID_RESERVED }, },
 };
 

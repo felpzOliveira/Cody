@@ -594,6 +594,31 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
     return r;
 }
 
+int SwapFontInternal(std::string fontname){
+    // NOTE: hard-coded fonts
+    if(fontname == "default"){
+        Graphics_SetFont((char *)FONT_liberation_mono_ttf, FONT_liberation_mono_ttf_len);
+        return 1;
+    }else if(fontname == "consolas"){
+        Graphics_SetFont((char *)FONT_consolas_ttf, FONT_consolas_ttf_len);
+        return 1;
+    }else if(fontname == "commit"){
+        Graphics_SetFont((char *)FONT_commit_mono_ttf, FONT_commit_mono_ttf_len);
+        return 1;
+    }else if(fontname == "ubuntu"){
+        Graphics_SetFont((char *)FONT_ubuntu_mono_ttf, FONT_ubuntu_mono_ttf_len);
+        return 1;
+    }else if(fontname == "dejavu"){
+        Graphics_SetFont((char *)FONT_dejavu_sans_ttf, FONT_dejavu_sans_ttf_len);
+        return 1;
+    }else if(fontname == "jet"){
+        Graphics_SetFont((char *)FONT_jet_mono_ttf, FONT_jet_mono_ttf_len);
+        return 1;
+    }
+
+    return 0;
+}
+
 int BaseCommand_ChangeFont(char *cmd, uint size, View *){
     int r = 1;
     uint len = 0;
@@ -601,10 +626,8 @@ int BaseCommand_ChangeFont(char *cmd, uint size, View *){
 
     std::string path(arg, len);
 
-    if(path == "default"){
-        Graphics_SetFont((char *)FONT_liberation_mono_ttf, FONT_liberation_mono_ttf_len);
+    if(SwapFontInternal(path))
         return r;
-    }
 
     if(!FileExists((char *)path.c_str()))
         return r;
@@ -1284,6 +1307,56 @@ int SwitchBufferCommandStart(View *view){
 //////////////////////////////////////////////////////////////////////////////////////////
 // Switch theme routines.
 //////////////////////////////////////////////////////////////////////////////////////////
+
+typedef struct{
+    const char *name;
+}FontDescription;
+
+int SwitchFontCommandCommit(QueryBar *queryBar, View *view){
+    Buffer *buffer = nullptr;
+    uint active = View_SelectableListGetActiveIndex(view);
+    View_SelectableListGetItem(view, active, &buffer);
+    if(!buffer){
+        return 0;
+    }
+
+    SwapFontInternal(std::string(buffer->data, buffer->taken));
+
+    SelectableListFreeLineBuffer(view);
+    return 1;
+}
+
+int SwitchFontCommandStart(View *view){
+    AssertA(view != nullptr, "Invalid view pointer");
+    LineBuffer *lineBuffer = nullptr;
+    const char *header = "Switch Font";
+    uint hlen = strlen(header);
+    lineBuffer = AllocatorGetN(LineBuffer, 1);
+
+    std::vector<FontDescription> fonts = {
+        {"default"},
+        {"consolas"},
+        {"commit"},
+        {"ubuntu"},
+        {"dejavu"},
+        {"jet"}
+    };
+
+    LineBuffer_InitBlank(lineBuffer);
+    for(uint i = 0; i < fonts.size(); i++){
+        FontDescription desc = fonts.at(i);
+        uint slen = strlen(desc.name);
+        LineBuffer_InsertLine(lineBuffer, (char *)desc.name, slen);
+    }
+
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+    filter.allowFreeType = 0;
+    View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
+                           SelectableListDefaultEntry, SelectableListDefaultCancel,
+                           SwitchFontCommandCommit, &filter);
+    return 0;
+}
+
 int SwitchThemeCommandCommit(QueryBar *queryBar, View *view){
     Buffer *buffer = nullptr;
     uint active = View_SelectableListGetActiveIndex(view);

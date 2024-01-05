@@ -3,6 +3,9 @@ cmake_policy(SET CMP0048 NEW)
 
 project(Cody VERSION 1.0.0 LANGUAGES CXX C)
 
+# For windows use: cmake .. -G"Visual Studio 17 2022"
+#                  MSBuild .\Cody.sln /p:Configuration=Release
+
 set(CODY "cody")
 set(SERVER "server")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
@@ -24,17 +27,21 @@ if(CODY_BUILD)
         # TODO: This is working, however it would be best if we could specify ${CMAKE_CXX_COMPILER}
         # also these flags are only ok for cl. It seems that using ${CMAKE_CXX_COMPILER} instead of cl
         # when compiling with visual studio generates an error. I have no idea why, but it does...
-        execute_process(COMMAND cl /EHsc /std:c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
+        add_custom_target(CompileResources
+                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
+                COMMAND cl /EHsc /std:c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp
+                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
     else()
         set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
-        execute_process(COMMAND ${CMAKE_CXX_COMPILER} -std=c++17
-                        ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources)
+        add_custom_target(CompileResources
+                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
+                COMMAND ${CMAKE_CXX_COMPILER} -std=c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources
+                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
     endif()
-    execute_process(COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR}
-                        ${CMAKE_SOURCE_DIR}/src/resources
-                        ${CMAKE_BINARY_DIR}
-                RESULT_VARIABLE PACK_RETURN_CODE
-                OUTPUT_VARIABLE PACK_CHK_FILES)
+    add_custom_target(ResourcesRunner
+                COMMAND ${CMAKE_COMMAND} -E echo "Running resources packer..."
+                COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src/resources ${CMAKE_BINARY_DIR}
+                DEPENDS CompileResources)
 
     if(NOT ${PACK_RETURN_CODE} EQUAL 0)
         message(SEND_ERROR ${PACK_CHK_FILES})
@@ -120,6 +127,7 @@ list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/net_services.cpp
 # resources directory
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/image_util.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_icons.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/extra_fonts.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_shader.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_font.cpp)
 
@@ -205,6 +213,7 @@ if(CODY_BUILD)
     set(EDITOR_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/cody.cpp)
 
     add_library(corelib OBJECT ${CORE_FILES})
+    add_dependencies(corelib ResourcesRunner)
     add_executable(${CODY} ${SUBSYSTEM} ${EDITOR_FILES} $<TARGET_OBJECTS:corelib>)
 
     add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}

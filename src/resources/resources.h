@@ -3,6 +3,17 @@
 
 extern unsigned char FONT_liberation_mono_ttf[];
 extern unsigned int FONT_liberation_mono_ttf_len;
+extern unsigned char FONT_consolas_ttf[];
+extern unsigned int FONT_consolas_ttf_len;
+extern unsigned char FONT_commit_mono_ttf[];
+extern unsigned int FONT_commit_mono_ttf_len;
+extern unsigned char FONT_ubuntu_mono_ttf[];
+extern unsigned int FONT_ubuntu_mono_ttf_len;
+extern unsigned char FONT_dejavu_sans_ttf[];
+extern unsigned int FONT_dejavu_sans_ttf_len;
+extern unsigned char FONT_jet_mono_ttf[];
+extern unsigned int FONT_jet_mono_ttf_len;
+
 
 extern const char *shader_icon_f;
 extern const char *shader_cursor_f;
@@ -40,3 +51,6 @@ extern unsigned int py_png_len;
 extern const char *shader__text_f_glsl;
 extern unsigned char logo_png[];
 extern unsigned int logo_png_len;
+
+extern unsigned char logo_ico[];
+extern unsigned int logo_ico_len;
