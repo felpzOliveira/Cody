@@ -6,6 +6,8 @@
 #include <vector>
 #include <buffers.h>
 
+// TODO
+
 #if 0
     #define PRINT_SAFE(head, ptr, len)do{\
         char __mem[128], __n[64];\
@@ -886,11 +888,29 @@ LEX_PROCESSOR(Lex_Comments){
         return 0;
     }
 
+    if(tReg->id != TOKEN_ID_IGNORE){
+        rLen = tReg->rLen;
+        (*p) += rLen;
+        *len = rLen;
+        token->identifier = tReg->id;
+        tReg->id = TOKEN_ID_IGNORE;
+        tReg->where = nullptr;
+        tReg->rLen = 0;
+        if((**p == 0 || **p == '\n') && type != 2){
+            (*p)++;
+            tokenizer->aggregate = 0;
+            return 2;
+        }
+        return 3;
+    }
+
+
     auto register_pos = [&]() -> int{
         size_t dif = (*p) - word_start;
         TokenId ret = Lex_CommentInnerID(word_start, dif);
+        int rval = 0;
         if(ret == TOKEN_ID_IGNORE)
-            return 0;
+            return 2;
         tReg->where = p;
         tReg->rLen = dif;
         tReg->id = ret;
@@ -903,16 +923,6 @@ LEX_PROCESSOR(Lex_Comments){
         return 1;
     };
 
-    if(tReg->id != TOKEN_ID_IGNORE){
-        rLen = tReg->rLen;
-        (*p) += rLen;
-        *len = rLen;
-        token->identifier = tReg->id;
-        tReg->id = TOKEN_ID_IGNORE;
-        tReg->where = nullptr;
-        tReg->rLen = 0;
-        return 3;
-    }
 
     if(lineChar == 0){
         is_cpp_based = 1;
@@ -1000,6 +1010,7 @@ LEX_PROCESSOR(Lex_Comments){
     }
 
     if(gathering == 0){
+        int reg = register_pos();
         if(register_pos() == 1)
             return -1;
     }

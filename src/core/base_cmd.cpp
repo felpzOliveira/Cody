@@ -163,24 +163,24 @@ void BaseCommand_JumpViewToBuffer(View *view, LineBuffer *lineBuffer, vec2i p){
 }
 
 int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
+    GlobalSearchResult *result = nullptr;
+    LineBuffer *targetLineBuffer = nullptr;
     int active = View_SelectableListGetActiveIndex(view);
     if(active == -1){
         return 0;
     }
 
     active = View_SelectableListGetRealIndex(view, active);
+    if(active >= linearResults.count){
+        goto __ret;
+    }
 
-    GlobalSearchResult *result = &linearResults.res[active];
-    LineBuffer *targetLineBuffer = result->lineBuffer;
-#if 0
-    Buffer *buffer = LineBuffer_GetBufferAt(targetLineBuffer, result->line);
-    printf("Picked %s:%d:%d : %s\n", targetLineBuffer->filePath,
-           result->line, result->col, buffer->data);
-#endif
+    result = &linearResults.res[active];
+    targetLineBuffer = result->lineBuffer;
 
     BaseCommand_JumpViewToBuffer(view, targetLineBuffer,
                                  vec2i(result->line, result->col));
-
+__ret:
     SelectableListFreeLineBuffer(view);
     linearResults.res.clear();
     linearResults.count = 0;
@@ -296,6 +296,7 @@ int SearchAllFilesCommandStart(View *view, std::string title){
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
     filter.allowFreeType = 0;
+    filter.toHistory = false;
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SelectableListDefaultEntry, SelectableListDefaultCancel,
                            GlobalSearchCommandCommit, &filter);
@@ -324,10 +325,10 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
 
 int BaseCommand_EncodingSwap(char *cmd, uint size, View *view){
     int r = 1;
-    std::string search(CMD_ENCODING_STR);
-    int e = StringFirstNonEmpty(&cmd[search.size()], size - search.size());
+    std::string encoding(CMD_ENCODING_STR);
+    int e = StringFirstNonEmpty(&cmd[encoding.size()], size - encoding.size());
     if(e < 0) return r;
-    e += search.size();
+    e += encoding.size();
 
     std::string target(&cmd[e]);
     BufferView *bView = View_GetBufferView(view);
