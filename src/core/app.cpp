@@ -1748,7 +1748,7 @@ void AppPasteString(const char *p, uint size, bool force_view){
             Buffer_EraseSymbols(buffer, symTable);
 
             uint n = LineBuffer_InsertRawTextAt(view->lineBuffer, (char *) p, size,
-            cursor.x, cursor.y, &off);
+                                                cursor.x, cursor.y, &off);
 
             section.start = cursor;
             section.end = vec2ui(cursor.x + n, off);
@@ -2545,7 +2545,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand,
                             Key_LeftControl, Key_Semicolon);
 
-    //RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_LeftControl, Key_J);
+    RegisterRepeatableEvent(mapping, AppCommandJumpNesting, Key_RightControl, Key_J);
     RegisterRepeatableEvent(mapping, AppJumpToNextError, Key_LeftControl, Key_J);
     RegisterRepeatableEvent(mapping, AppCommandIndent, Key_LeftControl, Key_Tab);
     RegisterRepeatableEvent(mapping, AppCommandCut, Key_LeftControl, Key_W);

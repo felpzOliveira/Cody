@@ -496,6 +496,7 @@ int BaseCommand_SearchFunctions(char *cmd, uint size, View *){
 int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
     int r = 0;
     std::string alias("alias ");
+    cmd[size] = 0;
     if(StringStartsWith(cmd, size, (char *)alias.c_str(), alias.size())){
         r = 1;
         int e = StringFirstNonEmpty(&cmd[alias.size()], size - alias.size());
@@ -504,31 +505,28 @@ int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
 
         char *target = &cmd[e];
 
-        int p = StringFindFirstChar(target, size - e, '=');
-        if(p < 0) return r;
+        SkipWhiteSpaces(&target);
+        if(*target == 0)
+            return r;
 
-        int n = p-1;
-        // rewind and remove space
-        for(int f = p-1; f > e; f--){
-            if(cmd[f] == ' ') n--;
-            else break;
+        char *ref = target;
+        SkipUntill(&ref, '=');
+        if(*ref == 0)
+            return r;
+
+        *ref = 0;
+        // skip backwards spaces
+        char *aux = ref-1;
+        while(*aux == ' '){
+            *aux = 0;
+            aux -= 1;
         }
 
-        char t = target[n];
-        target[n] = 0;
-
         std::string targetStr(target);
-        target[n] = t;
+        ref += 1;
+        SkipWhiteSpaces(&ref);
 
-        int s = StringFirstNonEmpty(&target[p+1], size - e - p - 1);
-        if(s < 0) return r;
-
-        char *value = &target[p+1+s];
-
-        char vv = cmd[size];
-        cmd[size] = 0;
-        std::string valueStr(value);
-        cmd[size] = vv;
+        std::string valueStr(ref);
 
         aliasMap[targetStr] = valueStr;
         //printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());

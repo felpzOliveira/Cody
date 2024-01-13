@@ -365,6 +365,18 @@ void Memcpy(void *dst, void *src, uint size);
 /* Standard memset */
 void Memset(void *dst, unsigned char v, uint size);
 
+inline
+void SkipUntill(char **ptr, char value){
+    while(**ptr != value && **ptr != 0)
+        (*ptr) += 1;
+}
+
+inline
+void SkipWhiteSpaces(char **ptr){
+    while(**ptr == ' ' && **ptr != 0)
+        (*ptr) += 1;
+}
+
 /*
 * Utility for reading string line-by-line.
 */
