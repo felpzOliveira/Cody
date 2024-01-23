@@ -71,11 +71,17 @@ struct FileEntry;
 #define CMD_EXPAND_STR "expand"
 #define CMD_EXPAND_HELP "Expand/Restore a view to the largest possible size."
 
+#define CMD_SET_ENCRYPT_STR "set-encrypted"
+#define CMD_SET_ENCRYPT_HELP "Marks the current file to be encrypted."
+
 #define CMD_KILLVIEW_STR "kill-view"
 #define CMD_KILLVIEW_HELP "Closes a view reclaiming the view's taken geometry."
 
 #define CMD_KILLBUFFER_STR "kill-buffer"
 #define CMD_KILLBUFFER_HELP "Closes the file opened in the current view (if any)."
+
+#define CMD_HISTORY_CLEAR_STR "history-clear"
+#define CMD_HISTORY_CLEAR_HELP "Clears the current history stack and file."
 
 #define CMD_CURSORSEG_STR "cursor-seg "
 #define CMD_CURSORSEG_HELP "Enable/Disable rendering of the line that connects the double cursor."

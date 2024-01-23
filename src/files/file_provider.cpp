@@ -7,6 +7,8 @@
 #include <languages.h>
 #include <storage.h>
 #include <sstream>
+#include <cryptoutil.h>
+#include <aes.h>
 
 typedef struct FileProvider{
     FileBufferList fileBuffer;
@@ -288,32 +290,75 @@ void FileProvider_CreateFile(char *targetPath, uint len, LineBuffer **lineBuffer
     if(lTokenizer) *lTokenizer = tokenizer;
 }
 
-bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
-                       bool mustFinish)
+bool FileProvider_VerifyEncryptedFile(uint8_t *content, uint32_t size){
+    uint8_t head[] = {CRYPTO_MAGIC};
+    uint8_t salt[CRYPTO_SALT_LEN];
+    // 1- No magic + iv
+    if(size < (7 + CRYPTO_SALT_LEN + 16 + 1))
+        return false;
+
+    // 2- No header
+    if(memcmp(content, head, 7) != 0)
+        return false;
+
+    return true;
+}
+
+static char *tempContent = nullptr;
+static uint tempSize = 0;
+static std::string tempPath;
+
+void FileProvider_ReleaseTemporary(){
+    if(tempContent)
+        AllocatorFree(tempContent);
+    tempSize = 0;
+    tempPath = std::string();
+    tempContent = nullptr;
+}
+
+int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
+                               bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
     Tokenizer *tokenizer = nullptr;
-    uint fileSize = 0;
+    char *targetPath = (char *)tempPath.c_str();
+    uint len = (uint)tempPath.size();
     LineBufferProps props;
-    char *content = nullptr;
-    StorageDevice *device = fProvider.storageDevice;
 
-    if(device){
-        content = device->GetContentsOf(targetPath, &fileSize);
-    #if 0 // TODO: We need to do something about binary files
-        double decode_ratio = ComputeDecodeRatio(content, fileSize);
-        if(!(decode_ratio < kMaximumDecodeRatio)){
-            if(REJECT_BINARY_FILES){
-                printf("[Warning] * File ( %s ) is possibly binary.\n"
-                       "            Cody does not supported  such files under current build.\n",
-                    targetPath);
-                AllocatorFree(content);
-                content = nullptr;
-                return false;
-            }
-        }
-    #endif
+    uint8_t salt[CRYPTO_SALT_LEN];
+    uint8_t iv[16];
+    uint8_t key[32];
+    uint8_t *input = nullptr;
+    std::vector<uint8_t> decrypted;
+
+    if(tempContent == nullptr || tempSize < (7 + CRYPTO_SALT_LEN + 16)){
+        FileProvider_ReleaseTemporary();
+        return FILE_LOAD_FAILED;
     }
+
+    // copy the salt
+    memcpy(salt, &tempContent[7], CRYPTO_SALT_LEN);
+
+    // copy the iv
+    memcpy(iv, &tempContent[7 + CRYPTO_SALT_LEN], 16);
+
+    // generate key
+    CryptoUtil_PasswordHash(pwd, pwdlen, key, salt);
+
+    input = (uint8_t *)&tempContent[7 + CRYPTO_SALT_LEN + 16];
+    if(!AES_CBC_Decrypt(input, tempSize - 7 - CRYPTO_SALT_LEN - 16, key,
+                        iv, AES256, decrypted))
+    {
+        printf("Could not decrypt file\n");
+        FileProvider_ReleaseTemporary();
+        return FILE_LOAD_FAILED;
+    }
+
+    uint fileSize = (uint)decrypted.size();
+    char *content = AllocatorGetN(char, fileSize+1);
+
+    memcpy(content, (char *)decrypted.data(), fileSize);
+    content[fileSize] = 0;
 
     lBuffer = AllocatorGetN(LineBuffer, 1);
     *lBuffer = LINE_BUFFER_INITIALIZER;
@@ -327,6 +372,7 @@ bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
     LineBuffer_SetType(lBuffer, props.type);
     LineBuffer_SetExtension(lBuffer, props.ext);
     LineBuffer_SetWrittable(lBuffer, true);
+    LineBuffer_SetEncrypted(lBuffer, key, salt);
 
     if(fileSize == 0 || content == nullptr){
         AllocatorFree(content);
@@ -356,7 +402,87 @@ bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
         *lineBuffer = lBuffer;
     }
 
-    return true;
+    FileProvider_ReleaseTemporary();
+    return FILE_LOAD_SUCCESS;
+}
+
+int FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
+                      bool mustFinish)
+{
+    LineBuffer *lBuffer = nullptr;
+    Tokenizer *tokenizer = nullptr;
+    uint fileSize = 0;
+    LineBufferProps props;
+    char *content = nullptr;
+    StorageDevice *device = fProvider.storageDevice;
+
+    FileProvider_ReleaseTemporary();
+
+    tempContent = nullptr;
+    tempSize = 0;
+
+    if(device){
+        uint8_t *ptr = nullptr;
+        content = device->GetContentsOf(targetPath, &fileSize);
+
+        ptr = (uint8_t *)content;
+        if(ptr != nullptr){
+            // NOTE: Check for encrypted file
+            if(FileProvider_VerifyEncryptedFile(ptr, (uint32_t)fileSize)){
+                // TODO: Need to interrupt this, ask for password, decrypt and than
+                //       swap buffers. The question here is how do we maintain control
+                //       in this routine if we have to yield to the query bar at this moment?
+                tempContent = content;
+                tempSize = fileSize;
+                tempPath = std::string(targetPath, len);
+                return FILE_LOAD_REQUIRES_DECRYPT;
+            }
+        }
+    }
+
+    lBuffer = AllocatorGetN(LineBuffer, 1);
+    *lBuffer = LINE_BUFFER_INITIALIZER;
+
+    tokenizer = FileProvider_GuessTokenizer(targetPath, len, &props, 1);
+    Lex_TokenizerContextReset(tokenizer);
+
+    LineBuffer_SetStoragePath(lBuffer, targetPath, len);
+
+    FileBufferList_Insert(&fProvider.fileBuffer, lBuffer);
+    LineBuffer_SetType(lBuffer, props.type);
+    LineBuffer_SetExtension(lBuffer, props.ext);
+    LineBuffer_SetWrittable(lBuffer, true);
+    lBuffer->props.isEncrypted = false;
+
+    if(fileSize == 0 || content == nullptr){
+        AllocatorFree(content);
+        LineBuffer_InitEmpty(lBuffer);
+        content = nullptr;
+    }else{
+        LineBuffer_Init(lBuffer, tokenizer, content, fileSize, mustFinish);
+    }
+
+    if(content != nullptr){
+        // NOTE: the memory taken from the file is released when the lexer
+        // has finished processing the contents of the file. Since now we
+        // are using the DisptachExecution method for loading files to handle
+        // large loads it is not safe to free this memory here.
+
+        //AllocatorFree(content);
+    }
+
+    // allow hooks execution
+    for(uint i = 0; i < fProvider.openHooksCount; i++){
+        if(fProvider.openHooks[i]){
+            fProvider.openHooks[i](targetPath, len, lBuffer, tokenizer);
+        }
+    }
+
+    if(lineBuffer){
+        *lineBuffer = lBuffer;
+    }
+
+    return FILE_LOAD_SUCCESS;
 }
 
 int FileProvider_IsLineBufferDirty(char *hint_name, uint len){

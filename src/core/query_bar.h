@@ -64,6 +64,15 @@ struct QueryBar{
 
     /* For file opening, this is called when user confirms a file */
     OnFileOpenCallback fileOpenCallback;
+
+    /* Allow to push an extra command */
+    bool hasPendingCallbacks;
+    char pendingTitle[64];
+    uint pendingSize;
+    QueryBarInputFilter pendingFilter;
+    OnQueryBarEntry pushedEntryCallback;
+    OnQueryBarCancel pushedCancelCallback;
+    OnQueryBarCommit pushedCommitCallback;
 };
 
 /*
@@ -80,6 +89,14 @@ void QueryBar_SetGeometry(QueryBar *queryBar, Geometry *geometry, Float lineHeig
 * Activates a QueryBar and prepares it to execute a given cmd.
 */
 void QueryBar_Activate(QueryBar *queryBar, QueryBarCommand cmd, View *view);
+
+/*
+* Pushes a new command to be run after running the current one. Allow for
+* chaining cmds.
+*/
+void QueryBar_SetPendingCall(QueryBar *queryBar, char *title, uint size,
+                             OnQueryBarEntry entry, OnQueryBarCancel cancel,
+                             OnQueryBarCommit commit, QueryBarInputFilter *filter);
 
 /*
 * Activates a QueryBar with a custom interface for controling events.

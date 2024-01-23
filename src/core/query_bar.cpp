@@ -138,6 +138,19 @@ static int QueryBar_AreCommandsContinuous(QueryBar *queryBar, QueryBarCommand cm
             (id == QUERY_BAR_CMD_SEARCH && cmd == QUERY_BAR_CMD_REVERSE_SEARCH));
 }
 
+void QueryBar_SetPendingCall(QueryBar *queryBar, char *title, uint size,
+                             OnQueryBarEntry entry, OnQueryBarCancel cancel,
+                             OnQueryBarCommit commit, QueryBarInputFilter *filter)
+{
+    queryBar->hasPendingCallbacks = true;
+    queryBar->pushedEntryCallback = entry;
+    queryBar->pushedCancelCallback = cancel;
+    queryBar->pushedCommitCallback = commit;
+    queryBar->pendingSize = (uint)Min((Float)size, (Float)64);
+    if(filter) queryBar->pendingFilter = *filter;
+    memcpy(queryBar->pendingTitle, title, queryBar->pendingSize);
+}
+
 /* Sets tittle and ids */
 static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
                                   char *name, uint titleLen)
@@ -152,6 +165,12 @@ static void QueryBar_StartCommand(QueryBar *queryBar, QueryBarCommand cmd,
     queryBar->entryCallback = nullptr;
     queryBar->cancelCallback = nullptr;
     queryBar->commitCallback = nullptr;
+    queryBar->pushedEntryCallback = nullptr;
+    queryBar->pushedCancelCallback = nullptr;
+    queryBar->pushedCommitCallback = nullptr;
+    queryBar->hasPendingCallbacks = false;
+    queryBar->pendingSize = 0;
+    queryBar->pendingFilter = INPUT_FILTER_INITIALIZER;
     switch(cmd){
         case QUERY_BAR_CMD_SEARCH:{
             len = snprintf(title, sizeof(title), "Search: ");
@@ -675,6 +694,17 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
         replace->toLocateLen = 0;
         replace->toReplaceLen = 0;
         replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
+
+        if(queryBar->hasPendingCallbacks){
+            QueryBar_ActivateCustom(queryBar, queryBar->pendingTitle, queryBar->pendingSize,
+                                    queryBar->pushedEntryCallback,
+                                    queryBar->pushedCancelCallback,
+                                    queryBar->pushedCommitCallback,
+                                    &queryBar->pendingFilter);
+            View_ReturnToState(AppGetActiveView(), View_QueryBar);
+            QueryBar_EnableCursorJump(queryBar);
+            r = 0;
+        }
     }
 
     return r;

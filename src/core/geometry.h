@@ -103,20 +103,12 @@ template<typename T> class vec2{
 
     vec2(){ x = y = (T)0; }
     vec2(T a){ x = y = a; }
-    vec2(T a, T b): x(a), y(b){
-        Assert(!HasNaN());
-    }
+    vec2(T a, T b): x(a), y(b){}
 
-    template<typename Q> vec2(vec2<Q> other): x(other.x), y(other.y){
-        Assert(!HasNaN());
-    }
+    template<typename Q> vec2(vec2<Q> other): x((T)other.x), y((T)other.y){}
 
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y);
-    }
-
-    bool HasNaN() const{
-        return IsNaN((Float)x) || IsNaN((Float)y);
     }
 
     int Dimensions() const{ return 2; }
@@ -212,24 +204,12 @@ template<typename T> class vec3{
     T x, y, z;
     vec3(){ x = y = z = (T)0; }
     vec3(T a){ x = y = z = a; }
-    vec3(T a, T b, T c): x(a), y(b), z(c){
-        Assert(!HasNaN());
-    }
+    vec3(T a, T b, T c): x(a), y(b), z(c){}
 
-    template<typename Q> vec3(vec3<Q> other): x(other.x), y(other.y), z(other.z){
-        Assert(!HasNaN());
-    }
+    template<typename Q> vec3(vec3<Q> other): x(other.x), y(other.y), z(other.z){}
 
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z);
-    }
-
-    bool HasNaN(){
-        return IsNaN((Float)x) || IsNaN((Float)y) || IsNaN((Float)z);
-    }
-
-    bool HasNaN() const{
-        return IsNaN(x) || IsNaN(y) || IsNaN(z);
     }
 
     int Dimensions() const{ return 3; }
@@ -269,7 +249,6 @@ template<typename T> class vec3{
     }
 
     vec3<T> operator/(const vec3<T> &v) const{
-        Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
         Float invz = (Float)1 / v.z;
@@ -277,7 +256,6 @@ template<typename T> class vec3{
     }
 
     vec3<T> &operator/(const vec3<T> &v){
-        Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
         Float invz = (Float)1 / v.z;
@@ -349,17 +327,7 @@ template<typename T> class vec4{
     T x, y, z, w;
     vec4(){ x = y = z = (T)0; }
     vec4(T a){ x = y = z = w = a; }
-    vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){
-        Assert(!HasNaN());
-    }
-
-    bool HasNaN(){
-        return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
-    }
-
-    bool HasNaN() const{
-        return IsNaN(x) || IsNaN(y) || IsNaN(z) || IsNaN(w);
-    }
+    vec4(T a, T b, T c, T d): x(a), y(b), z(c), w(d){}
 
     bool IsZeroVector() const{
         return IsZero(x) && IsZero(y) && IsZero(z) && IsZero(w);
@@ -402,7 +370,6 @@ template<typename T> class vec4{
     }
 
     vec4<T> operator/(const vec4<T> &v) const{
-        Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
         Float invz = (Float)1 / v.z;
@@ -411,7 +378,6 @@ template<typename T> class vec4{
     }
 
     vec4<T> &operator/(const vec4<T> &v){
-        Assert(!v.HasNaN());
         Float invx = (Float)1 / v.x;
         Float invy = (Float)1 / v.y;
         Float invz = (Float)1 / v.z;

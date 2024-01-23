@@ -22,6 +22,8 @@
 #include <modal.h>
 #include <functional>
 #include <unordered_map>
+#include <cryptoutil.h>
+#include <rng.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -222,6 +224,21 @@ void AppEarlyInitialize(bool use_tabs){
                                  QueryBarHistory_GetPath().c_str());
 
     BaseCommand_InitializeCommandMap();
+}
+
+void AppClearHistory(){
+    FileHandle handle;
+    StorageDevice *device = FetchStorageDevice();
+    if(device->StreamWriteStart(&handle, QueryBarHistory_GetPath().c_str())){
+        device->StreamFinish(&handle);
+    }
+
+    CircularStack_Clear<QueryBarHistoryItem>(appContext.queryBarHistory.history);
+}
+
+void AppReloadHistory(){
+    std::string path = QueryBarHistory_GetPath();
+    QueryBarHistory_DetachedLoad(&appContext.queryBarHistory, path.c_str());
 }
 
 int AppGetTabLength(int *using_tab){
@@ -1679,9 +1696,15 @@ void AppCommandLineQuicklyDisplay(){
 
 void AppCommandSaveBufferView(){
     BufferView *bufferView = AppGetActiveBufferView();
+    bool success = false;
     NullRet(bufferView->lineBuffer);
-    LineBuffer_SaveToStorage(bufferView->lineBuffer);
-    bufferView->lineBuffer->is_dirty = 0;
+    if(LineBuffer_IsEncrypted(bufferView->lineBuffer)){
+        success = LineBuffer_SaveToStorageEncrypted(bufferView->lineBuffer);
+    }else{
+        success = LineBuffer_SaveToStorage(bufferView->lineBuffer);
+    }
+
+    bufferView->lineBuffer->is_dirty = !success;
 }
 
 void AppCommandCopy(){
@@ -2285,7 +2308,9 @@ void AppDragAndDrop(char **paths, int count, int x, int y, void*){
                 //       I'm not sure the lexer can handle parallel requests under the same
                 //       tokenizer
                 r = FileProvider_Load((char *)valuec, len, &lineBuffer, false);
-                if(r && i == 0 && insert_into_view)
+                if(r == FILE_LOAD_REQUIRES_DECRYPT) // TODO: Should we do something here?
+                    FileProvider_ReleaseTemporary();
+                else if(r == FILE_LOAD_SUCCESS && i == 0 && insert_into_view)
                     BufferView_SwapBuffer(View_GetBufferView(view), lineBuffer, CodeView);
             }
         }
@@ -2294,7 +2319,26 @@ void AppDragAndDrop(char **paths, int count, int x, int y, void*){
 
 void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
     AppRestoreCurrentBufferViewState();
+    int localFlags = creationFlags;
     View *view = AppGetActiveView();
+
+    auto emptyFunc = [&](QueryBar *bar, View *view) -> int{ return 0; };
+    auto fileOpenEncrypted = [&](QueryBar *bar, View *view) -> int{
+        BufferView *bView = View_GetBufferView(view);
+        Tokenizer *tokenizer = nullptr;
+        LineBuffer *lBuffer = nullptr;
+        char *content = nullptr;
+        uint size = 0;
+        AppOnTypeChange();
+        QueryBar_GetWrittenContent(bar, &content, &size);
+
+        if(FileProvider_LoadTemporary(content, size, &lBuffer, false) == FILE_LOAD_SUCCESS){
+            BufferView_SwapBuffer(bView, lBuffer, CodeView);
+        }
+
+        return 1;
+    };
+
     auto fileOpen = [=](View *view, FileEntry *entry) -> void{
         char targetPath[PATH_MAX];
         Tokenizer *tokenizer = nullptr;
@@ -2304,8 +2348,16 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
-                if(FileProvider_Load(targetPath, l, &lBuffer, false))
+                int ret = FileProvider_Load(targetPath, l, &lBuffer, false);
+                if(ret == FILE_LOAD_SUCCESS)
                     BufferView_SwapBuffer(bView, lBuffer, CodeView);
+                else if(ret == FILE_LOAD_REQUIRES_DECRYPT){
+                    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+                    filter.toHistory = false;
+                    QueryBar *qbar = View_GetQueryBar(view);
+                    QueryBar_SetPendingCall(qbar, (char *)"Password", 8, emptyFunc,
+                                            emptyFunc, fileOpenEncrypted, &filter);
+                }
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
                 if(f == 0 || lBuffer == nullptr){
@@ -2315,7 +2367,7 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                     BufferView_SwapBuffer(bView, lBuffer, CodeView);
                 }
             }
-        }else if((creationFlags & OPEN_FILE_FLAGS_ALLOW_CREATION) && App_IsStateWrite()){
+        }else if((localFlags & OPEN_FILE_FLAGS_ALLOW_CREATION) && App_IsStateWrite()){
             char *content = nullptr;
             uint len = 0;
             QueryBar *querybar = View_GetQueryBar(view);

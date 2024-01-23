@@ -344,6 +344,16 @@ uint AppRegisterOnMouseEventCallback(MouseEventCallback *cb);
 */
 void AppReleaseOnMouseEventCallback(uint handle);
 
+/*
+* Clears the current stack of history and history file.
+*/
+void AppClearHistory();
+
+/*
+* Reloads the history.
+*/
+void AppReloadHistory();
+
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();
 void AppCommandJumpRightArrow();

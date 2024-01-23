@@ -20,7 +20,8 @@ static Float ComputeTransformOf(Float x, Transform *transform){
 void OpenGLRenderEmptyCursorRect(OpenGLBuffer *quad, vec2f lower,
                                  vec2f upper, vec4f color, uint thickness)
 {
-    Float x0 = lower.x, y0 = lower.y, x1 = upper.x, y1 = upper.y;
+    uint x0 = (uint)lower.x, y0 = (uint)lower.y,
+         x1 = (uint)upper.x, y1 = (uint)upper.y;
     if(quad->length + 24 > quad->size){
         Graphics_QuadFlush(quad);
     }
@@ -191,7 +192,7 @@ void OpenGLRenderCursorSegment(OpenGLState *state, View *view, vec4f color, uint
             }
         }
 
-        Graphics_QuadPush(state, vec2ui(0, y0), vec2ui(thickness, y1), color);
+        Graphics_QuadPush(state, vec2ui(0, (uint)y0), vec2ui(thickness, (uint)y1), color);
     }
 }
 
@@ -202,7 +203,8 @@ void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
     if(isActive){
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             if(state->cursorVisible)
-                Graphics_QuadPush(quad, vec2ui(x0, y0), vec2ui(x1, y1), color);
+                Graphics_QuadPush(quad, vec2ui((uint)x0, (uint)y0),
+                                  vec2ui((uint)x1, (uint)y1), color);
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
             if(state->cursorVisible)
@@ -1154,7 +1156,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     vec4i c = GetUIColor(theme, UIFileHeader);
     fonsStashMultiTextColor(font->fsContext, x, y, c.ToUnsigned(),
                             desc, NULL, &dummyGlyph, encoder);
-    int n = strlen(enddesc);
+    int n = (int)strlen(enddesc);
     Float w = 0;
     if(n > 0){
         w = fonsComputeStringAdvance(font->fsContext, enddesc, n, &dummyGlyph, encoder);
@@ -1168,7 +1170,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     uint fSize = currFontSize > 5 ? currFontSize - 5 : currFontSize;
     Float scale = font->fontMath.invReduceScale;
 
-    Graphics_SetFontSize(state, fSize, fSize + FONT_UPSCALE_DEFAULT_OFFSET);
+    Graphics_SetFontSize(state, (Float)fSize, (Float)fSize + FONT_UPSCALE_DEFAULT_OFFSET);
     Graphics_PrepareTextRendering(state, projection, &state->scale);
 
     int is_tab = 0;
@@ -1176,31 +1178,53 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     enddesc[0] = 0;
     std::string head, fmt;
     int k = 0;
+    int eState = LineBuffer_IsEncrypted(view->lineBuffer);
 
+    // TODO: Add a better symbol for this E/C thingy
     if(is_tab){
-        k = snprintf(enddesc, sizeof(enddesc), " TAB - %d %s", tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " TAB - %d %s",
+                     tabSpace, EncoderName(fileEncoder));
     }else{
-        k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d %s", tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d %s",
+                     tabSpace, EncoderName(fileEncoder));
     }
 
     Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph, encoder);
     Float rScale = font->fontMath.invReduceScale / scale;
     w = w * rScale;
     vec2f half = (vec2f(geometry->upper) - vec2f(geometry->lower)) *
-                        font->fontMath.invReduceScale * 0.5;
-    x = 2.0 * half.x;
+                        font->fontMath.invReduceScale * 0.5f;
+    x = 2.0f * half.x;
+
     if(n > 0){
-        x -= (1.5 * w + 1.2 * f);
+        x -= (1.5f * w + 1.2f * f);
     }else{
-        x -= 1.2 * f;
+        x -= 1.2f * f;
     }
 
-    y = (a1.y + a0.y) * 0.5 - 0.25 * font->fontMath.fontSizeAtRenderCall;
+    y = (a1.y + a0.y) * 0.5f - 0.25f * font->fontMath.fontSizeAtRenderCall;
+
     Graphics_PushText(state, x, y, (char *)enddesc, k, c, &dummyGlyph, encoder);
     Graphics_FlushText(state);
 
-    Graphics_SetFontSize(state, currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
+    Graphics_SetFontSize(state, (Float)currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
+
+    if(eState){
+        uint id = 0;
+        int off = 0;
+        // TODO: The dark icon is kinda bad, need a swap
+        if(CurrentThemeIsLight())
+            id = Graphics_FetchTextureFor(state, FILE_EXTENSION_LOCK_DARK, &off);
+        else
+            id = Graphics_FetchTextureFor(state, FILE_EXTENSION_LOCK_WHITE, &off);
+
+        Float dif = 1.0f * (a1.y - a0.y);
+        uint iX = (uint)(x/scale - dif);
+        uint iY = (uint)(a0.y);
+        Graphics_ImagePush(state, vec2ui(iX, iY), vec2ui(iX + (uint)dif, iY + (uint)dif), id);
+        Graphics_ImageFlush(state);
+    }
 
     glDisable(GL_BLEND);
 }
@@ -1271,7 +1295,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     if(view->renderLineNbs){
         view->lineOffset = fonsComputeStringAdvance(font->fsContext, linen, n, &pGlyph, encoder);
     }else{
-        view->lineOffset = fonsComputeStringAdvance(font->fsContext, " ", 1, &pGlyph, encoder) * 0.5;
+        view->lineOffset = fonsComputeStringAdvance(font->fsContext, " ", 1, &pGlyph, encoder) * 0.5f;
     }
 
     ActivateViewportAndProjection(state, vview, ViewportAllView);
@@ -1292,8 +1316,8 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
         OpenGLRenderAllLineNumbers(state, view, theme);
     }
 
-    geometry.lower.x += view->lineOffset * font->fontMath.reduceScale;
-    Float width = geometry.upper.x - geometry.lower.x;
+    geometry.lower.x += (uint)(view->lineOffset * font->fontMath.reduceScale);
+    Float width = (Float)(geometry.upper.x - geometry.lower.x);
     Float scaledWidth = width * font->fontMath.invReduceScale;
 
     OpenGLComputeCursor(state, &state->glCursor, cursorBuffer,

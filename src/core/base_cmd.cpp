@@ -14,6 +14,8 @@
 #include <storage.h>
 #include <theme.h>
 #include <resources.h>
+#include <rng.h>
+#include <cryptoutil.h>
 
 int Mkdir(const char *path);
 char* __realpath(const char* path, char* resolved_path);
@@ -870,6 +872,32 @@ int BaseCommand_CursorBlink(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_HistoryClear(char *, uint, View *){
+    AppClearHistory();
+    return 1;
+}
+
+int BaseCommandSetEncrypted(char *cmd, uint size, View *view){
+    uint8_t key[32];
+    uint8_t salt[CRYPTO_SALT_LEN];
+    std::string enc(CMD_SET_ENCRYPT_STR);
+    BufferView *bView = View_GetBufferView(view);
+    if(bView->lineBuffer == nullptr)
+        return 1;
+
+    int e = StringFirstNonEmpty(&cmd[enc.size()], size - enc.size());
+    if(e < 0) return 1;
+
+    e += enc.size();
+    std::string target(&cmd[e]);
+
+    Crypto_SecureRNG(salt, CRYPTO_SALT_LEN);
+    CryptoUtil_PasswordHash((char *)target.c_str(), target.size(), key, salt);
+
+    LineBuffer_SetEncrypted(bView->lineBuffer, key, salt);
+    return 1;
+}
+
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
@@ -899,6 +927,8 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_INDENT_FILE_STR] = {CMD_INDENT_FILE_HELP, BaseCommand_IndentFile};
     cmdMap[CMD_INDENT_REGION_STR] = {CMD_INDENT_REGION_HELP, BaseCommand_IndentRegion};
     cmdMap[CMD_CURSOR_BLINK_STR] = {CMD_CURSOR_BLINK_HELP, BaseCommand_CursorBlink};
+    cmdMap[CMD_HISTORY_CLEAR_STR] = {CMD_HISTORY_CLEAR_HELP, BaseCommand_HistoryClear};
+    cmdMap[CMD_SET_ENCRYPT_STR] = {CMD_SET_ENCRYPT_HELP, BaseCommandSetEncrypted};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

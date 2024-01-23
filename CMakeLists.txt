@@ -111,7 +111,9 @@ list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/files/file_buffer.cpp
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/cryptoutil.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/secure_hash.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rng.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/aes.cpp)
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/aes.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/blake2.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/argon2.cpp)
 
 # debugger directory
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/debugger/dbg.cpp

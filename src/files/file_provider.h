@@ -8,6 +8,10 @@
 */
 #define MAX_HOOKS 16
 
+#define FILE_LOAD_FAILED           0
+#define FILE_LOAD_SUCCESS          1
+#define FILE_LOAD_REQUIRES_DECRYPT 2
+
 // Function pointer for file hooks
 typedef void(*file_hook)(char *filepath, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer);
 
@@ -92,8 +96,19 @@ int FileProvider_IsFileOpened(char *path, uint len);
 * usefull for large files but dangerous for loading files in sequence, use with care.
 * Returns whether or not it was possible to load the file.
 */
-bool FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
-                       bool mustFinish=true);
+int FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
+                      bool mustFinish=true);
+
+/*
+* Loads an encrypted file that was stored as temporary during the file open operation.
+*/
+int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
+                               bool mustFinish);
+
+/*
+* Erase the temporary data.
+*/
+void FileProvider_ReleaseTemporary();
 
 /*
 * Creates a new file. lineBuffer returns a new line buffer allocated for the file

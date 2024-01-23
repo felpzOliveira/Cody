@@ -54,3 +54,8 @@ extern unsigned int logo_png_len;
 
 extern unsigned char logo_ico[];
 extern unsigned int logo_ico_len;
+
+extern unsigned char lock_black_png[];
+extern unsigned int lock_black_png_len;
+extern unsigned char lock_white_png[];
+extern unsigned int lock_white_png_len;

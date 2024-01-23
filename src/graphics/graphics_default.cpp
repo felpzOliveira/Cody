@@ -47,6 +47,7 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
     Graphics_FlushText(state);
     Graphics_SetFontSize(state, currFontSize);
+
     glDisable(GL_SCISSOR_TEST);
     return 0;
 }

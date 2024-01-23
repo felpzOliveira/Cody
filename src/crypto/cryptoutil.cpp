@@ -1,4 +1,5 @@
 #include <cryptoutil.h>
+#include <argon2.h>
 
 static std::string b64table = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                               "abcdefghijklmnopqrstuvwxyz"
@@ -47,6 +48,22 @@ void CryptoUtil_BufferToHex(unsigned char *buffer, size_t size, std::string &str
         snprintf(hex, 3, "%02x", val);
         str += std::string(hex);
     }
+}
+
+void CryptoUtil_PasswordHash(char *password, size_t len, uint8_t *keybuffer,
+                             uint8_t *salt)
+{
+    uint8_t *pwd = (uint8_t *)password;
+    uint32_t plen = (uint32_t)len;
+
+    uint32_t keylen = 32;
+    uint32_t saltlen = 16;
+    uint32_t t_cost = 2;
+    uint32_t m_cost = (1<<16);
+    uint32_t parallelism = 1; // NOTE: we don't actually support parallelism in argon2
+
+    argon2i_hash_raw(t_cost, m_cost, parallelism, pwd, plen,
+                     salt, saltlen, keybuffer, keylen);
 }
 
 void CryptoUtil_BufferToBase64(unsigned char *buffer, size_t size, std::string &str){
@@ -119,7 +136,7 @@ void CryptoUtil_BufferFromBase64(std::vector<unsigned char> &out, char *data, si
         if(i == 4){
             // get indexes from values
             for(i = 0; i < 4; i++){
-                source[i] = b64table.find(source[i]);
+                source[i] = (unsigned char)b64table.find(source[i]);
             }
 
             bytes[0] = ((source[0] & 0x3F) << 2) | ((source[1] & 0x30) >> 4);
@@ -141,7 +158,7 @@ void CryptoUtil_BufferFromBase64(std::vector<unsigned char> &out, char *data, si
         }
 
         for(int j = 0; j < 4; j++){
-            source[j] = b64table.find(source[j]);
+            source[j] = (unsigned char)b64table.find(source[j]);
         }
 
         bytes[0] = ((source[0] & 0x3F) << 2) | ((source[1] & 0x30) >> 4);

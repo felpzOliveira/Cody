@@ -9,6 +9,8 @@
 #include <storage.h>
 #include <sstream>
 #include <log.h>
+#include <aes.h>
+#include <cryptoutil.h>
 
 #define MODULE_NAME "Buffer"
 
@@ -1603,54 +1605,9 @@ vec2i LineBuffer_GetActiveBuffer(LineBuffer *lineBuffer){
     return lineBuffer->activeBuffer;
 }
 
-static bool saveDispatchRunning = false;
-void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
-    if(lineBuffer->filePathSize < 1){
-        printf("Skipping un-writtable linebuffer\n");
-        return;
-    }
-
-    StorageDevice *storage = FetchStorageDevice();
-    const long pollTimeout = 100;
-    long timeTaken = 0;
-
-    // Whenever we save remotely we need to make sure that any previous
-    // writes are complete because the server is not asynchronous. And if
-    // connection is slow it might happen that dispatching another save
-    // will corrupt the first one because dispatching spawns a different
-    // thread and the dispatching routine shares host dispatchers based on the
-    // the type of dispatch that is happening. So I'll wait at most 2 seconds
-    // to see if any previous dispatches finishes, if not we have no choice but
-    // to refuse this write and force the user to request again later.
-
-    // TODO: It might be worth to store the time the dispatch was made
-    //       to make sure this is indeed a dispatch running and not a bug.
-    //       However attempting to detect a slow connection/bug on socket
-    //       is very tricky.
-    if(!storage->IsLocallyStored()){
-        while(saveDispatchRunning && timeTaken < 2000){
-            std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
-            timeTaken += pollTimeout;
-        }
-
-        if(saveDispatchRunning){
-            LOG_ERR("Cannot save file, dispatch still running. Retry later.");
-            lineBuffer->is_dirty = 1;
-            return;
-        }
-    }
-
-    FileHandle file;
-    // using a std::stringstream for buffering the content
-    // is better for remote usage
+static void LineBuffer_FetchContent(LineBuffer *lineBuffer, std::string &content){
     std::stringstream ss;
     uint lines = lineBuffer->lineCount;
-    if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
-        printf("Could not open file %s in current storage device\n",
-               lineBuffer->filePath);
-        return;
-    }
-
     uint maxSize = 0;
     uint ic = 0;
     char *linePtr = nullptr;
@@ -1702,27 +1659,118 @@ void LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
     }
 
     AllocatorFree(linePtr);
-    lineBuffer->is_dirty = 0;
 
-    std::string v = ss.str();
+    content = ss.str();
+}
+
+static bool saveDispatchRunning = false;
+static bool LineBuffer_SaveToStorageImpl(LineBuffer *lineBuffer,
+                                         uint8_t *bytes, uint32_t size)
+{
+    FileHandle file;
+    std::string content;
+    StorageDevice *storage = FetchStorageDevice();
+    const long pollTimeout = 100;
+    long timeTaken = 0;
+
+    if(lineBuffer->filePathSize < 1){
+        printf("Skipping un-writtable linebuffer\n");
+        return false;
+    }
+    // Whenever we save remotely we need to make sure that any previous
+    // writes are complete because the server is not asynchronous. And if
+    // connection is slow it might happen that dispatching another save
+    // will corrupt the first one because dispatching spawns a different
+    // thread and the dispatching routine shares host dispatchers based on the
+    // the type of dispatch that is happening. So I'll wait at most 2 seconds
+    // to see if any previous dispatches finishes, if not we have no choice but
+    // to refuse this write and force the user to request again later.
+
+    // TODO: It might be worth to store the time the dispatch was made
+    //       to make sure this is indeed a dispatch running and not a bug.
+    //       However attempting to detect a slow connection/bug on socket
+    //       is very tricky.
+    if(!storage->IsLocallyStored()){
+        while(saveDispatchRunning && timeTaken < 2000){
+            std::this_thread::sleep_for(std::chrono::milliseconds(pollTimeout));
+            timeTaken += pollTimeout;
+        }
+
+        if(saveDispatchRunning){
+            LOG_ERR("Cannot save file, dispatch still running. Retry later.");
+            return false;
+        }
+    }
+
+    if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
+        printf("Could not open file %s in current storage device\n",
+               lineBuffer->filePath);
+        return false;
+    }
+
     if(!storage->IsLocallyStored()){
         DispatchExecution([&](HostDispatcher *dispatcher){
-            std::string localStr = v;
+            uint8_t *localPtr = bytes;
+            uint32_t localSize = size;
             FileHandle localFile = file;
             StorageDevice *localStorage = storage;
             saveDispatchRunning = true;
 
             dispatcher->DispatchHost();
 
-            localStorage->StreamWriteBytes(&localFile, (void *)localStr.c_str(),
-                                           1, localStr.size());
+            localStorage->StreamWriteBytes(&localFile, (void *)localPtr, 1, localSize);
             localStorage->StreamFinish(&localFile);
             saveDispatchRunning = false;
         });
     }else{
-        storage->StreamWriteBytes(&file, (void *)v.c_str(), 1, v.size());
+        storage->StreamWriteBytes(&file, (void *)bytes, 1, size);
         storage->StreamFinish(&file);
     }
+
+    return true;
+}
+
+bool LineBuffer_SaveToStorageEncrypted(LineBuffer *lineBuffer){
+    std::string content;
+    uint8_t *key  = lineBuffer->props.key;
+    uint8_t *salt = lineBuffer->props.salt;
+    std::vector<uint8_t> crypted;
+    std::vector<uint8_t> iv;
+    std::vector<uint8_t> dataOut = {CRYPTO_MAGIC};
+
+    if(lineBuffer->filePathSize < 1){
+        printf("Skipping un-writtable linebuffer\n");
+        return false;
+    }
+
+    LineBuffer_FetchContent(lineBuffer, content);
+
+    dataOut.insert(dataOut.end(), salt, &salt[CRYPTO_SALT_LEN]);
+
+    if(!AES_CBC_Encrypt((uint8_t *)content.c_str(), content.size(), key, AES256,
+                        crypted, iv))
+    {
+        LOG_ERR("Failed encryption");
+        return false;
+    }
+
+    dataOut.insert(dataOut.end(), iv.begin(), iv.end());
+    dataOut.insert(dataOut.end(), crypted.begin(), crypted.end());
+
+    return LineBuffer_SaveToStorageImpl(lineBuffer, dataOut.data(), dataOut.size());
+}
+
+bool LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
+    std::string content;
+    if(lineBuffer->filePathSize < 1){
+        printf("Skipping un-writtable linebuffer\n");
+        return false;
+    }
+
+    LineBuffer_FetchContent(lineBuffer, content);
+
+    return LineBuffer_SaveToStorageImpl(lineBuffer, (uint8_t *)content.c_str(),
+                                        content.size());
 }
 
 int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){
@@ -1774,7 +1822,19 @@ LineBuffer *LineBuffer_AllocateInternal(LineBuffer *lBuffer){
     LineBuffer_SetType(lineBuffer, 2); // 2 = Empty tokenizer
     LineBuffer_SetExtension(lineBuffer, FILE_EXTENSION_NONE);
     LineBuffer_SetInternal(lineBuffer);
+    lineBuffer->props.isEncrypted = false;
     return lineBuffer;
+}
+
+void LineBuffer_SetEncrypted(LineBuffer *lineBuffer, uint8_t *key, uint8_t *salt){
+    if(lineBuffer){
+        lineBuffer->props.isEncrypted = true;
+        for(int i = 0; i < 32; i++){
+            lineBuffer->props.key[i] = key[i];
+            if(i < CRYPTO_SALT_LEN)
+                lineBuffer->props.salt[i] = salt[i];
+        }
+    }
 }
 
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext){
@@ -1799,6 +1859,14 @@ void LineBuffer_SetInternal(LineBuffer *lineBuffer){
     if(lineBuffer){
         lineBuffer->props.isInternal = true;
     }
+}
+
+bool LineBuffer_IsEncrypted(LineBuffer *lineBuffer){
+    bool rv = false;
+    if(lineBuffer){
+        rv = lineBuffer->props.isEncrypted;
+    }
+    return rv;
 }
 
 bool LineBuffer_IsInternal(LineBuffer *lineBuffer){

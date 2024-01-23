@@ -4,6 +4,9 @@
 #include <string>
 #include <vector>
 
+#define CRYPTO_SALT_LEN 16
+#define CRYPTO_MAGIC 0x54, 0x67, 0x32, (uint8_t)'E', (uint8_t)'N', (uint8_t)'C', (uint8_t)';'
+
 #define CRYPTO_BYTE_0( x ) ( (uint8_t) (   ( x )         & 0xff ) )
 #define CRYPTO_BYTE_1( x ) ( (uint8_t) ( ( ( x ) >> 8  ) & 0xff ) )
 #define CRYPTO_BYTE_2( x ) ( (uint8_t) ( ( ( x ) >> 16 ) & 0xff ) )
@@ -52,6 +55,14 @@ void CryptoUtil_RotateBufferLeft(unsigned char **buffer, size_t len);
  */
 void CryptoUtil_RotateBufferRight(unsigned char *buffer, size_t len);
 void CryptoUtil_RotateBufferRight(unsigned char **buffer, size_t len);
+
+/*
+* Generates a key from a password. Returned key is 32 bytes in size, i.e.:
+* keybuffer must have at least 32 bytes in size. Salt must be 16 bytes in size
+* and should already be filled.
+*/
+void CryptoUtil_PasswordHash(char *password, size_t len, uint8_t *keybuffer,
+                             uint8_t *salt);
 
 /*
  * Debug. Prints the contents of a buffer in 16 block hex format.

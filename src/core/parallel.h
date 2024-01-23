@@ -200,7 +200,7 @@ void FinishExecutor();
 void GetExecutorLockedLineBuffer(LockedLineBuffer **ptr);
 
 inline int GetConcurrency(){
-    return Max(1, (int)std::thread::hardware_concurrency());
+    return (int)Max((Float)1, (Float)std::thread::hardware_concurrency());
 }
 
 /*

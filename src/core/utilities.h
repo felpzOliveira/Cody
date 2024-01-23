@@ -33,7 +33,9 @@
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
 #define MAX_DESCRIPTOR_LENGTH 256
-#define IGNORE(x) (void)!(x)
+#if !defined(IGNORE)
+    #define IGNORE(x) (void)!(x)
+#endif
 
 /*
 * NOTE: Make sure the build in fact supports binary files before
@@ -416,6 +418,15 @@ inline double MeasureInterval(const Fn &fn){
     clock_t start = clock();
     fn();
     return double(clock() - start)/CLOCKS_PER_SEC;
+}
+
+#include <fstream>
+inline void __DebugWriteFile(const char *file, const std::string &content){
+    std::ofstream ofs(file, std::ios::binary);
+    if(ofs.is_open()){
+        ofs << content;
+        ofs.close();
+    }
 }
 
 #if 0

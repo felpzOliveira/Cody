@@ -8,6 +8,7 @@
 #include <symbol.h>
 #include <vector>
 #include <encoding.h>
+#include <cryptoutil.h>
 
 /*
 * Basic data structure for lines. data holds the line pointer,
@@ -49,6 +50,10 @@ typedef enum{
     FILE_EXTENSION_TEXT,
     FILE_EXTENSION_FONT,
     FILE_EXTENSION_FOLDER,
+
+    FILE_EXTENSION_LOCK_DARK,
+    FILE_EXTENSION_LOCK_WHITE,
+    FILE_EXTENSION_TOTAL,
 }FileExtension;
 
 typedef struct{
@@ -64,6 +69,9 @@ struct LineBufferProps{
     CopySection cpSection;
     bool isWrittable;
     bool isInternal;
+    bool isEncrypted;
+    uint8_t key[32];
+    uint8_t salt[CRYPTO_SALT_LEN];
     EncoderDecoder encoder;
 };
 
@@ -387,7 +395,12 @@ bool LineBuffer_IsWrittable(LineBuffer *lineBuffer);
 /*
 * Saves the contents of the lineBuffer to storage.
 */
-void LineBuffer_SaveToStorage(LineBuffer *lineBuffer);
+bool LineBuffer_SaveToStorage(LineBuffer *lineBuffer);
+
+/*
+* Saves the content of the lineBuffer to storage encrypted.
+*/
+bool LineBuffer_SaveToStorageEncrypted(LineBuffer *lineBuffer);
 
 /*
 * Sets the active buffer during edit. This allows for buffering and prevent
@@ -412,6 +425,7 @@ void LineBuffer_SetType(LineBuffer *lineBuffer, uint type);
 void LineBuffer_SetExtension(LineBuffer *lineBuffer, FileExtension ext);
 void LineBuffer_SetCopySection(LineBuffer *lineBuffer, CopySection section);
 void LineBuffer_SetInternal(LineBuffer *lineBuffer);
+void LineBuffer_SetEncrypted(LineBuffer *lineBuffer, uint8_t *key, uint8_t *salt);
 
 /*
 * Generic getter for the linebuffer properties.
@@ -420,6 +434,7 @@ uint LineBuffer_GetType(LineBuffer *lineBuffer);
 FileExtension LineBuffer_GetExtension(LineBuffer *lineBuffer);
 void LineBuffer_GetCopySection(LineBuffer *lineBuffer, CopySection *section);
 bool LineBuffer_IsInternal(LineBuffer *lineBuffer);
+bool LineBuffer_IsEncrypted(LineBuffer *lineBuffer);
 
 /*
 * Checks if a token inside a buffer in the given linebuffer is inside the

@@ -10,7 +10,7 @@
 #include <linux/random.h>
 #include <errno.h>
 
-// TODO: Add Windows's CryptGenRandom, docs are in page 72.
+void Crypto_InitRNGEngine(){}
 
 // For linux we need to check the entropy counter first to see
 // if there was actually a register. I don't ever see this failing
@@ -67,12 +67,31 @@ bool Crypto_SecureRNG(void *buffer, size_t size){
     int rv = linux_rng_safe(buffer, size);
     return rv == 0;
 }
+
 #else
+#include <windows.h>
+#include <wincrypt.h>
+
+static HCRYPTPROV providerHandle = 0;
+void Crypto_InitRNGEngine(){
+    if(!providerHandle){
+        CryptAcquireContext(&providerHandle, 0, 0, PROV_RSA_FULL,
+                            CRYPT_VERIFYCONTEXT | CRYPT_SILENT);
+    }
+}
+
 bool Crypto_SecureRNG(void *buffer, size_t size){
-    // TODO: IMPLEMENT WINDOWS
     unsigned char *ptr = (unsigned char *)buffer;
-    for(size_t i = 0; i < size; i++)
-        ptr[i] = rand() % 255;
+    while(size > 0){
+        const DWORD len = (DWORD)(size > 1048576UL ? 1048576UL : size);
+        if(!CryptGenRandom(providerHandle, len, ptr)){
+            return false;
+        }
+
+        ptr += len;
+        size -= len;
+    }
+
     return true;
 }
 #endif

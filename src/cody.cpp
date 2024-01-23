@@ -9,6 +9,7 @@
 #include <storage.h>
 #include <security_services.h>
 #include <modal.h>
+#include <rng.h>
 
 typedef struct{
     bool is_remote;
@@ -149,7 +150,7 @@ void LoadStaticFilesOnStart(){
         std::string rootPath = AppGetRootDirectory();
         while (fgets(line, sizeof(line), fp) != NULL){
             {
-                uint n = strlen(line);
+                uint n = (uint)strlen(line);
                 line[n-1] = 0;
 
                 std::string lineStr(line);
@@ -159,9 +160,9 @@ void LoadStaticFilesOnStart(){
 
                 if(AppIsStoredFile(p)) continue;
 
-                int r = GuessFileEntry((char *)p.c_str(), p.size(), &entry, folder);
+                int r = GuessFileEntry((char *)p.c_str(), (uint)p.size(), &entry, folder);
                 if(!(r < 0) && entry.type == DescriptorFile){
-                    if(FileProvider_Load((char *)p.c_str(), p.size()))
+                    if(FileProvider_Load((char *)p.c_str(), (uint)p.size()))
                         AppAddStoredFile(lineStr);
                 }
             }
@@ -181,7 +182,7 @@ void StartWithNewFile(const char *path=nullptr){
     InitializeEmptyView(&view);
     if(path){
         LineBuffer *lineBuffer = nullptr;
-        FileProvider_CreateFile((char *)path, strlen(path), &lineBuffer, nullptr);
+        FileProvider_CreateFile((char *)path, (uint)strlen(path), &lineBuffer, nullptr);
         BufferView_SwapBuffer(view, lineBuffer, CodeView);
     }
 
@@ -194,7 +195,7 @@ void StartWithFile(const char *path=nullptr){
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
-        uint length = strlen(path);
+        uint length = (uint)strlen(path);
 
         if(FileProvider_Load((char *)path, length, &lineBuffer, false))
             BufferView_SwapBuffer(bView, lineBuffer, CodeView);
@@ -228,6 +229,8 @@ int cody_entry(int argc, char **argv){
         return ARG_OK;
     }, 0);
 
+    Crypto_InitRNGEngine();
+
     if(args.has_key)
         SecurityServices::CreateContext(context, args.key);
     else
@@ -248,11 +251,11 @@ int cody_entry(int argc, char **argv){
         if(args.unknownPath.size() > 0){
             char folder[PATH_MAX];
             char* p = (char*)args.unknownPath.c_str();
-            uint len = strlen(p);
+            uint len = (uint)strlen(p);
             FileEntry entry;
             int r = GuessFileEntry(p, len, &entry, folder);
 
-            if (r == -1) {
+            if(r == -1){
                 printf("Unknown argument, attempting to open as file\n");
                 AppEarlyInitialize(args.use_tabs);
                 StartWithNewFile(p);
@@ -299,19 +302,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int totalArgc = argc;
 
-    if (argc == 1) {
+    if(argc == 1){
         totalArgc += 1;
         addBaseDir = 1;
     }
 
     char** argv = new char* [totalArgc];
-    for (int i = 0; i < argc; ++i) {
+    for(int i = 0; i < argc; ++i){
         int size_needed = WideCharToMultiByte(CP_UTF8, 0, lpArgv[i], -1, NULL, 0, NULL, NULL);
         argv[i] = new char[size_needed];
         WideCharToMultiByte(CP_UTF8, 0, lpArgv[i], -1, argv[i], size_needed, NULL, NULL);
     }
 
-    if (addBaseDir) {
+    if(addBaseDir){
         PWSTR userProfile = nullptr;
         HRESULT result = SHGetKnownFolderPath(FOLDERID_Documents, 0, NULL, &userProfile);
         int bufferSize = WideCharToMultiByte(CP_UTF8, 0, userProfile, -1, NULL, 0, NULL, NULL);
@@ -324,7 +327,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 
     int rv = cody_entry(totalArgc, argv);
 
-    for (int i = 0; i < totalArgc; ++i) {
+    for(int i = 0; i < totalArgc; ++i){
         delete[] argv[i];
     }
     delete[] argv;
@@ -332,7 +335,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     return rv;
 }
 #else
-int main(int argc, char** argv) {
+int main(int argc, char** argv){
     return cody_entry(argc, argv);
 }
 #endif

@@ -936,6 +936,10 @@ static void OpenGLLoadIcons(OpenGLState *state){
                          ".lit_white", FILE_EXTENSION_LIT_WHITE);
     Graphics_TextureInit(state, wave_white_png, wave_white_png_len,
                          ".lit", FILE_EXTENSION_LIT);
+    Graphics_TextureInit(state, lock_black_png, lock_black_png_len,
+                         "lock_dark", FILE_EXTENSION_LOCK_DARK);
+    Graphics_TextureInit(state, lock_white_png, lock_white_png_len,
+                         "lock_white", FILE_EXTENSION_LOCK_WHITE);
 }
 
 void OpenGLInitialize(OpenGLState *state){
@@ -953,9 +957,6 @@ void OpenGLInitialize(OpenGLState *state){
     state->mouse.isPressed = false;
     state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
 
-    // TODO: We already have these files loaded in resources.h, can't we just use them here?
-    //SetWindowIcon(state->window, "C:\\Users\\Felpz\\Documents\\Cody\\icons\\logo.ico");
-    //SetWindowIcon(state->window, "/home/felpz/Documents/Cody/icons/logo.png");
     SetWindowIcon(state->window, logo_png, logo_png_len);
 
     AssertErr(gladLoadGL() != 0, "Failed to load OpenGL pointers");
@@ -1238,6 +1239,10 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
         id = state->textureMap[".lit_dark"];
     }else if(strExt == ".lit_white"){
         id = state->textureMap[".lit_white"];
+    }else if(strExt == "lock_dark"){
+        id = state->textureMap["lock_dark"];
+    }else if(strExt == "lock_white"){
+        id = state->textureMap["lock_white"];
     }
     else{
         // TODO: some unknown extension

@@ -7,4 +7,9 @@
 */
 bool Crypto_SecureRNG(void *buffer, size_t size);
 
+/*
+* Simple entry point to allow the underlying RNG engine to do any required
+* initialization. Call once and never touch again.
+*/
+void Crypto_InitRNGEngine();
 
