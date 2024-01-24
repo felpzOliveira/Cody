@@ -649,13 +649,11 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
 
             if(quadLen > 0 && n == 1){
                 _Quad quad = quads.at(quadLen-1);
-                Graphics_QuadPush(state, quad.left, quad.right,
-                                  quad.color);
+                Graphics_QuadPush(state, quad.left, quad.right, quad.color);
             }else{
                 for(int i = quadLen - 1; i >= 0; i--){
                     _Quad quad = quads.at(i);
-                    Graphics_QuadPush(state, quad.left, quad.right,
-                                      quad.color);
+                    Graphics_QuadPush(state, quad.left, quad.right, quad.color);
                 }
             }
 
@@ -1125,7 +1123,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
 
     if(vview->descLocation == DescriptionTop){
         a0 = vec2ui(l.x, l.y);
-        a1 = vec2ui(u.x, l.y + font->fontMath.fontSizeAtRenderCall);
+        a1 = vec2ui(u.x, (uint)(l.y + font->fontMath.fontSizeAtRenderCall));
     }else if(vview->descLocation != DescriptionBottom){
         AssertA(0, "Invalid description position");
     }
@@ -1151,8 +1149,8 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     Shader_UniformMatrix4(font->shader, "projection", &projection->m);
     Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
 
-    Float x = a0.x;
-    Float y = a0.y;
+    Float x = (Float)a0.x;
+    Float y = (Float)a0.y;
     vec4i c = GetUIColor(theme, UIFileHeader);
     fonsStashMultiTextColor(font->fsContext, x, y, c.ToUnsigned(),
                             desc, NULL, &dummyGlyph, encoder);
@@ -1160,13 +1158,13 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     Float w = 0;
     if(n > 0){
         w = fonsComputeStringAdvance(font->fsContext, enddesc, n, &dummyGlyph, encoder);
-        fonsStashMultiTextColor(font->fsContext, a1.x - 1.5 * w, y, c.ToUnsigned(),
+        fonsStashMultiTextColor(font->fsContext, a1.x - 1.5f * w, y, c.ToUnsigned(),
                                 enddesc, NULL, &dummyGlyph, encoder);
     }
 
     fonsStashFlush(font->fsContext);
 
-    uint currFontSize = font->fontMath.fontSizeAtDisplay;
+    uint currFontSize = (uint)font->fontMath.fontSizeAtDisplay;
     uint fSize = currFontSize > 5 ? currFontSize - 5 : currFontSize;
     Float scale = font->fontMath.invReduceScale;
 
@@ -1180,13 +1178,14 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     int k = 0;
     int eState = LineBuffer_IsEncrypted(view->lineBuffer);
 
-    // TODO: Add a better symbol for this E/C thingy
+    // TODO: Maybe add a dedicated routine to gether all strings related to the state
+    //       of the linebuffer so we can easily add more states here to print
     if(is_tab){
-        k = snprintf(enddesc, sizeof(enddesc), " TAB - %d %s",
-                     tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " %s TAB - %d %s",
+                     eState == 1 ? "[Encrypted]" : "", tabSpace, EncoderName(fileEncoder));
     }else{
-        k = snprintf(enddesc, sizeof(enddesc), " SPACE - %d %s",
-                     tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " %s SPACE - %d %s",
+                     eState == 1 ? "[Encrypted]" : "", tabSpace, EncoderName(fileEncoder));
     }
 
     Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph, encoder);
@@ -1197,19 +1196,19 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     x = 2.0f * half.x;
 
     if(n > 0){
-        x -= (1.5f * w + 1.2f * f);
+        x -= (1.5f * w + 1.0f * f + 0.015f * half.x);
     }else{
-        x -= 1.2f * f;
+        x -= 1.0f * f;
     }
 
-    y = (a1.y + a0.y) * 0.5f - 0.25f * font->fontMath.fontSizeAtRenderCall;
+    y = (a0.y + 0.15f * font->fontMath.fontSizeAtRenderCall) * rScale;
 
     Graphics_PushText(state, x, y, (char *)enddesc, k, c, &dummyGlyph, encoder);
     Graphics_FlushText(state);
 
     Graphics_SetFontSize(state, (Float)currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
-
+#if 0
     if(eState){
         uint id = 0;
         int off = 0;
@@ -1225,7 +1224,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
         Graphics_ImagePush(state, vec2ui(iX, iY), vec2ui(iX + (uint)dif, iY + (uint)dif), id);
         Graphics_ImageFlush(state);
     }
-
+#endif
     glDisable(GL_BLEND);
 }
 

@@ -1,6 +1,7 @@
 #include <server.h>
 #include <aes.h>
 #include <chrono>
+#include <utilities.h>
 
 #define LOG_MODULE "NET"
 #include <log.h>
@@ -587,7 +588,7 @@ void RPCServer::Start(int port){
 
     while(1){
         // if not bridge'd change directory
-        if(mode == 0) IGNORE(storage->Chdir(HOME.c_str()));
+        if(mode == 0) CODY_IGNORE(storage->Chdir(HOME.c_str()));
 
         linuxNet->clientfd = -1;
         LOG_SERVER("Waiting for connection on port " << port);

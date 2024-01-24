@@ -33,9 +33,7 @@
 #define MAX_STACK_SIZE 1024
 #define MAX_BOUNDED_STACK_SIZE 16
 #define MAX_DESCRIPTOR_LENGTH 256
-#if !defined(IGNORE)
-    #define IGNORE(x) (void)!(x)
-#endif
+#define CODY_IGNORE(x) (void)(x)
 
 /*
 * NOTE: Make sure the build in fact supports binary files before

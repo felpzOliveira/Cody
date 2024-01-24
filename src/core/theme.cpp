@@ -79,9 +79,9 @@ Theme themeGrayVim = {
     .mouseSelectionColor = ColorFromHex(0xFF232123),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.4,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.4f,
     },
 };
 
@@ -163,9 +163,9 @@ Theme themeDarkVim = {
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.2,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.2f,
     },
 };
 
@@ -242,9 +242,9 @@ Theme themeCatppuccin = {
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.75,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.75f,
     },
 };
 
@@ -316,9 +316,9 @@ Theme themeTerminal = {
     .mouseSelectionColor = ColorFromHex(0xff2e084a),
     .isLight = false,
     .visuals = {
-        .brightness = 0.15,
-        .saturation = 1.0,
-        .contrast = 1.0,
+        .brightness = 0.15f,
+        .saturation = 1.0f,
+        .contrast = 1.0f,
     },
 };
 
@@ -390,9 +390,9 @@ Theme themeGruvboxLight = {
     .mouseSelectionColor = ColorFromHex(0xFFebdbb2),
     .isLight = true,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.0,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.0f,
     },
 };
 
@@ -457,9 +457,9 @@ Theme themeDracula = {
     .mouseSelectionColor = ColorFromHex(0xFF44475a),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.0,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.0f,
     },
 };
 
@@ -527,9 +527,9 @@ Theme themeYavid = {
     .mouseSelectionColor = ColorFromHex(0xFF272729),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.0,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.0f,
     },
 };
 
@@ -600,9 +600,9 @@ Theme themeRadical = {
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.5,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.5f,
     },
 };
 
@@ -676,9 +676,9 @@ Theme theme4coderAlt = {
     .mouseSelectionColor = ColorFromHex(0xff0f0f0f),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.35,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.35f,
     },
 };
 
@@ -756,9 +756,9 @@ Theme theme4Coder = {
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.35,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.35f,
     },
 };
 
@@ -826,9 +826,9 @@ Theme themeNoah = {
     .mouseSelectionColor = ColorFromHex(0xff252838),
     .isLight = false,
     .visuals = {
-        .brightness = 0.05,
-        .saturation = 1.0,
-        .contrast = 1.0,
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.0f,
     },
 };
 
@@ -866,13 +866,12 @@ void SetAlpha(int active){
     globalActive = active;
 }
 
-template<typename T>
-inline static T ApplyAlpha(T color, Theme *theme){
+inline vec4i ApplyAlpha(vec4i color, Theme *theme){
     if(theme->alphaDimm){
-        T s = color;
-        if(globalActive) s.w *= kAlphaReduceInactive;
-        else s.w *= kAlphaReduceDefault;
-        return s;
+        Float w = (Float)color.w;
+        if(globalActive) w *= kAlphaReduceInactive;
+        else w *= kAlphaReduceDefault;
+        color.w = (int)w;
     }
 
     return color;
@@ -887,7 +886,7 @@ void GetThemeList(std::vector<ThemeDescription> **themes){
 void SwapDefaultTheme(char *name, uint len){
     for(uint i = 0; i < themesDesc.size(); i++){
         ThemeDescription *desc = &themesDesc[i];
-        uint slen = strlen(desc->name);
+        uint slen = (uint)strlen(desc->name);
         if(slen == len){
             if(StringEqual(name, (char *)desc->name, len)){
                 defaultTheme = desc->theme;
@@ -1054,15 +1053,15 @@ void CurrentThemeSetDimm(int dim){
 }
 
 void CurrentThemeSetBrightness(Float value){
-    defaultTheme->visuals.brightness = Max(value, 0.01);
+    defaultTheme->visuals.brightness = Max(value, 0.01f);
 }
 
 void CurrentThemeSetSaturation(Float value){
-    defaultTheme->visuals.saturation = Max(value, 0.01);
+    defaultTheme->visuals.saturation = Max(value, 0.01f);
 }
 
 void CurrentThemeSetContrast(Float value){
-    defaultTheme->visuals.contrast = Max(value, 0.01);
+    defaultTheme->visuals.contrast = Max(value, 0.01f);
 }
 
 void CurrentThemeGetVisuals(ThemeVisuals &out){

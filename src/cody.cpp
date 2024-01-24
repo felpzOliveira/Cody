@@ -262,7 +262,7 @@ int cody_entry(int argc, char **argv){
                 return 0;
             }
 
-            IGNORE(CHDIR(folder));
+            CODY_IGNORE(CHDIR(folder));
             AppEarlyInitialize(args.use_tabs);
 
             if(entry.type == DescriptorFile){

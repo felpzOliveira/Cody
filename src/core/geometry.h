@@ -105,6 +105,8 @@ template<typename T> class vec2{
     vec2(T a){ x = y = a; }
     vec2(T a, T b): x(a), y(b){}
 
+    template<typename Q>vec2(Q a, Q b): x((T)a), y((T)b){}
+
     template<typename Q> vec2(vec2<Q> other): x((T)other.x), y((T)other.y){}
 
     bool IsZeroVector() const{

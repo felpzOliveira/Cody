@@ -1080,7 +1080,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                 {
                     printf("Failed to list files from %s\n", opener->basePath);
                     opener->basePath[n] = tmp;
-                    IGNORE(storage->Chdir(opener->basePath));
+                    CODY_IGNORE(storage->Chdir(opener->basePath));
                     return 0;
                 }
 
@@ -1106,7 +1106,7 @@ static int FileOpenUpdateEntry(View *view, char *entry, uint len){
                                              &opener->entryCount, &opener->entrySize) < 0)
             {
                 printf("Failed to list files from %s\n", content);
-                IGNORE(storage->Chdir(opener->basePath));
+                CODY_IGNORE(storage->Chdir(opener->basePath));
                 return -1;
             }
 
@@ -1192,7 +1192,7 @@ int FileOpenCommandCommit(QueryBar *queryBar, View *view){
                                          &opener->entryCount, &opener->entrySize) < 0)
         {
             printf("Failed to list files from %s\n", opener->basePath);
-            IGNORE(storage->Chdir(opener->basePath));
+            CODY_IGNORE(storage->Chdir(opener->basePath));
             goto end;
         }
 

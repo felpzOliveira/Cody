@@ -8,13 +8,16 @@
 #include <utilities.h>
 #include <query_bar.h>
 
-#define View_IsQueryBarActive(view) ((view->state) == View_QueryBar || (view->state) == View_SelectableList)
+#define View_IsQueryBarActive(view) (((view)->state) == View_QueryBar ||\
+                                     ((view)->state) == View_SelectableList ||\
+                                     ((view)->state) == View_SelectableHelp)
 
 typedef enum{
     View_FreeTyping = 0,
     View_QueryBar,
     View_SelectableList,
     View_AutoComplete,
+    View_SelectableHelp,
     View_StatesCount
 }ViewState;
 

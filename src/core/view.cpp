@@ -171,14 +171,24 @@ void View_EarlyInitialize(View *view){
 
         .stageCount = 3,
     };
+
+    view->renderList[View_SelectableHelp] = {
+        .stages = {
+            Graphics_RenderListSelector, // TODO: Create a dedicated routine for this
+            Graphics_RenderQueryBar,
+            Graphics_RenderControlCommands,
+        },
+
+        .stageCount = 3,
+    };
 }
 
 void View_SetGeometry(View *view, Geometry geometry, uint lineHeight){
     Geometry barGeo;
-    Float height = geometry.upper.y - geometry.lower.y;
+    Float height = (Float)(geometry.upper.y - geometry.lower.y);
     Float acHeight = kAutoCompleteMaxHeightFraction * height;
-    Float realHeight = kViewSelectableListScaling * lineHeight;
-    Float pHeight = (1.0 + kViewSelectableListOffset) * realHeight;
+    Float realHeight = kViewSelectableListScaling * (Float)lineHeight;
+    Float pHeight = (1.0f + kViewSelectableListOffset) * realHeight;
     Float listLines = height / pHeight;
     uint count = (uint)Floor(listLines);
     uint displayable = (uint)Floor(height / realHeight) - 1;
@@ -199,12 +209,12 @@ void View_SetGeometry(View *view, Geometry geometry, uint lineHeight){
 
     barGeo.extensionX = geometry.extensionX;
     barGeo.extensionY = geometry.extensionY;
-    BufferView_SetGeometry(&view->bufferView, geometry, lineHeight);
-    QueryBar_SetGeometry(&view->queryBar, &barGeo, lineHeight);
+    BufferView_SetGeometry(&view->bufferView, geometry, (Float)lineHeight);
+    QueryBar_SetGeometry(&view->queryBar, &barGeo, (Float)lineHeight);
     SelectableList_SetRange(&view->selectableList, vec2ui(0, count));
 
     realHeight = kAutoCompleteListScaling * lineHeight;
-    pHeight = (1.0 + kViewSelectableListOffset) * realHeight;
+    pHeight = (1.0f + kViewSelectableListOffset) * realHeight;
     listLines = acHeight / pHeight;
     count = (uint)Floor(listLines);
     displayable = (uint)Floor(acHeight / realHeight) - 1;
