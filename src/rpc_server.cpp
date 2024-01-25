@@ -6,6 +6,7 @@
 #include <security_services.h>
 #include <cryptoutil.h>
 #include <aes.h>
+#include <rng.h>
 
 #define LOG_MODULE "RPC-Server"
 #include <log.h>
@@ -215,6 +216,7 @@ int main(int argc, char **argv){
     BridgeOpt b_opts(args.bridge_ip, args.bridge_port, bridgeKey);
 
     StorageDeviceEarlyInit();
+    Crypto_InitRNGEngine();
 
     server.Initialize(mode, b_opts, baseKey);
     server.Start(args.port);
