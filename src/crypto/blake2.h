@@ -2,6 +2,7 @@
 #pragma once
 #include <stdint.h>
 #include <limits.h>
+#include <stddef.h>
 
 enum blake2b_constant{
     BLAKE2B_BLOCKBYTES = 128,

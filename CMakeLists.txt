@@ -147,6 +147,8 @@ set(SERVER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/files/storage.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/encoding.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/cryptoutil.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/secure_hash.cpp
+                 ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/blake2.cpp
+                 ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/argon2.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/rng.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto/aes.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/net_services.cpp

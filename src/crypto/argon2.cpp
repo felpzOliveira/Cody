@@ -15,7 +15,9 @@
 #define VC_GE_2005(version) (version >= 1400)
 
 /* for explicit_bzero() on glibc */
-#define _DEFAULT_SOURCE
+#if !defined(_DEFAULT_SOURCE)
+    #define _DEFAULT_SOURCE
+#endif
 
 
 #if defined(__clang__)
