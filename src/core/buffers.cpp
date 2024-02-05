@@ -1709,9 +1709,16 @@ static bool LineBuffer_SaveToStorageImpl(LineBuffer *lineBuffer,
     }
 
     if(!storage->IsLocallyStored()){
+        // NOTE: We cannot make sure the memory being passed here will last untill
+        //       this writes finishes so we need to make a local copy
+        uint8_t *ownMemory = AllocatorGetN(uint8_t, size);
+        uint32_t  ownSize = size;
+
+        memcpy(ownMemory, bytes, size);
+
         DispatchExecution([&](HostDispatcher *dispatcher){
-            uint8_t *localPtr = bytes;
-            uint32_t localSize = size;
+            uint8_t *localPtr = ownMemory;
+            uint32_t localSize = ownSize;
             FileHandle localFile = file;
             StorageDevice *localStorage = storage;
             saveDispatchRunning = true;
@@ -1720,6 +1727,7 @@ static bool LineBuffer_SaveToStorageImpl(LineBuffer *lineBuffer,
 
             localStorage->StreamWriteBytes(&localFile, (void *)localPtr, 1, localSize);
             localStorage->StreamFinish(&localFile);
+            AllocatorFree(localPtr);
             saveDispatchRunning = false;
         });
     }else{
