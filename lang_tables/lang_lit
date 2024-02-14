@@ -73,6 +73,9 @@ render OPERATOR
 window OPERATOR
 sundir OPERATOR
 pixels OPERATOR
+edge OPERATOR
+spectrum OPERATOR
+rgb OPERATOR
 height OPERATOR
 global OPERATOR
 vertex OPERATOR

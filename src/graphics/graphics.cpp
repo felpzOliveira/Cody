@@ -898,8 +898,8 @@ void OpenGLFontSetup(OpenGLState *state){
     font->sdfSettings.sdfEnabled = 0;
 
     font->fsContext = nullptr;
-    fontfileContents = (char *)FONT_liberation_mono_ttf;
-    filesize = FONT_liberation_mono_ttf_len;
+    fontfileContents = (char *)FONT_consolas_ttf;
+    filesize = FONT_consolas_ttf_len;
 
     Graphics_SetFont(fontfileContents, filesize);
 }
