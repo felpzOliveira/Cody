@@ -30,13 +30,19 @@ struct FileEntry;
 #define CMD_INDENT_REGION_HELP "(Re)Indent the current region defined by the cursor."
 
 #define CMD_CHANGE_CONTRAST_STR "contrast"
-#define CMD_CHANGE_CONTRAST_HELP "Sets the constrast value for the current theme"
+#define CMD_CHANGE_CONTRAST_HELP "Sets the constrast value for the current theme."
+
+#define CMD_PUT_STR "put"
+#define CMD_PUT_HELP "Send a file to the RPC server."
+
+#define CMD_GET_STR "get"
+#define CMD_GET_HELP "Get a file to the RPC server."
 
 #define CMD_CHANGE_BRIGHTNESS_STR "brightness"
-#define CMD_CHANGE_BRIGHTNESS_HELP "Sets the brightness value for the current theme"
+#define CMD_CHANGE_BRIGHTNESS_HELP "Sets the brightness value for the current theme."
 
 #define CMD_CHANGE_SATURATION_STR "saturation"
-#define CMD_CHANGE_SATURATION_HELP "Sets the saturation value for the current theme"
+#define CMD_CHANGE_SATURATION_HELP "Sets the saturation value for the current theme."
 
 #define CMD_WRONGIDENT_DISPLAY_STR "ident-display"
 #define CMD_WRONGIDENT_DISPLAY_HELP "Toogle the display of the wrong identation character."

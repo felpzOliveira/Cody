@@ -1664,17 +1664,15 @@ static void LineBuffer_FetchContent(LineBuffer *lineBuffer, std::string &content
 }
 
 static bool saveDispatchRunning = false;
-static bool LineBuffer_SaveToStorageImpl(LineBuffer *lineBuffer,
-                                         uint8_t *bytes, uint32_t size)
-{
+bool SaveToStorageImpl(char *filePath, uint filePathSize, uint8_t *bytes, uint32_t size){
     FileHandle file;
     std::string content;
     StorageDevice *storage = FetchStorageDevice();
     const long pollTimeout = 100;
     long timeTaken = 0;
 
-    if(lineBuffer->filePathSize < 1){
-        printf("Skipping un-writtable linebuffer\n");
+    if(filePathSize < 1 || filePath == nullptr){
+        printf("Skipping un-writtable buffer\n");
         return false;
     }
     // Whenever we save remotely we need to make sure that any previous
@@ -1702,9 +1700,8 @@ static bool LineBuffer_SaveToStorageImpl(LineBuffer *lineBuffer,
         }
     }
 
-    if(!storage->StreamWriteStart(&file, lineBuffer->filePath)){
-        printf("Could not open file %s in current storage device\n",
-               lineBuffer->filePath);
+    if(!storage->StreamWriteStart(&file, filePath)){
+        printf("Could not open file %s in current storage device\n", filePath);
         return false;
     }
 
@@ -1765,7 +1762,8 @@ bool LineBuffer_SaveToStorageEncrypted(LineBuffer *lineBuffer){
     dataOut.insert(dataOut.end(), iv.begin(), iv.end());
     dataOut.insert(dataOut.end(), crypted.begin(), crypted.end());
 
-    return LineBuffer_SaveToStorageImpl(lineBuffer, dataOut.data(), dataOut.size());
+    return SaveToStorageImpl(lineBuffer->filePath, lineBuffer->filePathSize,
+                             dataOut.data(), dataOut.size());
 }
 
 bool LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
@@ -1777,8 +1775,8 @@ bool LineBuffer_SaveToStorage(LineBuffer *lineBuffer){
 
     LineBuffer_FetchContent(lineBuffer, content);
 
-    return LineBuffer_SaveToStorageImpl(lineBuffer, (uint8_t *)content.c_str(),
-                                        content.size());
+    return SaveToStorageImpl(lineBuffer->filePath, lineBuffer->filePathSize,
+                            (uint8_t *)content.c_str(), content.size());
 }
 
 int LineBuffer_IsInsideCopySection(LineBuffer *lineBuffer, uint id, uint bid){

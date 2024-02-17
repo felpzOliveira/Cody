@@ -877,6 +877,78 @@ int BaseCommand_HistoryClear(char *, uint, View *){
     return 1;
 }
 
+static
+std::string GetPwdDir(StorageDevice *device){
+    char dir[PATH_MAX];
+    uint len = PATH_MAX;
+    memset(dir, 0, PATH_MAX);
+    if(device)
+        device->GetWorkingDirectory(dir, len);
+    else
+        GetCurrentWorkingDirectory(dir, len);
+    return std::string(dir);
+}
+
+int BaseCommandPutFile(char *cmd, uint size, View *view){
+    uint fsize = 0;
+    StorageDevice *device = FetchStorageDevice();
+    if(device->IsLocallyStored())
+        return 1;
+
+    std::string put(CMD_PUT_STR);
+    int e = StringFirstNonEmpty(&cmd[put.size()], size - put.size());
+    if(e < 0)
+        return 1;
+
+    e += put.size();
+
+    char *content = GetFileContents(&cmd[e], &fsize);
+    if(content == nullptr || fsize < 1)
+        return 1;
+
+    uint where = GetSimplifiedPathName(&cmd[e], size - e);
+
+    std::string path(GetPwdDir(device));
+    std::string fileName(&cmd[e + where], size - e - where);
+
+    path += std::string(SEPARATOR_STRING) + fileName;
+    std::cout << "[Debug] Path= " << path << std::endl;
+
+    SaveToStorageImpl((char *)path.c_str(), path.size(),
+                      (uint8_t *)content, fsize);
+
+    AllocatorFree(content);
+    return 1;
+}
+
+int BaseCommandGetFile(char *cmd, uint size, View *view){
+    uint fsize = 0;
+    StorageDevice *device = FetchStorageDevice();
+    if(device->IsLocallyStored())
+        return 1;
+
+    std::string get(CMD_GET_STR);
+    int e = StringFirstNonEmpty(&cmd[get.size()], size - get.size());
+    if(e < 0)
+        return 1;
+
+    e += get.size();
+    uint where = GetSimplifiedPathName(&cmd[e], size - e);
+
+    std::string path(GetPwdDir(nullptr));
+    std::string fileName(&cmd[e + where], size - e - where);
+    path += std::string(SEPARATOR_STRING) + fileName;
+
+    char *content = device->GetContentsOf(&cmd[e], &fsize);
+
+    if(content == nullptr || fsize < 1)
+        return 1;
+
+    std::cout << "[Debug] Path= " << path << std::endl;
+    WriteFileContents(path.c_str(), content, fsize);
+    return 1;
+}
+
 int BaseCommandSetEncrypted(char *cmd, uint size, View *view){
     uint8_t key[32];
     uint8_t salt[CRYPTO_SALT_LEN];
@@ -886,10 +958,14 @@ int BaseCommandSetEncrypted(char *cmd, uint size, View *view){
         return 1;
 
     int e = StringFirstNonEmpty(&cmd[enc.size()], size - enc.size());
-    if(e < 0) return 1;
+    if(e < 0)
+        return 1;
 
     e += enc.size();
     std::string target(&cmd[e]);
+
+    QueryBar *qbar = View_GetQueryBar(view);
+    qbar->filter.toHistory = false;
 
     Crypto_SecureRNG(salt, CRYPTO_SALT_LEN);
     CryptoUtil_PasswordHash((char *)target.c_str(), target.size(), key, salt);
@@ -929,6 +1005,8 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_CURSOR_BLINK_STR] = {CMD_CURSOR_BLINK_HELP, BaseCommand_CursorBlink};
     cmdMap[CMD_HISTORY_CLEAR_STR] = {CMD_HISTORY_CLEAR_HELP, BaseCommand_HistoryClear};
     cmdMap[CMD_SET_ENCRYPT_STR] = {CMD_SET_ENCRYPT_HELP, BaseCommandSetEncrypted};
+    cmdMap[CMD_PUT_STR] = {CMD_PUT_HELP, BaseCommandPutFile};
+    cmdMap[CMD_GET_STR] = {CMD_GET_HELP, BaseCommandGetFile};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

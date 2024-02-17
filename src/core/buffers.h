@@ -473,6 +473,11 @@ void LineBuffer_Free(LineBuffer *lineBuffer);
 */
 LineBuffer *LineBuffer_AllocateInternal(LineBuffer *lBuffer);
 
+/*
+* Writes content to a path using the current storage device.
+*/
+bool SaveToStorageImpl(char *filePath, uint filePathSize, uint8_t *bytes, uint32_t size);
+
 /* Debug stuff */
 void Buffer_DebugStdoutData(Buffer *buffer);
 void LineBuffer_DebugStdoutLine(LineBuffer *lineBuffer, uint lineNo);

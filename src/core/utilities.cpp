@@ -991,6 +991,17 @@ int GetRightmostSplitter(const char *path, uint size){
     return addr;
 }
 
+bool WriteFileContents(const char *path, char *content, uint size){
+    FILE *fp = fopen(path, "wb");
+    if(fp == nullptr)
+        return false;
+
+    long writeN = fwrite(content, 1, size, fp);
+    fclose(fp);
+
+    return writeN == size;
+}
+
 char *GetFileContents(const char *path, uint *size){
     char *ret = nullptr;
     FILE *fp = fopen(path, "rb");

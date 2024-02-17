@@ -104,6 +104,9 @@ int Mkdir(const char *path);
 /* Reads a file and return its content in a new pointer */
 char *GetFileContents(const char *path, uint *size);
 
+/* Writes a file with the content given */
+bool WriteFileContents(const char *path, char *content, uint size);
+
 /*
 * Get the right-most value of a path string inside the path given.
 * In case no one is found it returns -1 otherwise the right-most position located.

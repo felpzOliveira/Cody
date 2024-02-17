@@ -1508,20 +1508,27 @@ void AppCommandQueryBarInteractiveCommand(){
     View *view = AppGetActiveView();
     ViewState state = View_GetState(view);
     if(state != View_QueryBar){
+        int oldCompression = AppGetPathCompression();
+        AppSetPathCompression(-1);
         QueryBar *qbar = View_GetQueryBar(view);
 
         auto emptyFunc = [&](QueryBar *bar, View *view) -> int{ return 0; };
+        auto cancelFunc = [&](QueryBar *bar, View *view) -> int{
+            AppSetPathCompression(oldCompression);
+            return 0;
+        };
         auto onCommit = [&](QueryBar *bar, View *view) -> int{
             char *content = nullptr;
             uint size = 0;
             AppOnTypeChange();
             QueryBar_GetWrittenContent(bar, &content, &size);
             int r = BaseCommand_Interpret(content, size, view);
+            AppSetPathCompression(oldCompression);
             return r == 2 ? 0 : -1;
         };
 
         QueryBar_ActiveCustomFull(qbar, nullptr, 0, emptyFunc,
-                                  emptyFunc, onCommit, nullptr,
+                                  cancelFunc, onCommit, nullptr,
                                   QUERY_BAR_CMD_INTERACTIVE);
 
         View_ReturnToState(view, View_QueryBar);

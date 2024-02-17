@@ -44,6 +44,8 @@ type OPERATOR
 flip OPERATOR
 base OPERATOR
 name OPERATOR
+force OPERATOR
+alignment OPERATOR
 View DATATYPE
 alpha OPERATOR
 Optix OPERATOR
