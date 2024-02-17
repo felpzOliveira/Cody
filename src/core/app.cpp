@@ -128,6 +128,7 @@ int AppGetPathCompression(){
 }
 
 void AppSetPathCompression(int value){
+    printf("Setting to %d\n", value);
     appGlobalConfig.pathCompression = value;
 }
 
@@ -1505,12 +1506,14 @@ bool AppIsPathFromRoot(std::string path){
 }
 
 void AppCommandQueryBarInteractiveCommand(){
-    View *view = AppGetActiveView();
-    ViewState state = View_GetState(view);
+    View *gView = AppGetActiveView();
+    ViewState state = View_GetState(gView);
     if(state != View_QueryBar){
-        int oldCompression = AppGetPathCompression();
+        // NOTE: This needs to be static otherwise if operation is detached
+        //       we lose the value
+        static int oldCompression = AppGetPathCompression();
         AppSetPathCompression(-1);
-        QueryBar *qbar = View_GetQueryBar(view);
+        QueryBar *qbar = View_GetQueryBar(gView);
 
         auto emptyFunc = [&](QueryBar *bar, View *view) -> int{ return 0; };
         auto cancelFunc = [&](QueryBar *bar, View *view) -> int{
@@ -1531,7 +1534,7 @@ void AppCommandQueryBarInteractiveCommand(){
                                   cancelFunc, onCommit, nullptr,
                                   QUERY_BAR_CMD_INTERACTIVE);
 
-        View_ReturnToState(view, View_QueryBar);
+        View_ReturnToState(gView, View_QueryBar);
         KeyboardSetActiveMapping(appContext.queryBarMapping);
         QueryBar_EnableCursorJump(qbar);
     }
