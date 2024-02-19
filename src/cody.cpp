@@ -223,7 +223,8 @@ int cody_entry(int argc, char **argv){
     [&](std::string val) -> bool
     {
         // got too many unknowns
-        if(args.unknownPath.size() > 0) return ARG_ABORT;
+        if(args.unknownPath.size() > 0)
+            return ARG_ABORT;
         // one unkown we handle as the path of a file or dir
         args.unknownPath = val;
         return ARG_OK;
@@ -256,7 +257,6 @@ int cody_entry(int argc, char **argv){
             int r = GuessFileEntry(p, len, &entry, folder);
 
             if(r == -1){
-                printf("Unknown argument, attempting to open as file\n");
                 AppEarlyInitialize(args.use_tabs);
                 StartWithNewFile(p);
                 return 0;

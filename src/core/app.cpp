@@ -128,7 +128,6 @@ int AppGetPathCompression(){
 }
 
 void AppSetPathCompression(int value){
-    printf("Setting to %d\n", value);
     appGlobalConfig.pathCompression = value;
 }
 
