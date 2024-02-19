@@ -955,7 +955,7 @@ void OpenGLInitialize(OpenGLState *state){
     SetOpenGLVersion(3, 3);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
-    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
+    state->window = CreateDisplayWindow(width, height, "Source - 0.0.1");
 
     SetWindowIcon(state->window, logo_png, logo_png_len);
 
