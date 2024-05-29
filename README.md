@@ -25,7 +25,7 @@ Known issues:
  * See todo file.
 
 ## Building
-Please note that currently the editor only runs under linux and was tested in Ubuntu only. Most of the code is self-contained with exception of libgit2
+The editor was tested on Ubuntu and Windows 11. Most of the code is self-contained with exception of libgit2
 that is a submodule.
 
 Clone it recursively:
