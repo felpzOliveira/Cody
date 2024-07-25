@@ -27,6 +27,7 @@ typedef struct{
     bool strings;
     bool numbers;
     bool lookups;
+    bool functions;
     bool multilineComment;
     char lineCommentChar;
     std::vector<ContextualProcessor> procs;
@@ -61,5 +62,10 @@ extern TokenizerSupport noneSupport;
 extern std::vector<std::vector<GToken>> cmakeReservedTable;
 extern std::vector<std::vector<GToken>> cmakeReservedPreprocessor;
 extern TokenizerSupport cmakeSupport;
+
+// Tex
+extern std::vector<std::vector<GToken>> texReservedTable;
+extern std::vector<std::vector<GToken>> texReservedPreprocessor;
+extern TokenizerSupport texSupport;
 
 #endif //LANGUAGES_H

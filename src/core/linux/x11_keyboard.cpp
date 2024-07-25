@@ -133,6 +133,7 @@ int TranslateKeyCode(int scancode){
         case XK_0:              return Key_0;
         case XK_space:          return Key_Space;
         case XK_minus:          return Key_Minus;
+        case XK_plus:           return Key_Plus;
         case XK_equal:          return Key_Equal;
         case XK_bracketleft:    return Key_LeftBracket;
         case XK_bracketright:   return Key_RightBracket;

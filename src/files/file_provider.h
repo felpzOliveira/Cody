@@ -11,6 +11,10 @@
 #define FILE_LOAD_FAILED           0
 #define FILE_LOAD_SUCCESS          1
 #define FILE_LOAD_REQUIRES_DECRYPT 2
+#define FILE_LOAD_REQUIRES_VIEWER  3
+
+#define FILE_TYPE_ON_LOAD_TEXT  0
+#define FILE_TYPE_ON_LOAD_IMAGE 1
 
 // Function pointer for file hooks
 typedef void(*file_hook)(char *filepath, uint len, LineBuffer *lineBuffer, Tokenizer *tokenizer);
@@ -57,12 +61,14 @@ Tokenizer *FileProvider_GetGlslTokenizer();
 Tokenizer *FileProvider_GetEmptyTokenizer();
 Tokenizer *FileProvider_GetLitTokenizer();
 Tokenizer *FileProvider_GetCmakeTokenizer();
+Tokenizer *FileProvider_GetTexTokenizer();
 Tokenizer *FileProvider_GetDetachedCppTokenizer();
 Tokenizer *FileProvider_GetDetachedPythonTokenizer();
 Tokenizer *FileProvider_GetDetachedGlslTokenizer();
 Tokenizer *FileProvider_GetDetachedEmptyTokenizer();
 Tokenizer *FileProvider_GetDetachedLitTokenizer();
 Tokenizer *FileProvider_GetDetachedCmakeTokenizer();
+Tokenizer *FileProvider_GetDetachedTexTokenizer();
 
 /*
 * Asks the file provider to guess what is the tokenizer to use for a given file,
@@ -96,14 +102,20 @@ int FileProvider_IsFileOpened(char *path, uint len);
 * usefull for large files but dangerous for loading files in sequence, use with care.
 * Returns whether or not it was possible to load the file.
 */
-int FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer=nullptr,
-                      bool mustFinish=true);
+int FileProvider_Load(char *targetPath, uint len, int &type,
+                      LineBuffer **lineBuffer=nullptr, bool mustFinish=true);
 
 /*
 * Loads an encrypted file that was stored as temporary during the file open operation.
 */
-int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
+int FileProvider_LoadTemporary(char *pwd, uint pwdlen, int &type, LineBuffer **lineBuffer,
                                bool mustFinish);
+
+/*
+* Gets the raw content that was loaded and cached, either this is not text
+* or it is encrypted.
+*/
+char *FileProvider_GetTemporary(uint *len);
 
 /*
 * Erase the temporary data.

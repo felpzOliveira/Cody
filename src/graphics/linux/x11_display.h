@@ -96,7 +96,7 @@ typedef struct{
 #define ON_MOUSE_LCLICK_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_MOUSE_RCLICK_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_MOUSE_PRESS_CALLBACK(name) void name(int x, int y, void *priv)
-#define ON_MOUSE_RELEASE_CALLBACK(name) void name(void *priv)
+#define ON_MOUSE_RELEASE_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_MOUSE_DCLICK_CALLBACK(name) void name(int x, int y, void *priv)
 #define ON_SIZE_CHANGE_CALLBACK(name) void name(int w, int h, void *priv)
 #define ON_FOCUS_CHANGE_CALLBACK(name) void name(bool in, long unsigned int id, void *priv)

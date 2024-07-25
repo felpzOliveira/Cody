@@ -67,6 +67,7 @@ set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/control_cmds.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/viewer_ctrl.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/keyboard.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/tries.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/encoding.cpp
@@ -85,12 +86,15 @@ set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/parallel.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/theme.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/view.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/pdfview.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/bufferview.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/modal.cpp)
 
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_querybar.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/image_renderer.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_image_render.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_ctrl_cmds_render.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/shaders.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_default.cpp
@@ -137,6 +141,7 @@ list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/image_util.cpp
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/cmake.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/glsl.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/cpp.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/tex.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/lit.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/py.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/none.cpp)
@@ -214,6 +219,15 @@ else()
 endif()
 
 if(CODY_BUILD)
+    ############################################################################
+    find_library(POPPLER_CPP_LIB NAMES poppler-cpp)
+    if(POPPLER_CPP_LIB)
+        add_definitions(-DPOPPLER_CPP_ENABLED)
+        list(APPEND CODY_LIBRARIES ${POPPLER_CPP_LIB})
+    else()
+        message(STATUS "Poppler not found, disabling PDF view")
+    endif()
+    ############################################################################
     set(EDITOR_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/cody.cpp)
 
     add_library(corelib OBJECT ${CORE_FILES})

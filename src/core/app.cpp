@@ -24,6 +24,8 @@
 #include <unordered_map>
 #include <cryptoutil.h>
 #include <rng.h>
+#include <pdfview.h>
+#include <viewer_ctrl.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -38,6 +40,7 @@ typedef struct{
     BindingMap *freeTypeMapping;
     BindingMap *queryBarMapping;
     BindingMap *autoCompleteMapping;
+    BindingMap *viewerMapping;
     View *activeView;
     int activeId;
     uint dbgHandle;
@@ -57,12 +60,15 @@ typedef struct{
 static App appContext = {
     nullptr,
     nullptr,
+    nullptr,
+    nullptr,
 };
 
 AppConfig appGlobalConfig;
 
 void AppInitializeFreeTypingBindings();
 void AppInitializeQueryBarBindings();
+void AppInitializeViewerBindings();
 void AppCommandAutoComplete();
 void AppCommandFreeTypingArrows(int direction);
 void AppCommandQueryBarCommit();
@@ -309,6 +315,7 @@ void AppSetBindingsForState(ViewState state, ViewType type){
         case View_QueryBar: KeyboardSetActiveMapping(appContext.queryBarMapping); break;
         case View_FreeTyping: KeyboardSetActiveMapping(appContext.freeTypeMapping); break;
         case View_AutoComplete: KeyboardSetActiveMapping(appContext.autoCompleteMapping); break;
+        case View_ImageDisplay: KeyboardSetActiveMapping(appContext.viewerMapping); break;
         default:{
             AssertErr(0, "Not implemented binding");
         }
@@ -420,10 +427,30 @@ void AppReleaseOnMouseEventCallback(uint handle){
     appContext.mouseEventMap.erase(handle);
 }
 
+static int lastMouseState = 0;
+void DoPdfViewMouseOperations(int x, int y, OpenGLState *state, int mouseState){
+    View *view = AppGetActiveView();
+    vec2ui mouse(x, state->height - y);
+    BufferView *bView = View_GetBufferView(view);
+    if(View_GetState(view) == View_ImageDisplay){
+        Geometry geo;
+        BufferView_GetGeometry(bView, &geo);
+        if(Geometry_IsPointInside(&geo, mouse)){
+            PdfViewState *pdfView = BufferView_GetPdfView(bView);
+            if(pdfView){
+                BufferView_GetGeometry(bView, &geo);
+                PdfView_MouseMotion(pdfView, mouse, mouseState, &geo);
+            }
+        }
+    }
+}
+
 void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
     View *oview = AppGetActiveView();
     View *view = oview;
     vec2ui mouse(x, state->height - y);
+    BufferView *bView = View_GetBufferView(view);
+
     if(press){
         mouse = AppActivateViewAt(x, state->height - y);
         view = AppGetActiveView();
@@ -438,6 +465,7 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
     }else{
         Geometry geo;
         BufferView *bView = View_GetBufferView(view);
+
         if(!BufferView_GetMousePressed(bView)) return;
 
         BufferView_GetGeometry(bView, &geo);
@@ -485,6 +513,7 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
 
 void AppHandleMouseMotion(int x, int y, OpenGLState *state){
     AppOnMouseMotion(x, y, state, false);
+    DoPdfViewMouseOperations(x, y, state, lastMouseState);
 #if 0
     vec2ui mouse(x, state->height - y);
     View *view = AppGetActiveView();
@@ -627,6 +656,7 @@ static void CursorToRegion(BufferView *bView, uint x){
 void AppJumpToNextError(){
     std::optional<BuildError> err = NextBuildError();
     if(err){
+        int fileType = -1;
         LineBuffer *lBuffer = nullptr;
         BuildError bErr = err.value();
         View *view = AppGetActiveView();
@@ -634,7 +664,7 @@ void AppJumpToNextError(){
                                          bErr.file.size(), nullptr);
         if(!rv){
             FileProvider_Load((char *)bErr.file.c_str(), bErr.file.size(),
-                              &lBuffer, false);
+                              fileType, &lBuffer, false);
         }
 
         if(lBuffer){
@@ -709,6 +739,13 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
 void AppHandleMousePress(int x, int y, OpenGLState *state){
     AppOnMouseMotion(x, y, state, true);
     appContext.mouseHook();
+    lastMouseState = 1;
+    DoPdfViewMouseOperations(x, y, state, lastMouseState);
+}
+
+void AppHandleMouseReleased(int x, int y, OpenGLState *state){
+    lastMouseState = 0;
+    DoPdfViewMouseOperations(x, y, state, lastMouseState);
 }
 
 void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){
@@ -1267,38 +1304,51 @@ void AppCommandKillEndOfLine(){
 }
 
 void AppCommandKillBuffer(){
+    View *view = AppGetActiveView();
     BufferView *bufferView = AppGetActiveBufferView();
     NullRet(bufferView);
-    if(!bufferView->lineBuffer) return;
-    NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
+    if(!bufferView->lineBuffer){
+        // NOTE: Check for viewers
+        PdfViewState *pdfView = BufferView_GetPdfView(bufferView);
+        if(!pdfView)
+            return;
 
-    LineBuffer *lineBuffer = bufferView->lineBuffer;
-    if(lineBuffer){
-        ViewTreeIterator iterator;
-        ViewTree_Begin(&iterator);
+        // TODO: Currently the bufferview calls close document if
+        //       it has a viewer it kinda makes this call function useless
+        //       in this case but it feels like it is all we need.
+        BufferView_SwapBuffer(bufferView, nullptr, EmptyView);
+        View_ReturnToState(view, View_FreeTyping);
+    }else{
+        NullRet(LineBuffer_IsWrittable(bufferView->lineBuffer));
 
-        Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
-        SymbolTable *symTable = tokenizer->symbolTable;
-        for(uint i = 0; i < lineBuffer->lineCount; i++){
-            Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-            Buffer_EraseSymbols(buffer, symTable);
-        }
+        LineBuffer *lineBuffer = bufferView->lineBuffer;
+        if(lineBuffer){
+            ViewTreeIterator iterator;
+            ViewTree_Begin(&iterator);
 
-        while(iterator.value){
-            View *view = iterator.value->view;
-            BufferView *bView = &view->bufferView;
-            if(bView->lineBuffer == lineBuffer){
-                BufferView_SwapBuffer(bView, nullptr, EmptyView);
+            Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
+            SymbolTable *symTable = tokenizer->symbolTable;
+            for(uint i = 0; i < lineBuffer->lineCount; i++){
+                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+                Buffer_EraseSymbols(buffer, symTable);
             }
-            ViewTree_Next(&iterator);
-        }
 
-        char *ptr = lineBuffer->filePath;
-        uint pSize = lineBuffer->filePathSize;
-        FileProvider_Remove(ptr, pSize);
-        BufferViewLocation_RemoveLineBuffer(lineBuffer);
-        LineBuffer_Free(lineBuffer);
-        AllocatorFree(lineBuffer);
+            while(iterator.value){
+                View *view = iterator.value->view;
+                BufferView *bView = &view->bufferView;
+                if(bView->lineBuffer == lineBuffer){
+                    BufferView_SwapBuffer(bView, nullptr, EmptyView);
+                }
+                ViewTree_Next(&iterator);
+            }
+
+            char *ptr = lineBuffer->filePath;
+            uint pSize = lineBuffer->filePathSize;
+            FileProvider_Remove(ptr, pSize);
+            BufferViewLocation_RemoveLineBuffer(lineBuffer);
+            LineBuffer_Free(lineBuffer);
+            AllocatorFree(lineBuffer);
+        }
     }
 }
 
@@ -1310,7 +1360,6 @@ void AppCommandKillView(){
         // we need to make sure the interface is not expanded otherwise
         // UI will get weird.
         ControlCommands_RestoreExpand();
-
         AppCommandKillBuffer();
         BufferViewLocation_RemoveView(bView);
          // TODO: Check if it is safe to erase the view in the vnode here
@@ -2178,6 +2227,7 @@ void AppCommandEnterKey(){
     ViewType type = BufferView_GetViewType(bufferView);
     switch(type){
         case CodeView: AppCommandNewLine(); break;
+        case ImageView: break;
         //case GitStatusView: AppCommandGitStatusChangeBuffer(); break;
         default: {
             printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
@@ -2241,8 +2291,8 @@ void AppCommandQueryBarPrevious(){
 }
 
 void AppDefaultReturn(){
-    ViewState state = View_GetDefaultState();
     View *view = AppGetActiveView();
+    ViewState state = View_GetDefaultState(view);
     if(View_GetState(view) != state){
         BufferView *bView = View_GetBufferView(view);
         ViewType type = BufferView_GetViewType(bView);
@@ -2252,8 +2302,8 @@ void AppDefaultReturn(){
 }
 
 void AppCommandQueryBarCommit(){
-    ViewState state = View_GetDefaultState();
     View *view = AppGetActiveView();
+    ViewState state = View_GetDefaultState(view);
     if(View_GetState(view) != state){
         if(View_CommitToState(view, state) != 0){
             BufferView *bView = View_GetBufferView(view);
@@ -2310,13 +2360,14 @@ void AppDragAndDrop(char **paths, int count, int x, int y, void*){
         uint len = value.size();
         char *valuec = (char *)value.c_str();
         int r = GuessFileEntry(valuec, len, &entry, folder);
+        int fileType = -1;
         if(!(r < 0) && entry.type == DescriptorFile){
             if(!FileProvider_IsFileLoaded(valuec, len)){
                 LineBuffer *lineBuffer = nullptr;
                 // NOTE: We can't async here as there might be multiple files being dropped
                 //       I'm not sure the lexer can handle parallel requests under the same
                 //       tokenizer
-                r = FileProvider_Load((char *)valuec, len, &lineBuffer, false);
+                r = FileProvider_Load((char *)valuec, len, fileType, &lineBuffer, false);
                 if(r == FILE_LOAD_REQUIRES_DECRYPT) // TODO: Should we do something here?
                     FileProvider_ReleaseTemporary();
                 else if(r == FILE_LOAD_SUCCESS && i == 0 && insert_into_view)
@@ -2338,10 +2389,13 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
         LineBuffer *lBuffer = nullptr;
         char *content = nullptr;
         uint size = 0;
+        int fileType = -1;
         AppOnTypeChange();
         QueryBar_GetWrittenContent(bar, &content, &size);
 
-        if(FileProvider_LoadTemporary(content, size, &lBuffer, false) == FILE_LOAD_SUCCESS){
+        if(FileProvider_LoadTemporary(content, size, fileType, &lBuffer, false) ==
+           FILE_LOAD_SUCCESS)
+        {
             BufferView_SwapBuffer(bView, lBuffer, CodeView);
         }
 
@@ -2357,7 +2411,8 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
             if(entry->isLoaded == 0){
-                int ret = FileProvider_Load(targetPath, l, &lBuffer, false);
+                int fileType = -1;
+                int ret = FileProvider_Load(targetPath, l, fileType, &lBuffer, false);
                 if(ret == FILE_LOAD_SUCCESS)
                     BufferView_SwapBuffer(bView, lBuffer, CodeView);
                 else if(ret == FILE_LOAD_REQUIRES_DECRYPT){
@@ -2366,6 +2421,25 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                     QueryBar *qbar = View_GetQueryBar(view);
                     QueryBar_SetPendingCall(qbar, (char *)"Password", 8, emptyFunc,
                                             emptyFunc, fileOpenEncrypted, &filter);
+                }else if(ret == FILE_LOAD_REQUIRES_VIEWER){
+                    uint pdfLen = 0;
+                    char *pdf = FileProvider_GetTemporary(&pdfLen);
+                    if(pdf && pdfLen > 0){
+                        int _width, _height;
+                        // TODO: Parse pdf, get image ptr, and setup whatever we need
+                        //       keyboard, rendering, etc...
+                        PdfViewState *pdfView = nullptr;
+                        if(!PdfView_OpenDocument(&pdfView, pdf, pdfLen, targetPath, l)){
+                            return;
+                        }
+
+                        BufferView_SwapBuffer(bView, nullptr, ImageView);
+                        BufferView_SetPdfView(bView, pdfView);
+                        PdfView_OpenPage(pdfView, 0);
+                        unsigned char *img = (unsigned char *)
+                                        PdfView_GetCurrentPage(pdfView, _width, _height);
+                        BufferView_ResetImageRenderer(bView, _width, _height, img);
+                    }
                 }
             }else{
                 int f = FileProvider_FindByPath(&lBuffer, targetPath, l, &tokenizer);
@@ -2387,6 +2461,7 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                 BufferView_SwapBuffer(bView, lBuffer, type);
             }
         }
+        AppSetDelayedCall(AppCommandQueryBarCommit);
     };
 
     int r = FileOpenerCommandStart(view, appContext.cwd,
@@ -2461,6 +2536,7 @@ void AppInitialize(){
     KeyboardInitMappings();
     AppInitializeFreeTypingBindings();
     AppInitializeQueryBarBindings();
+    AppInitializeViewerBindings();
 
     KeyboardSetActiveMapping(appContext.freeTypeMapping);
     appContext.dbgHandle =
@@ -2470,6 +2546,10 @@ void AppInitialize(){
 
     AppRemoveMouseHook();
     //DualModeEnter();
+}
+
+void AppInitializeViewerBindings(){
+    appContext.viewerMapping = InitializeViewerBindings();
 }
 
 void AppInitializeQueryBarBindings(){

@@ -7,6 +7,7 @@ const char *View_GetStateString(ViewState state){
         STR_CASE(View_QueryBar);
         STR_CASE(View_SelectableList);
         STR_CASE(View_AutoComplete);
+        STR_CASE(View_ImageDisplay);
         default: return "None";
     }
 #undef STR_CASE
@@ -17,8 +18,16 @@ static void View_SelectableListSetLineBuffer(View *view, LineBuffer *sourceBuffe
     SelectableList_SetLineBuffer(list, sourceBuffer);
 }
 
-//TODO: Adjust as needed
-ViewState View_GetDefaultState(){
+ViewState View_GetDefaultState(View *view){
+    if(view == nullptr){
+        return View_FreeTyping;
+    }
+
+    BufferView *bView = &view->bufferView;
+    //TODO: Adjust as needed
+    if(bView->lineBuffer == nullptr && bView->activeType == ImageView){
+        return View_ImageDisplay;
+    }
     return View_FreeTyping;
 }
 
@@ -180,6 +189,14 @@ void View_EarlyInitialize(View *view){
         },
 
         .stageCount = 3,
+    };
+
+    view->renderList[View_ImageDisplay] = {
+        .stages = {
+            Graphics_RenderImage,
+            Graphics_RenderControlCommands,
+        },
+        .stageCount = 1,
     };
 }
 

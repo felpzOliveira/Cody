@@ -1045,7 +1045,14 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
         }
     }
 
+    bool swapViews = true;
     std::string strCmd = BaseCommand_Interpret_Alias(cmd, size);
+    if(strCmd.size() > 4 &&
+       StringStartsWith((char *)strCmd.c_str(), strCmd.size(), (char *)"[nv]", 4))
+    {
+        strCmd = strCmd.substr(4);
+        swapViews = false;
+    }
 
     std::string rootDir = AppGetRootDirectory() + BaseCommand_GetBasePath();
     std::stringstream ss;
@@ -1058,19 +1065,27 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     BufferView *bView = View_GetBufferView(view);
     if(vnode){
         if(vnode->view){
-            bView = View_GetBufferView(vnode->view);
+            BufferView *tmpBView = View_GetBufferView(vnode->view);
+            if(View_GetState(vnode->view) != View_ImageDisplay &&
+               BufferView_GetViewType(tmpBView) != ImageView)
+            {
+                bView = tmpBView; // NOTE: This will overwrite the current view
+            }
         }
     }
 
-    BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, CodeView);
-    // because the parallel thread will reset the linebuffer we need
-    // to make sure the cursor is located in a valid range for rendering
-    // otherwise in case the build buffer does updates too fast it can
-    // generate a SIGSEGV. This needs to run after the swap as we need
-    // to make sure the position cache map is updated with whatever
-    // is being rendered at the moment.
-    BufferView_CursorToPosition(bView, 0, 0);
-    BufferView_GhostCursorFollow(bView);
+    if(swapViews && BufferView_GetViewType(bView) != ImageView){
+        BufferView_SwapBuffer(bView, lockedBuffer->lineBuffer, CodeView);
+        // because the parallel thread will reset the linebuffer we need
+        // to make sure the cursor is located in a valid range for rendering
+        // otherwise in case the build buffer does updates too fast it can
+        // generate a SIGSEGV. This needs to run after the swap as we need
+        // to make sure the position cache map is updated with whatever
+        // is being rendered at the moment.
+        BufferView_CursorToPosition(bView, 0, 0);
+        BufferView_GhostCursorFollow(bView);
+    }
+
     // TODO: function LockedBufferStartRender() or something
     lockedBuffer->render_state = 0;
     ExecuteCommand(md);

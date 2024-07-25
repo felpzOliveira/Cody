@@ -648,14 +648,16 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
             case QUERY_BAR_CMD_INTERACTIVE:
             case QUERY_BAR_CMD_CUSTOM:{
                 if(queryBar->commitCallback){
+                    char *content = nullptr;
+                    uint size = 0;
+                    QueryBar_GetWrittenContent(queryBar, &content, &size);
+                    std::string data = std::string(content, size);
+
                     r = queryBar->commitCallback(queryBar, view);
                     if(r != 0 && queryBar->filter.toHistory){
+                        std::string path;
                         QueryBarHistory *qHistory = AppGetQueryBarHistory();
-                        char *content = nullptr;
-                        uint size = 0;
-                        QueryBar_GetWrittenContent(queryBar, &content, &size);
                         if(content && size > 0){
-                            std::string data = std::string(content, size);
                             bool insert = true;
                             if(CircularStack_Size(qHistory->history) > 0){
                                 QueryBarHistoryItem *top =
@@ -664,7 +666,7 @@ int QueryBar_Reset(QueryBar *queryBar, View *view, int commit){
                             }
 
                             if(insert){
-                                std::string path = QueryBarHistory_GetPath();
+                                path = QueryBarHistory_GetPath();
                                 QueryBarHistoryItem item;
                                 item.value = data;
                                 CircularStack_Push(qHistory->history, &item);

@@ -198,6 +198,7 @@ int ExecuteCommand(std::string cmd);
 void CommandExecutorInit();
 void FinishExecutor();
 void GetExecutorLockedLineBuffer(LockedLineBuffer **ptr);
+int ExecuteCommandDone();
 
 inline int GetConcurrency(){
     return (int)Max((Float)1, (Float)std::thread::hardware_concurrency());

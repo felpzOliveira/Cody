@@ -59,3 +59,6 @@ extern unsigned char lock_black_png[];
 extern unsigned int lock_black_png_len;
 extern unsigned char lock_white_png[];
 extern unsigned int lock_white_png_len;
+extern unsigned char tex_png[];
+extern unsigned int tex_png_len;
+extern const char *shader__icon_f_glsl;

@@ -161,8 +161,9 @@ void LoadStaticFilesOnStart(){
                 if(AppIsStoredFile(p)) continue;
 
                 int r = GuessFileEntry((char *)p.c_str(), (uint)p.size(), &entry, folder);
+                int fileType = -1;
                 if(!(r < 0) && entry.type == DescriptorFile){
-                    if(FileProvider_Load((char *)p.c_str(), (uint)p.size()))
+                    if(FileProvider_Load((char *)p.c_str(), (uint)p.size(), fileType))
                         AppAddStoredFile(lineStr);
                 }
             }
@@ -196,8 +197,9 @@ void StartWithFile(const char *path=nullptr){
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
         uint length = (uint)strlen(path);
+        int fileType = -1;
 
-        if(FileProvider_Load((char *)path, length, &lineBuffer, false))
+        if(FileProvider_Load((char *)path, length, fileType, &lineBuffer, false))
             BufferView_SwapBuffer(bView, lineBuffer, CodeView);
     }else{
         LoadStaticFilesOnStart();

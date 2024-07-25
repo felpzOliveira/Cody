@@ -5,6 +5,7 @@ TokenizerSupport litSupport = {
     .strings = true,
     .numbers = true,
     .lookups = true,
+    .functions = false,
     .multilineComment = false,
     .lineCommentChar = '#',
     .procs = {},
@@ -30,6 +31,14 @@ ray OPERATOR
 set OPERATOR
 eta OPERATOR
 mat OPERATOR
+Gaussian OPERATOR
+gaussian OPERATOR
+box OPERATOR
+Box OPERATOR
+Mitchell OPERATOR
+mitchell OPERATOR
+Triangle OPERATOR
+triangle OPERATOR
 Zirr OPERATOR
 zirr OPERATOR
 Average OPERATOR
@@ -58,6 +67,8 @@ width OPERATOR
 light OPERATOR
 pixel OPERATOR
 depth OPERATOR
+save OPERATOR
+interval OPERATOR
 model OPERATOR
 albedo OPERATOR
 scatter OPERATOR
@@ -86,6 +97,7 @@ rotate OPERATOR
 radius OPERATOR
 center OPERATOR
 Filter DATATYPE
+Reconstruction DATATYPE
 sigma_a OPERATOR
 sigma_s OPERATOR
 texture OPERATOR
@@ -96,12 +108,15 @@ normals OPERATOR
 Include DATATYPE
 include DATATYPE
 Denoiser DATATYPE
+interrupt DATATYPE
 specular OPERATOR
 metallic OPERATOR
 rayleigh OPERATOR
 emission OPERATOR
 geometry OPERATOR
 Material DATATYPE
+Mask DATATYPE
+mask OPERATOR
 luminance OPERATOR
 wireframe OPERATOR
 sheenTint OPERATOR

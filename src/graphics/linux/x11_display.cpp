@@ -621,7 +621,7 @@ static Atom WriteTargetToProperty(const XSelectionRequestEvent* request){
     }else{
         selectionSize   = x11Helper.clipboardStringSize;
         selectionString = x11Helper.clipboardString;
-	}
+    }
 
     if(request->property == None){
         // The requester is a legacy client (ICCCM section 2.2)
@@ -1028,7 +1028,7 @@ void ProcessEventButtonReleaseX11(XEvent *event, WindowX11 *window, LibHelperX11
     switch(event->xbutton.button){
         case Button1:{
             List_ForAllItems(&window->onMouseReleasedCall, [=](OnMouseReleasedCallback *sc){
-                sc->fn(sc->priv);
+                sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
             });
 
             List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseLClickCallback *sc){

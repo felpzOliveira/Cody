@@ -1171,7 +1171,7 @@ LEX_PROCESSOR_TABLE(Lex_TokenLookupAny){
                 SymbolTable_Insert(tokenizer->symbolTable, h, length,
                                    TOKEN_ID_PREPROCESSOR_DEFINITION);
 
-            }else if(!(length == 1 && TerminatorChar(**p))){
+            }else if(!(length == 1 && TerminatorChar(**p)) && tokenizer->support.functions){
                 uint maxn = n - length;
                 char nextC = Lex_LookAhead(*p, length, maxn, fetcher, true);
                 if(nextC == '('){

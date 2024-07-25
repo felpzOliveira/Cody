@@ -9,6 +9,8 @@
 #include <scroll_controller.h>
 #include <functional>
 #include <optional>
+#include <pdfview.h>
+#include <image_renderer.h>
 
 #define LHINT_STATE_VALID      1
 #define LHINT_STATE_UNKNOW     2
@@ -24,6 +26,7 @@ typedef enum{
     GitStatusView,
     GitDiffView,
     DbgView,
+    ImageView,
     EmptyView,
     NoneView,
 }ViewType;
@@ -48,6 +51,8 @@ struct LineHints{
 
 struct BufferView{
     LineBuffer *lineBuffer;
+    PdfViewState *pdfView;
+    ImageRenderer imgRenderer;
     VScroll sController;
     Geometry geometry;
     ViewType activeType;
@@ -102,6 +107,27 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
 * Makes a bufferview uses a linebuffer for file reference.
 */
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type);
+
+/*
+* Sets the bufferview pdfview.
+*/
+void BufferView_SetPdfView(BufferView *view, PdfViewState *pdfView);
+
+/*
+* Gets the bufferview pdfview.
+*/
+PdfViewState *BufferView_GetPdfView(BufferView *view);
+
+/*
+* Gets the image renderer.
+*/
+ImageRenderer *BufferView_GetImageRenderer(BufferView *view);
+
+/*
+* Resets/inits the image renderer.
+*/
+void BufferView_ResetImageRenderer(BufferView *view, int width,
+                                   int height, unsigned char *img);
 
 /*
 * Retrieves the view type of the given bufferview.

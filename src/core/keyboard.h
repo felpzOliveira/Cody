@@ -81,6 +81,7 @@ typedef enum{
     Key_Semicolon,
     Key_Equal,
     Key_Minus,
+    Key_Plus,
     Key_LeftBracket,
     Key_Backslash,
     Key_RightBracket,

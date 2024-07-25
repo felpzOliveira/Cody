@@ -179,6 +179,21 @@ int BufferView_LocatePreviousCursorToken(BufferView *view, Token **targetToken){
     return tokenID;
 }
 
+void BufferView_SetPdfView(BufferView *view, PdfViewState *pdfView){
+    if(view->pdfView){
+        if(view->pdfView == pdfView)
+            return;
+
+        PdfView_CloseDocument(&view->pdfView);
+    }
+
+    view->pdfView = pdfView;
+}
+
+PdfViewState *BufferView_GetPdfView(BufferView *view){
+    return view->pdfView;
+}
+
 void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType type){
     AssertA(view != nullptr, "Invalid initialization");
     view->lineBuffer = lineBuffer;
@@ -192,6 +207,17 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->is_mouse_pressed = 0;
     view->is_range_selected = 0;
     view->highlightLine = {};
+    view->pdfView = nullptr;
+    view->imgRenderer = ImageRenderer();
+}
+
+void BufferView_ResetImageRenderer(BufferView *view, int width,
+                                   int height, unsigned char *img)
+{
+    ImageRendererCleanup(view->imgRenderer);
+    if(img && width > 0 && height > 0){
+        ImageRendererCreate(view->imgRenderer, width, height, img);
+    }
 }
 
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type){
@@ -208,6 +234,10 @@ void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     VScroll_Init(&view->sController);
     BufferView_SetGeometry(view, view->geometry, lineHeight);
     BufferViewFileLocation_Restore(view);
+    if(view->pdfView){
+        PdfView_CloseDocument(&view->pdfView);
+        view->pdfView = nullptr;
+    }
 }
 
 uint BufferView_GetMaximumLineView(BufferView *view){
@@ -733,6 +763,10 @@ uint BufferView_GetLineCount(BufferView *view){
 
 Transition BufferView_GetTransitionType(BufferView *view){
     return view->sController.transitionAnim.transition;
+}
+
+ImageRenderer *BufferView_GetImageRenderer(BufferView *view){
+    return &view->imgRenderer;
 }
 
 LineBuffer *BufferView_GetLineBuffer(BufferView *view){

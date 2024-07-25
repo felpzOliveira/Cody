@@ -22,6 +22,7 @@ typedef struct FileProvider{
     Tokenizer emptyTokenizer, emptyDetachedTokenizer;
     Tokenizer litTokenizer, litDetachedTokenizer;
     Tokenizer cmakeTokenizer, cmakeDetachedTokenizer;
+    Tokenizer texTokenizer, texDetachedTokenizer;
     StorageDevice *storageDevice;
 }FileProvider;
 
@@ -124,6 +125,13 @@ static void InitTokenizers(){
 
     Lex_BuildTokenizer(&fProvider.cmakeDetachedTokenizer, &fProvider.symbolTable,
                        {&cmakeReservedPreprocessor, &cmakeReservedTable}, &cmakeSupport);
+
+    // Tex
+    Lex_BuildTokenizer(&fProvider.texTokenizer, &fProvider.symbolTable,
+                       {&texReservedPreprocessor, &texReservedTable}, &texSupport);
+
+    Lex_BuildTokenizer(&fProvider.texDetachedTokenizer, &fProvider.symbolTable,
+                       {&texReservedPreprocessor, &texReservedTable}, &texSupport);
 }
 
 void FileProvider_Initialize(){
@@ -137,6 +145,7 @@ void FileProvider_Initialize(){
     fProvider.emptyTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litTokenizer   = TOKENIZER_INITIALIZER;
     fProvider.cmakeTokenizer = TOKENIZER_INITIALIZER;
+    fProvider.texTokenizer   = TOKENIZER_INITIALIZER;
 
     // Detached tokenizer for parallel parsing
     fProvider.cppDetachedTokenizer   = TOKENIZER_INITIALIZER;
@@ -145,6 +154,7 @@ void FileProvider_Initialize(){
     fProvider.emptyDetachedTokenizer = TOKENIZER_INITIALIZER;
     fProvider.litDetachedTokenizer   = TOKENIZER_INITIALIZER;
     fProvider.cmakeDetachedTokenizer = TOKENIZER_INITIALIZER;
+    fProvider.texDetachedTokenizer   = TOKENIZER_INITIALIZER;
 
     InitTokenizers();
 
@@ -196,6 +206,11 @@ Tokenizer *FileProvider_GuessTokenizer(char *filename, uint len,
             props->ext = FILE_EXTENSION_CPP;
             if(detached) return FileProvider_GetDetachedCppTokenizer();
             return FileProvider_GetCppTokenizer();
+        }else if(strExt == ".tex"){
+            props->type = 6;
+            props->ext = FILE_EXTENSION_TEX;
+            if(detached) return FileProvider_GetDetachedTexTokenizer();
+            return FileProvider_GetTexTokenizer();
         }else if(strExt == ".glsl" || strExt == ".gl" || strExt == ".vs" || strExt == ".fs"){
             props->type = 1;
             props->ext = FILE_EXTENSION_GLSL;
@@ -255,6 +270,7 @@ Tokenizer *FileProvider_GetLineBufferTokenizer(LineBuffer *lineBuffer){
         case 3: return FileProvider_GetLitTokenizer();
         case 4: return FileProvider_GetCmakeTokenizer();
         case 5: return FileProvider_GetPythonTokenizer();
+        case 6: return FileProvider_GetTexTokenizer();
         default:{
             //TODO: Empty tokenizer
             return FileProvider_GetEmptyTokenizer();
@@ -306,6 +322,7 @@ bool FileProvider_VerifyEncryptedFile(uint8_t *content, uint32_t size){
 
 static char *tempContent = nullptr;
 static uint tempSize = 0;
+static int tempFlag = 0;
 static std::string tempPath;
 
 void FileProvider_ReleaseTemporary(){
@@ -313,11 +330,17 @@ void FileProvider_ReleaseTemporary(){
         AllocatorFree(tempContent);
     tempSize = 0;
     tempPath = std::string();
+    tempFlag = 0;
     tempContent = nullptr;
 }
 
-int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
-                               bool mustFinish)
+char *FileProvider_GetTemporary(uint *len){
+    *len = tempSize;
+    return tempContent;
+}
+
+int FileProvider_LoadTemporary(char *pwd, uint pwdlen, int &fileType,
+                               LineBuffer **lineBuffer, bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
     Tokenizer *tokenizer = nullptr;
@@ -331,7 +354,9 @@ int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
     uint8_t *input = nullptr;
     std::vector<uint8_t> decrypted;
 
-    if(tempContent == nullptr || tempSize < (7 + CRYPTO_SALT_LEN + 16)){
+    if(tempContent == nullptr || tempSize < (7 + CRYPTO_SALT_LEN + 16) ||
+       tempFlag != 1)
+    {
         FileProvider_ReleaseTemporary();
         return FILE_LOAD_FAILED;
     }
@@ -406,7 +431,16 @@ int FileProvider_LoadTemporary(char *pwd, uint pwdlen, LineBuffer **lineBuffer,
     return FILE_LOAD_SUCCESS;
 }
 
-int FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
+static int FileProvider_GuessEntry(char *targetPath, uint len){
+    int where = GetFilePathExtension(targetPath, len);
+    if(StringEqual(&targetPath[where], (char *)".pdf", Min(len-where, 4))){
+        return FILE_TYPE_ON_LOAD_IMAGE;
+    }
+
+    return FILE_TYPE_ON_LOAD_TEXT;
+}
+
+int FileProvider_Load(char *targetPath, uint len, int &fileType, LineBuffer **lineBuffer,
                       bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
@@ -429,14 +463,24 @@ int FileProvider_Load(char *targetPath, uint len, LineBuffer **lineBuffer,
         if(ptr != nullptr){
             // NOTE: Check for encrypted file
             if(FileProvider_VerifyEncryptedFile(ptr, (uint32_t)fileSize)){
-                // TODO: Need to interrupt this, ask for password, decrypt and than
-                //       swap buffers. The question here is how do we maintain control
-                //       in this routine if we have to yield to the query bar at this moment?
                 tempContent = content;
                 tempSize = fileSize;
                 tempPath = std::string(targetPath, len);
+                tempFlag = 1; // decrypt
                 return FILE_LOAD_REQUIRES_DECRYPT;
             }
+        }
+
+        fileType = FileProvider_GuessEntry(targetPath, len);
+
+        // TODO: If this thing does not have a linebuffer how do index it
+        //       so we can move around and push the image to other views?
+        //       FileBufferList won't be able to pass it for searches, what now?
+        if(fileType != FILE_TYPE_ON_LOAD_TEXT){
+            tempContent = content;
+            tempSize = fileSize;
+            tempFlag = 2; // viewer
+            return FILE_LOAD_REQUIRES_VIEWER;
         }
     }
 
@@ -536,6 +580,10 @@ Tokenizer *FileProvider_GetCmakeTokenizer(){
     return &fProvider.cmakeTokenizer;
 }
 
+Tokenizer *FileProvider_GetTexTokenizer(){
+    return &fProvider.texTokenizer;
+}
+
 Tokenizer *FileProvider_GetDetachedCppTokenizer(){
     return &fProvider.cppDetachedTokenizer;
 }
@@ -558,4 +606,8 @@ Tokenizer *FileProvider_GetDetachedLitTokenizer(){
 
 Tokenizer *FileProvider_GetDetachedCmakeTokenizer(){
     return &fProvider.cmakeDetachedTokenizer;
+}
+
+Tokenizer *FileProvider_GetDetachedTexTokenizer(){
+    return &fProvider.texDetachedTokenizer;
 }

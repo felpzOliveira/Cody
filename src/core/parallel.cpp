@@ -137,6 +137,11 @@ static void BuildBufferSoftClear(int is_build){
     }
 }
 
+static int execution_done = 1;
+int ExecuteCommandDone(){
+    return execution_done;
+}
+
 template<typename Fn> int ExecuteCommand(std::string cmd, const Fn &callback){
     int rv = -1;
     char buffer[64];
@@ -146,6 +151,7 @@ template<typename Fn> int ExecuteCommand(std::string cmd, const Fn &callback){
         return rv;
     }
 
+    execution_done = 0;
     try{
         memset(buffer, 0, sizeof(buffer));
         while(fgets(buffer, sizeof(buffer), fp) != NULL){
@@ -163,6 +169,7 @@ template<typename Fn> int ExecuteCommand(std::string cmd, const Fn &callback){
         pclose(fp);
     }
 
+    execution_done = 1;
     return rv;
 }
 
@@ -300,7 +307,9 @@ void build_process_line(std::string line, BuildParseCtx &parseCtx){
         }if(line.find(": fatal error:") != std::string::npos){
             parseCtx.currMessage += line;
             parseCtx.pstate = 1;
-        }else if(line.find(": warning:") != std::string::npos){
+        }else if(line.find(": warning:") != std::string::npos ||
+                 line.find(": warning ") != std::string::npos)
+        {
             parseCtx.currMessage += line;
             parseCtx.pstate = 2;
         }
@@ -317,7 +326,9 @@ void build_process_line(std::string line, BuildParseCtx &parseCtx){
             parseCtx.currMessage = line;
             parseCtx.lastState = parseCtx.pstate;
             parseCtx.pstate = 1;
-        }else if(line.find(": warning:") != std::string::npos){
+        }else if(line.find(": warning:") != std::string::npos ||
+                 line.find(": warning ") != std::string::npos)
+        {
             print_state(parseCtx.currMessage, parseCtx);
 
             parseCtx.currMessage = line;

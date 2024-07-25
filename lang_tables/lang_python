@@ -17,6 +17,7 @@ TokenizerSupport pythonSupport = {
     .strings = true,
     .numbers = true,
     .lookups = true,
+    .functions = true,
     .multilineComment = false,
     .lineCommentChar = '#',
     .procs = { { "@", "a", TOKEN_ID_DATATYPE, 2,  python_decorator_capture }, },

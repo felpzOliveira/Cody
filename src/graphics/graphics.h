@@ -162,6 +162,7 @@ struct OpenGLState{
     OpenGLTexture textures[MAX_TEXTURES_COUNT];
     uint texBinds;
     Shader imageShader;
+    Shader imRendererShader;
     Mouse mouse;
     double cursorBlinkLastTime;
     bool cursorBlinking;
@@ -439,7 +440,7 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost=0);
 * be put on hold.
 */
 int Graphics_RenderBufferView(View *view, OpenGLState *state,
-                              Theme *theme, Float dt);
+                              Theme *theme, Float dt, int detached_running);
 
 /*
 * Renders a welcome message in the given view.
@@ -480,6 +481,11 @@ int Graphics_RenderAutoComplete(View *view, OpenGLState *state, Theme *theme, Fl
 */
 int Graphics_RenderControlCommands(View *view, OpenGLState *state,
                                    Theme *theme, Float dt);
+
+/*
+* Renders the a view that contains an image.
+*/
+int Graphics_RenderImage(View *view, OpenGLState *state, Theme *theme, Float dt);
 
 /*
 * Given a view and a target viewport, prepares the viewport and scissor

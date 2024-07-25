@@ -5,6 +5,7 @@ TokenizerSupport glslSupport = {
     .strings = true,
     .numbers = true,
     .lookups = true,
+    .functions = true,
     .multilineComment = true,
     .lineCommentChar = 0,
     .procs = {},

@@ -433,7 +433,7 @@ void ProcessEventButtonReleaseWin32(WindowWin32* window, LibHelperWin32* win32, 
         case WM_LBUTTONUP: {
             window->isMousePressed = 0;
             List_ForAllItems(&window->onMouseReleasedCall, [=](OnMouseReleasedCallback* sc) {
-                sc->fn(sc->priv);
+                sc->fn(window->lastCursorPosX, window->lastCursorPosY, sc->priv);
             });
 
             List_ForAllItems(&window->onMouseLClickCall, [=](OnMouseLClickCallback* sc) {

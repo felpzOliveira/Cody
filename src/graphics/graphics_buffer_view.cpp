@@ -1090,8 +1090,8 @@ int OpenGLRenderLine(BufferView *view, OpenGLState *state,
 }
 
 
-void Graphics_RenderFrame(OpenGLState *state, View *vview,
-                          Transform *projection, Float lineSpan, Theme *theme)
+void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection,
+                          Float lineSpan, Theme *theme, int detached_active)
 {
     BufferView *view = View_GetBufferView(vview);
     OpenGLFont *font = &state->font;
@@ -1181,11 +1181,13 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview,
     // TODO: Maybe add a dedicated routine to gether all strings related to the state
     //       of the linebuffer so we can easily add more states here to print
     if(is_tab){
-        k = snprintf(enddesc, sizeof(enddesc), " %s TAB - %d %s",
-                     eState == 1 ? "[Encrypted]" : "", tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " %s %s TAB - %d %s",
+                     eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
+                     tabSpace, EncoderName(fileEncoder));
     }else{
-        k = snprintf(enddesc, sizeof(enddesc), " %s SPACE - %d %s",
-                     eState == 1 ? "[Encrypted]" : "", tabSpace, EncoderName(fileEncoder));
+        k = snprintf(enddesc, sizeof(enddesc), " %s %s SPACE - %d %s",
+                     eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
+                     tabSpace, EncoderName(fileEncoder));
     }
 
     Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph, encoder);
@@ -1233,14 +1235,18 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
     if(bView->lineBuffer != nullptr){
         //TODO: Maybe generalize this for any linebuffer?
         int is_locked = 0;
+        int is_running = 0;
         LockedLineBuffer *lockedBuffer = nullptr;
         GetExecutorLockedLineBuffer(&lockedBuffer);
-        if(lockedBuffer->lineBuffer == bView->lineBuffer){
+        is_running = ExecuteCommandDone() == 0;
+        if(lockedBuffer->lineBuffer == bView->lineBuffer &&
+           bView->lineBuffer != nullptr)
+        {
             lockedBuffer->mutex.lock();
             is_locked = 1;
         }
 
-        int r =  Graphics_RenderBufferView(view, state, theme, dt);
+        int r =  Graphics_RenderBufferView(view, state, theme, dt, is_running);
 
         if(is_locked){
             if(lockedBuffer->render_state == 1){
@@ -1256,13 +1262,15 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
             lockedBuffer->mutex.unlock();
         }
 
-        return r;
+        return r || is_running;
     }else{
         return Graphics_RenderDefaultView(view, state, theme, dt);
     }
 }
 
-int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Float dt){
+int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
+                              Float dt, int detached_active)
+{
     Float ones[] = {1,1,1,1};
     char linen[32];
     BufferView *view = View_GetBufferView(vview);
@@ -1400,7 +1408,8 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme, Flo
     }
 
     ActivateViewportAndProjection(state, vview, ViewportAllView);
-    Graphics_RenderFrame(state, vview, &state->projection, originalScaleWidth, theme);
+    Graphics_RenderFrame(state, vview, &state->projection, originalScaleWidth,
+                         theme, detached_active);
 
     glDisable(GL_SCISSOR_TEST);
     return is_animating;

@@ -18,6 +18,7 @@ typedef enum{
     View_SelectableList,
     View_AutoComplete,
     View_SelectableHelp,
+    View_ImageDisplay,
     View_StatesCount
 }ViewState;
 
@@ -60,7 +61,7 @@ struct View{
 /*
 * Gets the top-most, i.e.: default, state of a view.
 */
-ViewState View_GetDefaultState();
+ViewState View_GetDefaultState(View *view);
 
 /*
 * Initializes a view component.

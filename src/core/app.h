@@ -297,6 +297,12 @@ void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state);
 void AppHandleMousePress(int x, int y, OpenGLState *state);
 
 /*
+* Handles the mouse release event for **a few events**. Part of the release operations
+* are solved by click events.
+*/
+void AppHandleMouseReleased(int x, int y, OpenGLState *state);
+
+/*
 * Handles the mouse click event. It uses this event when the view is using a selectable
 * list mode, i.e.: listing files, buffers, ...
 */

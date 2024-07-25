@@ -72,7 +72,6 @@ int CreateKeyTable() {
     keycodes[0x15B] = Key_LEFT_SUPER;
     keycodes[0x137] = Key_PRINT_SCREEN;
     keycodes[0x15C] = Key_RIGHT_SUPER;
-    keycodes[0x04E] = Key_ADD;
     keycodes[0x135] = Key_KP_DIVIDE;
     keycodes[0x037] = Key_KP_MULTIPLY;
 #endif
@@ -157,6 +156,7 @@ int CreateKeyTable() {
     keycodes[0x059] = Key_Equal;
 
     keycodes[0x04A] = Key_Minus;
+    keycodes[0x04E] = Key_Plus;
 
     for (int scancode = 0; scancode < 512; scancode++){
         if (keycodes[scancode] > 0)

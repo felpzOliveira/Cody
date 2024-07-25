@@ -22,6 +22,7 @@
 #include <popupwindow.h>
 #include <modal.h>
 #include <timer.h>
+#include <image_renderer.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -812,6 +813,13 @@ void WindowOnPress(int x, int y, void *){
     }
 }
 
+void WinOnMouseReleased(int x, int y, void *){
+    if(!MouseEventFilter(x, y)){
+        GlobalGLState.mouse.isPressed = false;
+        AppHandleMouseReleased(x, y, &GlobalGLState);
+    }
+}
+
 void WinOnFocusChange(bool in, long unsigned int id, void *){
     KeyboardResetState();
 }
@@ -833,6 +841,7 @@ void RegisterInputs(DisplayWindow *window){
     RegisterOnMousePressedCallback(window, WindowOnPress, nullptr);
     RegisterOnMouseDoubleClickCallback(window, WindowOnDoubleClick, nullptr);
     RegisterOnMouseMotionCallback(window, WinOnMouseMotion, nullptr);
+    RegisterOnMouseReleasedCallback(window, WinOnMouseReleased, nullptr);
     RegisterOnSizeChangeCallback(window, WindowOnSizeChange, nullptr);
     RegisterOnFocusChangeCallback(window, WinOnFocusChange, nullptr);
 }
@@ -876,6 +885,9 @@ void Graphics_SetFont(char *ttf, uint len){
     Graphics_SetFontSize(&GlobalGLState, AppGetFontSize());
 }
 
+extern const char *vertexImgContent;
+extern const char *fragmentImgContent;
+
 void OpenGLFontSetup(OpenGLState *state){
     uint filesize = 0;
     char *fontfileContents = nullptr;
@@ -889,11 +901,14 @@ void OpenGLFontSetup(OpenGLState *state){
     uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
     uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
     uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
+    uint imVertex  = Shader_CompileSource(vertexImgContent, SHADER_TYPE_VERTEX);
+    uint imFragment= Shader_CompileSource(fragmentImgContent, SHADER_TYPE_FRAGMENT);
 
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
     Shader_Create(state->buttonShader, bvertex, bfragment);
+    Shader_Create(state->imRendererShader, imVertex, imFragment);
 
     font->sdfSettings.sdfEnabled = 0;
 
@@ -924,6 +939,8 @@ static void OpenGLLoadIcons(OpenGLState *state){
     Graphics_TextureInit(state, folder_png, folder_png_len, ".folder", FILE_EXTENSION_FOLDER);
     Graphics_TextureInit(state, cmake_png, cmake_png_len, ".cmake", FILE_EXTENSION_CMAKE);
     Graphics_TextureInit(state, cpp_png, cpp_png_len, ".cpp", FILE_EXTENSION_CPP);
+    //Graphics_TextureInit(state, tex_png, tex_png_len, ".tex", FILE_EXTENSION_TEX);
+    Graphics_TextureInit(state, text_png, text_png_len, ".tex", FILE_EXTENSION_TEX);
     Graphics_TextureInit(state, cppheader_png, cppheader_png_len, ".cppheader");
     Graphics_TextureInit(state, py_png, py_png_len, ".py", FILE_EXTENSION_PYTHON);
     Graphics_TextureInit(state, glsl_png, glsl_png_len, ".glsl", FILE_EXTENSION_GLSL);
@@ -955,7 +972,7 @@ void OpenGLInitialize(OpenGLState *state){
     SetOpenGLVersion(3, 3);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
-    state->window = CreateDisplayWindow(width, height, "Source - 0.0.1");
+    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
 
     SetWindowIcon(state->window, logo_png, logo_png_len);
 
@@ -1207,6 +1224,8 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     // TODO: Maybe create an array so we can easily loop this thing
     if(strExt == ".cpp" || strExt == ".cc" || strExt == ".c"){
         id = state->textureMap[".cpp"];
+    }else if(strExt == ".tex"){
+        id = state->textureMap[".tex"];
     }else if(strExt == ".py"){
         id = state->textureMap[".py"];
     }else if(strExt == ".h" || strExt == ".hpp"){
@@ -1540,6 +1559,7 @@ void OpenGLEntry(){
 
     _OpenGLUpdateProjections(state, state->width, state->height);
     _OpenGLInitGlobalWidgets(state);
+    InitializeImageRendererQuad();
 
     BufferView_CursorTo(bufferView, 0);
     Timing_Update();

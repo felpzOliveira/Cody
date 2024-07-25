@@ -207,9 +207,10 @@ bool DbgApp_HandleStopPoint(DbgSyncPackage *pkg){
                                     sp->file.size(), nullptr);
     if(!r){
         // if the file provider does not have it, than attempt to load it
+        int fileType = -1;
         if(FileExists((char *)sp->file.c_str())){
             FileProvider_Load((char *)sp->file.c_str(),
-                              sp->file.size(), &dbgLB);
+                              sp->file.size(), fileType, &dbgLB);
             if(dbgLB){
                 dbgSync.loadedLBs.push_back(dbgLB);
                 DEBUG_MSG("Loaded %s\n", sp->file.c_str());

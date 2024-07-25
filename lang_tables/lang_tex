@@ -1,0 +1,34 @@
+#include <languages.h>
+
+// capture stuff like
+// \blablabla[
+// \blablabla{
+// no compositions
+bool tex_declaration_capture(char *head, char *curr){
+    char value = *curr;
+    // 1 - grab alpha characters
+    if((value >= 'A' && value <= 'Z') || (value >= 'a' && value <= 'z'))
+        return true;
+    // I think it is ok to return false here even if we are only thinking
+    // about '{' and '['
+    return false;
+}
+
+TokenizerSupport texSupport = {
+    .comments = true,
+    .strings = true,
+    .numbers = true,
+    .lookups = true,
+    .functions = false,
+    .multilineComment = false,
+    .lineCommentChar = '%',
+    .procs = {
+        { "\\", "a", TOKEN_ID_DATATYPE, 2,  tex_declaration_capture },
+    },
+};
+
+TARGET src/languages/tex.cpp
+BEGIN texReservedPreprocessor
+END
+BEGIN texReservedTable
+END
