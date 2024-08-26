@@ -8,7 +8,7 @@
 #include <X11/Xlib.h>
 #include <X11/keysym.h>
 #include <X11/Xatom.h>
-#include <X11/Xcursor/Xcursor.h>
+//#include <X11/Xcursor/Xcursor.h>
 
 // The XRandR extension provides mode setting and gamma control
 #include <X11/extensions/Xrandr.h>

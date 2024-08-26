@@ -69,11 +69,19 @@ void AppViewerHandleScroll(int is_up, void *){
         return;
 
     int keyControl = KeyboardGetKeyState(Key_LeftControl);
+    int keyAlt     = KeyboardGetKeyState(Key_LeftAlt);
     if(keyControl == KEYBOARD_EVENT_PRESS || keyControl == KEYBOARD_EVENT_REPEAT){
         if(is_up)
             PdfView_IncreaseZoomLevel(pdfView);
         else
             PdfView_DecreaseZoomLevel(pdfView);
+    }else if(keyAlt == KEYBOARD_EVENT_PRESS || keyAlt == KEYBOARD_EVENT_REPEAT){
+        if(is_up){
+            PdfView_PreviousPage(pdfView);
+        }else{
+            PdfView_NextPage(pdfView);
+        }
+        PdfView_ResetZoom(pdfView);
     }else{
         vec2f dir(0.f, SoftDx);
         if(!is_up)

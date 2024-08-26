@@ -46,8 +46,8 @@ void ImageRendererCleanup(ImageRenderer &renderer);
 void ImageRendererUpdate(ImageRenderer &renderer, int width, int height,
                          unsigned char *image);
 
-void ImageRendererRender(ImageRenderer &renderer, Shader &shader,
-                         Geometry *geometry, vec2f zoomCenter, Float zoomLevel,
-                         int active);
+void ImageRendererRender(ImageRenderer &renderer, Shader &shaderImg, Shader &shaderBorder,
+                         vec4f backgroundColor, Float tFactor, Geometry *geometry,
+                         vec2f zoomCenter, Float zoomLevel, int active);
 
 void InitializeImageRendererQuad();

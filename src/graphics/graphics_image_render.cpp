@@ -23,12 +23,11 @@ bool render_images(View *view, Geometry *geometry,
 
     check_for_update(pdfView, renderer);
 
-    glUseProgram(state->imRendererShader.id);
-    Shader_UniformVec4(state->imRendererShader, "backgroundColor", backgroundColor);
-    Shader_UniformFloat(state->imRendererShader, "transitionFactor", (Float)factor);
-    ImageRendererRender(renderer, state->imRendererShader, geometry,
+    ImageRendererRender(renderer, state->imRendererShader, state->imBorderShader,
+                        backgroundColor, (Float)factor, geometry,
                         PdfView_GetZoomCenter(pdfView), PdfView_GetZoomLevel(pdfView),
                         view->isActive ? 1 : 0);
+
     return renderer.IsTransitioninig();
 }
 

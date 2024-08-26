@@ -887,28 +887,31 @@ void Graphics_SetFont(char *ttf, uint len){
 
 extern const char *vertexImgContent;
 extern const char *fragmentImgContent;
+extern const char *borderFragmentImg;
 
 void OpenGLFontSetup(OpenGLState *state){
     uint filesize = 0;
     char *fontfileContents = nullptr;
     OpenGLFont *font = &state->font;
 
-    uint vertex    = Shader_CompileSource(shader_text_v, SHADER_TYPE_VERTEX);
-    uint fragment  = Shader_CompileSource(shader_text_f, SHADER_TYPE_FRAGMENT);
-    uint cvertex   = Shader_CompileSource(shader_cursor_v, SHADER_TYPE_VERTEX);
-    uint cfragment = Shader_CompileSource(shader_cursor_f, SHADER_TYPE_FRAGMENT);
-    uint ivertex   = Shader_CompileSource(shader_icon_v, SHADER_TYPE_VERTEX);
-    uint ifragment = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
-    uint bvertex   = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
-    uint bfragment = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
-    uint imVertex  = Shader_CompileSource(vertexImgContent, SHADER_TYPE_VERTEX);
-    uint imFragment= Shader_CompileSource(fragmentImgContent, SHADER_TYPE_FRAGMENT);
+    uint vertex       = Shader_CompileSource(shader_text_v, SHADER_TYPE_VERTEX);
+    uint fragment     = Shader_CompileSource(shader_text_f, SHADER_TYPE_FRAGMENT);
+    uint cvertex      = Shader_CompileSource(shader_cursor_v, SHADER_TYPE_VERTEX);
+    uint cfragment    = Shader_CompileSource(shader_cursor_f, SHADER_TYPE_FRAGMENT);
+    uint ivertex      = Shader_CompileSource(shader_icon_v, SHADER_TYPE_VERTEX);
+    uint ifragment    = Shader_CompileSource(shader_icon_f, SHADER_TYPE_FRAGMENT);
+    uint bvertex      = Shader_CompileSource(shader_button_v, SHADER_TYPE_VERTEX);
+    uint bfragment    = Shader_CompileSource(shader_button_f, SHADER_TYPE_FRAGMENT);
+    uint imVertex     = Shader_CompileSource(vertexImgContent, SHADER_TYPE_VERTEX);
+    uint imFragment   = Shader_CompileSource(fragmentImgContent, SHADER_TYPE_FRAGMENT);
+    uint imBorderFrag = Shader_CompileSource(borderFragmentImg, SHADER_TYPE_FRAGMENT);
 
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
     Shader_Create(state->imageShader, ivertex, ifragment);
     Shader_Create(state->buttonShader, bvertex, bfragment);
     Shader_Create(state->imRendererShader, imVertex, imFragment);
+    Shader_Create(state->imBorderShader, imVertex, imBorderFrag);
 
     font->sdfSettings.sdfEnabled = 0;
 

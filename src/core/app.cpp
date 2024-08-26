@@ -428,7 +428,9 @@ void AppReleaseOnMouseEventCallback(uint handle){
 }
 
 static int lastMouseState = 0;
-void DoPdfViewMouseOperations(int x, int y, OpenGLState *state, int mouseState){
+void DoPdfViewMouseOperations(int x, int y, OpenGLState *state, int mouseState,
+                              int isclick)
+{
     View *view = AppGetActiveView();
     vec2ui mouse(x, state->height - y);
     BufferView *bView = View_GetBufferView(view);
@@ -440,6 +442,14 @@ void DoPdfViewMouseOperations(int x, int y, OpenGLState *state, int mouseState){
             if(pdfView){
                 BufferView_GetGeometry(bView, &geo);
                 PdfView_MouseMotion(pdfView, mouse, mouseState, &geo);
+
+                if(isclick && false){ // TODO: FIX ME!
+                    Float u0 = (Float)mouse.x / (Float)geo.Width();
+                    if(u0 < 0.1)
+                        PdfView_PreviousPage(pdfView);
+                    else if(u0 > 0.9)
+                        PdfView_NextPage(pdfView);
+                }
             }
         }
     }
@@ -513,7 +523,7 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
 
 void AppHandleMouseMotion(int x, int y, OpenGLState *state){
     AppOnMouseMotion(x, y, state, false);
-    DoPdfViewMouseOperations(x, y, state, lastMouseState);
+    DoPdfViewMouseOperations(x, y, state, lastMouseState, 0);
 #if 0
     vec2ui mouse(x, state->height - y);
     View *view = AppGetActiveView();
@@ -687,6 +697,8 @@ void AppHandleMouseClick(int x, int y, OpenGLState *state){
         AppResetBufferViewRangeVisible(oview);
     }
 
+    DoPdfViewMouseOperations(x, y, state, lastMouseState, 1);
+
     ViewState vstate = View_GetState(view);
     uint dy = view->geometry.upper.y - view->geometry.lower.y;
     // account for view transform
@@ -740,12 +752,12 @@ void AppHandleMousePress(int x, int y, OpenGLState *state){
     AppOnMouseMotion(x, y, state, true);
     appContext.mouseHook();
     lastMouseState = 1;
-    DoPdfViewMouseOperations(x, y, state, lastMouseState);
+    DoPdfViewMouseOperations(x, y, state, lastMouseState, 0);
 }
 
 void AppHandleMouseReleased(int x, int y, OpenGLState *state){
     lastMouseState = 0;
-    DoPdfViewMouseOperations(x, y, state, lastMouseState);
+    DoPdfViewMouseOperations(x, y, state, lastMouseState, 0);
 }
 
 void AppHandleMouseScroll(int x, int y, int is_up, OpenGLState *state){

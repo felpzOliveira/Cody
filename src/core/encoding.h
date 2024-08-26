@@ -102,3 +102,13 @@ unsigned int StringToCodepointUpdate_Opaque(void *encoder, unsigned int *state,
 * rendering specific stuff, get a UTF-8 one with the following call.
 */
 EncoderDecoder *UTF8Encoder();
+
+/*
+* Sets the global encoding scheme when opening buffers.
+*/
+bool SetGlobalDefaultEncoding(std::string str);
+
+/*
+* Gets the global encoding scheme when opening buffers.
+*/
+EncoderDecoderType GetGlobalDefaultEncoding();

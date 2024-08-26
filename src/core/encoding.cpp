@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <stdint.h>
 
+static EncoderDecoderType globalEncodingType = ENCODER_DECODER_UTF8;
+
 static bool
 IsEncoderTypeValid(EncoderDecoderType type){
     return type == ENCODER_DECODER_UTF8 || type == ENCODER_DECODER_LATIN1;
@@ -263,4 +265,19 @@ EncoderDecoder globalUTF8Encoder(ENCODER_DECODER_UTF8, StringToCodepoint_UTF8,
 
 EncoderDecoder *UTF8Encoder(){
     return &globalUTF8Encoder;
+}
+
+bool SetGlobalDefaultEncoding(std::string str){
+    EncoderDecoderType type = EncoderDecoder_GetType(str);
+    if(type == ENCODER_DECODER_NONE){
+        printf("Invalid encoding '%s'\n", str.c_str());
+        return false;
+    }else{
+        globalEncodingType = type;
+        return true;
+    }
+}
+
+EncoderDecoderType GetGlobalDefaultEncoding(){
+    return globalEncodingType;
 }

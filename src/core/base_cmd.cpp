@@ -325,6 +325,20 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
     return r;
 }
 
+int BaseCommand_GlobalEncodingSwap(char *cmd, uint size, View *view){
+    int r = 1;
+    std::string encoding(CMD_GLOBAL_ENCODING_STR);
+
+    int e = StringFirstNonEmpty(&cmd[encoding.size()], size - encoding.size());
+    if(e < 0) return r;
+
+    e += encoding.size();
+    std::string target(&cmd[e]);
+
+    SetGlobalDefaultEncoding(target);
+    return r;
+}
+
 int BaseCommand_EncodingSwap(char *cmd, uint size, View *view){
     int r = 1;
     std::string encoding(CMD_ENCODING_STR);
@@ -979,6 +993,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
     cmdMap[CMD_SEARCH_STR] = {CMD_SEARCH_HELP, BaseCommand_SearchAllFiles};
     cmdMap[CMD_ENCODING_STR] = {CMD_ENCODING_HELP, BaseCommand_EncodingSwap};
+    cmdMap[CMD_GLOBAL_ENCODING_STR] = {CMD_GLOBAL_ENCODING_HELP, BaseCommand_GlobalEncodingSwap};
     cmdMap[CMD_FUNCTIONS_STR] = {CMD_FUNCTIONS_HELP, BaseCommand_SearchFunctions};
     cmdMap[CMD_HSPLIT_STR] = {CMD_HSPLIT_HELP, BaseCommand_Hsplit};
     cmdMap[CMD_VSPLIT_STR] = {CMD_VSPLIT_HELP, BaseCommand_Vsplit};

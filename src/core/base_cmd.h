@@ -62,6 +62,9 @@ struct FileEntry;
 #define CMD_ENCODING_STR "encoding"
 #define CMD_ENCODING_HELP "Changes the encoding for the given file"
 
+#define CMD_GLOBAL_ENCODING_STR "set-global-encoding"
+#define CMD_GLOBAL_ENCODING_HELP "Change the global encoding sets for default buffers."
+
 #define CMD_FUNCTIONS_STR "functions"
 #define CMD_FUNCTIONS_HELP "List all functions found on all opened files."
 

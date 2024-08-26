@@ -112,6 +112,18 @@ ARGUMENT_PROCESS(disable_dual_mode){
     return ARG_OK;
 }
 
+ARGUMENT_PROCESS(set_encoding){
+    std::string type = ParseNext(argc, argv, i, "--encoding");
+    if(type.size() == 0){
+        printf("Missing encoding type\n");
+        return ARG_ABORT;
+    }
+    if(!SetGlobalDefaultEncoding(type)){
+        return ARG_ABORT;
+    }
+    return ARG_OK;
+}
+
 std::map<const char *, ArgDesc> arg_map = {
     {"--remote",
         { .processor = remote_flags,
@@ -136,6 +148,10 @@ std::map<const char *, ArgDesc> arg_map = {
     {"--no-modal",
         { .processor = disable_dual_mode,
           .help = "Disable modal mode for the editor." }
+    },
+    {"--encoding",
+        { .processor = set_encoding,
+          .help = "Sets the default encoding method." }
     }
 };
 
@@ -210,6 +226,42 @@ void StartWithFile(const char *path=nullptr){
 
 void DEVEL_MSG(){
     printf("\n* Cody - Built %s at %s *\n", __DATE__, __TIME__);
+}
+
+//#define LRU_CACHE_DEBUG
+#include <lru_cache.h>
+struct PageInfo{
+    int info;
+    PageInfo(int s) : info(s){}
+};
+
+void cache_cleanup(PageInfo data){
+    // NOTE: nothing to clear;
+}
+
+std::string cache_print_key(int val){
+    return std::string("K[") + std::to_string(val) + "]";
+}
+
+std::string cache_print_item(PageInfo val){
+    return std::string("I[") + std::to_string(val.info) + "]";
+}
+
+int __test(){
+    LRUCache<int, PageInfo> cache (4, cache_cleanup);
+    cache.set_dbg_functions(cache_print_item, cache_print_key);
+
+    cache.put(1, PageInfo(1));
+    cache.put(10, PageInfo(8));
+    cache.put(-4, PageInfo(5));
+    cache.put(19, PageInfo(9));
+
+    cache.put(-19, PageInfo(-30));
+    cache.put(-16, PageInfo(25));
+    cache.put(100, PageInfo(12));
+
+    cache.dbg_print_state();
+    return 0;
 }
 
 int cody_entry(int argc, char **argv){

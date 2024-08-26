@@ -15,6 +15,26 @@ const char *vertexImgContent = "#version 450 core\n"
 "    gl_Position = vec4(inPosition, 1.0);\n"
 "}";
 
+const char *borderFragmentImg = "#version 450 core\n"
+"uniform vec4 backgroundColor;\n"
+"uniform float transitionFactor;\n"
+"in vec2 TexCoords;\n"
+"out vec4 fragColor;\n"
+"void main(){\n"
+"    vec2 uv = TexCoords;\n"
+"    float u0 = 0.0025;\n"
+"    float u1 = 0.9975;\n"
+"    float v0 = 0.0025;\n"
+"    float v1 = 0.9975;\n"
+"    vec4 baseColor = backgroundColor;\n"
+"    if(uv.x < u0 || uv.x > u1 || uv.y < v0 || uv.y > v1){\n"
+"        vec4 redColor = vec4(1.0, 1.0, 0.0, 1.0);\n"
+"        baseColor = mix(redColor, backgroundColor, transitionFactor);\n"
+"    }else\n"
+"        discard;\n"
+"    fragColor = baseColor;\n"
+"}";
+
 
 const char *fragmentImgContent = "#version 450 core\n"
 "uniform sampler2D image0;\n"
@@ -23,8 +43,6 @@ const char *fragmentImgContent = "#version 450 core\n"
 "uniform vec2 zoomCenter;\n"
 "uniform float zoomLevel;\n"
 "uniform vec4 backgroundColor;\n"
-"uniform float transitionFactor;\n"
-"uniform float viewActive;\n"
 "in vec2 TexCoords;\n"
 "out vec4 fragColor;\n"
 "vec2 zoom_at(vec2 uv, vec2 zoomCenter, float zoomLevel){\n"
@@ -55,17 +73,8 @@ const char *fragmentImgContent = "#version 450 core\n"
 "            float v_0 = dv * 0.5;\n"
 "            float v_1 = 1.0 - v_0;\n"
 "            if(uv.y > v_1 || uv.y < v_0){\n"
-"                vec4 redColor = vec4(1.0, 1.0, 0.0, 1.0);\n"
-"                vec4 lineColor = mix(redColor, backgroundColor, transitionFactor);\n"
-"                if(uv.y < v_0){\n"
-"                    blendFactor = smoothstep(v_0 - border_width, v_0, uv.y);\n"
-"                    imageColor = mix(backgroundColor, lineColor, blendFactor);\n"
-"                }else{\n"
-"                    blendFactor = smoothstep(v_1, v_1 + border_width, uv.y);\n"
-"                    imageColor = mix(lineColor, backgroundColor, blendFactor);\n"
-"                }\n"
-"            }\n"
-"            else{\n"
+"                imageColor = backgroundColor;\n"
+"            }else{\n"
 "                uv.y = (uv.y - v_0) / (v_1 - v_0);\n"
 "                fragColor = texture2D(image0, uv);\n"
 "            }\n"
@@ -75,15 +84,7 @@ const char *fragmentImgContent = "#version 450 core\n"
 "        float u_0 = du * 0.5;\n"
 "        float u_1 = 1.0 - u_0;\n"
 "        if(uv.x < u_0 || uv.x > u_1){\n"
-"            vec4 redColor = vec4(1.0, 1.0, 0.0, 1.0);\n"
-"            vec4 lineColor = mix(redColor, backgroundColor, transitionFactor);\n"
-"            if(uv.x < u_0){\n"
-"                blendFactor = smoothstep(u_0 - border_width, u_0, uv.x);\n"
-"                imageColor = mix(backgroundColor, lineColor, blendFactor);\n"
-"            }else{\n"
-"                blendFactor = smoothstep(u_1, u_1 + border_width, uv.x);\n"
-"                imageColor = mix(lineColor, backgroundColor, blendFactor);\n"
-"            }\n"
+"            imageColor = backgroundColor;\n"
 "        }else{\n"
 "            uv.x = (uv.x - u_0) / (u_1 - u_0);\n"
 "            imageColor = texture2D(image0, uv);\n"
@@ -91,6 +92,8 @@ const char *fragmentImgContent = "#version 450 core\n"
 "    }\n"
 "    fragColor = imageColor;\n"
 "}";
+
+
 
 void InitializeImageRendererQuad(){
     int rv = -1;
@@ -180,30 +183,37 @@ void ImageRendererUpdate(ImageRenderer &renderer, int width, int height,
                         width, height, GL_RGBA, GL_UNSIGNED_BYTE, image));
 }
 
-void ImageRendererRender(ImageRenderer &renderer, Shader &shader,
-                         Geometry *geometry, vec2f zoomCenter, Float zoomLevel,
-                         int active)
+void ImageRendererRender(ImageRenderer &renderer, Shader &shaderImg, Shader &shaderBorder,
+                         vec4f backgroundColor, Float factor,  Geometry *geometry,
+                         vec2f zoomCenter, Float zoomLevel, int active)
 {
     if(!renderer.IsInited())
         return;
 
     glDisable(GL_BLEND);
-    glUseProgram(shader.id);
+
+    glUseProgram(shaderImg.id);
     glBindVertexArray(quadVAO);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, quadEBO);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glActiveTexture(GL_TEXTURE0);
     OpenGLCHK(glBindTexture(GL_TEXTURE_2D, renderer.texture));
-    Shader_UniformInteger(shader, "image0", 0);
-    Shader_UniformFloat(shader, "width", geometry->Width());
-    Shader_UniformFloat(shader, "height", geometry->Height());
-    Shader_UniformVec2(shader, "zoomCenter", zoomCenter);
-    Shader_UniformFloat(shader, "zoomLevel", zoomLevel);
-    //Shader_UniformFloat(shader, "viewActive", active);
+    Shader_UniformInteger(shaderImg, "image0", 0);
+    Shader_UniformFloat(shaderImg, "width", geometry->Width());
+    Shader_UniformFloat(shaderImg, "height", geometry->Height());
+    Shader_UniformVec2(shaderImg, "zoomCenter", zoomCenter);
+    Shader_UniformFloat(shaderImg, "zoomLevel", zoomLevel);
+    Shader_UniformVec4(shaderImg, "backgroundColor", backgroundColor);
 
     OpenGLCHK(glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1));
+#if 1
+    glUseProgram(shaderBorder.id);
+    Shader_UniformVec4(shaderBorder, "backgroundColor", backgroundColor);
+    Shader_UniformFloat(shaderBorder, "transitionFactor", factor);
 
+    OpenGLCHK(glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1));
+#endif
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
     glBindVertexArray(0);

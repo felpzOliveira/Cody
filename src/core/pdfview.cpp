@@ -2,6 +2,7 @@
 #include <utilities.h>
 #include <unordered_map>
 #include <file_provider.h>
+#include <lru_cache.h>
 
 //#define LOG_PDF_OPEN(ptr) printf("[PDF] Open (%p)\n", ptr)
 //#define LOG_PDF_CLOSE(ptr) printf("[PDF] Close (%p)\n", ptr)
@@ -27,8 +28,12 @@ const char *PdfView_GetCurrentPage(PdfViewState *, int &, int &){ return nullptr
 const char *PdfView_GetImagePage(PdfViewState *, int,
                                  int &, int &){ return nullptr; }
 
+bool PdfView_CanMoveTo(PdfViewState *, vec2f){ return false; }
+PdfViewGraphicState PdfView_GetGraphicsState(PdfViewState *){ return PdfViewGraphicState(); }
+void PdfView_SetGraphicsState(PdfViewState *, PdfViewGraphicState){}
+
 bool PdfView_ProjectCoordinate(PdfViewState *, vec2f, Geometry *, vec2f &){ return false; }
-void PdfView_MouseMotion(PdfViewState *, vec2f, Geometry *){}
+void PdfView_MouseMotion(PdfViewState *, vec2f, int, Geometry *){}
 vec2f PdfView_GetZoomCenter(PdfViewState *){ return vec2f(0.5, 0.5); }
 Float PdfView_GetZoomLevel(PdfViewState *){ return 1.0f; }
 void PdfView_SetZoomCenter(PdfViewState *, vec2f){}
@@ -268,6 +273,104 @@ int GetDestPage(PopplerDocument *document, PopplerDest *dest){
     return dest->page_num;
 }
 
+struct PdfPagePixels{
+    unsigned char *pixels;
+    int width, height;
+};
+
+static
+PdfPagePixels PdfView_RenderPage(PopplerDocument *document, int pageIndex){
+    PdfPagePixels resultPage = {nullptr, 0, 0};
+    double dWidth = 0, dHeight = 0;
+    int width, height;
+    PopplerPage *page = nullptr;
+    cairo_surface_t *surface = nullptr;
+    cairo_t *cr = nullptr;
+    int stride = 0;
+    int iterator = 0;
+    char *hptr = nullptr;
+    float scale = 4.0f;
+
+    page = poppler_document_get_page(document, pageIndex);
+    if(!page){
+        printf("Could not get page { %d }\n", pageIndex);
+        goto __ret;
+    }
+
+    poppler_page_get_size(page, &dWidth, &dHeight);
+    width  = static_cast<int>(dWidth) * scale;
+    height = static_cast<int>(dHeight) * scale;
+
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+    if(!surface){
+        printf("Could not create surface\n");
+        goto __ret;
+    }
+
+    cr = cairo_create(surface);
+    if(!cr){
+        printf("cairo_create failed\n");
+        goto __ret;
+    }
+
+    cairo_scale(cr, scale, scale);
+    cairo_set_source_rgb(cr, 1.0, 1.0, 1.0);
+    cairo_paint(cr);
+
+    poppler_page_render(page, cr);
+
+    pixels = cairo_image_surface_get_data(surface);
+    stride = cairo_image_surface_get_stride(surface);
+
+    resultPage.pixels = new unsigned char[stride * height];
+    if(!resultPage.pixels){
+        printf("Could not allocate memory for pixels\n");
+        goto __ret;
+    }
+
+    for(int y = 0; y < height; y++){
+        for(int x = 0; x < width; x++){
+            const unsigned int pixel = *reinterpret_cast<unsigned int *>(hptr + x * 4);
+            unsigned char r = (pixel >> 16) & 0xff;
+            unsigned char g = (pixel >> 8) & 0xff;
+            unsigned char b = pixel & 0xff;
+            resultPage.pixels[4 * iterator + 0] = r;
+            resultPage.pixels[4 * iterator + 1] = g;
+            resultPage.pixels[4 * iterator + 2] = b;
+            resultPage.pixels[4 * iterator + 3] = 255;
+            iterator += 1;
+        }
+
+        hptr -= stride;
+    }
+
+    resultPage.width = width;
+    resultPage.height = height;
+__ret:
+    if(cr) cairo_destroy(cr);
+    if(surface) cairo_surface_destroy(surface);
+    return resultPage;
+}
+
+const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
+                                 int &width, int &height)
+{
+    if(poppler_document_get_n_pages(pdfView->document) <= pageIndex)
+        return nullptr;
+
+    if(pdfView->pixels){
+        delete[] pdfView->pixels;
+        pdfView->pixels = nullptr;
+    }
+
+    PdfPagePixels pagePixels = PdfView_RenderPage(pdfView->document, pageIndex);
+    pdfView->pixels = pagePixels.pixels;
+    width = pagePixels.width;
+    height = pagePixels.height;
+    return (const char *)pdfView->pixels;
+}
+
+#if 0
 const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
                                  int &width, int &height)
 {
@@ -382,7 +485,7 @@ __ret:
     if(surface) cairo_surface_destroy(surface);
     return (const char *)pdfView->pixels;
 }
-
+#endif
 
 #else
 #include <poppler/cpp/poppler-document.h>

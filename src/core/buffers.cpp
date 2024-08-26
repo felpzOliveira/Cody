@@ -875,8 +875,7 @@ void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     lineBuffer->props.isWrittable = true;
     lineBuffer->props.isInternal = false;
 
-    EncoderDecoder_InitFor(&lineBuffer->props.encoder, ENCODER_DECODER_UTF8);
-    //EncoderDecoder_InitFor(&lineBuffer->props.encoder, ENCODER_DECODER_LATIN1);
+    EncoderDecoder_InitFor(&lineBuffer->props.encoder, GetGlobalDefaultEncoding());
 
     for(uint i = 0; i < DefaultAllocatorSize; i++){
         lineBuffer->lines[i] = (Buffer *)AllocatorGet(sizeof(Buffer));

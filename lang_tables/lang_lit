@@ -76,6 +76,9 @@ coeff OPERATOR
 rough OPERATOR
 sigma OPERATOR
 scale OPERATOR
+to OPERATOR
+from OPERATOR
+angles OPERATOR
 direction OPERATOR
 Shape DATATYPE
 DirectLight DATATYPE
