@@ -19,23 +19,37 @@ template<typename KeyType, typename ItemType>
 class LRUCache{
     public:
 
+    LRUCache(): maxSize(0){}
+
     LRUCache(size_t size, std::function<void(ItemType)> cln) :
         maxSize(size), cleanup(cln){}
+
+    void init(size_t size, std::function<void(ItemType)> cln){
+        maxSize = size;
+        cleanup = cln;
+    }
+
+    void clear(){
+        for(auto it : cache){
+            cleanup(it.second.first);
+        }
+        order.clear();
+        cache.clear();
+    }
 
     std::optional<ItemType> get(KeyType key){
         std::lock_guard<std::mutex> lock(cache_mutex);
         auto it = cache.find(key);
         if(it == cache.end()){
-            lru_print("[LRU] Could not find key '" << printKey(key) << "'");
+            lru_print("[LRU-get] Could not find key '" << printKey(key) << "'");
             return {};
         }
 
         order.erase(it->second.second);
         order.push_front(key);
-        lru_print("[LRU] Pushing key '" << printKey(key) << "' to front");
-        lru_print("[LRU] Returning '" << printItem(it->first) << "'");
+        lru_print("[LRU-get] Pushing key '" << printKey(key) << "' to front");
         it->second.second = order.begin();
-        return std::optional<ItemType>(it->first);
+        return std::optional<ItemType>(it->second.first);
     }
 
     void put(KeyType key, ItemType item){
@@ -44,13 +58,13 @@ class LRUCache{
             KeyType lru = order.back();
             order.pop_back();
 
-            lru_print("[LRU] Max Size, clearing '" << printKey(lru) << "'");
+            lru_print("[LRU-put] Max Size, clearing '" << printKey(lru) << "'");
             auto it = cache.find(lru);
             cleanup(it->second.first);
             cache.erase(lru);
         }
 
-        lru_print("[LRU] Putting key '" << printKey(key) << "' into cache");
+        lru_print("[LRU-put] Putting key '" << printKey(key) << "' into cache");
         order.push_front(key);
         cache.insert(std::make_pair(key, std::make_pair(item, order.begin())));
     }
