@@ -944,6 +944,24 @@ class Geometry{
         extensionY = other.extensionY;
     }
 
+    vec2f PointAt(vec2f p){
+        return vec2f(static_cast<Float>(lower.x) + p.x * Width(),
+                     static_cast<Float>(lower.y) + p.y * Height());
+    }
+
+    Geometry Region(vec2f pMin, vec2f pMax){
+        Geometry geo;
+        Float w = Width();
+        Float h = Height();
+
+        geo.lower = vec2ui(lower.x + static_cast<uint>(w * pMin.x),
+                           lower.y + static_cast<uint>(h * pMin.y));
+
+        geo.upper = vec2ui(lower.x + static_cast<uint>(w * pMax.x),
+                           lower.y + static_cast<uint>(h * pMax.y));
+        return geo;
+    }
+
     vec2f Center(){
         Float x = (Float)lower.x + (Float)upper.x;
         Float y = (Float)lower.y + (Float)upper.y;

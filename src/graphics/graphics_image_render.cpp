@@ -53,26 +53,21 @@ bool render_images(View *view, Geometry *geometry, OpenGLState *state,
         Graphics_SetFontSize(state, fontSize);
         Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 
-        Float w = geometry->Width();
-        Float h = geometry->Height();
-
         Float dx = fonsComputeStringAdvance(font->fsContext, line,
                                         len, &pGlyph, UTF8Encoder()) * 0.5;
 
-        Float _x = 0.9f * (Float)geometry->upper.x;
-        Float _y = 0.9f * (Float)geometry->upper.y;
-        Float x = _x * font->fontMath.invReduceScale * 1.05f;
-        Float y = (h - _y) * font->fontMath.invReduceScale;
-
-        x = x - dx;
-
-        Geometry smallGeo;
-        smallGeo.lower = vec2ui(static_cast<uint>(_x), static_cast<uint>(_y));
-        smallGeo.upper = vec2ui(static_cast<uint>(_x + 0.1 * w),
-                                static_cast<uint>(_y + 0.1 * h));
+        vec2f corner_p0 = vec2f(0.9);
+        vec2f corner_p1 = vec2f(1.0);
+        Geometry smallGeo = geometry->Region(corner_p0, corner_p1);
 
         Geometry rectGeo = smallGeo;
-        rectGeo.lower.y -= 0.04 * h;
+        rectGeo.lower.y -= 0.04 * geometry->Height();
+
+        Float y = geometry->Height() * font->fontMath.invReduceScale *
+                        (1.0f - corner_p0.y);
+        Float x = geometry->Width() * font->fontMath.invReduceScale *
+                        (corner_p0.x + corner_p1.x) * 0.5f - dx;
+
         update_render_index(pdfView, n, scrollRenderer);
 
         ActivateViewportAndProjection(state, &rectGeo, true);
