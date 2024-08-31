@@ -19,7 +19,7 @@ template<typename KeyType, typename ItemType>
 class LRUCache{
     public:
 
-    LRUCache(): maxSize(0){}
+    LRUCache(): maxSize(1), cleanup(LRUCache::cleanup_stub){}
 
     LRUCache(size_t size, std::function<void(ItemType)> cln) :
         maxSize(size), cleanup(cln){}
@@ -36,6 +36,9 @@ class LRUCache{
         order.clear();
         cache.clear();
     }
+
+    static
+    void cleanup_stub(ItemType type){}
 
     std::optional<ItemType> get(KeyType key){
         std::lock_guard<std::mutex> lock(cache_mutex);

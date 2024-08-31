@@ -11,15 +11,7 @@
 #define LOG_PDF_OPEN(ptr)
 #define LOG_PDF_CLOSE(ptr)
 
-// TODO: In order to have pdf downsampling working
-//       we need the image renderer to be aware of the change
-//       in image resolution as OpenGL does not allow us to
-//       handle textures the same way we handle buffers. Sad.
-//       But that means the renderer needs to have multiple textures
-//       slots and know what to bind.
-
-//#define ENABLE_DOWNSAPLING
-#define PDF_RENDER_DPI 200
+#define PDF_RENDER_DPI 400
 
 #if !defined(POPPLER_CPP_ENABLED) && !defined(POPPLER_GLIB_ENABLED)
 struct PdfViewState{
@@ -61,8 +53,10 @@ bool PdfView_IsZoomLocked(PdfViewState *){ return false; }
 void PdfView_ResetZoom(PdfViewState *){}
 bool PdfView_Reload(PdfViewState **){ return false; }
 PdfScrollState *PdfView_GetScroll(PdfViewState *){ return nullptr; }
+void PdfView_JumpNPages(PdfViewState *, int){}
 
 #else
+
 #include <iostream>
 #include <parallel.h>
 #include <poppler/cpp/poppler-document.h>
@@ -81,9 +75,7 @@ struct PdfViewGraphics{
 
 struct PdfPagePixels{
     unsigned char *pixels;
-    unsigned char *downsampled;
-    int width, height,
-        dwidth, dheight;
+    int width, height;
     size_t bytes;
 };
 
@@ -274,21 +266,9 @@ static inline void
 GetProperImage(unsigned char **pixels, int &width, int &height,
                PdfPagePixels *pdfPixels, Float zoom)
 {
-#if defined(ENABLE_DOWNSAPLING)
-    if(!IsZero(zoom - 1)){
-        *pixels = pdfPixels->pixels;
-        width = pdfPixels->width;
-        height = pdfPixels->height;
-    }else{
-        *pixels = pdfPixels->downsampled;
-        width = pdfPixels->dwidth;
-        height = pdfPixels->dheight;
-    }
-#else
     *pixels = pdfPixels->pixels;
     width = pdfPixels->width;
     height = pdfPixels->height;
-#endif
 }
 
 const char *PdfView_GetCurrentPage(PdfViewState *pdfView, int &width, int &height){
@@ -333,8 +313,6 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
     img = renderer.render_page(page, dpi, dpi);
     resultPage.width = img.width();
     resultPage.height = img.height();
-    resultPage.dwidth = resultPage.width / 2;
-    resultPage.dheight = resultPage.height / 2;
 
     fmt = img.format();
     if(fmt != poppler::image::format_enum::format_argb32){
@@ -342,12 +320,7 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
         goto __ret;
     }
 
-#if defined(ENABLE_DOWNSAPLING)
-    resultPage.bytes = 4 * (resultPage.width  * resultPage.height +
-                            resultPage.dwidth * resultPage.dheight);
-#else
     resultPage.bytes = 4 * (resultPage.width  * resultPage.height);
-#endif
 
     resultPage.pixels = new unsigned char[resultPage.bytes];
 
@@ -373,31 +346,6 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
 
         hptr -= img.bytes_per_row();
     }
-
-#if defined(ENABLE_DOWNSAPLING)
-    resultPage.downsampled = &resultPage.pixels[4 * resultPage.width * resultPage.height];
-    for(int y = 0; y < resultPage.dheight; y++){
-        for(int x = 0; x < resultPage.dwidth; x++){
-            vec4i pixel1 = pixel_at(2 * x, 2 * y, resultPage.width);
-            vec4i pixel2 = pixel_at(2 * x + 1, 2 * y, resultPage.width);
-            vec4i pixel3 = pixel_at(2 * x, 2 * y + 1, resultPage.width);
-            vec4i pixel4 = pixel_at(2 * x + 1, 2 * y + 1, resultPage.width);
-
-            vec4i sample = (pixel1 + pixel2 + pixel3 + pixel4);
-            unsigned char r = (unsigned char)((Float)sample.x * 0.25f);
-            unsigned char g = (unsigned char)((Float)sample.y * 0.25f);
-            unsigned char b = (unsigned char)((Float)sample.z * 0.25f);
-            unsigned char a = (unsigned char)((Float)sample.w * 0.25f);
-
-            int d_id = x + y * resultPage.dwidth;
-
-            resultPage.downsampled[4 * d_id + 0] = r;
-            resultPage.downsampled[4 * d_id + 1] = g;
-            resultPage.downsampled[4 * d_id + 2] = b;
-            resultPage.downsampled[4 * d_id + 3] = a;
-        }
-    }
-#endif
 
 __ret:
     if(page)
@@ -505,6 +453,7 @@ const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
             int dRight = 1, dLeft = 1;
             bool should_continue = true;
             for(int s = 0; s < 8 && should_continue; s++){
+                should_continue = false;
                 int where = select_one(local_index, local_count,
                                        dRight, dLeft, local_cache);
                 if(where >= 0){
@@ -516,8 +465,6 @@ const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
                     if(pRes.pixels){
                         local_cache->put(where, pRes);
                     }
-                }else{
-                    should_continue = false;
                 }
             }
 
@@ -620,10 +567,10 @@ bool PdfView_CanMoveTo(PdfViewState *pdfView, vec2f center){
     vec2f lower_proj = center_proj + lower * d;
     vec2f upper_proj = center_proj + upper * d;
     return
-        !((lower_proj.x < 0 || lower_proj.x > 1 ||
-           lower_proj.y < 0 || lower_proj.y > 1) ||
-          (upper_proj.x < 0 || upper_proj.x > 1 ||
-           upper_proj.y < 0 || upper_proj.y > 1));
+        !(( lower_proj.x < 0 || lower_proj.x > 1 ||
+            lower_proj.y < 0 || lower_proj.y > 1) ||
+          ( upper_proj.x < 0 || upper_proj.x > 1 ||
+            upper_proj.y < 0 || upper_proj.y > 1 ));
 }
 
 void PdfView_MouseMotion(PdfViewState *pdfView, vec2f mouse,
