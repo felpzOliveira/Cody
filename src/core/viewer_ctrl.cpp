@@ -2,6 +2,7 @@
 #include <keyboard.h>
 #include <app.h>
 #include <geometry.h>
+#include <pdfview.h>
 
 #define SoftDx 0.05f
 
@@ -47,24 +48,36 @@ void AppViewerZoomReset(){
     PdfView_ResetZoom(pdfView);
 }
 
-void AppViewerHandleScroll(int is_up, void *){
+PdfViewState *GetActivePdfView(){
+    PdfViewState *pview = nullptr;
+    BufferView *bView = nullptr;
+#if 0
     int x = 0, y = 0;
     DisplayWindow *window = Graphics_GetGlobalWindow();
     OpenGLState *state = Graphics_GetGlobalContext();
     GetLastRecordedMousePosition(window, &x, &y);
 
     View *view = AppGetViewAt(x, state->height - y);
+#else
+    View *view = AppGetActiveView();
+#endif
     if(!view)
-        return;
+        goto __ret;
 
-    BufferView *bView = View_GetBufferView(view);
+    bView = View_GetBufferView(view);
     if(View_GetState(view) != View_ImageDisplay ||
        BufferView_GetViewType(bView) != ImageView)
     {
-        return;
+        goto __ret;
     }
 
-    PdfViewState *pdfView = BufferView_GetPdfView(bView);
+    pview = BufferView_GetPdfView(bView);
+__ret:
+    return pview;
+}
+
+void AppViewerHandleScroll(int is_up, void *){
+    PdfViewState *pdfView = GetActivePdfView();
     if(!pdfView)
         return;
 
@@ -76,12 +89,19 @@ void AppViewerHandleScroll(int is_up, void *){
         else
             PdfView_DecreaseZoomLevel(pdfView);
     }else if(keyAlt == KEYBOARD_EVENT_PRESS || keyAlt == KEYBOARD_EVENT_REPEAT){
+        PdfScrollState *scroll = PdfView_GetScroll(pdfView);
+        int n = PdfView_EstimateScrollPage(pdfView);
+        int totalPages = PdfView_GetNumPages(pdfView);
         if(is_up){
-            PdfView_PreviousPage(pdfView);
+            if(n > 0)
+                scroll->page_off -= 1;
+            //PdfView_PreviousPage(pdfView);
         }else{
-            PdfView_NextPage(pdfView);
+            if(n < totalPages)
+                scroll->page_off += 1;
+            //PdfView_NextPage(pdfView);
         }
-        PdfView_ResetZoom(pdfView);
+        //PdfView_ResetZoom(pdfView);
     }else{
         vec2f dir(0.f, SoftDx);
         if(!is_up)
@@ -93,6 +113,27 @@ void AppViewerHandleScroll(int is_up, void *){
         if(PdfView_CanMoveTo(pdfView, center)){
             PdfView_SetZoomCenter(pdfView, center);
         }
+    }
+}
+
+void ViewerRawKeyCallback(int rawKeyCode){
+    if(TranslateKey(rawKeyCode) != Key_LeftAlt)
+        return;
+
+    PdfViewState *pdfView = GetActivePdfView();
+
+    if(!pdfView)
+        return;
+
+    PdfScrollState *scroll = PdfView_GetScroll(pdfView);
+    int keyAlt = KeyboardGetKeyState(Key_LeftAlt);
+    if(keyAlt == KEYBOARD_EVENT_PRESS){
+        scroll->page_off = 0;
+        scroll->active = 1;
+    }else if(keyAlt == KEYBOARD_EVENT_RELEASE){
+        PdfView_JumpNPages(pdfView, scroll->page_off);
+        scroll->page_off = 0;
+        scroll->active = 0;
     }
 }
 
@@ -114,7 +155,7 @@ void AppViewerReloadCmd(){
     if(PdfView_Reload(&pdfView)){
         PdfView_SetGraphicsState(pdfView, state);
         ImageRenderer &renderer = view->bufferView.imgRenderer;
-        renderer.BeginTransition(2);
+        renderer.BeginTransition(1);
     }
 }
 
@@ -127,6 +168,7 @@ BindingMap *InitializeViewerBindings(){
     RegisterRepeatableEvent(mapping, AppViewerIncreaseZoom, Key_LeftControl, Key_Equal);
     RegisterRepeatableEvent(mapping, AppViewerDecreaseZoom, Key_LeftControl, Key_Minus);
     RegisterRepeatableEvent(mapping, AppViewerZoomReset, Key_LeftControl, Key_R);
+    RegisterKeyboardRawEntry(mapping, ViewerRawKeyCallback);
 
     // NOTE: Default ones
     RegisterRepeatableEvent(mapping, AppCommandSwapView, Key_LeftAlt, Key_W);

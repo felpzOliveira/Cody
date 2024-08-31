@@ -209,14 +209,17 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->highlightLine = {};
     view->pdfView = nullptr;
     view->imgRenderer = ImageRenderer();
+    view->scrollImgRenderer = ImageRenderer();
 }
 
 void BufferView_ResetImageRenderer(BufferView *view, int width,
                                    int height, unsigned char *img)
 {
     ImageRendererCleanup(view->imgRenderer);
+    ImageRendererCleanup(view->scrollImgRenderer);
     if(img && width > 0 && height > 0){
         ImageRendererCreate(view->imgRenderer, width, height, img);
+        ImageRendererCreate(view->scrollImgRenderer, width, height, img);
     }
 }
 

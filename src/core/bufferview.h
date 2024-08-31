@@ -53,6 +53,7 @@ struct BufferView{
     LineBuffer *lineBuffer;
     PdfViewState *pdfView;
     ImageRenderer imgRenderer;
+    ImageRenderer scrollImgRenderer;
     VScroll sController;
     Geometry geometry;
     ViewType activeType;

@@ -356,6 +356,11 @@ void AppReleaseOnMouseEventCallback(uint handle);
 void AppClearHistory();
 
 /*
+* Inform core that windows focus has changed.
+*/
+void AppFocusChange();
+
+/*
 * Reloads the history.
 */
 void AppReloadHistory();

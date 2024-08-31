@@ -5,18 +5,18 @@ static int keycodes[512];
 static int scancodes[Key_Unmapped + 2];
 
 // Must implement these
-int TranslateKey(int scancode) {
+int TranslateKey(int scancode){
     if (scancode < 0 || scancode > 511){
         return Key_Unmapped;
     }
     return keycodes[scancode];
 }
 
-int GetMappedKeysCount() {
+int GetMappedKeysCount(){
     return 512;
 }
 
-int CreateKeyTable() {
+int CreateKeyTable(){
     for (int scancode = 0; scancode < 512; scancode++)
         keycodes[scancode] = Key_Unmapped;
 

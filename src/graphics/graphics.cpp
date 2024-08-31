@@ -821,6 +821,7 @@ void WinOnMouseReleased(int x, int y, void *){
 }
 
 void WinOnFocusChange(bool in, long unsigned int id, void *){
+    AppFocusChange();
     KeyboardResetState();
 }
 

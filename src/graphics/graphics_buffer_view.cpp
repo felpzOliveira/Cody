@@ -1263,6 +1263,13 @@ int Graphics_RenderView(View *view, OpenGLState *state, Theme *theme, Float dt){
         }
 
         return r || is_running;
+    }else if(BufferView_GetViewType(bView) == ImageView){
+        // NOTE: in case the query bar is calling this we need
+        //       to not query the view state as it is going to be
+        //       marked as taken by the query bar. The BufferView
+        //       instead should give us the hint we could be displaying
+        //       images (pdfs)
+        return Graphics_RenderImage(view, state, theme, dt);
     }else{
         return Graphics_RenderDefaultView(view, state, theme, dt);
     }

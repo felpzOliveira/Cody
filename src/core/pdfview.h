@@ -3,6 +3,11 @@
 #include <types.h>
 #include <geometry.h>
 
+struct PdfScrollState{
+    int page_off;
+    int active;
+};
+
 struct PdfViewGraphicState{
     vec2f zoomCenter;
     Float zoomLevel;
@@ -26,6 +31,11 @@ bool PdfView_OpenDocument(PdfViewState **pdfView, const char *pdf, uint len,
                           const char *path, uint pathLen);
 
 /*
+* Checks if the scroll is active in the pdfView.
+*/
+bool PdfView_IsScrolling(PdfViewState *pdfView);
+
+/*
 * Free the resources taken by the document.
 */
 void PdfView_CloseDocument(PdfViewState **pdfView);
@@ -34,6 +44,11 @@ void PdfView_CloseDocument(PdfViewState **pdfView);
 * Get the total number of pages inside the pdfview.
 */
 int PdfView_GetNumPages(PdfViewState *pdfView);
+
+/*
+* Gets a reference to the pdf scroll info.
+*/
+PdfScrollState *PdfView_GetScroll(PdfViewState *pdfView);
 
 /*
 * Gets const acessor to the pixels of the current opened page.
@@ -54,6 +69,16 @@ void PdfView_NextPage(PdfViewState *pdfView);
 * Swaps to the previous page.
 */
 void PdfView_PreviousPage(PdfViewState *pdfView);
+
+/*
+* Jumps n pages in any direction, positive values go forward, negative backwards.
+*/
+void PdfView_JumpNPages(PdfViewState *pdfView, int n);
+
+/*
+* Estimate the page number active _now_.
+*/
+int PdfView_EstimateScrollPage(PdfViewState *pdfView);
 
 /*
 * Clears internal change flag.

@@ -1694,8 +1694,29 @@ ViewNode *AppGetNextViewNode(){
     return vnode;
 }
 
+PdfViewState *GetActivePdfView();
+void AppFocusChange(){
+    PdfViewState *pView = GetActivePdfView();
+    if(pView){ // Make sure we are not on a scroll
+        if(PdfView_IsScrolling(pView)){
+            PdfScrollState *scroll = PdfView_GetScroll(pView);
+            scroll->page_off = 0;
+            scroll->active = 0;
+        }
+    }
+}
+
 void AppCommandSwapView(){
     NullRet(!ControlCommands_IsExpanded());
+    PdfViewState *pView = GetActivePdfView();
+    if(pView){ // Make sure we are not on a scroll
+        if(PdfView_IsScrolling(pView)){
+            PdfScrollState *scroll = PdfView_GetScroll(pView);
+            scroll->page_off = 0;
+            scroll->active = 0;
+        }
+    }
+
     ViewNode *vnode = AppGetNextViewNode();
     if(vnode->view){
         if(BufferView_IsVisible(&vnode->view->bufferView)){

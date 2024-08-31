@@ -11,14 +11,26 @@
 #define LOG_PDF_OPEN(ptr)
 #define LOG_PDF_CLOSE(ptr)
 
+// TODO: In order to have pdf downsampling working
+//       we need the image renderer to be aware of the change
+//       in image resolution as OpenGL does not allow us to
+//       handle textures the same way we handle buffers. Sad.
+//       But that means the renderer needs to have multiple textures
+//       slots and know what to bind.
+
+//#define ENABLE_DOWNSAPLING
+#define PDF_RENDER_DPI 200
+
 #if !defined(POPPLER_CPP_ENABLED) && !defined(POPPLER_GLIB_ENABLED)
 struct PdfViewState{
     int dummy;
 };
 
 bool PdfView_IsEnabled(){ return false; }
+bool PdfView_IsScrolling(PdfViewState *){ return false; }
 bool PdfView_OpenDocument(PdfViewState **, const char *, uint,
                           const char *, uint){ return false; }
+int PdfView_EstimateScrollPage(PdfViewState *){ return -1; }
 void PdfView_CloseDocument(PdfViewState **){}
 int PdfView_GetNumPages(PdfViewState *){ return -1; }
 void PdfView_OpenPage(PdfViewState *, int){}
@@ -48,6 +60,7 @@ void PdfView_DecreaseZoomLevel(PdfViewState *){}
 bool PdfView_IsZoomLocked(PdfViewState *){ return false; }
 void PdfView_ResetZoom(PdfViewState *){}
 bool PdfView_Reload(PdfViewState **){ return false; }
+PdfScrollState *PdfView_GetScroll(PdfViewState *){ return nullptr; }
 
 #else
 #include <iostream>
@@ -68,7 +81,10 @@ struct PdfViewGraphics{
 
 struct PdfPagePixels{
     unsigned char *pixels;
-    int width, height;
+    unsigned char *downsampled;
+    int width, height,
+        dwidth, dheight;
+    size_t bytes;
 };
 
 struct PdfViewState{
@@ -78,6 +94,7 @@ struct PdfViewState{
     int pageIndex;
     bool changed;
     PdfViewGraphics graphics;
+    PdfScrollState scroll;
     LRUCache<int, PdfPagePixels> cache;
 };
 
@@ -97,12 +114,20 @@ std::string cache_item_dbg(PdfPagePixels page){
 
 bool PdfView_IsEnabled(){ return true; }
 
+bool PdfView_IsScrolling(PdfViewState *pdfView){
+    return pdfView->scroll.active;
+}
+
 void PdfView_ClearPendingFlag(PdfViewState *pdfView){
     pdfView->changed = false;
 }
 
 bool PdfView_Changed(PdfViewState *pdfView){
     return pdfView->changed;
+}
+
+PdfScrollState *PdfView_GetScroll(PdfViewState *pdfView){
+    return &pdfView->scroll;
 }
 
 static
@@ -150,6 +175,8 @@ bool PdfView_OpenDocument(PdfViewState **pdfView, const char *pdf, uint len,
     view->document = doc;
     view->pixels = nullptr;
     view->pageIndex = 0;
+    view->scroll.page_off = 0;
+    view->scroll.active = 0;
     view->changed = false;
     view->graphics.width = 0;
     view->graphics.height = 0;
@@ -186,6 +213,32 @@ void PdfView_OpenPage(PdfViewState *pdfView, int pageIndex){
     }
 }
 
+int PdfView_EstimateScrollPage(PdfViewState *pdfView){
+    int totalPages = PdfView_GetNumPages(pdfView);
+    int target = pdfView->pageIndex + pdfView->scroll.page_off;
+    return Clamp(target, 0, totalPages-1);
+}
+
+void PdfView_JumpNPages(PdfViewState *pdfView, int n){
+    if(n == 0)
+        return;
+
+    int totalPages = PdfView_GetNumPages(pdfView);
+    int target = pdfView->pageIndex + n;
+    if(totalPages < 0){
+        printf("Failed to get pages\n");
+        return;
+    }
+
+    target = Clamp(target, 0, totalPages-1);
+    if(target != pdfView->pageIndex){
+        pdfView->pageIndex = target;
+        (void)PdfView_GetImagePage(pdfView, pdfView->pageIndex,
+                                   pdfView->graphics.width, pdfView->graphics.height);
+        pdfView->changed = true;
+    }
+}
+
 void PdfView_NextPage(PdfViewState *pdfView){
     int totalPages = PdfView_GetNumPages(pdfView);
     if(totalPages < 0){
@@ -216,9 +269,38 @@ void PdfView_PreviousPage(PdfViewState *pdfView){
     }
 }
 
+
+static inline void
+GetProperImage(unsigned char **pixels, int &width, int &height,
+               PdfPagePixels *pdfPixels, Float zoom)
+{
+#if defined(ENABLE_DOWNSAPLING)
+    if(!IsZero(zoom - 1)){
+        *pixels = pdfPixels->pixels;
+        width = pdfPixels->width;
+        height = pdfPixels->height;
+    }else{
+        *pixels = pdfPixels->downsampled;
+        width = pdfPixels->dwidth;
+        height = pdfPixels->dheight;
+    }
+#else
+    *pixels = pdfPixels->pixels;
+    width = pdfPixels->width;
+    height = pdfPixels->height;
+#endif
+}
+
 const char *PdfView_GetCurrentPage(PdfViewState *pdfView, int &width, int &height){
-    width  = pdfView->graphics.width;
-    height = pdfView->graphics.height;
+    std::optional<PdfPagePixels> page = pdfView->cache.get(pdfView->pageIndex);
+    if(!page.has_value()){
+        printf("[BUG] Requested for current page but cache has no register\n");
+        return nullptr;
+    }
+
+    PdfPagePixels pixelPage = page.value();
+    GetProperImage(&pdfView->pixels, width, height, &pixelPage,
+                   pdfView->graphics.zoomLevel);
     return (const char *)pdfView->pixels;
 }
 
@@ -235,6 +317,14 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
     renderer.set_image_format(poppler::image::format_enum::format_argb32);
     poppler::page *page = document->create_page(pageIndex);
 
+    auto pixel_at = [&](int x, int y, int w) -> vec4i{
+        int pix_id = x + y * w;
+        return vec4i(resultPage.pixels[4 * pix_id + 0],
+                     resultPage.pixels[4 * pix_id + 1],
+                     resultPage.pixels[4 * pix_id + 2],
+                     resultPage.pixels[4 * pix_id + 3]);
+    };
+
     if(!page){
         printf("Could not get page { %d }\n", pageIndex);
         goto __ret;
@@ -243,6 +333,8 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
     img = renderer.render_page(page, dpi, dpi);
     resultPage.width = img.width();
     resultPage.height = img.height();
+    resultPage.dwidth = resultPage.width / 2;
+    resultPage.dheight = resultPage.height / 2;
 
     fmt = img.format();
     if(fmt != poppler::image::format_enum::format_argb32){
@@ -250,7 +342,15 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
         goto __ret;
     }
 
-    resultPage.pixels = new unsigned char[4 * resultPage.width * resultPage.height];
+#if defined(ENABLE_DOWNSAPLING)
+    resultPage.bytes = 4 * (resultPage.width  * resultPage.height +
+                            resultPage.dwidth * resultPage.dheight);
+#else
+    resultPage.bytes = 4 * (resultPage.width  * resultPage.height);
+#endif
+
+    resultPage.pixels = new unsigned char[resultPage.bytes];
+
     if(!resultPage.pixels){
         printf("Could not allocate memory for pixels\n");
         goto __ret;
@@ -273,16 +373,95 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
 
         hptr -= img.bytes_per_row();
     }
+
+#if defined(ENABLE_DOWNSAPLING)
+    resultPage.downsampled = &resultPage.pixels[4 * resultPage.width * resultPage.height];
+    for(int y = 0; y < resultPage.dheight; y++){
+        for(int x = 0; x < resultPage.dwidth; x++){
+            vec4i pixel1 = pixel_at(2 * x, 2 * y, resultPage.width);
+            vec4i pixel2 = pixel_at(2 * x + 1, 2 * y, resultPage.width);
+            vec4i pixel3 = pixel_at(2 * x, 2 * y + 1, resultPage.width);
+            vec4i pixel4 = pixel_at(2 * x + 1, 2 * y + 1, resultPage.width);
+
+            vec4i sample = (pixel1 + pixel2 + pixel3 + pixel4);
+            unsigned char r = (unsigned char)((Float)sample.x * 0.25f);
+            unsigned char g = (unsigned char)((Float)sample.y * 0.25f);
+            unsigned char b = (unsigned char)((Float)sample.z * 0.25f);
+            unsigned char a = (unsigned char)((Float)sample.w * 0.25f);
+
+            int d_id = x + y * resultPage.dwidth;
+
+            resultPage.downsampled[4 * d_id + 0] = r;
+            resultPage.downsampled[4 * d_id + 1] = g;
+            resultPage.downsampled[4 * d_id + 2] = b;
+            resultPage.downsampled[4 * d_id + 3] = a;
+        }
+    }
+#endif
+
 __ret:
     if(page)
         delete page;
     return resultPage;
 }
 
+static
+int select_one(int x, int total, int &dRight, int &dLeft,
+               LRUCache<int, PdfPagePixels> *cache)
+{
+    int dist_right = dRight;
+    int dist_left = dLeft;
+    int left = x-dLeft;
+    int right = x+dRight;
+    while(1){
+        bool pick_left = false;
+        bool pick_right = false;
+        if(left >= 0){
+            std::optional<PdfPagePixels> page = cache->get(left);
+            if(!page.has_value()){
+                pick_left = true;
+            }
+        }
+
+        if(!pick_left){
+            left -= 1;
+            dist_left += 1;
+        }
+
+        if(right <= total-1){
+            std::optional<PdfPagePixels> page = cache->get(right);
+            if(!page.has_value()){
+                pick_right = true;
+            }
+        }
+
+        if(!pick_right){
+            right += 1;
+            dist_right += 1;
+        }
+
+        if(pick_left && pick_right){
+            if(dist_right < dist_left)
+                return right;
+            return left;
+        }
+
+        if(pick_left && dist_left < dist_right)
+            return left;
+
+        if(pick_right && dist_right < dist_left)
+            return right;
+
+        if(left < 0 && right >= total)
+            return -1;
+    }
+}
+
+static bool loadDispatchRunning = false;
 const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
                                  int &width, int &height)
 {
-    int dpi = 500;
+    int dpi = PDF_RENDER_DPI;
     int pageCount = 0;
 
     if(!pdfView->document){
@@ -299,45 +478,52 @@ const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
     std::optional<PdfPagePixels> pagePixels = pdfView->cache.get(pageIndex);
     if(pagePixels.has_value()){
         PdfPagePixels value = pagePixels.value();
-        width = value.width;
-        height = value.height;
-        pdfView->pixels = value.pixels;
+        GetProperImage(&pdfView->pixels, width, height,
+                        &value, pdfView->graphics.zoomLevel);
     }else{
         PdfPagePixels result = PdfView_RenderPage(pdfView->document, pageIndex, dpi);
         if(result.pixels){
-            width = result.width;
-            height = result.height;
-            pdfView->pixels = result.pixels;
-
             pdfView->cache.put(pageIndex, result);
+            GetProperImage(&pdfView->pixels, width, height,
+                            &result, pdfView->graphics.zoomLevel);
         }
     }
 
-    DispatchExecution([&](HostDispatcher *dispatcher){
-        int rangePages[8] = {pageIndex-1, pageIndex+1, pageIndex-2,
-                             pageIndex+2, pageIndex-3, pageIndex+3,
-                             pageIndex-4, pageIndex+4};
-        int local_dpi = dpi;
-        int local_count = pageCount;
-        poppler::document *local_doc = pdfView->document;
-        LRUCache<int, PdfPagePixels> *local_cache = &pdfView->cache;
+    if(!loadDispatchRunning){
+        DispatchExecution([&](HostDispatcher *dispatcher){
+            int rangeNum = 0;
+            int local_dpi = dpi;
+            int local_count = pageCount;
+            int local_index = pageIndex;
+            poppler::document *local_doc = pdfView->document;
+            LRUCache<int, PdfPagePixels> *local_cache = &pdfView->cache;
 
-        dispatcher->DispatchHost();
+            loadDispatchRunning = true;
 
-        for(int i = 0; i < 8; i++){
-            int pageNum = rangePages[i];
-            if(pageNum >= local_count || pageNum < 0)
-                continue;
+            dispatcher->DispatchHost();
 
-            std::optional<PdfPagePixels> pPage = local_cache->get(pageNum);
-            if(!pPage.has_value()){
-                PdfPagePixels pRes = PdfView_RenderPage(local_doc, pageNum, local_dpi);
-                if(pRes.pixels){
-                    local_cache->put(pageNum, pRes);
+            int dRight = 1, dLeft = 1;
+            bool should_continue = true;
+            for(int s = 0; s < 8 && should_continue; s++){
+                int where = select_one(local_index, local_count,
+                                       dRight, dLeft, local_cache);
+                if(where >= 0){
+                    should_continue = std::abs(where - local_index) < 8;
+                    if(!should_continue)
+                        break;
+
+                    PdfPagePixels pRes = PdfView_RenderPage(local_doc, where, local_dpi);
+                    if(pRes.pixels){
+                        local_cache->put(where, pRes);
+                    }
+                }else{
+                    should_continue = false;
                 }
             }
-        }
-    });
+
+            loadDispatchRunning = false;
+        });
+    }
 
     return (const char *)pdfView->pixels;
 }
@@ -414,10 +600,12 @@ void PdfView_DisableZoom(PdfViewState *pdfView){
 
 void PdfView_IncreaseZoomLevel(PdfViewState *pdfView){
     pdfView->graphics.zoomLevel += 0.25f;
+    pdfView->changed = true;
 }
 
 void PdfView_DecreaseZoomLevel(PdfViewState *pdfView){
     pdfView->graphics.zoomLevel = Max(pdfView->graphics.zoomLevel - 0.25f, 1.0f);
+    pdfView->changed = true;
 }
 
 bool PdfView_IsZoomLocked(PdfViewState *pdfView){
@@ -463,6 +651,7 @@ void PdfView_MouseMotion(PdfViewState *pdfView, vec2f mouse,
 void PdfView_ResetZoom(PdfViewState *pdfView){
     pdfView->graphics.zoomCenter = vec2f(0.5, 0.5);
     pdfView->graphics.zoomLevel = 1.0f;
+    pdfView->changed = true;
 }
 
 vec2f PdfView_GetZoomCenter(PdfViewState *pdfView){

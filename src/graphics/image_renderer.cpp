@@ -18,6 +18,7 @@ const char *vertexImgContent = "#version 450 core\n"
 const char *borderFragmentImg = "#version 450 core\n"
 "uniform vec4 backgroundColor;\n"
 "uniform float transitionFactor;\n"
+"uniform float viewActive;\n"
 "in vec2 TexCoords;\n"
 "out vec4 fragColor;\n"
 "void main(){\n"
@@ -27,11 +28,15 @@ const char *borderFragmentImg = "#version 450 core\n"
 "    float v0 = 0.0025;\n"
 "    float v1 = 0.9975;\n"
 "    vec4 baseColor = backgroundColor;\n"
-"    if(uv.x < u0 || uv.x > u1 || uv.y < v0 || uv.y > v1){\n"
+"    if(uv.x > u1){\n"
 "        vec4 redColor = vec4(1.0, 1.0, 0.0, 1.0);\n"
 "        baseColor = mix(redColor, backgroundColor, transitionFactor);\n"
-"    }else\n"
+"    }else if(uv.x < u0 && viewActive > 0){\n"
+"        vec4 redColor = vec4(1.0, 0.0, 0.0, 1.0);\n"
+"        baseColor = mix(redColor, backgroundColor, 0.5);\n"
+"    }else{\n"
 "        discard;\n"
+"    }\n"
 "    fragColor = baseColor;\n"
 "}";
 
@@ -54,7 +59,6 @@ const char *fragmentImgContent = "#version 450 core\n"
 "}\n"
 "void main(){\n"
 "    vec4 imageColor;"
-"    vec4 outerColor = vec4(0.6, 0.6, 0.6, 1.0);\n"
 "    vec2 uv = TexCoords;\n"
 "    float blendFactor = 0.0;\n"
 "    float border_width = 0.005 * 800.0 / width;\n"
@@ -211,8 +215,9 @@ void ImageRendererRender(ImageRenderer &renderer, Shader &shaderImg, Shader &sha
     glUseProgram(shaderBorder.id);
     Shader_UniformVec4(shaderBorder, "backgroundColor", backgroundColor);
     Shader_UniformFloat(shaderBorder, "transitionFactor", factor);
-
+    Shader_UniformFloat(shaderBorder, "viewActive", active);
     OpenGLCHK(glDrawElementsInstanced(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0, 1));
+
 #endif
     glDisableVertexAttribArray(0);
     glDisableVertexAttribArray(1);
