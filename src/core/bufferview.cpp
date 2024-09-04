@@ -212,15 +212,12 @@ void BufferView_Initialize(BufferView *view, LineBuffer *lineBuffer, ViewType ty
     view->scrollImgRenderer = ImageRenderer();
 }
 
-void BufferView_ResetImageRenderer(BufferView *view, int width,
-                                   int height, unsigned char *img)
-{
+
+void BufferView_ResetImageRenderer(BufferView *view, PdfRenderPages pages){
     ImageRendererCleanup(view->imgRenderer);
     ImageRendererCleanup(view->scrollImgRenderer);
-    if(img && width > 0 && height > 0){
-        ImageRendererCreate(view->imgRenderer, width, height, img);
-        ImageRendererCreate(view->scrollImgRenderer, width, height, img);
-    }
+    ImageRendererCreate(view->imgRenderer, pages);
+    ImageRendererCreate(view->scrollImgRenderer, pages);
 }
 
 void BufferView_SwapBuffer(BufferView *view, LineBuffer *lineBuffer, ViewType type){

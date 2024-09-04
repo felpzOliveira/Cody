@@ -2458,7 +2458,6 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                     uint pdfLen = 0;
                     char *pdf = FileProvider_GetTemporary(&pdfLen);
                     if(pdf && pdfLen > 0){
-                        int _width, _height;
                         // TODO: Parse pdf, get image ptr, and setup whatever we need
                         //       keyboard, rendering, etc...
                         PdfViewState *pdfView = nullptr;
@@ -2469,9 +2468,8 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                         BufferView_SwapBuffer(bView, nullptr, ImageView);
                         BufferView_SetPdfView(bView, pdfView);
                         PdfView_OpenPage(pdfView, 0);
-                        unsigned char *img = (unsigned char *)
-                                        PdfView_GetCurrentPage(pdfView, _width, _height);
-                        BufferView_ResetImageRenderer(bView, _width, _height, img);
+                        PdfRenderPages pages = PdfView_GetCurrentPage(pdfView);
+                        BufferView_ResetImageRenderer(bView, pages);
                     }
                 }
             }else{

@@ -973,7 +973,7 @@ void OpenGLInitialize(OpenGLState *state){
 
     InitializeDisplay();
     SetSamples(16);
-    SetOpenGLVersion(3, 3);
+    SetOpenGLVersion(4, 5);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
     state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");

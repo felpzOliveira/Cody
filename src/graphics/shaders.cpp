@@ -230,6 +230,18 @@ void Shader_UniformVec4(Shader &shader, const char *name, vec4f value){
     }
 }
 
+void Shader_UniformVec3(Shader &shader, const char *name, vec3f value){
+    OpenGLClearErrors();
+    int id = glGetUniformLocation(shader.id, name);
+    if(id >= 0){
+        glUniform3f(id, value.x, value.y, value.z);
+    }else{
+        if(loggedMap.find(name) == loggedMap.end()){
+            Shader_LogUniformError(shader, name);
+        }
+    }
+}
+
 void Shader_UniformVec2(Shader &shader, const char *name, vec2f value){
     OpenGLClearErrors();
     int id = glGetUniformLocation(shader.id, name);

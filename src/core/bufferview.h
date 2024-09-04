@@ -127,8 +127,7 @@ ImageRenderer *BufferView_GetImageRenderer(BufferView *view);
 /*
 * Resets/inits the image renderer.
 */
-void BufferView_ResetImageRenderer(BufferView *view, int width,
-                                   int height, unsigned char *img);
+void BufferView_ResetImageRenderer(BufferView *view, PdfRenderPages pages);
 
 /*
 * Retrieves the view type of the given bufferview.

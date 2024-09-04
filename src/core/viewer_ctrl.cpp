@@ -83,6 +83,9 @@ void AppViewerHandleScroll(int is_up, void *){
 
     int keyControl = KeyboardGetKeyState(Key_LeftControl);
     int keyAlt     = KeyboardGetKeyState(Key_LeftAlt);
+    int keyShift   = KeyboardGetKeyState(Key_LeftShift);
+    int n = PdfView_EstimateScrollPage(pdfView);
+    int totalPages = PdfView_GetNumPages(pdfView);
     if(keyControl == KEYBOARD_EVENT_PRESS || keyControl == KEYBOARD_EVENT_REPEAT){
         if(is_up)
             PdfView_IncreaseZoomLevel(pdfView);
@@ -90,8 +93,6 @@ void AppViewerHandleScroll(int is_up, void *){
             PdfView_DecreaseZoomLevel(pdfView);
     }else if(keyAlt == KEYBOARD_EVENT_PRESS || keyAlt == KEYBOARD_EVENT_REPEAT){
         PdfScrollState *scroll = PdfView_GetScroll(pdfView);
-        int n = PdfView_EstimateScrollPage(pdfView);
-        int totalPages = PdfView_GetNumPages(pdfView);
         if(is_up){
             if(n > 0)
                 scroll->page_off -= 1;
@@ -103,17 +104,40 @@ void AppViewerHandleScroll(int is_up, void *){
         }
         //PdfView_ResetZoom(pdfView);
     }else{
-        vec2f dir(0.f, SoftDx);
+        Float delta = SoftDx;
+        if(keyShift == KEYBOARD_EVENT_PRESS || keyShift == KEYBOARD_EVENT_REPEAT)
+            delta *= 3.f;
+
+        vec2f dir(0.f, delta);
         if(!is_up)
-            dir.y = -SoftDx;
+            dir.y = -delta;
 
-        vec2f center = PdfView_GetZoomCenter(pdfView) + dir;
-        center = Clamp(center, vec2f(0.f), vec2f(1.f));
+        vec2f oldCenter = PdfView_GetZoomCenter(pdfView);
+        vec2f center = oldCenter + dir;
 
-        if(PdfView_CanMoveTo(pdfView, center)){
-            PdfView_SetZoomCenter(pdfView, center);
+        if(n == 0){
+            Float y = Clamp(center.y, 0, 1);
+            if(!PdfView_AcceptByUpper(pdfView, y))
+                return;
         }
+
+        if(n == totalPages-1){
+            Float y = Clamp(center.y, 0, 1);
+            if(!PdfView_AcceptByLower(pdfView, y))
+                return;
+        }
+
+        if(center.y < 0){
+            PdfView_NextPage(pdfView);
+            center.y += 1;
+        }else if(center.y > 1){
+            PdfView_PreviousPage(pdfView);
+            center.y -= 1;
+        }
+
+        PdfView_SetZoomCenter(pdfView, center);
     }
+
 }
 
 void ViewerRawKeyCallback(int rawKeyCode){

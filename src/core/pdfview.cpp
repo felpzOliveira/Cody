@@ -8,6 +8,9 @@
 
 //#define LOG_PDF_OPEN(ptr) printf("[PDF] Open (%p)\n", ptr)
 //#define LOG_PDF_CLOSE(ptr) printf("[PDF] Close (%p)\n", ptr)
+
+#define PDF_DEBUG_MSG(...) printf(__VA_ARGS__)
+
 #define LOG_PDF_OPEN(ptr)
 #define LOG_PDF_CLOSE(ptr)
 
@@ -30,11 +33,13 @@ void PdfView_NextPage(PdfViewState *){}
 void PdfView_ClearPendingFlag(PdfViewState *){}
 bool PdfView_Changed(PdfViewState *){ return false; }
 void PdfView_PreviousPage(PdfViewState *){}
-const char *PdfView_GetCurrentPage(PdfViewState *, int &, int &){ return nullptr; }
-const char *PdfView_GetImagePage(PdfViewState *, int,
-                                 int &, int &){ return nullptr; }
+PdfRenderPages PdfView_GetCurrentPage(PdfViewState *){ return PdfRenderPages; }
+PdfGraphicsPage PdfView_GetPage(PdfViewState *, int){ return PdfGraphicsPage; }
+bool PdfView_FetchPage(PdfViewState *, int, bool){ return false; }
 
 bool PdfView_CanMoveTo(PdfViewState *, vec2f){ return false; }
+bool PdfView_AcceptByUpper(PdfViewState *, Float){ return false; }
+bool PdfView_AcceptByLower(PdfViewState *, Float){ return false; }
 PdfViewGraphicState PdfView_GetGraphicsState(PdfViewState *){ return PdfViewGraphicState(); }
 void PdfView_SetGraphicsState(PdfViewState *, PdfViewGraphicState){}
 
@@ -81,7 +86,6 @@ struct PdfPagePixels{
 
 struct PdfViewState{
     poppler::document *document;
-    unsigned char *pixels;
     std::string docPath;
     int pageIndex;
     bool changed;
@@ -165,13 +169,10 @@ bool PdfView_OpenDocument(PdfViewState **pdfView, const char *pdf, uint len,
 
     view->docPath = std::string(path, pathLen);
     view->document = doc;
-    view->pixels = nullptr;
     view->pageIndex = 0;
     view->scroll.page_off = 0;
     view->scroll.active = 0;
     view->changed = false;
-    view->graphics.width = 0;
-    view->graphics.height = 0;
     view->graphics.zooming = true;
     view->graphics.zoomLocked = false;
     view->graphics.xpos = 0;
@@ -195,9 +196,7 @@ int PdfView_GetNumPages(PdfViewState *pdfView){
 }
 
 void PdfView_OpenPage(PdfViewState *pdfView, int pageIndex){
-    const char *ptr = PdfView_GetImagePage(pdfView, pageIndex, pdfView->graphics.width,
-                                           pdfView->graphics.height);
-    if(ptr){
+    if(PdfView_FetchPage(pdfView, pageIndex)){
         pdfView->pageIndex = pageIndex;
         pdfView->changed = true;
     }else{
@@ -225,8 +224,7 @@ void PdfView_JumpNPages(PdfViewState *pdfView, int n){
     target = Clamp(target, 0, totalPages-1);
     if(target != pdfView->pageIndex){
         pdfView->pageIndex = target;
-        (void)PdfView_GetImagePage(pdfView, pdfView->pageIndex,
-                                   pdfView->graphics.width, pdfView->graphics.height);
+        PdfView_FetchPage(pdfView, pdfView->pageIndex);
         pdfView->changed = true;
     }
 }
@@ -240,8 +238,7 @@ void PdfView_NextPage(PdfViewState *pdfView){
 
     if(totalPages > pdfView->pageIndex+1){
         pdfView->pageIndex += 1;
-        (void)PdfView_GetImagePage(pdfView, pdfView->pageIndex,
-                                   pdfView->graphics.width, pdfView->graphics.height);
+        PdfView_FetchPage(pdfView, pdfView->pageIndex);
         pdfView->changed = true;
     }
 }
@@ -255,8 +252,7 @@ void PdfView_PreviousPage(PdfViewState *pdfView){
 
     if(pdfView->pageIndex > 0){
         pdfView->pageIndex -= 1;
-        (void)PdfView_GetImagePage(pdfView, pdfView->pageIndex,
-                                   pdfView->graphics.width, pdfView->graphics.height);
+        PdfView_FetchPage(pdfView, pdfView->pageIndex);
         pdfView->changed = true;
     }
 }
@@ -264,24 +260,54 @@ void PdfView_PreviousPage(PdfViewState *pdfView){
 
 static inline void
 GetProperImage(unsigned char **pixels, int &width, int &height,
-               PdfPagePixels *pdfPixels, Float zoom)
+               PdfPagePixels *pdfPixels)
 {
     *pixels = pdfPixels->pixels;
     width = pdfPixels->width;
     height = pdfPixels->height;
 }
 
-const char *PdfView_GetCurrentPage(PdfViewState *pdfView, int &width, int &height){
-    std::optional<PdfPagePixels> page = pdfView->cache.get(pdfView->pageIndex);
+PdfGraphicsPage PdfView_GetPage(PdfViewState *pdfView, int pageIndex){
+    PdfGraphicsPage pages;
+    std::optional<PdfPagePixels> page = pdfView->cache.get(pageIndex);
     if(!page.has_value()){
-        printf("[BUG] Requested for current page but cache has no register\n");
-        return nullptr;
+        PdfView_FetchPage(pdfView, pageIndex, false);
+        page = pdfView->cache.get(pageIndex);
     }
 
     PdfPagePixels pixelPage = page.value();
-    GetProperImage(&pdfView->pixels, width, height, &pixelPage,
-                   pdfView->graphics.zoomLevel);
-    return (const char *)pdfView->pixels;
+    GetProperImage(&pages.pixels, pages.width, pages.height, &pixelPage);
+    return pages;
+}
+
+PdfRenderPages PdfView_GetCurrentPage(PdfViewState *pdfView){
+    PdfRenderPages pages;
+    std::optional<PdfPagePixels> page = pdfView->cache.get(pdfView->pageIndex);
+    std::optional<PdfPagePixels> previousPage = pdfView->cache.get(pdfView->pageIndex-1);
+    std::optional<PdfPagePixels> nextPage = pdfView->cache.get(pdfView->pageIndex+1);
+
+    if(!page.has_value()){
+        printf("[BUG] Requested for current page but cache has no register\n");
+        return pages;
+    }
+
+    PdfPagePixels pixelPage = page.value();
+    GetProperImage(&pages.centerPage.pixels, pages.centerPage.width,
+                   pages.centerPage.height, &pixelPage);
+
+    if(previousPage.has_value()){
+        PdfPagePixels previousPixelPage = previousPage.value();
+        GetProperImage(&pages.previousPage.pixels, pages.previousPage.width,
+                   pages.previousPage.height, &previousPixelPage);
+    }
+
+    if(nextPage.has_value()){
+        PdfPagePixels nextPixelPage = nextPage.value();
+        GetProperImage(&pages.nextPage.pixels, pages.nextPage.width,
+                   pages.nextPage.height, &nextPixelPage);
+    }
+
+    return pages;
 }
 
 static
@@ -296,14 +322,6 @@ PdfPagePixels PdfView_RenderPage(poppler::document *document, int pageIndex, int
     renderer.set_render_hint(poppler::page_renderer::text_antialiasing, true);
     renderer.set_image_format(poppler::image::format_enum::format_argb32);
     poppler::page *page = document->create_page(pageIndex);
-
-    auto pixel_at = [&](int x, int y, int w) -> vec4i{
-        int pix_id = x + y * w;
-        return vec4i(resultPage.pixels[4 * pix_id + 0],
-                     resultPage.pixels[4 * pix_id + 1],
-                     resultPage.pixels[4 * pix_id + 2],
-                     resultPage.pixels[4 * pix_id + 3]);
-    };
 
     if(!page){
         printf("Could not get page { %d }\n", pageIndex);
@@ -405,39 +423,61 @@ int select_one(int x, int total, int &dRight, int &dLeft,
     }
 }
 
-static bool loadDispatchRunning = false;
-const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
-                                 int &width, int &height)
+static std::atomic<bool> loadDispatchRunning = false;
+bool PdfView_FetchPage(PdfViewState *pdfView, int pageIndex,
+                       bool enforceBoundaries, bool allowDeatch)
 {
     int dpi = PDF_RENDER_DPI;
     int pageCount = 0;
+    bool rv = false;
 
     if(!pdfView->document){
         printf("Document not opened\n");
-        return nullptr;
+        return rv;
     }
 
     pageCount = pdfView->document->pages();
     if(pageIndex >= pageCount || pageIndex < 0){
         printf("Invalid pageIndex {%d} >= {%d}\n", pageIndex, pdfView->document->pages());
-        return nullptr;
+        return rv;
     }
 
     std::optional<PdfPagePixels> pagePixels = pdfView->cache.get(pageIndex);
-    if(pagePixels.has_value()){
-        PdfPagePixels value = pagePixels.value();
-        GetProperImage(&pdfView->pixels, width, height,
-                        &value, pdfView->graphics.zoomLevel);
-    }else{
+    if(!pagePixels.has_value()){
         PdfPagePixels result = PdfView_RenderPage(pdfView->document, pageIndex, dpi);
         if(result.pixels){
             pdfView->cache.put(pageIndex, result);
-            GetProperImage(&pdfView->pixels, width, height,
-                            &result, pdfView->graphics.zoomLevel);
+            rv = true;
+        }
+    }else{
+        rv = true;
+    }
+
+    if(enforceBoundaries){
+        if(pageIndex-1 >= 0){
+            pagePixels = pdfView->cache.get(pageIndex-1);
+            if(!pagePixels.has_value()){
+                PdfPagePixels result = PdfView_RenderPage(pdfView->document,
+                                                          pageIndex-1, dpi);
+                if(result.pixels){
+                    pdfView->cache.put(pageIndex-1, result);
+                }
+            }
+        }
+
+        if(pageIndex+1 < pageCount){
+            pagePixels = pdfView->cache.get(pageIndex+1);
+            if(!pagePixels.has_value()){
+                PdfPagePixels result = PdfView_RenderPage(pdfView->document,
+                                                          pageIndex+1, dpi);
+                if(result.pixels){
+                    pdfView->cache.put(pageIndex+1, result);
+                }
+            }
         }
     }
 
-    if(!loadDispatchRunning){
+    if(!loadDispatchRunning && allowDeatch){
         DispatchExecution([&](HostDispatcher *dispatcher){
             int rangeNum = 0;
             int local_dpi = dpi;
@@ -472,7 +512,7 @@ const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
         });
     }
 
-    return (const char *)pdfView->pixels;
+    return rv;
 }
 
 PdfViewGraphicState PdfView_GetGraphicsState(PdfViewState *pdfView){
@@ -559,6 +599,22 @@ bool PdfView_IsZoomLocked(PdfViewState *pdfView){
     return pdfView->graphics.zoomLocked;
 }
 
+bool PdfView_AcceptByUpper(PdfViewState *pdfView, Float y){
+    Float u_y = 1.f;
+    Float d = 1.f / pdfView->graphics.zoomLevel;
+    Float y_proj = y - d * 0.5f;
+    Float u_y_proj = y_proj + u_y * d;
+    return !(u_y_proj > 1);
+}
+
+bool PdfView_AcceptByLower(PdfViewState *pdfView, Float y){
+    Float u_y = 0.f;
+    Float d = 1.f / pdfView->graphics.zoomLevel;
+    Float y_proj = y - d * 0.5f;
+    Float u_y_proj = y_proj + u_y * d;
+    return !(u_y_proj < 0);
+}
+
 bool PdfView_CanMoveTo(PdfViewState *pdfView, vec2f center){
     vec2f lower(0.f, 0.f);
     vec2f upper(1.f, 1.f);
@@ -606,8 +662,9 @@ vec2f PdfView_GetZoomCenter(PdfViewState *pdfView){
 }
 
 void PdfView_SetZoomCenter(PdfViewState *pdfView, vec2f center){
-    pdfView->graphics.zoomCenter = vec2f(Clamp(center.x, 0.f, 1.f),
-                                         Clamp(center.y, 0.f, 1.f));
+    //pdfView->graphics.zoomCenter = vec2f(Clamp(center.x, 0.f, 1.f),
+                                         //Clamp(center.y, 0.f, 1.f));
+    pdfView->graphics.zoomCenter = center;
 }
 
 Float PdfView_GetZoomLevel(PdfViewState *pdfView){

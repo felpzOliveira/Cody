@@ -4,10 +4,12 @@
 #include <glad/glad.h>
 #include <shaders.h>
 #include <timer.h>
+#include <pdfview.h>
 
 class ImageRenderer{
 public:
-    GLuint texture;
+    GLuint texture[3];
+    vec3f active;
     bool inited;
     bool transRunning;
     double startInterval;
@@ -38,13 +40,13 @@ public:
     }
 };
 
-void ImageRendererCreate(ImageRenderer &renderer, int width,
-                         int height, unsigned char *image);
+void ImageRendererCreate(ImageRenderer &renderer, PdfRenderPages pages);
 
 void ImageRendererCleanup(ImageRenderer &renderer);
 
-void ImageRendererUpdate(ImageRenderer &renderer, int width, int height,
-                         unsigned char *image);
+void ImageRendererUpdate(ImageRenderer &renderer, PdfRenderPages pages);
+
+void ImageRendererUpdate(ImageRenderer &renderer, PdfGraphicsPage page);
 
 void ImageRendererRender(ImageRenderer &renderer, Shader &shaderImg, Shader &shaderBorder,
                          vec4f backgroundColor, Float tFactor, Geometry *geometry,

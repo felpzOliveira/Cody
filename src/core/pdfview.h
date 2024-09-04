@@ -14,6 +14,23 @@ struct PdfViewGraphicState{
     int pageIndex;
 };
 
+struct PdfGraphicsPage{
+    unsigned char *pixels;
+    int width, height;
+
+    PdfGraphicsPage() : pixels(nullptr), width(0), height(0){}
+};
+
+struct PdfRenderPages{
+    PdfGraphicsPage centerPage;
+    PdfGraphicsPage previousPage;
+    PdfGraphicsPage nextPage;
+
+    PdfRenderPages(): centerPage(PdfGraphicsPage()),
+        previousPage(PdfGraphicsPage()), nextPage(PdfGraphicsPage())
+    {}
+};
+
 struct PdfViewState;
 
 /*
@@ -51,9 +68,9 @@ int PdfView_GetNumPages(PdfViewState *pdfView);
 PdfScrollState *PdfView_GetScroll(PdfViewState *pdfView);
 
 /*
-* Gets const acessor to the pixels of the current opened page.
+* Gets acessor to the pixels of the current opened page as well as their boundaries pages.
 */
-const char *PdfView_GetCurrentPage(PdfViewState *pdfView, int &width, int &height);
+PdfRenderPages PdfView_GetCurrentPage(PdfViewState *pdfView);
 
 /*
 * Sets the document to be on a specific page. Update internals to reflect that.
@@ -167,15 +184,21 @@ void PdfView_DisableZoom(PdfViewState *pdfView);
 void PdfView_ResetZoom(PdfViewState *pdfView);
 
 /*
-* Gets a const accessor to the pixels of the page 'pageIndex'. This function
-* does not update the internal pageIndex, kinda of a random access. Exposing just
-* for tests, shouldn't actually be called elsewhere.
+* 
 */
-const char *PdfView_GetImagePage(PdfViewState *pdfView, int pageIndex,
-                                 int &width, int &height);
+bool PdfView_FetchPage(PdfViewState *pdfView, int pageIndex,
+                       bool enforceBoundaries=true, bool allowDeatch=true);
+
+/*
+*
+*/
+PdfGraphicsPage PdfView_GetPage(PdfViewState *pdfView, int pageIndex);
 
 /*
 * Checks if the pdf view can move to position given by 'center'. This checks that
 * the rendering of the box (0,0)x(1,1) is bounded considering the current zoom level.
 */
 bool PdfView_CanMoveTo(PdfViewState *pdfView, vec2f center);
+
+bool PdfView_AcceptByUpper(PdfViewState *pdfView, Float y);
+bool PdfView_AcceptByLower(PdfViewState *pdfView, Float y);
