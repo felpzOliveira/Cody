@@ -935,6 +935,42 @@ int BaseCommandPutFile(char *cmd, uint size, View *view){
     return 1;
 }
 
+int BaseCommandJumpTo(char *cmd, uint size, View *view){
+    std::string jump_to(CMD_JUMP_TO_STR);
+    int e = StringFirstNonEmpty(&cmd[jump_to.size()], size - jump_to.size());
+    if(e < 0)
+        return 1;
+
+    e += jump_to.size();
+    char *target = &cmd[e];
+
+    SkipWhiteSpaces(&target);
+    if(*target == 0)
+        return 1;
+
+    int value = atoi(target);
+    if(value < 0)
+        return 1;
+
+    BufferView *bView = View_GetBufferView(view);
+    if(BufferView_GetViewType(bView) == ImageView){
+        PdfViewState *pdfView = bView->pdfView;
+        if(!pdfView)
+            return 1;
+
+        PdfView_OpenPage(pdfView, value);
+    }else{
+        uint maxn = BufferView_GetLineCount(bView);
+        value = value > 0 ? value-1 : 0;
+        value = Clamp(value, (uint)0, maxn-1);
+        Buffer *buffer = BufferView_GetBufferAt(bView, value);
+        uint p = Buffer_FindFirstNonEmptyLocation(buffer);
+        BufferView_CursorToPosition(bView, value, p);
+    }
+
+    return 1;
+}
+
 int BaseCommandGetFile(char *cmd, uint size, View *view){
     uint fsize = 0;
     StorageDevice *device = FetchStorageDevice();
@@ -1022,6 +1058,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_SET_ENCRYPT_STR] = {CMD_SET_ENCRYPT_HELP, BaseCommandSetEncrypted};
     cmdMap[CMD_PUT_STR] = {CMD_PUT_HELP, BaseCommandPutFile};
     cmdMap[CMD_GET_STR] = {CMD_GET_HELP, BaseCommandGetFile};
+    cmdMap[CMD_JUMP_TO_STR] = {CMD_JUMP_TO_HELP, BaseCommandJumpTo};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

@@ -869,6 +869,8 @@ TokenId Lex_CommentInnerID(char *head, size_t len){
     return ret;
 }
 
+// NOTE: Currently this captures the triple " string parsing for python
+//       it is a hack untill we decide to proper re-implement these routines.
 /* (char **p, size_t n, char **head, size_t *len, TokenizerContext *context, Token *token, Tokenizer *tokenizer) */
 LEX_PROCESSOR(Lex_Comments){
     int aggregate = tokenizer->aggregate;
@@ -878,9 +880,10 @@ LEX_PROCESSOR(Lex_Comments){
     int gathering = 1;
     size_t rLen = 0;
     char prev = 0;
+    TokenId expected = type == 3 ? TOKEN_ID_STRING : TOKEN_ID_COMMENT;
     char lineChar = tokenizer->support.lineCommentChar;
     char *word_start = 0;
-    int is_cpp_based = 0;
+    int can_capture_mult = 0;
     TokenRegister *tReg = &tokenizer->tokenRegister;
     *len = 0;
     *head = *p;
@@ -896,7 +899,7 @@ LEX_PROCESSOR(Lex_Comments){
         tReg->id = TOKEN_ID_IGNORE;
         tReg->where = nullptr;
         tReg->rLen = 0;
-        if((**p == 0 || **p == '\n') && type != 2){
+        if((**p == 0 || **p == '\n') && type != 2 && type != 3){
             (*p)++;
             tokenizer->aggregate = 0;
             return 2;
@@ -919,26 +922,33 @@ LEX_PROCESSOR(Lex_Comments){
         *len = rLen;
         tokenizer->aggregate = aggregate;
         tokenizer->type = type;
-        token->identifier = TOKEN_ID_COMMENT;
+        token->identifier = expected;
         return 1;
     };
 
 
-    if(lineChar == 0){
-        is_cpp_based = 1;
+    // TODO: Get information about file type for python
+    if(lineChar == 0 || lineChar == '#'){
+        can_capture_mult = 1;
     }else if(tokenizer->support.multilineComment){
         printf("Error: Unimplemented generic multi-line comment\n");
         exit(0);
     }
 
     if(aggregate == 0){
-        if(is_cpp_based){
+        if(can_capture_mult){
             if(n < 2) return 0;
             if(**p == '/' && *((*p)+1) == '/'){
                 type = 1;
             }else if(**p == '/' &&  *((*p)+1) == '*'){
                 type = 2;
                 aggregate = 1;
+            }else if(n >= 3 && **p == '\"' &&  *((*p)+1) == '\"' && *((*p)+2) == '\"'){
+                type = 3;
+                aggregate = 1;
+                expected = TOKEN_ID_STRING;
+                (*p)++;
+                rLen ++;
             }else{
                 goto end;
             }
@@ -985,10 +995,27 @@ LEX_PROCESSOR(Lex_Comments){
                         return -1;
                 }
             }
+        }else if(type == 3){
+            if(rLen >= 2 && **p == '\"' && prev == '\"' && *((*p)-2) == '\"'){
+                (*p) ++;
+                rLen ++;
+                aggregate = 0;
+                goto end;
+            }else{
+
+                prev = **p;
+                (*p) ++;
+                rLen++;
+                if(StopChar(**p) && gathering == 0){
+                    gathering = 1;
+                    if(register_pos() == 1)
+                        return -1;
+                }
+            }
         }else{
             if(rLen+1 <= n){
                 char s = *(*(p)+1);
-                if(**p == '\\' && (s == 0 || s == '\n') && is_cpp_based){
+                if(**p == '\\' && (s == 0 || s == '\n') && can_capture_mult){
                     aggregate = 1;
                     (*p)++;
                     rLen++;
@@ -1019,7 +1046,7 @@ end:
     *len = rLen;
     tokenizer->aggregate = aggregate;
     tokenizer->type = type;
-    token->identifier = TOKEN_ID_COMMENT;
+    token->identifier = expected;
     return rLen > 0 ? (aggregate > 0 ? 3 : 1) : 0;
 }
 

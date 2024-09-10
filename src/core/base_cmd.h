@@ -98,6 +98,9 @@ struct FileEntry;
 #define CMD_PATH_COMPRESSION_STR "path-compression "
 #define CMD_PATH_COMPRESSION_HELP "Configures the amount by which paths should be reduced in the query bar."
 
+#define CMD_JUMP_TO_STR "goto"
+#define CMD_JUMP_TO_HELP "Jump to a specific part of the current view."
+
 #define CMD_DBG_START_STR "dbg start "
 #define CMD_DBG_START_HELP "Start the debugger on a given file (unfinished)."
 
