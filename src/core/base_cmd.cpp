@@ -16,6 +16,8 @@
 #include <resources.h>
 #include <rng.h>
 #include <cryptoutil.h>
+#include <unordered_map>
+#include <set>
 
 int Mkdir(const char *path);
 char* __realpath(const char* path, char* resolved_path);
@@ -1379,6 +1381,8 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
     opener->pathLen = length;
     opener->entryCount = 0;
 
+    view->bufferFlags = std::vector<char>();
+
     if(ListFileEntriesAndCheckLoaded(basePath, &opener->entries,
                                      &opener->entryCount, &opener->entrySize) < 0)
     {
@@ -1431,7 +1435,7 @@ int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
         return 0;
     }
 
-    if(FileBufferList_FindByName(fList, &lineBuffer, buffer->data,
+    if(FileBufferList_FindByPath(fList, &lineBuffer, buffer->data,
                                  buffer->taken) == 0)
     {
         return 0;
@@ -1443,6 +1447,7 @@ int SwitchBufferCommandCommit(QueryBar *queryBar, View *view){
 }
 
 int SwitchBufferCommandStart(View *view){
+    std::unordered_map<std::string, int> pathMap;
     AssertA(view != nullptr, "Invalid view pointer");
     LineBuffer *lineBuffer = nullptr;
     List<FileBuffer> *list = nullptr;
@@ -1454,14 +1459,26 @@ int SwitchBufferCommandStart(View *view){
     LineBuffer_InitBlank(lineBuffer);
 
     list = fBuffers->fList;
+    view->bufferFlags = std::vector<char>();
 
     auto filler = [&](FileBuffer *buf) -> int{
         if(buf){
             if(buf->lineBuffer){
+                char val = 0;
                 char *ptr = buf->lineBuffer->filePath;
                 uint len = buf->lineBuffer->filePathSize;
                 uint n = GetSimplifiedPathName(ptr, len);
-                LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n);
+                char *simpl = &ptr[n];
+
+                std::string name(simpl, len-n);
+
+                LineBuffer_InsertLine(lineBuffer, ptr, len);
+                if(pathMap.find(name) != pathMap.end()){
+                    val = 1;
+                }
+                pathMap[name] = val;
+                //uint n = GetSimplifiedPathName(ptr, len);
+                //LineBuffer_InsertLine(lineBuffer, &ptr[n], len - n);
             }
         }
 
@@ -1469,6 +1486,17 @@ int SwitchBufferCommandStart(View *view){
     };
 
     List_Transverse<FileBuffer>(list, filler);
+
+    view->bufferFlags.resize(lineBuffer->lineCount);
+    for(int i = 0; i < lineBuffer->lineCount; i++){
+        Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
+        uint n = GetSimplifiedPathName(buffer->data, buffer->taken);
+        char *simpl = &buffer->data[n];
+
+        std::string name(simpl, buffer->taken-n);
+        view->bufferFlags[i] = pathMap[name];
+    }
+
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
     filter.allowFreeType = 0;
 

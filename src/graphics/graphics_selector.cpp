@@ -52,7 +52,7 @@ void RenderSelectableListItensBackground(OpenGLState *state, SelectableList *lis
     }
 }
 
-void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
+void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *list,
                                Theme *theme, Float lWidth, FrameStyle *style,
                                FileOpener *opener = nullptr)
 {
@@ -92,12 +92,21 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
             x = Max(x, 2 * size);
         }
 
-        if((int)i == list->active){
-            Graphics_PushText(state, x, ym, buffer->data, buffer->taken,
-                              style->item_active_foreground_color, &pGlyph, encoder);
-        }else{
-            Graphics_PushText(state, x, ym, buffer->data, buffer->taken,
-                              style->item_foreground_color, &pGlyph, encoder);
+        uint ni = GetSimplifiedPathName(buffer->data, buffer->taken);
+        char *dataPtr = &buffer->data[ni];
+        uint len = buffer->taken - ni;
+        vec4i s_col = (int)i == list->active ? style->item_active_foreground_color :
+                        style->item_foreground_color;
+
+        Graphics_PushText(state, x, ym, dataPtr, len, s_col, &pGlyph, encoder);
+
+        if(view->bufferFlags.size() > 0){
+            if(view->bufferFlags[rindex] > 0){
+                s_col.w *= 0.5;
+                std::string value = "  (" + std::string(buffer->data, ni-1) + ")";
+                Graphics_PushText(state, x, ym, (char *)value.c_str(),
+                                  value.size(), s_col, &pGlyph, encoder);
+            }
         }
 
         // TODO: How to compute icon width/height?
@@ -131,7 +140,7 @@ void RenderSelectableListItens(OpenGLState *state, SelectableList *list,
                 if(e->isLoaded){
                     const char *ld = " LOADED *";
                     uint llen = 9;
-                    if(!FileProvider_IsLineBufferDirty(buffer->data, buffer->taken)){
+                    if(!FileProvider_IsLineBufferDirty(dataPtr, len)){
                         llen = 7;
                     }
 
@@ -188,7 +197,7 @@ int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
 
     Graphics_QuadFlush(state);
 
-    RenderSelectableListItens(state, list, theme, lWidth, &style);
+    RenderSelectableListItens(view, state, list, theme, lWidth, &style);
 
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);
@@ -343,7 +352,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     glUseProgram(font->cursorShader.id);
     Graphics_QuadFlush(state);
 
-    RenderSelectableListItens(state, list, theme, lWidth, &style, opener);
+    RenderSelectableListItens(view, state, list, theme, lWidth, &style, opener);
 
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     Graphics_FlushText(state);

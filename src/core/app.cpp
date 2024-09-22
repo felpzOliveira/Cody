@@ -2414,6 +2414,7 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
     AppRestoreCurrentBufferViewState();
     int localFlags = creationFlags;
     View *view = AppGetActiveView();
+    view->bufferFlags = std::vector<char>();
 
     auto emptyFunc = [&](QueryBar *bar, View *view) -> int{ return 0; };
     auto fileOpenEncrypted = [&](QueryBar *bar, View *view) -> int{

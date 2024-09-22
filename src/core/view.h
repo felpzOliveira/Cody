@@ -7,6 +7,7 @@
 #include <graphics.h>
 #include <utilities.h>
 #include <query_bar.h>
+#include <vector>
 
 #define View_IsQueryBarActive(view) (((view)->state) == View_QueryBar ||\
                                      ((view)->state) == View_SelectableList ||\
@@ -56,6 +57,7 @@ struct View{
     RenderList renderList[View_StatesCount];
     ControlProps controlProps;
     ViewTransform transforms;
+    std::vector<char> bufferFlags;
 };
 
 /*

@@ -880,7 +880,12 @@ LEX_PROCESSOR(Lex_Comments){
     int gathering = 1;
     size_t rLen = 0;
     char prev = 0;
-    TokenId expected = type == 3 ? TOKEN_ID_STRING : TOKEN_ID_COMMENT;
+
+    // NOTE: Can change the first one to an specific id for python
+    //       triple " comments, for now I'll make it a comment
+    TokenId onTripleid = TOKEN_ID_COMMENT;
+    TokenId expected = type == 3 ? onTripleid : TOKEN_ID_COMMENT;
+
     char lineChar = tokenizer->support.lineCommentChar;
     char *word_start = 0;
     int can_capture_mult = 0;
@@ -928,7 +933,7 @@ LEX_PROCESSOR(Lex_Comments){
 
 
     // TODO: Get information about file type for python
-    if(lineChar == 0 || lineChar == '#'){
+    if(lineChar == 0){
         can_capture_mult = 1;
     }else if(tokenizer->support.multilineComment){
         printf("Error: Unimplemented generic multi-line comment\n");
@@ -943,12 +948,6 @@ LEX_PROCESSOR(Lex_Comments){
             }else if(**p == '/' &&  *((*p)+1) == '*'){
                 type = 2;
                 aggregate = 1;
-            }else if(n >= 3 && **p == '\"' &&  *((*p)+1) == '\"' && *((*p)+2) == '\"'){
-                type = 3;
-                aggregate = 1;
-                expected = TOKEN_ID_STRING;
-                (*p)++;
-                rLen ++;
             }else{
                 goto end;
             }
@@ -957,7 +956,14 @@ LEX_PROCESSOR(Lex_Comments){
             rLen += 2;
         }else{
             if(n < 1) return 0;
-            if(**p == lineChar){
+            if(n >= 3 && **p == '\"' &&  *((*p)+1) == '\"' && *((*p)+2) == '\"'){
+                type = 3;
+                aggregate = 1;
+                expected = onTripleid;
+                (*p)++;
+                rLen ++;
+                tokenizer->lastToken.identifier = expected;
+            }else if(**p == lineChar){
                 type = 1;
             }else{
                 goto end;
