@@ -184,6 +184,11 @@ void PdfView_DisableZoom(PdfViewState *pdfView);
 void PdfView_ResetZoom(PdfViewState *pdfView);
 
 /*
+* Checks if the dispatcher is loading pages _right_now_
+*/
+bool PdfView_IsDispatchRunning();
+
+/*
 * 
 */
 bool PdfView_FetchPage(PdfViewState *pdfView, int pageIndex,

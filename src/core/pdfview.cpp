@@ -21,6 +21,7 @@ struct PdfViewState{
     int dummy;
 };
 
+bool PdfView_IsDispatchRunning(){ return false; }
 bool PdfView_IsEnabled(){ return false; }
 bool PdfView_IsScrolling(PdfViewState *){ return false; }
 bool PdfView_OpenDocument(PdfViewState **, const char *, uint,
@@ -424,6 +425,8 @@ int select_one(int x, int total, int &dRight, int &dLeft,
 }
 
 static std::atomic<bool> loadDispatchRunning = false;
+bool PdfView_IsDispatchRunning(){ return loadDispatchRunning; }
+
 bool PdfView_FetchPage(PdfViewState *pdfView, int pageIndex,
                        bool enforceBoundaries, bool allowDeatch)
 {
@@ -541,6 +544,13 @@ bool PdfView_Reload(PdfViewState **pdfView){
         printf("No document is opened\n");
         return false;
     }
+
+    // NOTE: We need to refuse the reload if the dispatch is running
+    //       since it will likely corrupt the thread stack. This likely
+    //       needs to be applied to other routines as well. But we'll handle
+    //       them if we actually need to.
+    if(PdfView_IsDispatchRunning())
+        return false;
 
     std::string path = (*pdfView)->docPath;
     if(path.size() < 1){

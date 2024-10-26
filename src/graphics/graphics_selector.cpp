@@ -100,7 +100,7 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
 
         Graphics_PushText(state, x, ym, dataPtr, len, s_col, &pGlyph, encoder);
 
-        if(view->bufferFlags.size() > 0){
+        if(view->bufferFlags.size() > 0 && rindex < view->bufferFlags.size()){
             if(view->bufferFlags[rindex] > 0){
                 s_col.w *= 0.5;
                 std::string value = "  (" + std::string(buffer->data, ni-1) + ")";
