@@ -36,6 +36,15 @@
 
 #define CODEVIEW_OR_RET(bview) if(BufferView_GetViewType(bview) != CodeView) return
 
+/*
+* TODO: We have a complicated task on implementing line wrapping in this editor.
+*       A probable working strategy is to add a virtual line structure wrapper
+*       the parts of the code that want to access line positions and cursor locations
+*       query the virtual wrapper without directly relating cursor and line positions.
+*       That is still quite a lot of work as we need to adjust every place that access
+*       cursor x buffers. But it is a nice idea.
+*/
+
 typedef struct{
     BindingMap *freeTypeMapping;
     BindingMap *queryBarMapping;
@@ -1752,28 +1761,65 @@ void AppCommandAutoComplete(){
     EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(bView->lineBuffer);
     NullRet(buffer);
 
-    //TODO: Comments cannot find their token id
-    uint tid = Buffer_GetTokenAt(buffer, cursor.y > 0 ? cursor.y - 1 : 0, encoder);
-    if(buffer->tokenCount > 0){
-        if(tid <= buffer->tokenCount-1){
-            Token *token = &buffer->tokens[tid];
-            if(token->identifier != TOKEN_ID_SPACE){
-                SelectableList *list = view->autoCompleteList;
-                char *ptr = &buffer->data[token->position];
-                if(View_GetState(view) != View_AutoComplete){
-                    appGlobalConfig.autoCompleteSize = (int)token->size;
-                }
+    Token *token = nullptr;
+    int tid = Buffer_GetTokenAt(buffer, cursor.y > 0 ? cursor.y - 1 : 0, encoder);
+    if(buffer->tokenCount == 0 || (tid >= buffer->tokenCount)){
+        return;
+    }
 
-                int n = AutoComplete_Search(ptr, token->size, list);
-                if(n > 0 && View_GetState(view) != View_AutoComplete){
-                    View_ReturnToState(view, View_AutoComplete);
-                    AppSetBindingsForState(View_AutoComplete);
-                    SelectableList_ResetView(list);
-                    if(n == 1){
-                        AutoComplete_Commit();
-                        appGlobalConfig.autoCompleteSize = 0;
-                    }
-                }
+    // TODO: This is not strictly correct. Taking the previous token does
+    //       not accurately represent the previous value. Inside a comment
+    //       taking cursor.y-1 will yields the comment itself (same for strings)
+    //       I cant think of a situation where this affect this routine. But be aware.
+    token = &buffer->tokens[tid];
+    if(token->identifier >= TOKEN_ID_BRACE_OPEN &&
+       token->identifier <= TOKEN_ID_ASTERISK)
+    {
+        return;
+    }
+
+    if(token->identifier == TOKEN_ID_MATH || token->identifier == TOKEN_ID_SPACE
+       || token->identifier == TOKEN_ID_SCOPE)
+    {
+        return;
+    }
+
+    token = nullptr;
+
+    tid = BufferView_LocatePreviousCursorToken(bView, &token);
+    uint targetY = 0;
+
+    // TODO: This is better than previously however strings and comments
+    //       do not add their content to the autocomplete trie. This makes
+    //       it so that this routine can not autocomplete these words, the question:
+    //        do we care?
+    if(tid >= 0){
+        targetY = token->position;
+        if(!Symbol_IsTokenJumpable(token->identifier)){
+            uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor.y,
+                                                         nullptr, encoder);
+            targetY = Buffer_FindPreviousSeparator(buffer, rawp);
+        }
+
+        uint py = Buffer_Utf8RawPositionToPosition(buffer, targetY, encoder);
+        char *ptr = &buffer->data[py];
+        uint size = cursor.y - py;
+
+        std::string value(ptr, size);
+
+        SelectableList *list = view->autoCompleteList;
+        if(View_GetState(view) != View_AutoComplete){
+            appGlobalConfig.autoCompleteSize = (int)size;
+        }
+
+        int n = AutoComplete_Search(ptr, size, list);
+        if(n > 0 && View_GetState(view) != View_AutoComplete){
+            View_ReturnToState(view, View_AutoComplete);
+            AppSetBindingsForState(View_AutoComplete);
+            SelectableList_ResetView(list);
+            if(n == 1){
+                AutoComplete_Commit();
+                appGlobalConfig.autoCompleteSize = 0;
             }
         }
     }
