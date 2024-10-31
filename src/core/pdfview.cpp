@@ -3,6 +3,8 @@
 #include <unordered_map>
 #include <file_provider.h>
 
+#define SoftZoom 0.15
+
 //#define LRU_CACHE_DEBUG
 #include <lru_cache.h>
 
@@ -595,13 +597,14 @@ void PdfView_DisableZoom(PdfViewState *pdfView){
     PdfView_ResetZoom(pdfView);
 }
 
+// TODO: Please implement smooth zooming
 void PdfView_IncreaseZoomLevel(PdfViewState *pdfView){
-    pdfView->graphics.zoomLevel += 0.25f;
+    pdfView->graphics.zoomLevel += SoftZoom;
     pdfView->changed = true;
 }
 
 void PdfView_DecreaseZoomLevel(PdfViewState *pdfView){
-    pdfView->graphics.zoomLevel = Max(pdfView->graphics.zoomLevel - 0.25f, 1.0f);
+    pdfView->graphics.zoomLevel = Max(pdfView->graphics.zoomLevel - SoftZoom, 1.0f);
     pdfView->changed = true;
 }
 
