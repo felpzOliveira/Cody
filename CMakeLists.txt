@@ -21,33 +21,6 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_definitions(-DDEBUG_BUILD -DDMEMORY_DEBUG)
 endif()
 
-if(CODY_BUILD)
-    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
-        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources.exe)
-        # TODO: This is working, however it would be best if we could specify ${CMAKE_CXX_COMPILER}
-        # also these flags are only ok for cl. It seems that using ${CMAKE_CXX_COMPILER} instead of cl
-        # when compiling with visual studio generates an error. I have no idea why, but it does...
-        add_custom_target(CompileResources
-                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
-                COMMAND cl /EHsc /std:c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp
-                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
-    else()
-        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
-        add_custom_target(CompileResources
-                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
-                COMMAND ${CMAKE_CXX_COMPILER} -std=c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources
-                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
-    endif()
-    add_custom_target(ResourcesRunner
-                COMMAND ${CMAKE_COMMAND} -E echo "Running resources packer..."
-                COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR} ${CMAKE_SOURCE_DIR}/src/resources ${CMAKE_BINARY_DIR}
-                DEPENDS CompileResources)
-
-    if(NOT ${PACK_RETURN_CODE} EQUAL 0)
-        message(SEND_ERROR ${PACK_CHK_FILES})
-    endif()
-endif()
-
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/files
@@ -130,21 +103,21 @@ list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/net_services.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/security_services.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc/rpc_services.cpp)
 
-# resources directory
+# resources pre-defined
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/image_util.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_icons.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/extra_fonts.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_shader.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_font.cpp)
-
-# languages directory
-list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/cmake.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/glsl.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/cpp.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/tex.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/lit.cpp
-                       ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/py.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/resources/const_font.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/languages/none.cpp)
+
+# resources that need to be generated
+set(GEN_FILES "${CMAKE_CURRENT_BINARY_DIR}/src/languages/cmake.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/languages/glsl.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/languages/cpp.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/languages/tex.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/languages/lit.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/languages/py.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/resources/const_shader.cpp"
+              "${CMAKE_CURRENT_BINARY_DIR}/src/resources/const_icons.cpp")
 
 set(SERVER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/files/storage.cpp
                  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory.cpp
@@ -163,6 +136,43 @@ set(SERVER_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/files/storage.cpp
 
 file(GLOB MH_SHADERS shaders/*.glsl)
 file(GLOB MH_LANGS lang_tables/*)
+
+# create empty files for cmake
+foreach(FILE ${GEN_FILES})
+    if(NOT EXISTS ${FILE})
+        file(WRITE ${FILE} "")
+    endif()
+endforeach()
+
+list(APPEND CORE_FILES ${GEN_FILES})
+
+if(CODY_BUILD)
+    if(CMAKE_SYSTEM_NAME MATCHES "Windows")
+        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources.exe)
+        # TODO: This is working, however it would be best if we could specify ${CMAKE_CXX_COMPILER}
+        # also these flags are only ok for cl. It seems that using ${CMAKE_CXX_COMPILER} instead of cl
+        # when compiling with visual studio generates an error. I have no idea why, but it does...
+        add_custom_target(CompileResources
+                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
+                COMMAND cl /EHsc /std:c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp
+                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
+    else()
+        set(PACK_RESOURCES ${CMAKE_BINARY_DIR}/pack_resources)
+        add_custom_target(CompileResources
+                COMMAND ${CMAKE_COMMAND} -E echo "Compiling resources packer..."
+                COMMAND ${CMAKE_CXX_COMPILER} -std=c++17 ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp -o pack_resources
+                DEPENDS ${CMAKE_SOURCE_DIR}/cmake/pack_resources.cpp)
+    endif()
+    add_custom_target(ResourcesRunner
+                COMMAND ${CMAKE_COMMAND} -E echo "Running resources packer..."
+                COMMAND ${PACK_RESOURCES} ${CMAKE_SOURCE_DIR} ${CMAKE_CURRENT_BINARY_DIR}/src/resources ${CMAKE_CURRENT_BINARY_DIR}/src
+                DEPENDS CompileResources ${MH_SHADERS} ${MH_LANGS})
+
+    if(NOT ${PACK_RETURN_CODE} EQUAL 0)
+        message(SEND_ERROR ${PACK_CHK_FILES})
+    endif()
+endif()
+
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows
@@ -234,11 +244,11 @@ if(CODY_BUILD)
     add_dependencies(corelib ResourcesRunner)
     add_executable(${CODY} ${SUBSYSTEM} ${EDITOR_FILES} $<TARGET_OBJECTS:corelib>)
 
-    add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
-                            ${CMAKE_SOURCE_DIR}
-                            ${CMAKE_SOURCE_DIR}/src/resources
-                            ${CMAKE_BINARY_DIR}
-                        DEPENDS ${MH_SHADERS} ${MH_LANGS})
+    #add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
+     #                       ${CMAKE_SOURCE_DIR}
+      #                      ${CMAKE_CURRENT_BINARY_DIR}/src/resources
+       #                     ${CMAKE_CURRENT_BINARY_DIR}/src
+        #                DEPENDS ${MH_SHADERS} ${MH_LANGS})
 
     target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})
     target_link_options(${CODY} PRIVATE ${LINK_OPTS})

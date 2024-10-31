@@ -14,7 +14,7 @@ TokenizerSupport cmakeSupport = {
                {"$<", ">", TOKEN_ID_DATATYPE, 0, empty_cmake_capture }, },
 };
 
-TARGET src/languages/cmake.cpp
+TARGET languages/cmake.cpp
 BEGIN cmakeReservedPreprocessor
 END
 BEGIN cmakeReservedTable

@@ -11,7 +11,7 @@ TokenizerSupport glslSupport = {
     .procs = {},
 };
 
-TARGET src/languages/glsl.cpp
+TARGET languages/glsl.cpp
 BEGIN glslReservedPreprocessor
 # PREPROCESSOR
 + MATH

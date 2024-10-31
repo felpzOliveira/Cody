@@ -10,7 +10,7 @@ TokenizerSupport cppSupport = {
     .procs = {},
 };
 
-TARGET src/languages/cpp.cpp
+TARGET languages/cpp.cpp
 BEGIN cppReservedPreprocessor
 # PREPROCESSOR
 + MATH

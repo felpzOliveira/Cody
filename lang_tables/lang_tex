@@ -27,7 +27,7 @@ TokenizerSupport texSupport = {
     },
 };
 
-TARGET src/languages/tex.cpp
+TARGET languages/tex.cpp
 BEGIN texReservedPreprocessor
 END
 BEGIN texReservedTable

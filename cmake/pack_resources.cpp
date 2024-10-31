@@ -200,13 +200,13 @@ int PackIcons(std::vector<std::string> *vars, std::string baseDir, std::string b
         return -1;
     }
 
-    c_file += std::string("/const_icons.cpp");
+    c_file += std::string("/resources/const_icons.cpp");
     std::ofstream ofsc_file(c_file, std::ios::binary);
     if(ofsc_file.is_open()){
         ofsc_file << f;
         ofsc_file.close();
     }else{
-        LOG_MSG("Failed to open output file");
+        LOG_MSG("Failed to open output file %s", c_file.c_str());
         return -1;
     }
 
@@ -278,20 +278,20 @@ int PackShaders(std::vector<std::string> *vars, std::string baseDir, std::string
         return -1;
     }
 
-    c_file += std::string("/const_shader.cpp");
+    c_file += std::string("/resources/const_shader.cpp");
     std::ofstream ofsc_file(c_file, std::ios::binary);
     if(ofsc_file.is_open()){
         ofsc_file << f;
         ofsc_file.close();
     }else{
-        LOG_MSG("Failed to open output file\n");
+        LOG_MSG("Failed to open output file %s\n", c_file.c_str());
         return -1;
     }
 
     return 0;
 }
 
-int language_table_gen(std::string path){
+int language_table_gen(std::string path, std::string workPath){
     struct token_type{
         std::string value;
         std::string type;
@@ -326,7 +326,7 @@ int language_table_gen(std::string path){
                 runningMap.clear();
                 parsing = true;
             }else if(starts_with(line, "TARGET ")){
-                pathName = std::string("../") + line.substr(7);
+                pathName = workPath + std::string("/") + line.substr(7);
             }else{
                 context += line + "\n";
             }
@@ -396,13 +396,13 @@ int language_table_gen(std::string path){
     return 0;
 }
 
-int PackLanguages(std::string baseDir){
+int PackLanguages(std::string baseDir, std::string workPath){
     std::string dir = baseDir + std::string("/lang_tables");
     int r = ForAllFiles(dir.c_str(), [&](fs::directory_entry entry,
                         std::string filenameStr, std::ifstream *ifs) -> int
     {
         std::string path = dir + std::string("/") + filenameStr;
-        return language_table_gen(path.c_str());
+        return language_table_gen(path.c_str(), workPath);
     });
     return r;
 }
@@ -418,15 +418,16 @@ int main(int argc, char **argv){
 
     std::vector<std::string> vars;
     std::string resourcepath(argv[2]);
+    c_file = resourcepath;
     resourcepath += "/resources.h";
 
-    int r = PackShaders(&vars, argv[1], c_file);
+    int r = PackShaders(&vars, argv[1], argv[3]);
     if(r != 0) return r;
 
-    r = PackLanguages(argv[1]);
+    r = PackLanguages(argv[1], argv[3]);
     if(r != 0) return r;
 
-    r = PackIcons(&vars, argv[1], c_file);
+    r = PackIcons(&vars, argv[1], argv[3]);
     if(r != 0) return r;
 
     std::ifstream res_ifs(resourcepath);

@@ -19,7 +19,7 @@ TokenizerSupport litSupport = {
 // want to allow for a more robust divider list on the lexer
 // but it is not a must now.
 
-TARGET src/languages/lit.cpp
+TARGET languages/lit.cpp
 BEGIN litReservedPreprocessor
 END
 BEGIN litReservedTable

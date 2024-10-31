@@ -23,7 +23,7 @@ TokenizerSupport pythonSupport = {
     .procs = { { "@", "a", TOKEN_ID_DATATYPE, 2,  python_decorator_capture }, },
 };
 
-TARGET src/languages/py.cpp
+TARGET languages/py.cpp
 BEGIN pyReservedPreprocessor
 END
 BEGIN pyReservedTable
