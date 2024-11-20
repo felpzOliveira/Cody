@@ -867,6 +867,11 @@ int BaseCommand_CursorSegmentToogle(char *, uint, View *){
     return 1;
 }
 
+int BaseCommandSwapTabs(char *, uint, View *){
+    AppSwapUseTabs();
+    return 1;
+}
+
 int BaseCommand_ToogleWrongIdent(char *, uint, View *){
     int val = AppGetDisplayWrongIdent() > 0 ? 1 : 0;
     AppSetDisplayWrongIdent(1 - val);
@@ -1061,6 +1066,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_PUT_STR] = {CMD_PUT_HELP, BaseCommandPutFile};
     cmdMap[CMD_GET_STR] = {CMD_GET_HELP, BaseCommandGetFile};
     cmdMap[CMD_JUMP_TO_STR] = {CMD_JUMP_TO_HELP, BaseCommandJumpTo};
+    cmdMap[CMD_SWAP_TABS] = {CMD_SWAP_TABS_HELP, BaseCommandSwapTabs};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

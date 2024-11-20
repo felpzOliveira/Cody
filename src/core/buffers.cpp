@@ -1191,7 +1191,6 @@ void LineBuffer_Init(LineBuffer *lineBuffer, Tokenizer *tokenizer,
     AssertA(lineBuffer != nullptr && fileContents != nullptr && filesize > 0,
             "Invalid line buffer initialization");
 
-    synchronous = true;
     if(synchronous){
         LineBufferTokenizer lineBufferTokenizer;
         LineBuffer_InitBlank(lineBuffer);

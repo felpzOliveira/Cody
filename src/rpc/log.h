@@ -41,10 +41,10 @@ template<typename T> struct PartTrait { typedef T Type; };
 #endif
 
 #if defined(LOG_MODULE)
-    #define LOG_ERR(msg) LOG(COLOR_RED << "{" LOG_MODULE "} " << COLOR_NONE << msg)
-    #define LOG_INFO(msg) LOG("{" LOG_MODULE "} " << msg)
+    #define LOG_ERR(msg) LOG(COLOR_RED << "[" LOG_MODULE "] " << COLOR_NONE << msg)
+    #define LOG_INFO(msg) LOG("[" LOG_MODULE "] " << msg)
     #if !defined(LOG_VERBOSE)
-        #define LOG_VERBOSE(msg) LOG(COLOR_BLUE << " - {" LOG_MODULE "} " << COLOR_NONE << msg)
+        #define LOG_VERBOSE(msg) LOG(COLOR_BLUE << " - [" LOG_MODULE "] " << COLOR_NONE << msg)
     #endif
 #else
     #define LOG_ERR(msg) LOG(COLOR_RED << COLOR_NONE << msg)

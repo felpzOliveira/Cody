@@ -256,6 +256,10 @@ void AppReloadHistory(){
     QueryBarHistory_DetachedLoad(&appContext.queryBarHistory, path.c_str());
 }
 
+void AppSwapUseTabs(){
+    appGlobalConfig.useTabs = 1 - appGlobalConfig.useTabs;
+}
+
 int AppGetTabLength(int *using_tab){
     if(using_tab){
         *using_tab = appGlobalConfig.useTabs;
@@ -485,10 +489,12 @@ void AppOnMouseMotion(int x, int y, OpenGLState *state, bool press){
         Geometry geo;
         BufferView *bView = View_GetBufferView(view);
 
-        if(!BufferView_GetMousePressed(bView)) return;
+        if(!BufferView_GetMousePressed(bView))
+            return;
 
         BufferView_GetGeometry(bView, &geo);
-        if(!Geometry_IsPointInside(&geo, mouse)) return;
+        if(!Geometry_IsPointInside(&geo, mouse))
+            return;
 
         mouse = mouse - geo.lower;
     }

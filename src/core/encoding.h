@@ -77,6 +77,17 @@ EncoderDecoderType EncoderDecoder_GetType(std::string str);
 int StringToCodepoint(EncoderDecoder *encoder, char *u, int size, int *off);
 
 /*
+* Given a codepoint 'codepoint' computes the string representation of it
+* and put it in 'u' which must have at least size 5. This function writes in 'size'
+* the length of the resulting string. In case the encoder cannot convert the value
+* it returns -1, otherwise returns the value 'size'.
+* NOTE: I dont think we have an actual use for this routine as it makes no sense
+* to want to convert a codepoint to a string. But let us expose this so we can
+* easily test things.
+*/
+int CodepointToString(EncoderDecoder *encoder, char *u, int *size, int codepoint);
+
+/*
 * Converts a string 'input' with size 'len' that is in UTF-8 to whatever the encoder type
 * is. This procedure can fail depending on the encoder support, so be aware.
 */

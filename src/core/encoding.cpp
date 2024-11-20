@@ -93,7 +93,10 @@ int StringToCodepoint_UTF8(char *u, int size, int *off){
 
 int CodepointToString_UTF8(int cp, char *c){
     int n = -1;
-    memset(c, 0x00, sizeof(char) * 5);
+    c[0] = 0; c[1] = 0;
+    c[2] = 0; c[3] = 0;
+    c[4] = 0;
+
     if(cp <= 0x7F){
         c[0] = cp;
         n = 1;
@@ -154,7 +157,10 @@ unsigned int StringToCodepointUpdate_Latin1(unsigned int *state, unsigned int *c
 
 int CodepointToString_Latin1(int cp, char *c){
     int n = -1;
-    memset(c, 0x00, sizeof(char) * 5);
+    c[0] = 0; c[1] = 0;
+    c[2] = 0; c[3] = 0;
+    c[4] = 0;
+
     if(cp <= 0x7F){ // Ascii
         c[0] = cp;
         n = 1;
@@ -187,6 +193,16 @@ char *ConvertFromUtf8_Latin1(char *source, int *len){
 int StringToCodepoint(EncoderDecoder *encoder, char *u, int size, int *off){
     if(encoder && encoder->stringToCodepointFn){
         return encoder->stringToCodepointFn(u, size, off);
+    }
+
+    printf("NIL ENCODER_DECODER OR UNITIALIZED!!\n");
+    return -1;
+}
+
+int CodepointToString(EncoderDecoder *encoder, char *u, int *size, int codepoint){
+    if(encoder && encoder->codepointToStringFn){
+        *size = encoder->codepointToStringFn(codepoint, u);
+        return *size;
     }
 
     printf("NIL ENCODER_DECODER OR UNITIALIZED!!\n");

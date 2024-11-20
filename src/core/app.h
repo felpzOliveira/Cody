@@ -365,6 +365,11 @@ void AppFocusChange();
 */
 void AppReloadHistory();
 
+/*
+* Swaps the tab configuration flag.
+*/
+void AppSwapUseTabs();
+
 /* Base commands for free typing */
 void AppCommandJumpLeftArrow();
 void AppCommandJumpRightArrow();

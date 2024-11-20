@@ -533,7 +533,8 @@ PdfViewGraphicState PdfView_GetGraphicsState(PdfViewState *pdfView){
 void PdfView_SetGraphicsState(PdfViewState *pdfView, PdfViewGraphicState state){
     pdfView->graphics.zoomCenter = state.zoomCenter;
     pdfView->graphics.zoomLevel = state.zoomLevel;
-    pdfView->pageIndex = state.pageIndex;
+    pdfView->pageIndex = Clamp(state.pageIndex, 0,
+                               pdfView->document->pages()-1);
 
     PdfView_OpenPage(pdfView, pdfView->pageIndex);
 }

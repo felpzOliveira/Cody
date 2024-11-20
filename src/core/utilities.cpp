@@ -658,10 +658,13 @@ uint StringComputeRawPosition(EncoderDecoder *encoder, char *s0, uint len, uint 
             c += of;
         }
 
+        // NOTE: This seem to happen on special characters (alpha, ...)
+        //       maybe something related to codepoint length, reference for debug:
+        // Could not compute raw position for %    α-shapes: 238394 triangles (α = 150) - 43( u8 = 43 )
         if(r != u8p){
             BUG();
-            printf("Could not compute raw position for %s - %d( u8 = %u )\n",
-                   s0, (int)len, u8p);
+            //printf("Could not compute raw position for %s - %d( u8 = %u )\n",
+                   //s0, (int)len, u8p);
             return 0;
         }
 

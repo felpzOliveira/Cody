@@ -101,6 +101,9 @@ struct FileEntry;
 #define CMD_JUMP_TO_STR "goto"
 #define CMD_JUMP_TO_HELP "Jump to a specific part of the current view."
 
+#define CMD_SWAP_TABS "swap-tab"
+#define CMD_SWAP_TABS_HELP "Swaps the flag for using tab/spacing."
+
 #define CMD_DBG_START_STR "dbg start "
 #define CMD_DBG_START_HELP "Start the debugger on a given file (unfinished)."
 

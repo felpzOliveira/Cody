@@ -6,7 +6,9 @@
 #define LOG_MODULE "NET"
 #include <log.h>
 
-#define LOG_CLIENT(msg) LOG(COLOR_CYAN << "[Client] " << COLOR_NONE << msg)
+//#define LOG_CLIENT(msg) LOG(COLOR_CYAN << "[Client] " << COLOR_NONE << msg)
+#define LOG_CLIENT(...)
+
 #define LOG_SERVER(msg) LOG(COLOR_YELLOW_BRIGHT << "[Server] " << COLOR_NONE << msg)
 
 #define MAX_BLOCK_SIZE (MAX_TRANSPORT_SIZE-2*AES_BLOCK_SIZE_IN_BYTES)
@@ -1044,7 +1046,7 @@ static void RPCClientChecker(RPCClient *client){
     while(client->checkerRunning){
         out.clear();
         {
-            LOG_INFO("Querying Server");
+            //LOG_INFO("Querying Server");
             std::lock_guard<std::mutex> guard(client->mutex);
             ProtocolError error = EncryptAndSend(&client->secCtx, sock, (uint8_t *)&val,
                                                  sizeof(uint32_t));
