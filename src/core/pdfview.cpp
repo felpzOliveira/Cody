@@ -36,8 +36,8 @@ void PdfView_NextPage(PdfViewState *){}
 void PdfView_ClearPendingFlag(PdfViewState *){}
 bool PdfView_Changed(PdfViewState *){ return false; }
 void PdfView_PreviousPage(PdfViewState *){}
-PdfRenderPages PdfView_GetCurrentPage(PdfViewState *){ return PdfRenderPages; }
-PdfGraphicsPage PdfView_GetPage(PdfViewState *, int){ return PdfGraphicsPage; }
+PdfRenderPages PdfView_GetCurrentPage(PdfViewState *){ return PdfRenderPages(); }
+PdfGraphicsPage PdfView_GetPage(PdfViewState *, int){ return PdfGraphicsPage(); }
 bool PdfView_FetchPage(PdfViewState *, int, bool){ return false; }
 
 bool PdfView_CanMoveTo(PdfViewState *, vec2f){ return false; }

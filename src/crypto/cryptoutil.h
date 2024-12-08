@@ -1,5 +1,6 @@
 /* date = October 25th 2021 22:18 */
 #pragma once
+#include <stdint.h>
 #include <stddef.h>
 #include <string>
 #include <vector>
