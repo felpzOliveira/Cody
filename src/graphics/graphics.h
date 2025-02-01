@@ -272,7 +272,6 @@ void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
 */
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
-uint Graphics_FetchTextureFor(OpenGLState *state, std::string name, int *off);
 
 /*
 * Get all information from a texture given its id.

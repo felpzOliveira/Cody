@@ -7,6 +7,7 @@
 #include <functional>
 #include <string>
 #include <vector>
+#include <map>
 
 struct QueryBar;
 struct LineBuffer;
@@ -16,6 +17,13 @@ struct FileEntry;
 
 #define OnFileOpenCallback std::function<void(View *view, FileEntry *entry)>
 #define OnInteractiveSearch std::function<int(QueryBar *bar, View *view, int accepted)>
+#define OnInteractiveList std::function<int(LineBuffer *titles)>
+
+/*
+* NOTE: When defining help strings avoid using slashes '/' as this makes the
+* possible for the text to be interpreted as a path in some parts. We should
+* probably fix that.
+*/
 
 #define CMD_CHANGE_FONTSIZE_STR "fontsize"
 #define CMD_CHANGE_FONTSIZE_HELP "Sets the default font size to be used."
@@ -51,7 +59,7 @@ struct FileEntry;
 #define CMD_CURSORSET_HELP "Sets the format of the cursor (choices: quad, dash, rect)."
 
 #define CMD_DIMM_STR "dimm "
-#define CMD_DIMM_HELP "Sets if the current theme should dimm inactive views (choices: on/off)."
+#define CMD_DIMM_HELP "Sets if the current theme should dimm inactive views (choices: on(off))."
 
 #define CMD_KILLSPACES_STR "kill-spaces"
 #define CMD_KILLSPACES_HELP "Removes all extra spaces in the current file."
@@ -78,7 +86,7 @@ struct FileEntry;
 #define CMD_VSPLIT_HELP "Split the current view vertically."
 
 #define CMD_EXPAND_STR "expand"
-#define CMD_EXPAND_HELP "Expand/Restore a view to the largest possible size."
+#define CMD_EXPAND_HELP "Expand(Restore) a view to the largest possible size."
 
 #define CMD_SET_ENCRYPT_STR "set-encrypted"
 #define CMD_SET_ENCRYPT_HELP "Marks the current file to be encrypted."
@@ -93,7 +101,7 @@ struct FileEntry;
 #define CMD_HISTORY_CLEAR_HELP "Clears the current history stack and file."
 
 #define CMD_CURSORSEG_STR "cursor-seg "
-#define CMD_CURSORSEG_HELP "Enable/Disable rendering of the line that connects the double cursor."
+#define CMD_CURSORSEG_HELP "Enable(Disable) rendering of the line that connects the double cursor."
 
 #define CMD_PATH_COMPRESSION_STR "path-compression "
 #define CMD_PATH_COMPRESSION_HELP "Configures the amount by which paths should be reduced in the query bar."
@@ -102,7 +110,7 @@ struct FileEntry;
 #define CMD_JUMP_TO_HELP "Jump to a specific part of the current view."
 
 #define CMD_SWAP_TABS "swap-tab"
-#define CMD_SWAP_TABS_HELP "Swaps the flag for using tab/spacing."
+#define CMD_SWAP_TABS_HELP "Swaps the flag for using tab(spacing)."
 
 #define CMD_DBG_START_STR "dbg start "
 #define CMD_DBG_START_HELP "Start the debugger on a given file (unfinished)."
@@ -121,6 +129,11 @@ struct FileEntry;
 
 #define CMD_DBG_EVALUATE_STR "dbg eval "
 #define CMD_DBG_EVALUATE_HELP "Evaluates an expression on an instance of the debugger (unfinished)."
+
+struct CmdInformation{
+    std::string help;
+    std::function<int(char *, uint, View *)> fn;
+};
 
 #define MAX_THREADS 16
 struct GlobalSearchResult{
@@ -230,5 +243,17 @@ uint BaseCommand_FetchGlobalSearchData(GlobalSearch **gSearch);
 * to implement 'AppCommandListFunctions'.
 */
 int BaseCommand_SearchFunctions(char *cmd, uint size, View *);
+
+/*
+* Initializes a display call for showing information in a selectable list
+* inside the given view. The callback should be able to fill a linebuffer
+* with the list of what it is to show.
+*/
+int InteractiveListStart(View *view, char *title, OnInteractiveList onListInfo);
+
+/*
+* Get a pointer to the command map. DO NOT MODIFY THIS MAP.
+*/
+std::map<std::string, CmdInformation> *BaseCommand_GetCmdMap();
 
 #endif //BASE_CMD_H

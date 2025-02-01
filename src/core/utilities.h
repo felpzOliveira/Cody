@@ -38,6 +38,9 @@
 /*
 * NOTE: Make sure the build in fact supports binary files before
 * attempting to set this to zero.
+* NOTE: Not being used since we added support for pdf loading.
+* we still however should do something about binary files, but I think
+* we no longer crash we should however implement a hex editor.
 */
 #define REJECT_BINARY_FILES 1
 

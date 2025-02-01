@@ -70,7 +70,7 @@ except OPERATOR
 lambda OPERATOR
 with OPERATOR
 assert OPERATOR
-finnally OPERATOR
+finally OPERATOR
 nonlocal OPERATOR
 yield OPERATOR
 break OPERATOR

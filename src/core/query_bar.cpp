@@ -119,13 +119,16 @@ void QueryBar_SetInteractiveSearchCallback(QueryBar *queryBar, OnInteractiveSear
     replace->searchCallback = onConfirm;
 }
 
-static int QueryBar_AcceptInput(QueryBar *queryBar, char *input, uint len){
+static int QueryBar_AcceptInput(QueryBar *queryBar, char *input, uint len, int force){
     QueryBarInputFilter *filter = &queryBar->filter;
     if(filter->digitOnly){
         return StringIsDigits(input, len);
     }
 
-    return 1;
+    if(force)
+        return 1;
+
+    return filter->allowFreeType ? 1 : 0;
 }
 
 static int QueryBar_AreCommandsContinuous(QueryBar *queryBar, QueryBarCommand cmd){
@@ -447,7 +450,7 @@ void QueryBar_GetTitle(QueryBar *queryBar, char **ptr, uint *len){
 }
 
 void QueryBar_SetEntry(QueryBar *queryBar, View *view, char *str, uint len){
-    if(QueryBar_AcceptInput(queryBar, str, len)){
+    if(QueryBar_AcceptInput(queryBar, str, len, 1)){
         uint p = queryBar->writePosU8;
         uint rawP = queryBar->writePos;
         Buffer_RemoveRangeRaw(&queryBar->buffer, rawP, queryBar->buffer.taken,
@@ -465,7 +468,7 @@ int QueryBar_AddEntry(QueryBar *queryBar, View *view, char *str, uint len){
     AssertA(queryBar != nullptr && str != nullptr && len > 0,
             "Invalid QueryBar pointer");
 
-    if(QueryBar_AcceptInput(queryBar, str, len)){
+    if(QueryBar_AcceptInput(queryBar, str, len, 0)){
         uint p = queryBar->cursor.textPosition.y;
         uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p,
                                                 nullptr, &queryBar->encoder);

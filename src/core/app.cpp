@@ -205,7 +205,7 @@ void AppEarlyInitialize(bool use_tabs){
     appGlobalConfig.displayWrongIdent = 1;
     appGlobalConfig.displayViewIndices = 0;
     appGlobalConfig.useTabs = use_tabs ? 1 : 0;
-    appGlobalConfig.defaultFontSize = 18;
+    appGlobalConfig.defaultFontSize = 20;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
 
@@ -1387,7 +1387,7 @@ void AppCommandKillView(){
         // we need to make sure the interface is not expanded otherwise
         // UI will get weird.
         ControlCommands_RestoreExpand();
-        AppCommandKillBuffer();
+        //AppCommandKillBuffer();
         BufferViewLocation_RemoveView(bView);
          // TODO: Check if it is safe to erase the view in the vnode here
         ViewNode *vnode = ViewTree_DestroyCurrent(1);
@@ -1605,8 +1605,10 @@ void AppCommandQueryBarInteractiveCommand(){
             return r == 2 ? 0 : -1;
         };
 
+        QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+
         QueryBar_ActiveCustomFull(qbar, nullptr, 0, emptyFunc,
-                                  cancelFunc, onCommit, nullptr,
+                                  cancelFunc, onCommit, &filter,
                                   QUERY_BAR_CMD_INTERACTIVE);
 
         View_ReturnToState(gView, View_QueryBar);
@@ -2555,6 +2557,30 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
     }
 }
 
+void AppCommandListHelp(){
+    AppRestoreCurrentBufferViewState();
+    View *view = AppGetActiveView();
+
+    auto fillCall = [&](LineBuffer *titlesLb) -> int{
+        char line[512];
+
+        std::map<std::string, CmdInformation> *cmdMap = BaseCommand_GetCmdMap();
+        std::map<std::string, CmdInformation>::iterator it;
+        for(it = cmdMap->begin(); it != cmdMap->end(); it++){
+            int n = snprintf(line, sizeof(line), "[%s] : %s",
+                            it->first.c_str(), it->second.help.c_str());
+            LineBuffer_InsertLine(titlesLb, line, n);
+        }
+        return cmdMap->size();
+    };
+
+    int r = InteractiveListStart(view, (char *)"Help", fillCall);
+
+    if(r >= 0){
+        AppSetBindingsForState(View_SelectableList);
+    }
+}
+
 void AppCommandOpenFile(){
     AppCommandOpenFileWithViewType(CodeView, OPEN_FILE_FLAGS_ALLOW_CREATION);
 }
@@ -2765,6 +2791,7 @@ void AppInitializeFreeTypingBindings(){
     RegisterRepeatableEvent(mapping, AppCommandSwapToBuildBuffer, Key_LeftControl, Key_M);
 
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
+    RegisterRepeatableEvent(mapping, AppCommandListHelp, Key_LeftControl, Key_H);
 
     //TODO: re-do (AppCommandRedo)
     RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand,

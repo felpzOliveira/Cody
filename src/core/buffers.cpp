@@ -855,6 +855,23 @@ void LineBuffer_InsertLineAt(LineBuffer *lineBuffer, uint at, char *line, uint s
     lineBuffer->lineCount++;
 }
 
+void LineBuffer_SoftClearReset(LineBuffer *lineBuffer){
+    lineBuffer->lineCount = 0;
+    lineBuffer->is_dirty = 0;
+    lineBuffer->activeBuffer = vec2i(-1, -1);
+    lineBuffer->props.cpSection = {
+        .start = vec2ui(),
+        .end = vec2ui(),
+        .currTime = 0,
+        .interval = 0,
+        .active = 0,
+    };
+
+    lineBuffer->props.isWrittable = true;
+    lineBuffer->props.isInternal = false;
+    EncoderDecoder_InitFor(&lineBuffer->props.encoder, GetGlobalDefaultEncoding());
+}
+
 void LineBuffer_InitBlank(LineBuffer *lineBuffer){
     AssertA(lineBuffer != nullptr, "Invalid line buffer blank initialization");
     lineBuffer->lines = AllocatorGetDefault(Buffer *);

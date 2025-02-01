@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Cody
+Comment=Cody Luncher
+Exec=/bin/cody
+Icon=/usr/share/icons/cody.png
+Terminal=false
+Type=Application
+X-Ubuntu-Touch=true

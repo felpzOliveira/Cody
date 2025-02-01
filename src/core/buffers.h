@@ -372,6 +372,13 @@ uint LineBuffer_GetTextFromRange(LineBuffer *lineBuffer, char **ptr,
 void LineBuffer_SoftClear(LineBuffer *lineBuffer);
 
 /*
+* Call this after 'LineBuffer_SoftClear' if you need the linebuffer to look
+* 'new'. The LineBuffer_SoftClear lets some dangling information for fast display
+* but will not be compatible with a clear one. Call this to make it completely clear.
+*/
+void LineBuffer_SoftClearReset(LineBuffer *lineBuffer);
+
+/*
 * Gets the storage path for the contents of the LineBuffer given.
 */
 char *LineBuffer_GetStoragePath(LineBuffer *lineBuffer);

@@ -22,11 +22,6 @@
 int Mkdir(const char *path);
 char* __realpath(const char* path, char* resolved_path);
 
-struct CmdInformation{
-    std::string help;
-    std::function<int(char *, uint, View *)> fn;
-};
-
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
 static std::map<std::string, std::string> mathSymbolMap;
@@ -106,6 +101,10 @@ static int SelectableListDefaultCancel(QueryBar *queryBar, View *view){
         results[i].count = 0;
     }
     return 1;
+}
+
+std::map<std::string, CmdInformation> *BaseCommand_GetCmdMap(){
+    return &cmdMap;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -299,7 +298,6 @@ int SearchAllFilesCommandStart(View *view, std::string title){
     }
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
-    filter.allowFreeType = 0;
     filter.toHistory = false;
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SelectableListDefaultEntry, SelectableListDefaultCancel,
@@ -1186,9 +1184,8 @@ static void FileOpenUpdateList(View *view){
     FileOpener *opener = View_GetFileOpener(view);
     LineBuffer *lb = View_SelectableListGetLineBuffer(view);
 
-    // TODO: This is very ineficient, but it is working so...
-    LineBuffer_Free(lb);
-    LineBuffer_InitBlank(lb);
+    LineBuffer_SoftClear(lb);
+    LineBuffer_SoftClearReset(lb);
 
     for(uint i = 0; i < opener->entryCount; i++){
         FileEntry *e = &opener->entries[i];
@@ -1368,6 +1365,36 @@ end:
     return rv;
 }
 
+int InteractiveListStart(View *view, char *title, OnInteractiveList onListInfo){
+    AssertA(view != nullptr && title != nullptr,
+            "Invalid setup of interactive start");
+
+    LineBuffer *titlesLineBuffer = AllocatorGetN(LineBuffer, 1);
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+    uint hlen = strlen(title);
+
+    QueryBar *queryBar = View_GetQueryBar(view);
+    LineBuffer_InitBlank(titlesLineBuffer);
+
+    int n = onListInfo(titlesLineBuffer);
+
+    auto returnFuncCancel = [&](QueryBar *bar, View *view) -> int{
+        SelectableListFreeLineBuffer(view);
+        return 0;
+    };
+
+    auto returnFuncCommit = [&](QueryBar *bar, View *view) -> int{
+        SelectableListFreeLineBuffer(view);
+        return 1;
+    };
+
+    View_SelectableListSet(view, titlesLineBuffer, (char *)title, hlen,
+                           SelectableListDefaultEntry,
+                           returnFuncCancel, returnFuncCommit, &filter);
+
+    return 0;
+}
+
 int FileOpenerCommandStart(View *view, char *basePath, ushort len,
                            OnFileOpenCallback onOpenFile)
 {
@@ -1377,6 +1404,7 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
     LineBuffer *lineBuffer = nullptr;
     char *pEntry = nullptr;
     const char *header = "Open File";
+    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
     uint hlen = strlen(header);
     ushort length = Min(len, PATH_MAX-1);
     QueryBar *queryBar = View_GetQueryBar(view);
@@ -1417,7 +1445,7 @@ int FileOpenerCommandStart(View *view, char *basePath, ushort len,
 
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            FileOpenCommandEntry, FileOpenCommandCancel,
-                           FileOpenCommandCommit, nullptr);
+                           FileOpenCommandCommit, &filter);
 
     QueryBar_SetEntry(queryBar, view, pEntry, len+1);
     queryBar->fileOpenCallback = onOpenFile;
@@ -1504,7 +1532,6 @@ int SwitchBufferCommandStart(View *view){
     }
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
-    filter.allowFreeType = 0;
 
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SelectableListDefaultEntry, SelectableListDefaultCancel,
@@ -1558,7 +1585,6 @@ int SwitchFontCommandStart(View *view){
     }
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
-    filter.allowFreeType = 0;
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SelectableListDefaultEntry, SelectableListDefaultCancel,
                            SwitchFontCommandCommit, &filter);
@@ -1598,7 +1624,6 @@ int SwitchThemeCommandStart(View *view){
     }
 
     QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
-    filter.allowFreeType = 0;
     View_SelectableListSet(view, lineBuffer, (char *)header, hlen,
                            SelectableListDefaultEntry, SelectableListDefaultCancel,
                            SwitchThemeCommandCommit, &filter);

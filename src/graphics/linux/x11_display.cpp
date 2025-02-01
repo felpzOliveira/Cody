@@ -383,7 +383,7 @@ void _CreateWindowX11(int width, int height, const char *title,
 
     XClassHint *xHint = XAllocClassHint();
     if(xHint){
-        xHint->res_name = xHint->res_class = (char *)"Source"; //TODO: app name
+        xHint->res_name = xHint->res_class = (char *)"Cody"; //TODO: app name
         XSetClassHint(x11->display, window->handle, xHint);
         XFree(xHint);
     }

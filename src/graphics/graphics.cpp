@@ -1221,8 +1221,8 @@ static void _Graphics_BindTexture(OpenGLState *state, GlTextureId id, uint tid){
     //printf("Binding %d = %s (%d)\n", id, tex->bindingname, tex->textureId);
 }
 
-static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *off,
-                                   std::string str = std::string())
+static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt,
+                                   int *off, std::string str=std::string())
 {
     uint id = 0;
     // TODO: Maybe create an array so we can easily loop this thing
@@ -1269,7 +1269,7 @@ static uint _Graphics_FetchTexture(OpenGLState *state, std::string strExt, int *
     }
     else{
         // TODO: some unknown extension
-        id = state->textureMap[".folder"];
+        id = state->textureMap[".txt"];
     }
     return id;
 }
@@ -1323,6 +1323,8 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
             id = state->textureMap[".txt"];
             *off = 10;
         }
+    }else{
+        id = state->textureMap[".folder"];
     }
 
     return id;
@@ -1337,10 +1339,6 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){
     }
 
     return id;
-}
-
-uint Graphics_FetchTextureFor(OpenGLState *state, std::string name, int *off){
-    return _Graphics_FetchTexture(state, name, off, name);
 }
 
 void Graphics_BindImages(OpenGLState *state, OpenGLImageQuadBuffer *quad){

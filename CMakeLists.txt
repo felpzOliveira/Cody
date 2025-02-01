@@ -253,6 +253,10 @@ if(CODY_BUILD)
 
     target_link_libraries(${CODY} PRIVATE ${CODY_LIBRARIES})
     target_link_options(${CODY} PRIVATE ${LINK_OPTS})
+
+    install(TARGETS ${CODY} RUNTIME DESTINATION /bin)
+    #install(FILES ${DESKTOP_FILE} DESTINATION ~/.local/share/applications)
+    #install(FILES ${ICON_FILE} DESTINATION ~/.local/share/icons/hicolor/128x128/apps)
 endif()
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
