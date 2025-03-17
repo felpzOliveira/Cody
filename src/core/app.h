@@ -391,6 +391,7 @@ void AppCommandJumpNesting();
 void AppCommandSwitchTheme();
 void AppCommandSwitchBuffer();
 void AppCommandCopy();
+void AppCommandListHelp();
 void AppCommandSaveBufferView();
 void AppCommandLineQuicklyDisplay();
 void AppCommandSwapLineNbs();

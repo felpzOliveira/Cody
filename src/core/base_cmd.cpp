@@ -1086,6 +1086,11 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
             at++;
         }
 
+        if(StringStartsWith(cmd, size, (char *)"help", 4)){
+            AppSetDelayedCall(AppCommandListHelp);
+            return 1;
+        }
+
         for(auto it = cmdMap.begin(); it != cmdMap.end(); it++){
             std::string val = it->first;
             char *ptr = (char *)val.c_str();

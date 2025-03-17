@@ -344,8 +344,13 @@ void AppSetBindingsForState(ViewState state, ViewType type){
     }
 
     if(appContext.hasDelayedCall){
-        appContext.delayedCall();
+        // IMPORTANT: clear the delay flag before dispatching the call.
+        //            some routines want to make sure they are in the
+        //            default state prior to running and they will call
+        //            a view restoration. Which will again trigger this
+        //            causing an infinite recursion.
         appContext.hasDelayedCall = false;
+        appContext.delayedCall();
     }
 }
 
