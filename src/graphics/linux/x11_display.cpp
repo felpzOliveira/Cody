@@ -23,6 +23,12 @@ Timer timer;
 Framebuffer x11Framebuffer;
 ContextGL x11GLContext;
 
+Pixmap xBlankCursor;
+XColor dummy;
+char xBlankCursorData[1] = {0};
+Cursor xInvisibleCursor;
+int isCursorAlive = 1;
+
 #define SkipEventNoWindow(window) do{ if(!window) return; }while(0)
 
 void ProcessEventX11(XEvent *event);
@@ -390,7 +396,34 @@ void _CreateWindowX11(int width, int height, const char *title,
 
     window->shouldClose = 0;
 
+    xBlankCursor = XCreateBitmapFromData(x11->display, window->handle,
+                                         xBlankCursorData, 1, 1);
+    xInvisibleCursor = XCreatePixmapCursor(x11->display, xBlankCursor,
+                                           xBlankCursor, &dummy, &dummy,
+                                           0, 0);
+
+    XFreePixmap(x11->display, xBlankCursor);
+    isCursorAlive = 1;
+
     XFlush(x11->display);
+}
+
+void HideCursorX11(WindowX11 *window){
+    if(isCursorAlive == 1){
+        XDefineCursor(x11Helper.display, window->handle, xInvisibleCursor);
+    }
+    isCursorAlive = 0;
+}
+
+void ShowCursorX11(WindowX11 *window){
+    if(isCursorAlive == 0){
+        XUndefineCursor(x11Helper.display, window->handle);
+    }
+    isCursorAlive = 1;
+}
+
+int IsCursorDisplayedX11(){
+    return isCursorAlive;
 }
 
 void SetSamplesX11(int samples){

@@ -58,6 +58,18 @@ void GetLastRecordedMousePosition(DisplayWindow *window, int *x, int *y){
     GetLastRecordedMousePositionWin32(window, x, y);
 }
 
+void ShowCursor(DisplayWindow *window){
+    ShowCursorWin32(window);
+}
+
+void HideCursor(DisplayWindow *window){
+    HideCursorWin32(window);
+}
+
+int IsCursorAlive(){
+    return IsCursorDisplayedWin32();
+}
+
 void PoolEvents(){
     PollEventsWin32();
 }
@@ -125,6 +137,18 @@ void GetLastRecordedMousePosition(DisplayWindow *window, int *x, int *y){
 
 void SetWindowShouldClose(DisplayWindow *window){
     SetWindowShouldCloseX11(window);
+}
+
+void ShowCursor(DisplayWindow *window){
+    ShowCursorX11(window);
+}
+
+void HideCursor(DisplayWindow *window){
+    HideCursorX11(window);
+}
+
+int IsCursorAlive(){
+    return IsCursorDisplayedX11();
 }
 
 void PoolEvents(){

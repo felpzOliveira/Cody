@@ -58,6 +58,7 @@ struct View{
     ControlProps controlProps;
     ViewTransform transforms;
     std::vector<char> bufferFlags;
+    bool allowPathCompression;
 };
 
 /*
@@ -189,6 +190,14 @@ int View_CommitToState(View *view, ViewState state);
 * Sets the rendering properties of the control cmds.
 */
 void View_SetControlOpts(View *view, ControlRenderOpts opts, Float inter=0);
+
+/*
+* Sets the flag of allowing path compression. Only usefull for the selector
+* renderer to shorten displayed paths.
+* NOTE: The default behavior is everyone uses path compression when displaying
+* except the search cmd to prevent incorrect compressions.
+*/
+void View_SetAllowPathCompression(View *view, bool value);
 
 /*
 * Gets the current configuration of the control cmds rendering options.

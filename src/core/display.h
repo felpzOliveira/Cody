@@ -42,3 +42,9 @@ void InitializeDisplay();
 void SetSamples(int samples);
 
 void SetOpenGLVersion(int major, int minor);
+
+void ShowCursor(DisplayWindow *window);
+
+void HideCursor(DisplayWindow *window);
+
+int IsCursorAlive();

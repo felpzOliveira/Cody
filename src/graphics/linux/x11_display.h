@@ -221,6 +221,9 @@ void SwapBuffersX11(WindowX11 *window);
 void SwapIntervalX11(WindowX11 *window, int interval);
 void PoolEventsX11();
 void MakeContextX11(WindowX11 *window);
+void HideCursorX11(WindowX11 *window);
+void ShowCursorX11(WindowX11 *window);
+int IsCursorDisplayedX11();
 void WaitForEventsX11();
 WindowX11 *CreateWindowX11(int width, int height, const char *title);
 WindowX11 *CreateWindowX11Shared(int width, int height,

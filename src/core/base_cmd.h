@@ -44,7 +44,7 @@ struct FileEntry;
 #define CMD_PUT_HELP "Send a file to the RPC server."
 
 #define CMD_GET_STR "get"
-#define CMD_GET_HELP "Get a file to the RPC server."
+#define CMD_GET_HELP "Get a file from the RPC server."
 
 #define CMD_CHANGE_BRIGHTNESS_STR "brightness"
 #define CMD_CHANGE_BRIGHTNESS_HELP "Sets the brightness value for the current theme."

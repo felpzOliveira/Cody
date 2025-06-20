@@ -1,6 +1,86 @@
 #include <theme.h>
 #include <utilities.h>
 
+Theme themeToxi = {
+    .backgroundColor = ColorFromHex(0xFF0B1210),
+    .hoverableItemForegroundColor = ColorFromHex(0xFFFDFB00),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFF441EA4),
+    .selectorBackground = ColorFromHex(0xFF0B1210),
+    .searchBackgroundColor = ColorFromHex(0xFF441EA4),
+    .selectableListBackground = ColorFromHex(0xFF0E1C1E),
+    .searchWordColor = ColorFromHex(0xFF96147E),
+    .backgroundLineNumbers = ColorFromHex(0xFF0B1210),
+    .lineNumberColor = ColorFromHex(0x000B1210),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF14BBCB),
+    .cursorLineHighlight = ColorFromHex(0xFF0B1210),
+    .fileHeaderColor = ColorFromHex(0xCCBFBFBF),
+    .operatorColor   = ColorFromHex(0xCCFDFB00),
+
+    .datatypeColor   = ColorFromHex(0xCCE5071F),
+    .commentColor    = ColorFromHex(0xFF707273),
+    .commentTodoColor = ColorFromHex(0xFFE90329),
+    .commentNoteColor = ColorFromHex(0xFFE90329),
+    .commentImportantColor = ColorFromHex(0xFFE90329),
+    .stringColor     = ColorFromHex(0xCC48D867),
+    .numberColor     = ColorFromHex(0xCC97F0CD),
+    .reservedColor   = ColorFromHex(0xCC73B079),
+    .functionColor   = ColorFromHex(0xCCC89C3D),
+    .includeColor    = ColorFromHex(0xCCACB705),
+    .mathColor       = ColorFromHex(0xCCE3B643),
+    .tokensColor     = ColorFromHex(0xCC7AD5A4),
+    .tokensOverCursorColor = ColorFromHex(0xFF0B1210),
+
+    /////////////////////////////////////////////////////
+    .preprocessorColor = ColorFromHex(0xCCF10143),
+    .preprocessorDefineColor = ColorFromHex(0xCCF10143),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    /////////////////////////////////////////////////////
+
+    .braces = ColorFromHex(0xFF73B079),
+    .cursorColor = ColorFromHex(0xFF75A36A),
+
+    .querybarCursorColor = ColorFromHex(0xFF75A36A),
+    .ghostCursorColor = ColorFromHex(0xFF75A36A),
+    .parenthesis = {
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFF0B1210),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xCCE5071F),
+
+    ///////////////////////////////////////////////////
+    .userDatatypeEnum = ColorFromHex(0xCC5793A4),
+    ///////////////////////////////////////////////////
+
+    .scopeLineColor = ColorFromHex(0xAAAAAAAA),
+    .scrollbarColor = ColorFromHex(0xFF1A1A1A),
+    .querybarTypeLineColor = ColorFromHex(0xFF7AD5A4),
+    .selectorLoadedColor = ColorFromHex(0xFFF5BD96),
+    .userDefineColor = ColorFromHex(0xCCE5071F),
+
+    .backTextCount = 0,
+    .lineBorderWidth = 0,
+    .alphaDimm = 0,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFF232333),
+    .isLight = false,
+    .visuals = {
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 1.75f,
+    },
+};
+
+
 Theme themeGrayVim = {
     .backgroundColor = ColorFromHex(0xFF191819),
     .hoverableItemForegroundColor = ColorFromHex(0xFF72ae55),
@@ -986,8 +1066,9 @@ Theme themeHalloween = {
 // swap this to make the default theme, i.e.: theme enabled when opening
 // otherwise use swap theme for changing between these
 
+Theme *defaultTheme = &themeToxi;
 //Theme *defaultTheme = &themeGrayVim;
-Theme *defaultTheme = &themeHalloween;
+//Theme *defaultTheme = &themeHalloween;
 //Theme *defaultTheme = &themeGreenish;
 //Theme *defaultTheme = &theme4coderAlt;
 //Theme *defaultTheme = &themeDarkVim;
@@ -1013,7 +1094,8 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "DarkVim", .theme = &themeDarkVim, },
     { .name = "GrayVim", .theme = &themeGrayVim, },
     { .name = "GreenVilage", .theme = &themeGreenish, },
-    { .name = "Halloween", .theme = &themeHalloween, }
+    { .name = "Halloween", .theme = &themeHalloween, },
+    { .name = "Toxi", .theme = &themeToxi, }
 };
 
 static int globalActive = 0;

@@ -1211,6 +1211,19 @@ void PollEventsWin32()
 
 bool CreateContextWGL(WindowWin32* window, const ContextGL* ctxconfig, const Framebuffer* fbconfig);
 
+void HideCursorWin32(WindowWin32* window){
+    printf("[Unimplemented] Cursor HIDE!\n");
+}
+
+void ShowCursorWin32(WindowWin32* window){
+    printf("[Unimplemented] Cursor SHOW!\n");
+}
+
+int IsCursorDisplayedWin32(){
+    printf("[Unimplemented] Cursor QUERY!\n");
+    return 1;
+}
+
 void WaitEventsWin32(){
     WaitMessage();
     PollEventsWin32();

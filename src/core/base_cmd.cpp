@@ -62,8 +62,9 @@ static void InitializeMathSymbolList(){
         mathSymbolMap["delta"] = "δ"; mathSymbolMap["Delta"] = "Δ";
         mathSymbolMap["epsilon"] = "ε"; mathSymbolMap["Epsilon"] = "E";
         mathSymbolMap["partial"] = "∂"; mathSymbolMap["int"] = "∫";
-        mathSymbolMap["inf"] = "∞"; mathSymbolMap["approx"] = "≈";
-        mathSymbolMap["or"] = "||";    mathSymbolMap["dash"] = "\\";
+        mathSymbolMap["inf"] = "∞";     mathSymbolMap["approx"] = "≈";
+        mathSymbolMap["cdot"] = "·";    mathSymbolMap["or"] = "||";
+        mathSymbolMap["dash"] = "\\"; mathSymbolMap["sqrt"] = "√";
         is_math_symbol_inited = true;
     }
 }
@@ -100,6 +101,8 @@ static int SelectableListDefaultCancel(QueryBar *queryBar, View *view){
         results[i].results.clear();
         results[i].count = 0;
     }
+
+    View_SetAllowPathCompression(view, true);
     return 1;
 }
 
@@ -183,6 +186,7 @@ int GlobalSearchCommandCommit(QueryBar *queryBar, View *view){
 
     BaseCommand_JumpViewToBuffer(view, targetLineBuffer,
                                  vec2i(result->line, result->col));
+    View_SetAllowPathCompression(view, true);
 __ret:
     SelectableListFreeLineBuffer(view);
     linearResults.res.clear();
@@ -207,6 +211,8 @@ int SearchAllFilesCommandStart(View *view, std::string title){
 
     linearResults.count = 0;
     linearResults.res.clear();
+
+    View_SetAllowPathCompression(view, false);
 
     uint max_written_len = 60;
     int pathCompression = 1;
@@ -285,8 +291,6 @@ int SearchAllFilesCommandStart(View *view, std::string title){
             }else{
                 len += snprintf(&m[len], sizeof(m)-len, "%s ...", &buffer->data[start_loc]);
             }
-
-            //printf("Adding %s\n", m);
 
             buffer->data[end_loc] = ss;
 

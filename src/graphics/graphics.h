@@ -17,6 +17,7 @@
 #include <memory>
 #include <parallel.h>
 #include <encoding.h>
+#include <atomic>
 
 //TODO: Fix this, this might be too few texture units
 #define MAX_TEXTURES_COUNT 256
@@ -182,6 +183,8 @@ struct OpenGLState{
     double maxSamplingRate;
     Shader buttonShader;
     GlobalWidgets gWidgets;
+    std::atomic<int> isCursorDisplayEventRunning;
+    double cursorDisplayTime;
 
     // NOTE: We use shared_ptr here because otherwise we would need cyclic
     // dependencies because the signal for closing a widget goes to a widget

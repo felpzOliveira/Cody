@@ -67,7 +67,10 @@ image OPERATOR
 width OPERATOR
 light OPERATOR
 pixel OPERATOR
+aggregator OPERATOR
 depth OPERATOR
+output OPERATOR
+mode OPERATOR
 save OPERATOR
 interval OPERATOR
 model OPERATOR
@@ -89,6 +92,12 @@ Medium DATATYPE
 render OPERATOR
 window OPERATOR
 sundir OPERATOR
+spp OPERATOR
+warp OPERATOR
+method OPERATOR
+apply OPERATOR
+rotation OPERATOR
+spectral OPERATOR
 pixels OPERATOR
 edge OPERATOR
 spectrum OPERATOR

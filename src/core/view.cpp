@@ -132,10 +132,15 @@ void View_ResetTransforms(View *view){
     view->transforms.translate = Transform();
 }
 
+void View_SetAllowPathCompression(View *view, bool value){
+    view->allowPathCompression = value;
+}
+
 void View_EarlyInitialize(View *view){
     view->descLocation = DescriptionTop; // TODO: Config
     view->fileOpener = AllocatorGetN(FileOpener, 1);
     view->autoCompleteList = AllocatorGetN(SelectableList, 1);
+    view->allowPathCompression = true;
 
     View_ResetTransforms(view);
 

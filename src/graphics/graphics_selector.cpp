@@ -92,7 +92,10 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
             x = Max(x, 2 * size);
         }
 
-        uint ni = GetSimplifiedPathName(buffer->data, buffer->taken);
+        uint ni = 0;
+        if(view->allowPathCompression){
+            ni = GetSimplifiedPathName(buffer->data, buffer->taken);
+        }
         char *dataPtr = &buffer->data[ni];
         uint len = buffer->taken - ni;
         vec4i s_col = (int)i == list->active ? style->item_active_foreground_color :

@@ -44,7 +44,15 @@ inline void TokenizerUpdateState(Tokenizer *tokenizer, Token *token){
 
 inline int Lex_IsTokenReserved(Token *token){
     TokenId id = token->identifier;
-    return (id == TOKEN_ID_RESERVED ||
+    return (
+            // NOTE: setting TOKEN_ID_RESERVED here makes it so that
+            // definitions that have some pre-defines cant happen, for
+            // example:
+            //    struct __align__( OPTIX_SBT_RECORD_ALIGNMENT ) RaygenRecord
+            // becomes invalid and we cant highlight RaygenRecord
+            // a limitation of the lack of tokens types we have assigned
+            // unfortunatelly.
+            id == TOKEN_ID_RESERVED ||
             id == TOKEN_ID_PREPROCESSOR || id == TOKEN_ID_PREPROCESSOR_DEFINE ||
             id == TOKEN_ID_PREPROCESSOR_DEFINITION || id == TOKEN_ID_INCLUDE_SEL ||
             id == TOKEN_ID_INCLUDE || id == TOKEN_ID_OPERATOR ||

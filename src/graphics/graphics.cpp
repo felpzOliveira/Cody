@@ -43,6 +43,8 @@ constexpr Float iconBlur = 3.0f;
 constexpr Float iconBlur = 0.0f;
 #endif
 
+constexpr double CursorDisplayEventInterval = 2;
+
 static OpenGLState GlobalGLState;
 
 /*
@@ -784,15 +786,39 @@ static bool MouseEventFilter(int x, int y){
     return false;
 }
 
+bool MouseDisplayActionEvent(){
+    double currTime = GetElapsedTime();
+    double dif = currTime - GlobalGLState.cursorDisplayTime;
+    bool finish = dif >= CursorDisplayEventInterval;
+    if(finish){
+        HideCursor(GlobalGLState.window);
+        GlobalGLState.isCursorDisplayEventRunning = 0;
+    }
+    return !finish;
+}
+
+void onMouseAction(){
+    ShowCursor(GlobalGLState.window);
+    if(GlobalGLState.isCursorDisplayEventRunning == 0){
+        Graphics_AddEventHandler(CursorDisplayEventInterval,
+                                 MouseDisplayActionEvent);
+        GlobalGLState.isCursorDisplayEventRunning = 1;
+    }
+
+    GlobalGLState.cursorDisplayTime = GetElapsedTime();
+}
+
 // Mouse motion generates a lot of cpu usage...
 void WinOnMouseMotion(int x, int y, void *){
     GlobalGLState.mouse.position = vec2ui((uint)x, (uint)y);
     AppHandleMouseMotion(x, y, &GlobalGLState);
+    onMouseAction();
 }
 
 void WindowOnMouseClick(int x, int y, void *){
     if(!MouseEventFilter(x, y)){
         AppHandleMouseClick(x, y, &GlobalGLState);
+        onMouseAction();
     }
 }
 
@@ -803,6 +829,7 @@ void WindowOnScroll(int is_up, void *){
     GetLastRecordedMousePosition(GlobalGLState.window, &x, &y);
     if(!MouseEventFilter(x, y)){
         AppHandleMouseScroll(x, y, is_up, &GlobalGLState);
+        onMouseAction();
     }
 }
 
@@ -817,6 +844,7 @@ void WinOnMouseReleased(int x, int y, void *){
     if(!MouseEventFilter(x, y)){
         GlobalGLState.mouse.isPressed = false;
         AppHandleMouseReleased(x, y, &GlobalGLState);
+        onMouseAction();
     }
 }
 
@@ -977,6 +1005,7 @@ void OpenGLInitialize(OpenGLState *state){
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
     state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
+    state->isCursorDisplayEventRunning = 0;
 
     SetWindowIcon(state->window, logo_png, logo_png_len);
 
@@ -995,6 +1024,7 @@ void OpenGLInitialize(OpenGLState *state){
     OpenGLLoadIcons(state);
 
     WindowOnSizeChange(width, height, nullptr);
+    onMouseAction();
 }
 
 int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid){
@@ -1109,7 +1139,6 @@ void Graphics_QuadFlush(OpenGLBuffer *quad, int blend){
         glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, NULL);
 
         glDrawArrays(GL_TRIANGLES, 0, quad->length);
-
         glDisableVertexAttribArray(1);
         glDisableVertexAttribArray(0);
         glBindVertexArray(0);

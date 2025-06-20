@@ -313,6 +313,9 @@ void SetWindowTitleWin32(WindowWin32* window, const char* title);
 void TerminateWin32();
 void WaitEventsWin32();
 void PollEventsWin32();
+void HideCursorWin32(WindowWin32* window);
+void ShowCursorWin32(WindowWin32* window);
+int IsCursorDisplayedWin32();
 
 void SetWindowIconWin32(WindowWin32 *window, unsigned char *png, unsigned int pngLen);
 int WindowShouldCloseWin32(WindowWin32* window);

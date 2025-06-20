@@ -8,6 +8,7 @@ project(Cody VERSION 1.0.0 LANGUAGES CXX C)
 
 set(CODY "cody")
 set(SERVER "server")
+set(LEX_TOOL "ltool")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(CODY_BUILD "Build the editor" ON)
@@ -38,31 +39,31 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src
 # core directory
 set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/memory.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/control_cmds.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/viewer_ctrl.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/keyboard.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/tries.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/encoding.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/scroll_controller.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/undo.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/query_bar.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/base_cmd.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/autocomplete.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/lex.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/selectable.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/transform.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/display.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/hash.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/utilities.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/symbol.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/parallel.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/theme.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/view.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/pdfview.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/bufferview.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp
-                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/modal.cpp)
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/modal.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/lex.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/utilities.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/symbol.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/encoding.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/hash.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp)
 
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_querybar.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics.cpp
@@ -258,6 +259,11 @@ if(CODY_BUILD)
     #install(FILES ${DESKTOP_FILE} DESTINATION ~/.local/share/applications)
     #install(FILES ${ICON_FILE} DESTINATION ~/.local/share/icons/hicolor/128x128/apps)
 endif()
+
+set(LEX_TOOL_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/src/ltool.cpp)
+add_executable(${LEX_TOOL} ${SUBSYSTEM} ${LEX_TOOL_SOURCES} $<TARGET_OBJECTS:corelib>)
+target_link_libraries(${LEX_TOOL} PRIVATE ${CODY_LIBRARIES})
+target_link_options(${LEX_TOOL} PRIVATE ${LINK_OPTS})
 
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     # TODO: Prevent compilation of the server in windows for now
