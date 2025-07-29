@@ -23,7 +23,7 @@ static std::map<int, std::thread::id> progMap;
 
 std::string OpenGLValidateErrorStr(int *err);
 
-int Shader_CheckForCompileErrors(GLuint object, std::string type){
+int Shader_CheckForCompileErrors(GLuint object, std::string type, const char *shaderSource=nullptr){
     int err = 0;
     GLint success;
     GLchar infoLog[1024];
@@ -146,7 +146,7 @@ int Shader_CompileSource(const std::string &content, int type){
     OpenGLCHK(glShaderSource(id, 1, (char **)&p, NULL));
     OpenGLCHK(glCompileShader(id));
 
-    if(Shader_CheckForCompileErrors(id, str)) goto end;
+    if(Shader_CheckForCompileErrors(id, str, content.c_str())) goto end;
 
     rv = (int)id;
 

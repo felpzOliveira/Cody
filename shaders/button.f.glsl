@@ -1,8 +1,8 @@
-#version 120
-varying vec4 interpolatedColor;
-
+#version 330
+in vec4 interpolatedColor;
+out vec4 fragColor;
 void main(){
     vec3 color = interpolatedColor.rgb;
-    gl_FragColor = vec4(color, interpolatedColor.a);
+    fragColor = vec4(color, interpolatedColor.a);
 }
 

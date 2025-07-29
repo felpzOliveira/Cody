@@ -1,12 +1,13 @@
+#version 330
 uniform mat4 modelView;
 uniform mat4 projection;
 
-attribute vec4 vertexPosition;
-attribute vec2 vertexTexCoord;
-attribute vec4 vertexColor;
+layout(location=0) in vec4 vertexPosition;
+layout(location=1) in vec2 vertexTexCoord;
+layout(location=2) in vec4 vertexColor;
 
-varying vec2 interpolatedTexCoord;
-varying vec4 interpolatedColor;
+out vec2 interpolatedTexCoord;
+out vec4 interpolatedColor;
 
 void main() {
     interpolatedColor = vertexColor;

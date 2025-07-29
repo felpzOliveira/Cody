@@ -1025,6 +1025,9 @@ void OpenGLInitialize(OpenGLState *state){
 
     WindowOnSizeChange(width, height, nullptr);
     onMouseAction();
+
+    //printf("GL  version: %s\n", glGetString(GL_VERSION));
+    //printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 }
 
 int Graphics_ImagePush(OpenGLImageQuadBuffer *quad, vec2ui left, vec2ui right, int mid){

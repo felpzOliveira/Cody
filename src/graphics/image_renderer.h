@@ -15,7 +15,13 @@ public:
     double startInterval;
     double endInterval;
 
-    ImageRenderer(): inited(false), texture(0), transRunning(false){}
+    ImageRenderer(){
+        texture[0] = 0;
+        texture[1] = 0;
+        texture[2] = 0;
+        inited = false;
+        transRunning = false;
+    }
     bool IsInited(){ return inited; }
     void Inited(){ inited = true; }
     void BeginTransition(double _duration){
