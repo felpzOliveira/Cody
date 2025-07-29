@@ -1,3 +1,6 @@
 [submodule "external/libgit2"]
 	path = external/libgit2
 	url = git@github.com:libgit2/libgit2.git
+[submodule "external/SDL3"]
+	path = external/SDL3
+	url = https://github.com/libsdl-org/SDL.git

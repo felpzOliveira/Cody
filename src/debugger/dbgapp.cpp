@@ -105,16 +105,20 @@ DbgSynchronizer dbgSync = {
     .dbgLB = nullptr,
 };
 void DbgApp_AsyncHandleStopPoint(DbgStop *sp){
-    dbgSync.inQ.push({.code = DbgSyncCode::SyncStop, .sp = *sp});
+    DbgSyncPackage message = {.code = DbgSyncCode::SyncStop, .sp = *sp};
+    dbgSync.inQ.push(message);
 }
 
 void DbgApp_AsyncHandleState(DbgState state){
     DbgStop empty = {.reason = No_Stop};
-    dbgSync.inQ.push({.code = DbgSyncCode::SyncState, .sp = empty, .state = state});
+    DbgSyncPackage message = {.code = DbgSyncCode::SyncState,
+                              .sp = empty, .state = state};
+    dbgSync.inQ.push(message);
 }
 
 void DbgApp_AsyncHandleExit(){
-    dbgSync.inQ.push({.code = DbgSyncCode::SyncExit,});
+    DbgSyncPackage message = {.code = DbgSyncCode::SyncExit,};
+    dbgSync.inQ.push(message);
 }
 
 void DbgApp_AsyncHandleBkptFeedback(BreakpointFeedback feedback){

@@ -24,7 +24,7 @@ char* __realpath(const char* path, char* resolved_path);
 
 static std::map<std::string, std::string> aliasMap;
 static std::string envDir;
-static std::map<std::string, std::string> mathSymbolMap;
+static std::map<std::string, std::string> lookupSymbol;
 static std::map<std::string, CmdInformation> cmdMap;
 
 struct QueriableSearchResult{
@@ -37,35 +37,41 @@ QueriableSearchResult linearResults;
 
 
 static void InitializeMathSymbolList(){
-    static bool is_math_symbol_inited = false;
-    if(!is_math_symbol_inited){
-        mathSymbolMap["pi"] = "π";    mathSymbolMap["Pi"] = "Π";
-        mathSymbolMap["theta"] = "θ"; mathSymbolMap["Theta"] = "Θ";
-        mathSymbolMap["mu"] = "μ";    mathSymbolMap["Mu"] = "M";
-        mathSymbolMap["zeta"] = "ζ";  mathSymbolMap["Zeta"] = "Z";
-        mathSymbolMap["eta"] = "η";   mathSymbolMap["Eta"] = "H";
-        mathSymbolMap["iota"] = "ι";  mathSymbolMap["Iota"] = "I";
-        mathSymbolMap["kappa"] = "κ"; mathSymbolMap["Kappa"] = "K";
-        mathSymbolMap["lambda"] = "λ";mathSymbolMap["Lambda"] = "Λ";
-        mathSymbolMap["nu"] = "ν";    mathSymbolMap["Nu"] = "N";
-        mathSymbolMap["xi"] = "ξ";    mathSymbolMap["Xi"] = "Ξ";
-        mathSymbolMap["rho"] = "ρ";   mathSymbolMap["Rho"] = "P";
-        mathSymbolMap["sigma"] = "σ"; mathSymbolMap["Sigma"] = "Σ";
-        mathSymbolMap["tau"] = "τ";   mathSymbolMap["Tau"] = "T";
-        mathSymbolMap["phi"] = "φ";   mathSymbolMap["Phi"] = "Φ";
-        mathSymbolMap["chi"] = "χ";   mathSymbolMap["Chi"] = "X";
-        mathSymbolMap["psi"] = "ψ";   mathSymbolMap["Psi"] = "Ψ";
-        mathSymbolMap["omega"] = "ω"; mathSymbolMap["Omega"] = "Ω";
-        mathSymbolMap["beta"] = "β";  mathSymbolMap["Beta"] = "B";
-        mathSymbolMap["alpha"] = "α"; mathSymbolMap["Alpha"] = "A";
-        mathSymbolMap["gamma"] = "γ"; mathSymbolMap["Gamma"] = "Γ";
-        mathSymbolMap["delta"] = "δ"; mathSymbolMap["Delta"] = "Δ";
-        mathSymbolMap["epsilon"] = "ε"; mathSymbolMap["Epsilon"] = "E";
-        mathSymbolMap["partial"] = "∂"; mathSymbolMap["int"] = "∫";
-        mathSymbolMap["inf"] = "∞";     mathSymbolMap["approx"] = "≈";
-        mathSymbolMap["cdot"] = "·";    mathSymbolMap["or"] = "||";
-        mathSymbolMap["dash"] = "\\"; mathSymbolMap["sqrt"] = "√";
-        is_math_symbol_inited = true;
+    static bool is_lookup_symbols_inited = false;
+    if(!is_lookup_symbols_inited){
+        lookupSymbol["pi"] = "π";    lookupSymbol["Pi"] = "Π";
+        lookupSymbol["theta"] = "θ"; lookupSymbol["Theta"] = "Θ";
+        lookupSymbol["mu"] = "μ";    lookupSymbol["Mu"] = "M";
+        lookupSymbol["zeta"] = "ζ";  lookupSymbol["Zeta"] = "Z";
+        lookupSymbol["eta"] = "η";   lookupSymbol["Eta"] = "H";
+        lookupSymbol["iota"] = "ι";  lookupSymbol["Iota"] = "I";
+        lookupSymbol["kappa"] = "κ"; lookupSymbol["Kappa"] = "K";
+        lookupSymbol["lambda"] = "λ";lookupSymbol["Lambda"] = "Λ";
+        lookupSymbol["nu"] = "ν";    lookupSymbol["Nu"] = "N";
+        lookupSymbol["xi"] = "ξ";    lookupSymbol["Xi"] = "Ξ";
+        lookupSymbol["rho"] = "ρ";   lookupSymbol["Rho"] = "P";
+        lookupSymbol["sigma"] = "σ"; lookupSymbol["Sigma"] = "Σ";
+        lookupSymbol["tau"] = "τ";   lookupSymbol["Tau"] = "T";
+        lookupSymbol["phi"] = "φ";   lookupSymbol["Phi"] = "Φ";
+        lookupSymbol["chi"] = "χ";   lookupSymbol["Chi"] = "X";
+        lookupSymbol["psi"] = "ψ";   lookupSymbol["Psi"] = "Ψ";
+        lookupSymbol["omega"] = "ω"; lookupSymbol["Omega"] = "Ω";
+        lookupSymbol["beta"] = "β";  lookupSymbol["Beta"] = "B";
+        lookupSymbol["alpha"] = "α"; lookupSymbol["Alpha"] = "A";
+        lookupSymbol["gamma"] = "γ"; lookupSymbol["Gamma"] = "Γ";
+        lookupSymbol["delta"] = "δ"; lookupSymbol["Delta"] = "Δ";
+        lookupSymbol["epsilon"] = "ε"; lookupSymbol["Epsilon"] = "E";
+        lookupSymbol["partial"] = "∂"; lookupSymbol["int"] = "∫";
+        lookupSymbol["inf"] = "∞";     lookupSymbol["approx"] = "≈";
+        lookupSymbol["cdot"] = "·";    lookupSymbol["or"] = "||";
+        lookupSymbol["dash"] = "\\"; lookupSymbol["sqrt"] = "√";
+        lookupSymbol["rarrow"] = "→"; lookupSymbol["larrow"] = "←";
+        lookupSymbol["e2"] = "²"; lookupSymbol["e3"] = "³";
+        lookupSymbol["e4"] = "⁴"; lookupSymbol["e5"] = "⁵";
+        lookupSymbol["e6"] = "⁶"; lookupSymbol["e7"] = "⁷";
+        lookupSymbol["ctimes"] = "×"; lookupSymbol["e-"] = "⁻";
+        lookupSymbol["e+"] = "⁺";
+        is_lookup_symbols_inited = true;
     }
 }
 
@@ -320,8 +326,8 @@ int BaseCommand_InsertMappedSymbol(char *cmd, uint size){
         std::string symname(&cmd[e]);
         InitializeMathSymbolList();
 
-        if(mathSymbolMap.find(symname) != mathSymbolMap.end()){
-            std::string value = mathSymbolMap[symname];
+        if(lookupSymbol.find(symname) != lookupSymbol.end()){
+            std::string value = lookupSymbol[symname];
             AppPasteString(value.c_str(), value.size(), true);
         }
     }

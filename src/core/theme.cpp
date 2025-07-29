@@ -59,7 +59,7 @@ Theme themeToxi = {
 
     .scopeLineColor = ColorFromHex(0xAAAAAAAA),
     .scrollbarColor = ColorFromHex(0xFF1A1A1A),
-    .querybarTypeLineColor = ColorFromHex(0xFF7AD5A4),
+    .querybarTypeLineColor = ColorFromHex(0xFF330d0d),
     .selectorLoadedColor = ColorFromHex(0xFFF5BD96),
     .userDefineColor = ColorFromHex(0xCCE5071F),
 

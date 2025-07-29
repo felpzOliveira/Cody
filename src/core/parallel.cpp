@@ -440,7 +440,8 @@ void FinishExecutor(){
     // cleanup of threaded queue is generating errors if we terminate before cleanup
     // so we are just going to sleep and wait for it
     state = 0;
-    commandQ.push(CMD_EXIT);
+    std::string lExit(CMD_EXIT);
+    commandQ.push(lExit);
     while(state == 0){
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }

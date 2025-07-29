@@ -50,8 +50,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m){
                             irow = j;
                             icol = k;
                         }
-                    } else if (ipiv[k] > 1)
-                        printf("Singular matrix in MatrixInvert\n");
+                    } 
                 }
             }
         }
@@ -62,7 +61,6 @@ Matrix4x4 Inverse(const Matrix4x4 &m){
         }
         indxr[i] = irow;
         indxc[i] = icol;
-        if (minv[icol][icol] == 0.f) printf("Singular matrix in MatrixInvert\n");
         
         // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
         Float pivinv = 1. / minv[icol][icol];

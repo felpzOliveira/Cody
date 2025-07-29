@@ -228,7 +228,96 @@ void DEVEL_MSG(){
     printf("\n* Cody - Built %s at %s *\n", __DATE__, __TIME__);
 }
 
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_audio.h>
+#include <dr_mp3.h>
+
+#include <audio.h>
+int test_call(){
+    InitializeAudioSystem();
+
+    const char* path =
+            "/home/felipe/Documents/TaichiExpl/Dominus_Tenebris.mp3";
+
+    char arg[AUDIO_MESSAGE_MAX_SIZE];
+    AudioMessage message;
+    message.code = AUDIO_CODE_PLAY;
+    int n = snprintf(arg, AUDIO_MESSAGE_MAX_SIZE, "%s", path);
+
+    memcpy(message.argument, arg, n * sizeof(char));
+
+    AudioRequest(message);
+
+    while(1){}
+}
+
+int _test_call()
+{
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+    if(!SDL_Init(SDL_INIT_AUDIO)){
+        printf("SDL audio init failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    const char* path = "/home/felipe/Documents/TaichiExpl/Dominus_Tenebris.mp3";
+
+    drmp3 mp3;
+    if(!drmp3_init_file(&mp3, path, nullptr)){
+        printf("failed to open mp3\n");
+        SDL_Quit();
+        return 1;
+    }
+
+    const drmp3_uint64 frames = drmp3_get_pcm_frame_count(&mp3);
+    std::vector<int16_t> pcm(frames * mp3.channels);
+    const drmp3_uint64 read_frames =
+        drmp3_read_pcm_frames_s16(&mp3, frames, pcm.data());
+    drmp3_uninit(&mp3);
+
+    if(read_frames == 0){
+        printf("decoded 0 frames\n");
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_AudioSpec spec{};
+    spec.freq     = (int)mp3.sampleRate;
+    spec.format   = SDL_AUDIO_S16;
+    spec.channels = (Uint8)mp3.channels;
+
+    SDL_AudioStream* stream =
+        SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+                                  &spec, nullptr, nullptr);
+    if(!stream){
+        printf("SDL_OpenAudioDeviceStream failed: %s\n", SDL_GetError());
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_ResumeAudioStreamDevice(stream);
+
+    const int bytes = (int)(read_frames * mp3.channels * sizeof(int16_t));
+    if(SDL_PutAudioStreamData(stream, pcm.data(), bytes) < 0){
+        printf("SDL_PutAudioStreamData failed: %s\n", SDL_GetError());
+        SDL_DestroyAudioStream(stream);
+        SDL_Quit();
+        return 1;
+    }
+
+    SDL_FlushAudioStream(stream);  // optional here
+
+    // Just sleep for the length of the audio plus a tiny safety margin.
+    const Uint32 ms = (Uint32)((1000.0 * read_frames) / spec.freq);
+    SDL_Delay(ms + 200);  // 200ms pad
+
+    SDL_DestroyAudioStream(stream);
+    SDL_Quit();
+    return 0;
+}
+
 int cody_entry(int argc, char **argv){
+    //test_call();
+    //return 0;
     //DEVEL_MSG();
     SecurityServices::Context context;
     CmdLineArgs args;

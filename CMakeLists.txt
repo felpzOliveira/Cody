@@ -24,6 +24,7 @@ endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/core
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/audio
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/files
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/debugger
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/languages
@@ -33,8 +34,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/resources
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/crypto
                     ${CMAKE_CURRENT_SOURCE_DIR}/src/rpc
-                    ${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include
-                    ${CMAKE_CURRENT_SOURCE_DIR}/external/libgit2/include)
+                    ${CMAKE_CURRENT_SOURCE_DIR}/src/external/glad/include)
 
 # core directory
 set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
@@ -65,6 +65,7 @@ set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/hash.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp)
 
+# graphics directory
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_querybar.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/image_renderer.cpp
@@ -77,6 +78,10 @@ list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_queryba
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/dbgwidget.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/widgets.cpp
                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/graphics_buffer_view.cpp)
+
+# audio directory
+list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/audio/mp3decoder.cpp
+                       ${CMAKE_CURRENT_SOURCE_DIR}/src/audio/audioworker.cpp)
 
 # files directory
 list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/files/file_buffer.cpp
@@ -175,9 +180,13 @@ if(CODY_BUILD)
 endif()
 
 
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/external)
+
 if(CMAKE_SYSTEM_NAME MATCHES "Windows")
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows
-                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows)
+                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows
+                        ${LIB_GIT2_INCLUDEDIR}
+                        ${LIB_SDL3_INCLUDEDIR})
     list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows/win_keyboard.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/core/windows/timer.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/windows/win_display.cpp
@@ -196,7 +205,9 @@ else()
     endif()
 
     include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src/core/linux
-                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/linux)
+                        ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/linux
+                        ${LIB_GIT2_INCLUDEDIR}
+                        ${LIB_SDL3_INCLUDEDIR})
 
     list(APPEND CORE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/src/core/linux/x11_keyboard.cpp
                            ${CMAKE_CURRENT_SOURCE_DIR}/src/graphics/linux/x11_display.cpp
@@ -225,7 +236,9 @@ else()
         set (CODY_LIBRARIES
                 dl
                 ${X11_LIB}
-                ${PTHREAD_LIB})
+                ${PTHREAD_LIB}
+                ${LIB_GIT2_TARGET}
+                ${LIB_SDL3_TARGET})
     endif()
 endif()
 
@@ -244,7 +257,8 @@ if(CODY_BUILD)
 
     add_library(corelib OBJECT ${CORE_FILES})
     add_dependencies(corelib ResourcesRunner)
-    add_executable(${CODY} ${SUBSYSTEM} ${EDITOR_FILES} $<TARGET_OBJECTS:corelib>)
+    add_executable(${CODY} ${SUBSYSTEM} ${EDITOR_FILES}
+                   $<TARGET_OBJECTS:corelib>)
 
     #add_custom_command(TARGET ${CODY} PRE_BUILD COMMAND ${PACK_RESOURCES}
      #                       ${CMAKE_SOURCE_DIR}

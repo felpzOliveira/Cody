@@ -181,6 +181,7 @@ cudaSuccess RESERVED
 cudaEvent_t DATATYPE
 cudaError_t DATATYPE
 static_cast OPERATOR
+__PRETTY_FUNCTION__ RESERVED
 __FUNCTION__ RESERVED
 __constant__ RESERVED
 __restrict__ RESERVED
@@ -767,6 +768,7 @@ cudaEvent_t DATATYPE
 cudaError_t DATATYPE
 static_cast OPERATOR
 CUDA_SUCCESS RESERVED
+__PRETTY_FUNCTION__ RESERVED
 __FUNCTION__ RESERVED
 __constant__ RESERVED
 __restrict__ RESERVED

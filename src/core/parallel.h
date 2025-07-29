@@ -13,7 +13,7 @@
 #include <chrono>
 #include <iostream>
 
-#define PARALLEL_QUEUE_TIMEOUT_MS 10
+#define PARALLEL_QUEUE_TIMEOUT_MS 20
 
 struct LockedLineBuffer{
     LineBuffer *lineBuffer;
@@ -138,7 +138,7 @@ template<typename T> class ConcurrentTimedQueue{
         return itemQ.size();
     }
 
-    void push(T item){
+    void push(T &item){
         std::unique_lock<std::mutex> locker(mutex);
         itemQ.push(item);
         locker.unlock();
@@ -175,7 +175,7 @@ template<typename T> class ConcurrentQueue{
         return val;
     }
 
-    void push(T item){
+    void push(T &item){
         std::unique_lock<std::mutex> locker(mutex);
         itemQ.push(item);
         locker.unlock();
