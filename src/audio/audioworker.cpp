@@ -42,6 +42,7 @@ struct AudioController{
 
 static std::atomic<bool> audioThreadRunning = false;
 static std::atomic<bool> audioThreadInited = false;
+static std::atomic<int> audioThreadState = 0;
 static AudioController gAudioController = {
     .stream = nullptr
 };
@@ -135,6 +136,8 @@ _AudioPushTrackToStream(AudioController *controller, AudioTrack *track){
             AudioLog("SDL_PutAudioStreamData failed: %s\n", SDL_GetError());
             ok = false;
         }
+
+        audioThreadState |= AUDIO_STATE_PLAYING_BIT;
     }
 
     return ok;
@@ -309,6 +312,18 @@ static void _AudioOpen_OnMeta(void *pUser, const drmp3_metadata *pMetadata){
     }
 }
 
+static void _AudioPause(AudioController *controller, AudioMessage *message){
+    SDL_PauseAudioStreamDevice(controller->stream);
+    audioThreadState &= ~AUDIO_STATE_PLAYING_BIT;
+}
+
+static void _AudioResume(AudioController *controller, AudioMessage *message){
+    SDL_ResumeAudioStreamDevice(controller->stream);
+
+    if(SDL_GetAudioStreamQueued(controller->stream) > 0)
+        audioThreadState |= AUDIO_STATE_PLAYING_BIT;
+}
+
 static void _AudioPlay(AudioController *controller, AudioMessage *message){
     AudioTrack *track = nullptr;
     SDL_AudioSpec in{};
@@ -363,6 +378,7 @@ static void AudioThreadEntry(AudioController *controller){
     int rv = 0;
     bool requestedTerminate = false;
     audioThreadRunning = true;
+    audioThreadState = 0;
     _AudioResetController(controller);
 
     rv = _AudioInit(controller);
@@ -370,6 +386,7 @@ static void AudioThreadEntry(AudioController *controller){
         goto __terminate;
 
     audioThreadInited = true;
+    audioThreadState |= AUDIO_STATE_RUNNING_BIT;
 
     while(!requestedTerminate){
         std::optional<AudioMessage> optMessage = controller->audioQueue.pop();
@@ -380,6 +397,14 @@ static void AudioThreadEntry(AudioController *controller){
             switch(message.code){
                 case AUDIO_CODE_PLAY:{
                     _AudioPlay(controller, &message);
+                } break;
+
+                case AUDIO_CODE_PAUSE:{
+                    _AudioPause(controller, &message);
+                } break;
+
+                case AUDIO_CODE_RESUME:{
+                    _AudioResume(controller, &message);
                 } break;
 
                 case AUDIO_CODE_FINISH:{
@@ -398,6 +423,8 @@ static void AudioThreadEntry(AudioController *controller){
                 controller->trackList.pop();
                 SDL_DestroyAudioStream(currTrack->stream);
                 delete currTrack;
+
+                audioThreadState &= ~AUDIO_STATE_PLAYING_BIT;
             }
         }
     }
@@ -414,6 +441,7 @@ __finish:
     _AudioFinish(controller);
 __terminate:
     audioThreadRunning = false;
+    audioThreadState = 0;
 }
 
 /* interface */
@@ -426,6 +454,14 @@ void InitializeAudioSystem(){
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
     }
+}
+
+int AudioGetState(){
+    return audioThreadState;
+}
+
+bool AudioIsRunning(){
+    return audioThreadRunning;
 }
 
 void AudioRequest(AudioMessage &message){

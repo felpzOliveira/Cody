@@ -1591,7 +1591,8 @@ void AppCommandQueryBarInteractiveCommand(){
     if(state != View_QueryBar){
         // NOTE: This needs to be static otherwise if operation is detached
         //       we lose the value
-        static int oldCompression = AppGetPathCompression();
+        static int oldCompression = -1;
+        oldCompression = AppGetPathCompression();
         AppSetPathCompression(-1);
         QueryBar *qbar = View_GetQueryBar(gView);
 
@@ -1606,7 +1607,12 @@ void AppCommandQueryBarInteractiveCommand(){
             AppOnTypeChange();
             QueryBar_GetWrittenContent(bar, &content, &size);
             int r = BaseCommand_Interpret(content, size, view);
-            AppSetPathCompression(oldCompression);
+            /* Check the operation did not change path compression */
+            int currCompression = AppGetPathCompression();
+            if(currCompression == -1){
+                /* user did not change path compression, restore it */
+                AppSetPathCompression(oldCompression);
+            }
             return r == 2 ? 0 : -1;
         };
 

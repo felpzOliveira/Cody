@@ -18,6 +18,7 @@
 #include <cryptoutil.h>
 #include <unordered_map>
 #include <set>
+#include <audio.h>
 
 int Mkdir(const char *path);
 char* __realpath(const char* path, char* resolved_path);
@@ -844,6 +845,61 @@ int BaseCommand_KillSpaces(char *cmd, uint size, View *view){
     return r;
 }
 
+int BaseCommandMusicMng_Add(char *cmd, uint size, View *view){
+    int r = 0;
+    const char *strCmd = CMD_MUSIC_ADD;
+    const uint len = strlen(strCmd);
+    if(StringStartsWith(cmd, size, (char *)strCmd, len)){
+        int e = StringFirstNonEmpty(&cmd[len], size-len);
+        e += len;
+
+        if(FileExists(&cmd[e])){
+            if(size-len+1 < AUDIO_MESSAGE_MAX_SIZE){
+                AudioMessage message;
+                InitializeAudioSystem();
+
+                message.code = AUDIO_CODE_PLAY;
+                int n = snprintf((char *)message.argument,
+                                 AUDIO_MESSAGE_MAX_SIZE, "%s", &cmd[e]);
+                message.argument[n] = 0;
+                AudioRequest(message);
+
+                r = 1;
+            }else{
+                printf("[BUG] File path larger than audio message!\n");
+            }
+        }
+    }
+    return r;
+}
+
+int BaseCommandMusicMng_Pause(char *, uint, View *){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        message.code = AUDIO_CODE_PAUSE;
+        AudioRequest(message);
+    }
+    return 1;
+}
+
+int BaseCommandMusicMng_Resume(char *, uint, View *){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        message.code = AUDIO_CODE_RESUME;
+        AudioRequest(message);
+    }
+    return 1;
+}
+
+int BaseCommandMusicMng_Stop(char *, uint, View *){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        message.code = AUDIO_CODE_FINISH;
+        AudioRequest(message);
+    }
+    return 1;
+}
+
 /* These are most duplicated from app.cpp so we get a list of strings attached to a cmd */
 int BaseCommand_Vsplit(char *, uint, View *){
     AppCommandSplitVertical();
@@ -1075,6 +1131,10 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_GET_STR] = {CMD_GET_HELP, BaseCommandGetFile};
     cmdMap[CMD_JUMP_TO_STR] = {CMD_JUMP_TO_HELP, BaseCommandJumpTo};
     cmdMap[CMD_SWAP_TABS] = {CMD_SWAP_TABS_HELP, BaseCommandSwapTabs};
+    cmdMap[CMD_MUSIC_ADD] = {CMD_MUSIC_ADD_HELP, BaseCommandMusicMng_Add};
+    cmdMap[CMD_MUSIC_PAUSE] = {CMD_MUSIC_PAUSE_HELP, BaseCommandMusicMng_Pause};
+    cmdMap[CMD_MUSIC_RESUME] = {CMD_MUSIC_RESUME_HELP, BaseCommandMusicMng_Resume};
+    cmdMap[CMD_MUSIC_STOP] = {CMD_MUSIC_STOP_HELP, BaseCommandMusicMng_Stop};
 }
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){

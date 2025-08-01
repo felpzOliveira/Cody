@@ -7,6 +7,7 @@
 #include <parallel.h>
 #include <iostream>
 #include <dbgapp.h>
+#include <audio.h>
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                      Float &x, Float &y, uint lineNr);
@@ -1178,14 +1179,24 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
     int k = 0;
     int eState = LineBuffer_IsEncrypted(view->lineBuffer);
 
+    int audioFlags = AudioGetState();
+    const char *audioString = "";
+    if(audioFlags & AUDIO_STATE_PLAYING_BIT){
+        audioString = "♫♪";
+    }else if(audioFlags & AUDIO_STATE_RUNNING_BIT){
+        audioString = "—";
+    }
+
     // TODO: Maybe add a dedicated routine to gether all strings related to the state
     //       of the linebuffer so we can easily add more states here to print
     if(is_tab){
-        k = snprintf(enddesc, sizeof(enddesc), " %s %s TAB - %d %s",
+        k = snprintf(enddesc, sizeof(enddesc), " %s %s %s TAB - %d %s",
+                     audioString,
                      eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
                      tabSpace, EncoderName(fileEncoder));
     }else{
-        k = snprintf(enddesc, sizeof(enddesc), " %s %s SPACE - %d %s",
+        k = snprintf(enddesc, sizeof(enddesc), " %s %s %s SPACE - %d %s",
+                     audioString,
                      eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
                      tabSpace, EncoderName(fileEncoder));
     }
