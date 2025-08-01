@@ -120,7 +120,12 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
             x0 = fonsComputeStringAdvance(state->font.fsContext, ptr,
                                           rawp+utf8Len, &glCursor->pGlyph, encoder);
         }
-        x0 = Max(0, x0-CursorDefaultPadding);
+
+        if(useDriverDownscale)
+            x0 = Max(0, x0-CursorDefaultPadding);
+        else
+            x0 += 5;
+
         // TODO: Why does this makes sense on windows and not on linux?
     #if defined(_WIN32)
         int isZero = x0 == 0;
@@ -479,6 +484,9 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
                 uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len, encoder);
                 char *chr = &buffer->data[rawp];
                 if(*chr != '\t'){
+                    if(!useDriverDownscale){
+                        p.x += 1;
+                    }
                     Graphics_PrepareTextRendering(state, projection, &state->model);
                     vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
                     fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
@@ -1169,7 +1177,8 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
     uint fSize = currFontSize > 5 ? currFontSize - 5 : currFontSize;
     Float scale = font->fontMath.invReduceScale;
 
-    Graphics_SetFontSize(state, (Float)fSize, (Float)fSize + FONT_UPSCALE_DEFAULT_OFFSET);
+    Graphics_SetFontSize(state, (Float)fSize,
+                (Float)fSize + FONT_UPSCALE_DEFAULT_OFFSET);
     Graphics_PrepareTextRendering(state, projection, &state->scale);
 
     int is_tab = 0;

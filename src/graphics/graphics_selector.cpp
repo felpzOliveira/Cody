@@ -74,9 +74,9 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
     #if defined(_WIN32)
-        uint size = 35;
+        uint size = useDriverDownscale ? 35 : 10;
     #else
-        uint size = 80;
+        uint size = useDriverDownscale ? 80 : 10;
     #endif
         int pGlyph = -1;
         Float x = lWidth * multiplier;
@@ -119,12 +119,18 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
                 int off = 0;
                 FileEntry *e = &opener->entries[rindex];
                 mid = Graphics_FetchTextureFor(state, e, &off);
-                size -= off;
+                if(useDriverDownscale)
+                    size -= off;
+                else
+                    size = 30;
+
                 #if defined(_WIN32)
                     vec2ui p = vec2ui(20, (uint)ym-10);
                     if (off < 0) size *= .65;
                 #else
-                    vec2ui p = vec2ui(50, (uint)ym-20);
+                    vec2ui p = vec2ui(useDriverDownscale ? 50 : 5,
+                                      useDriverDownscale ? (uint)ym-20 :
+                                                           (uint)ym-10);
                 #endif
                 int needs_render = Graphics_ImagePush(state, p, p+size, mid);
                 if(needs_render){

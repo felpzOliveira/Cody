@@ -44,6 +44,7 @@ constexpr Float iconBlur = 0.0f;
 #endif
 
 constexpr double CursorDisplayEventInterval = 2;
+int useDriverDownscale = 1;
 
 static OpenGLState GlobalGLState;
 
@@ -400,8 +401,12 @@ void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize,
                                            Transform *model, Float reference)
 {
     FontMath *fMath = &font->fontMath;
-    fMath->fontSizeAtRenderCall = reference;
+    if(useDriverDownscale)
+        fMath->fontSizeAtRenderCall = reference;
+    else
+        fMath->fontSizeAtRenderCall = fontSize;
     fMath->fontSizeAtDisplay = fontSize;
+    fMath->referenceSize = reference;
 
     fMath->reduceScale = fMath->fontSizeAtDisplay / fMath->fontSizeAtRenderCall;
     fMath->invReduceScale = 1.0 / fMath->reduceScale;
@@ -413,7 +418,9 @@ uint Graphics_GetDefaultLineHeight(){
 }
 
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
+    Float scalingFactor = fontSize / reference;
     OpenGLFont *font = &state->font;
+    state->imageModel = Scale(scalingFactor, scalingFactor, 1);
     Graphics_ComputeTransformsForFontSize(font, fontSize, &state->scale, reference);
 }
 
@@ -756,6 +763,10 @@ static void _OpenGLUpdateProjections(OpenGLState *state, int width, int height){
     state->scale = Scale(font->fontMath.reduceScale,
                          font->fontMath.reduceScale, 1);
 
+    Float imageScaleFactor = font->fontMath.fontSizeAtRenderCall /
+                                        font->fontMath.referenceSize;
+    state->imageModel = Scale(imageScaleFactor, imageScaleFactor, 1);
+
     Geometry geometry;
     geometry.lower = vec2ui(0, 0);
     geometry.upper = vec2ui(width, height);
@@ -1026,6 +1037,21 @@ void OpenGLInitialize(OpenGLState *state){
     WindowOnSizeChange(width, height, nullptr);
     onMouseAction();
 
+    // NOTE: I think nvidia drivers automatically does something
+    //       to textures so that sampling a larger texture → small target
+    //       do some very high-quality filtering because the results are
+    //       great. So if we are using nvidia it is actually better to render
+    //       everything larger and allow the driver/gpu setup to downscale.
+    const GLubyte *vendor = glGetString(GL_VENDOR);
+    std::string vendor_str((const char *)vendor);
+    if(vendor_str.find("NVIDIA") != std::string::npos &&
+       vendor_str.find("nvidia") != std::string::npos)
+    {
+        // if on integrated graphics render everything to scale
+        useDriverDownscale = 0;
+    }
+
+    //printf("Vendor: %s\n", glGetString(GL_VENDOR));
     //printf("GL  version: %s\n", glGetString(GL_VERSION));
     //printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 }
@@ -1091,7 +1117,7 @@ void Graphics_ImageFlush(OpenGLState *state, OpenGLImageQuadBuffer *oquad){
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glUseProgram(state->imageShader.id);
         Shader_UniformMatrix4(state->imageShader, "projection", &state->projection.m);
-        Shader_UniformMatrix4(state->imageShader, "modelView", &state->scale.m);
+        Shader_UniformMatrix4(state->imageShader, "modelView", &state->imageModel.m);
 
         Shader_UniformFloat(state->imageShader, "blurIntensity", iconBlur);
 
@@ -1495,7 +1521,7 @@ void UpdateEventsAndHandleRequests(int animating, double frameInterval){
                 expected_ival = Min(expected_ival, handler.interval);
             }
 
-            // in case someone exited we need to update the iterval
+            // in case someone exited we need to update the interval
             // for the next one
             if(any_rems && state->eventHandlers.size() > 0){
                 state->eventInterval = expected_ival;

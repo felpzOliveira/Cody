@@ -27,9 +27,6 @@
 // than 1/1024, I'm sorry, you should review your event.
 #define MIN_EVENT_SAMPLING_INTERVAL 0.000976562
 
-// Our OpenGL rendering renders everything in very high resolution and
-// than reduce scaling to get simple AA. This could potentially be slow
-// but it is working fine for me.
 #if !defined(_WIN32)
     #define FONT_UPSCALE_DEFAULT_SIZE 65
     #define FONT_UPSCALE_DEFAULT_OFFSET 47
@@ -75,6 +72,7 @@ struct FontMath{
     Float fontSizeAtDisplay;
     Float reduceScale;
     Float invReduceScale;
+    Float referenceSize;
 };
 
 struct OpenGLFont{
@@ -177,6 +175,7 @@ struct OpenGLState{
     Transform projection;
     Transform scale;
     Transform model;
+    Transform imageModel;
     std::vector<EventHandler> eventHandlers;
     double eventInterval;
     double lastEventTime;
@@ -215,6 +214,8 @@ typedef struct{
     uint stageCount;
 }RenderList;
 
+// expose the downscale flag
+extern int useDriverDownscale;
 
 void Graphics_Initialize();
 int  Graphics_IsRunning();
