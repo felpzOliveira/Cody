@@ -5,37 +5,10 @@
 #include <stdint.h>
 
 /*
- * Disclaimer: All crypto code present in Cody is meant to be both
- * learn material for myself and provide a sandbox for basic operations.
- * This means that while I try my best to make this code safe it is meant
- * to protect against connection stuff and not local stuff, i.e.: I won't
- * bother with things like: caching attack and other side channels attacks
- * as for this application it makes no sense to worry about that and it would
- * only make it harder to implement these algorithms. I'm a strong believer
- * on 2 things:
- *   1 - We should consider implementing things ourselves, it's the only way
- *       we learn and maybe get things to a better place;
- *   2 - Applications should use what they need and not fantasize about
- *       things that are impossible in their scenarios.
- * This implies that my implementation is meant to provide protection over network
- * connections and not on local machines, If you feel like this code should
- * do more I suggest you implement crypto using either OpenSSL or MbedTLS.
- * I also don't make any promises that this will be decently fast, performance
- * is also irrelevant for Cody as the crypto agent will be detached and the editor's
- * performance won't be affect. I'll however eventually tabulate things but only when
- * actually required. While I have written several protocols around OpenSSL and MbedTLS
- * I have never written the crypto stuff at low level, so expect the implementation to
- * be the 'naive' one, however this is a good oportunity to learn implementation details
- * of each algorithm and explore modern algorithms that have not yet been implemented
- * in packages such as OpenSSL and MbedTLS. I'm quite excited to attempt lattice
- * and isogeny-based cryptography.
- */
-
-/*
- * Note: The AES implementation here is the reference implementation, i.e.: it only
- * uses tables for the galois field multiplication and does not merge ShiftRows,
- * MixColumns, etc... into table components. Expect it to be slower than the optmized
- * version you would find in OpenSSL and MbedTLS.
+ * While this implementation is working nicely, it is very slow as it
+ * not optmized and doesnt use assembly. Passing large files through
+ * the server interface can be annoyingly slow. Maybe integrate a bit
+ * of OpenSSL just so we can speed this thing up.
  */
 
 #define AES_BLOCK_SIZE_IN_BYTES 16

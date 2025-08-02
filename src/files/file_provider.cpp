@@ -9,6 +9,10 @@
 #include <sstream>
 #include <cryptoutil.h>
 #include <aes.h>
+#include <audio.h>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 typedef struct FileProvider{
     FileBufferList fileBuffer;
@@ -320,6 +324,15 @@ bool FileProvider_VerifyEncryptedFile(uint8_t *content, uint32_t size){
     return true;
 }
 
+// Very naive test
+bool FileProvider_IsMp3File(uint8_t *content, uint32_t size){
+    if(size < 3)
+        return false;
+    return (content[0] == 'I' &&
+            content[1] == 'D' &&
+            content[2] == '3');
+}
+
 static char *tempContent = nullptr;
 static uint tempSize = 0;
 static int tempFlag = 0;
@@ -440,8 +453,46 @@ static int FileProvider_GuessEntry(char *targetPath, uint len){
     return FILE_TYPE_ON_LOAD_TEXT;
 }
 
-int FileProvider_Load(char *targetPath, uint len, int &fileType, LineBuffer **lineBuffer,
-                      bool mustFinish)
+std::string bad_rng_string(uint size){
+    std::string res;
+    const char charset[] =
+        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+
+    int charset_size = sizeof(charset) - 1;
+
+    res.resize(size);
+    for(uint i = 0; i < size; i++){
+        res[i] = charset[rand() % charset_size];
+    }
+
+    return res;
+}
+
+fs::path FileProvider_MakeTempFile(){
+    fs::path dir = fs::temp_directory_path();
+#if defined(_WIN32)
+    char path[MAX_PATH];
+    if(GetTempFileNameA(dir.string().c_str(), "CODY", 0, path) == 0){
+        // Could not do it, default to a local dumb file
+        std::string tpath = std::string(".cody_temp_") + bad_rng_string(8);
+        return fs::path{tpath};
+    }
+
+    return fs::path{path};
+#else
+    std::string pattern = (dir / "cody-XXXXXX").string();
+    int fd = mkstemp(pattern.data());
+    if(fd == -1){
+        std::string tpath = std::string(".cody_temp_") + bad_rng_string(8);
+        return fs::path{tpath};
+    }
+    close(fd);
+    return fs::path{pattern};
+#endif
+}
+
+int FileProvider_Load(char *targetPath, uint len, int &fileType,
+                      LineBuffer **lineBuffer, bool mustFinish)
 {
     LineBuffer *lBuffer = nullptr;
     Tokenizer *tokenizer = nullptr;
@@ -468,6 +519,27 @@ int FileProvider_Load(char *targetPath, uint len, int &fileType, LineBuffer **li
                 tempPath = std::string(targetPath, len);
                 tempFlag = 1; // decrypt
                 return FILE_LOAD_REQUIRES_DECRYPT;
+            }
+
+            if(FileProvider_IsMp3File(ptr, (uint32_t)fileSize)){
+                // NOTE: We have to dump to a temporary file otherwise
+                // we can lost the data because the file might have been
+                // by a storage provider that is not local. We need to make
+                // it local for the audio service.
+                fs::path path = FileProvider_MakeTempFile();
+                std::ofstream ofs(path.string(), std::ios::binary);
+                if(ofs.is_open()){
+                    ofs.write(reinterpret_cast<const char*>(ptr),
+                              static_cast<std::streamsize>(fileSize));
+                    ofs.close();
+
+                    // Make sure audio is running
+                    InitializeAudioSystem();
+                    AudioRequestAddMusic(path.string().c_str(), 1);
+                }
+                // we always return failure here as we cant actually display
+                // the file
+                return FILE_LOAD_FAILED;
             }
         }
 

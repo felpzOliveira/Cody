@@ -855,15 +855,8 @@ int BaseCommandMusicMng_Add(char *cmd, uint size, View *view){
 
         if(FileExists(&cmd[e])){
             if(size-len+1 < AUDIO_MESSAGE_MAX_SIZE){
-                AudioMessage message;
                 InitializeAudioSystem();
-
-                message.code = AUDIO_CODE_PLAY;
-                int n = snprintf((char *)message.argument,
-                                 AUDIO_MESSAGE_MAX_SIZE, "%s", &cmd[e]);
-                message.argument[n] = 0;
-                AudioRequest(message);
-
+                AudioRequestAddMusic(&cmd[e], 0);
                 r = 1;
             }else{
                 printf("[BUG] File path larger than audio message!\n");
@@ -893,9 +886,7 @@ int BaseCommandMusicMng_Resume(char *, uint, View *){
 
 int BaseCommandMusicMng_Stop(char *, uint, View *){
     if(AudioIsRunning()){
-        AudioMessage message;
-        message.code = AUDIO_CODE_FINISH;
-        AudioRequest(message);
+        TerminateAudioSystem();
     }
     return 1;
 }

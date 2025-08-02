@@ -23,6 +23,7 @@
 #include <modal.h>
 #include <timer.h>
 #include <image_renderer.h>
+#include <audio.h>
 
 //NOTE: Since we already modified fontstash source to reduce draw calls
 //      we might as well embrace it
@@ -1680,6 +1681,7 @@ void OpenGLEntry(){
     state->running = 0;
     state->window = nullptr;
     FinishExecutor();
+    TerminateAudioSystem();
 }
 
 int Graphics_IsRunning(){

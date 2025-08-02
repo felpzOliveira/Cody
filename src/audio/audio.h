@@ -32,6 +32,12 @@ struct AudioMessage{
 void InitializeAudioSystem();
 
 /*
+ * Terminates the audio subsystem. Dont just send a finish message, call
+ * this instead.
+ */
+void TerminateAudioSystem();
+
+/*
  * Checks if the audio system is up _right_now_.
  */
 bool AudioIsRunning();
@@ -45,3 +51,9 @@ int AudioGetState();
  * Send a request to the audio system.
  */
 void AudioRequest(AudioMessage &message);
+
+/*
+ * Sends a music-add request optionally requesting for the
+ * audio thread to take ownership of the file. (deleting it after use).
+ */
+void AudioRequestAddMusic(const char *path, int takeFile);

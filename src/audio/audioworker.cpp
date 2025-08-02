@@ -40,6 +40,7 @@ struct AudioController{
     AudioPlayMode mode;
 };
 
+static std::thread audioThreadId;
 static std::atomic<bool> audioThreadRunning = false;
 static std::atomic<bool> audioThreadInited = false;
 static std::atomic<int> audioThreadState = 0;
@@ -327,7 +328,9 @@ static void _AudioResume(AudioController *controller, AudioMessage *message){
 static void _AudioPlay(AudioController *controller, AudioMessage *message){
     AudioTrack *track = nullptr;
     SDL_AudioSpec in{};
-    char *mp3Path = (char *)message->argument;
+    int takeFile  = message->argument[0];
+    char *mp3Path = (char *)&message->argument[1];
+
     AudioLog("Enqueue path= %s\n", mp3Path);
 
     // Minimal checks and load
@@ -363,6 +366,11 @@ static void _AudioPlay(AudioController *controller, AudioMessage *message){
     if(track->framesRead == 0){
         AudioLog("Read no frames, empty/corrupted file?\n");
         goto __error;
+    }
+
+    // Store path in case of owned file
+    if(takeFile){
+        UNLINK(mp3Path);
     }
 
     AudioLog("Pushing track [%s - %s]\n", track->title, track->author);
@@ -449,10 +457,21 @@ void InitializeAudioSystem(){
     if(!audioThreadRunning){
         audioThreadInited = false;
         // TODO: make this joinable instead
-        std::thread(AudioThreadEntry, &gAudioController).detach();
+        audioThreadId = std::thread(AudioThreadEntry, &gAudioController);
         while(!audioThreadInited){
             std::this_thread::sleep_for(std::chrono::milliseconds(50));
         }
+    }
+}
+
+void TerminateAudioSystem(){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        message.code = AUDIO_CODE_FINISH;
+        AudioRequest(message);
+
+        if(audioThreadId.joinable())
+            audioThreadId.join();
     }
 }
 
@@ -466,4 +485,14 @@ bool AudioIsRunning(){
 
 void AudioRequest(AudioMessage &message){
     gAudioController.audioQueue.push(message);
+}
+
+void AudioRequestAddMusic(const char *path, int takeFile){
+    AudioMessage message;
+    message.code = AUDIO_CODE_PLAY;
+    message.argument[0] = takeFile;
+    int n = snprintf((char *)&message.argument[1],
+                     AUDIO_MESSAGE_MAX_SIZE-1, "%s", path);
+    message.argument[n+1] = 0;
+    AudioRequest(message);
 }

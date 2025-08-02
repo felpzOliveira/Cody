@@ -18,6 +18,7 @@
     #define PATH_MAX 256
     #define CHDIR(x) _chdir(x)
     #define MKDIR(x) _mkdir(x)
+    #define UNLINK(x) _unlink(x)
     #define SEPARATOR_CHAR '\\'
     #define SEPARATOR_STRING "\\"
     #define SLEEP(n) Sleep(n)
@@ -25,6 +26,7 @@
     #include <unistd.h>
     #define CHDIR(x) chdir(x)
     #define MKDIR(x) mkdir(x, 0777)
+    #define UNLINK(x) unlink(x)
     #define SEPARATOR_CHAR '/'
     #define SEPARATOR_STRING "/"
     #define SLEEP(n) sleep(n)
