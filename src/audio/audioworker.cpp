@@ -9,7 +9,8 @@
 #include <queue>
 
 // TODO: Actual log
-#define AudioLog(...) printf(__VA_ARGS__)
+//#define AudioLog(...) printf(__VA_ARGS__)
+#define AudioLog(...)
 
 #define AUDIO_ERR_OK              0
 #define AUDIO_ERR_INIT_FAILED     1
@@ -30,6 +31,9 @@ struct AudioTrack{
     char title[ID3V2_MAX_MIME_SIZE];
     char author[ID3V2_MAX_MIME_SIZE];
     std::vector<uint8_t> cover;
+    double currentProgress;
+    drmp3_uint64 totalFrames;
+    drmp3_uint64 currentFrames;
 };
 
 struct AudioController{
@@ -38,6 +42,8 @@ struct AudioController{
     std::queue<AudioTrack *> trackList;
     SDL_AudioSpec spec;
     AudioPlayMode mode;
+    float currentGain;
+    double currentTrackProgress;
 };
 
 static std::thread audioThreadId;
@@ -54,6 +60,9 @@ static void _AudioInitEmptyTrack(AudioTrack *track){
     track->framesRead = 0;
     track->eof = false;
     track->stream = nullptr;
+    track->currentProgress = 0;
+    track->currentFrames = 0;
+    track->totalFrames = 0;
 }
 
 static int _AudioInit(AudioController *controller){
@@ -66,6 +75,7 @@ static int _AudioInit(AudioController *controller){
     controller->spec.freq     = 48000;
     controller->spec.format   = SDL_AUDIO_S16;
     controller->spec.channels = 2;
+    controller->currentGain   = 1;
 
     controller->stream =
               SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
@@ -77,6 +87,8 @@ static int _AudioInit(AudioController *controller){
     }
 
     controller->mode = AUDIO_PLAY_MODE_REPEAT;
+    controller->currentTrackProgress = 0;
+    SDL_SetAudioStreamGain(controller->stream, controller->currentGain);
     SDL_ResumeAudioStreamDevice(controller->stream);
 
     return AUDIO_ERR_OK;
@@ -84,6 +96,7 @@ static int _AudioInit(AudioController *controller){
 
 static void _AudioResetController(AudioController *controller){
     controller->stream = nullptr;
+    controller->currentTrackProgress = 0;
     controller->audioQueue.clear();
     controller->spec = {};
     // 10× smaller than the audio sampling interval
@@ -123,7 +136,9 @@ static void _AudioReadNextFrames(AudioTrack *track){
 static bool
 _AudioPushTrackToStream(AudioController *controller, AudioTrack *track){
     bool ok = true;
+    int bytesPerFrame = controller->spec.channels * sizeof(int16_t);
     int max_size = track->samples.size();
+    drmp3_uint64 &currentFrames = track->currentFrames;
     for(;;){
         int got = SDL_GetAudioStreamData(track->stream,
                         track->samples.data(), track->samples.size());
@@ -138,10 +153,21 @@ _AudioPushTrackToStream(AudioController *controller, AudioTrack *track){
             ok = false;
         }
 
+        currentFrames += got / bytesPerFrame;
         audioThreadState |= AUDIO_STATE_PLAYING_BIT;
     }
 
+    track->currentProgress = (currentFrames * 100.0) / track->totalFrames;
+    controller->currentTrackProgress = track->currentProgress;
+
     return ok;
+}
+
+static void
+_AudioResetTrack(AudioTrack *track){
+    drmp3_seek_to_pcm_frame(&track->mp3, 0);
+    track->currentFrames = 0;
+    track->currentProgress = 0;
 }
 
 static bool
@@ -166,7 +192,7 @@ _AudioHandleTrackProgression(AudioController *controller, AudioTrack *track){
             }else{
                 if(controller->mode == AUDIO_PLAY_MODE_REPEAT){
                     // go back to begining
-                    drmp3_seek_to_pcm_frame(&track->mp3, 0);
+                    _AudioResetTrack(track);
                 }else{
                     track->eof = true;
                     SDL_FlushAudioStream(controller->stream);
@@ -325,6 +351,21 @@ static void _AudioResume(AudioController *controller, AudioMessage *message){
         audioThreadState |= AUDIO_STATE_PLAYING_BIT;
 }
 
+static void _AudioHandleGainChange(AudioController *controller,
+                                   AudioMessage *message)
+{
+    float dgain = 0.f;
+    memcpy((void *)&dgain, message->argument, sizeof(float));
+
+    controller->currentGain += dgain;
+    if(controller->currentGain > 1)
+        controller->currentGain = 1;
+    if(controller->currentGain < 0)
+        controller->currentGain = 0;
+
+    SDL_SetAudioStreamGain(controller->stream, controller->currentGain);
+}
+
 static void _AudioPlay(AudioController *controller, AudioMessage *message){
     AudioTrack *track = nullptr;
     SDL_AudioSpec in{};
@@ -359,6 +400,8 @@ static void _AudioPlay(AudioController *controller, AudioMessage *message){
         AudioLog("Could not create audio stream\n");
         goto __error;
     }
+
+    track->totalFrames = drmp3_get_pcm_frame_count(&track->mp3);
 
     // Load a couple of frames
     _AudioReadNextFrames(track);
@@ -400,7 +443,6 @@ static void AudioThreadEntry(AudioController *controller){
         std::optional<AudioMessage> optMessage = controller->audioQueue.pop();
         if(optMessage.has_value()){
             AudioMessage message = optMessage.value();
-            AudioLog("Got message with code {%x}\n", message.code);
 
             switch(message.code){
                 case AUDIO_CODE_PLAY:{
@@ -413,6 +455,10 @@ static void AudioThreadEntry(AudioController *controller){
 
                 case AUDIO_CODE_RESUME:{
                     _AudioResume(controller, &message);
+                } break;
+
+                case AUDIO_CODE_GAIN:{
+                    _AudioHandleGainChange(controller, &message);
                 } break;
 
                 case AUDIO_CODE_FINISH:{
@@ -495,4 +541,16 @@ void AudioRequestAddMusic(const char *path, int takeFile){
                      AUDIO_MESSAGE_MAX_SIZE-1, "%s", path);
     message.argument[n+1] = 0;
     AudioRequest(message);
+}
+
+float AudioDefaultGainChange(){
+    return 0.05;
+}
+
+float AudioGetCurrentGain(){
+    return gAudioController.currentGain;
+}
+
+float AudioGetTrackProgress(){
+    return gAudioController.currentTrackProgress;
 }

@@ -10,7 +10,7 @@
 #define KEYBOARD_EVENT_REPEAT  2
 
 #define KEYSET_MAX_SIZE 4
-#define MAX_BINDINGS_PER_ENTRY 32
+#define MAX_BINDINGS_PER_ENTRY 48
 #define KEYSET_EVENT(name) void name()
 #define KEY_ENTRY_EVENT(name) void name(char *utf8Data, int utf8Size, void *priv)
 #define KEY_ENTRY_RAW_EVENT(name) void name(int rawKeyCode)

@@ -523,7 +523,7 @@ int FileProvider_Load(char *targetPath, uint len, int &fileType,
 
             if(FileProvider_IsMp3File(ptr, (uint32_t)fileSize)){
                 // NOTE: We have to dump to a temporary file otherwise
-                // we can lost the data because the file might have been
+                // we can lose the data because the file might have been open
                 // by a storage provider that is not local. We need to make
                 // it local for the audio service.
                 fs::path path = FileProvider_MakeTempFile();

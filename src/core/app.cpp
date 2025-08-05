@@ -26,6 +26,7 @@
 #include <rng.h>
 #include <pdfview.h>
 #include <viewer_ctrl.h>
+#include <audio.h>
 
 #define DIRECTION_LEFT  0
 #define DIRECTION_UP    1
@@ -208,6 +209,7 @@ void AppEarlyInitialize(bool use_tabs){
     appGlobalConfig.defaultFontSize = 20;
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
+    appGlobalConfig.configFileRoot = nullptr;
 
     ViewTree_Initialize();
     FileProvider_Initialize();
@@ -231,7 +233,38 @@ void AppEarlyInitialize(bool use_tabs){
     dir += ".cody";
     appGlobalConfig.configFolder = dir;
     appGlobalConfig.rootFolder = appContext.cwd;
-    appGlobalConfig.configFile = dir + std::string(SEPARATOR_STRING ".config");
+    appGlobalConfig.configFile =
+                dir + std::string(SEPARATOR_STRING ".config");
+
+    // read config file and prepare it
+    uint fileSize = 0;
+    char *fileMem =
+      storage->GetContentsOf(appGlobalConfig.configFile.c_str(), &fileSize);
+
+    if(fileMem && fileSize > 0){
+        JSON_Object *obj = nullptr;
+        appGlobalConfig.configFileRoot =
+                    json_parse_string_with_comments(fileMem);
+
+        AllocatorFree(fileMem);
+        if(appGlobalConfig.configFileRoot == nullptr){
+            printf("[ERROR] Il-formed config file!\n");
+        }else{
+            obj = json_value_get_object(appGlobalConfig.configFileRoot);
+
+            const char *userFont = json_object_get_string(obj, "PreferFont");
+            fileSize = 0;
+            fileMem = storage->GetContentsOf(userFont, &fileSize);
+
+            appGlobalConfig.userFont = (unsigned char *)fileMem;
+            appGlobalConfig.userFontLen = fileSize;
+        }
+    }
+
+    // check for a new file
+    if(appGlobalConfig.configFileRoot == nullptr){
+        appGlobalConfig.configFileRoot = json_value_init_object();
+    }
 
     // TODO: Configurable number of entries?/init function?
     appContext.queryBarHistory.history = CircularStack_Create<QueryBarHistoryItem>(64);
@@ -239,6 +272,15 @@ void AppEarlyInitialize(bool use_tabs){
                                  QueryBarHistory_GetPath().c_str());
 
     BaseCommand_InitializeCommandMap();
+}
+
+unsigned char *AppGetUserPreferredFont(unsigned int &len){
+    len = appGlobalConfig.userFontLen;
+    return appGlobalConfig.userFont;
+}
+
+JSON_Value *AppGetConfigFileRoot(){
+    return appGlobalConfig.configFileRoot;
 }
 
 void AppClearHistory(){
@@ -269,13 +311,15 @@ int AppGetTabLength(int *using_tab){
 }
 
 void AppAddStoredFile(std::string basePath){
-    std::string fullPath = appGlobalConfig.rootFolder + std::string(SEPARATOR_STRING) + basePath;
+    std::string fullPath = appGlobalConfig.rootFolder +
+                                std::string(SEPARATOR_STRING) + basePath;
     appGlobalConfig.filesStored.push_back(fullPath);
 }
 
 int AppIsStoredFile(std::string path){
     for(std::string &s : appGlobalConfig.filesStored){
-        if(s == path) return 1;
+        if(s == path)
+            return 1;
     }
     return false;
 }
@@ -1358,13 +1402,6 @@ void AppCommandKillBuffer(){
             ViewTreeIterator iterator;
             ViewTree_Begin(&iterator);
 
-            Tokenizer *tokenizer = FileProvider_GetLineBufferTokenizer(lineBuffer);
-            SymbolTable *symTable = tokenizer->symbolTable;
-            for(uint i = 0; i < lineBuffer->lineCount; i++){
-                Buffer *buffer = LineBuffer_GetBufferAt(lineBuffer, i);
-                Buffer_EraseSymbols(buffer, symTable);
-            }
-
             while(iterator.value){
                 View *view = iterator.value->view;
                 BufferView *bView = &view->bufferView;
@@ -1374,12 +1411,32 @@ void AppCommandKillBuffer(){
                 ViewTree_Next(&iterator);
             }
 
-            char *ptr = lineBuffer->filePath;
-            uint pSize = lineBuffer->filePathSize;
-            FileProvider_Remove(ptr, pSize);
-            BufferViewLocation_RemoveLineBuffer(lineBuffer);
-            LineBuffer_Free(lineBuffer);
-            AllocatorFree(lineBuffer);
+            Tokenizer *tokenizer =
+                    FileProvider_GetLineBufferTokenizer(lineBuffer);
+
+            DispatchExecution([&](HostDispatcher *dispatcher){
+                Tokenizer *localTokenizer = tokenizer;
+                SymbolTable *localSymTable = tokenizer->symbolTable;
+                LineBuffer *localLinebuffer = lineBuffer;
+
+                // remove from main memory before dispatch so that
+                // we dont run the risk of sync issues.
+                char *ptr = localLinebuffer->filePath;
+                uint pSize = localLinebuffer->filePathSize;
+                FileProvider_Remove(ptr, pSize);
+                BufferViewLocation_RemoveLineBuffer(localLinebuffer);
+
+                dispatcher->DispatchHost();
+
+                for(uint i = 0; i < localLinebuffer->lineCount; i++){
+                    Buffer *buffer =
+                            LineBuffer_GetBufferAt(localLinebuffer, i);
+                    Buffer_EraseSymbols(buffer, localSymTable);
+                }
+
+                LineBuffer_Free(localLinebuffer);
+                AllocatorFree(localLinebuffer);
+            });
         }
     }
 }
@@ -1632,10 +1689,12 @@ void AppCommandStoreFileCommand(){
     View *view = AppGetActiveView();
     NullRet(view->bufferView.lineBuffer);
     NullRet(LineBuffer_IsWrittable(view->bufferView.lineBuffer));
-    std::string writtenPath = std::string(view->bufferView.lineBuffer->filePath);
     std::string rootDir = AppGetRootDirectory();
+    std::string writtenPath =
+            std::string(view->bufferView.lineBuffer->filePath);
     if(AppIsPathFromRoot(writtenPath)){
-        writtenPath = std::string(&view->bufferView.lineBuffer->filePath[rootDir.size()+1]);
+        writtenPath =
+         std::string(&view->bufferView.lineBuffer->filePath[rootDir.size()+1]);
     }else{
         printf("Warning: linebuffer has inconsistent path\n");
         printf("File Path : %s\n", view->bufferView.lineBuffer->filePath);
@@ -2568,6 +2627,28 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
     }
 }
 
+void AppCommandAudioIncrease(){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        float dGain = AudioDefaultGainChange();
+
+        message.code = AUDIO_CODE_GAIN;
+        memcpy(message.argument, (void *)&dGain, sizeof(float));
+        AudioRequest(message);
+    }
+}
+
+void AppCommandAudioReduce(){
+    if(AudioIsRunning()){
+        AudioMessage message;
+        float dGain = -AudioDefaultGainChange();
+
+        message.code = AUDIO_CODE_GAIN;
+        memcpy(message.argument, (void *)&dGain, sizeof(float));
+        AudioRequest(message);
+    }
+}
+
 void AppCommandListHelp(){
     AppRestoreCurrentBufferViewState();
     View *view = AppGetActiveView();
@@ -2803,6 +2884,8 @@ void AppInitializeFreeTypingBindings(){
 
     RegisterRepeatableEvent(mapping, AppCommandUndo, Key_LeftControl, Key_Z);
     RegisterRepeatableEvent(mapping, AppCommandListHelp, Key_LeftControl, Key_H);
+    RegisterRepeatableEvent(mapping, AppCommandAudioIncrease, Key_LeftControl, Key_Equal);
+    RegisterRepeatableEvent(mapping, AppCommandAudioReduce, Key_LeftControl, Key_Minus);
 
     //TODO: re-do (AppCommandRedo)
     RegisterRepeatableEvent(mapping, AppCommandQueryBarInteractiveCommand,

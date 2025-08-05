@@ -145,9 +145,36 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
     }
 
     if(size > 0){
+        FileHandle file;
         StorageDevice *device = FetchStorageDevice();
         std::string path = AppGetConfigFilePath();
-        device->AppendTo(path.c_str(), entry);
+        JSON_Value *root = AppGetConfigFileRoot();
+        JSON_Object *obj = json_value_get_object(root);
+
+        if(!obj){
+            return 0;
+        }
+
+        JSON_Array *array = json_object_get_array(obj, "StartupLoad");
+        if(!array)
+            return 0;
+
+        json_array_append_string_with_len(array, entry, size);
+
+        if(!device->StreamWriteStart(&file, path.c_str())){
+            printf("Could not open file %s in current storage device\n",
+                    path.c_str());
+            return 0;
+        }
+
+        json_set_escape_slashes(0);
+
+        char *serialized = json_serialize_to_string_pretty(root);
+        device->StreamWriteBytes(&file, (void *)serialized,
+                                  1, strlen(serialized));
+        device->StreamFinish(&file);
+
+        json_free_serialized_string(serialized);
     }
 
     return 0;
@@ -625,8 +652,8 @@ int SwapFontInternal(std::string fontname){
     if(fontname == "default"){
         Graphics_SetFont((char *)FONT_liberation_mono_ttf, FONT_liberation_mono_ttf_len);
         return 1;
-    }else if(fontname == "consolas"){
-        Graphics_SetFont((char *)FONT_consolas_ttf, FONT_consolas_ttf_len);
+    }else if(fontname == "firacode"){
+        Graphics_SetFont((char *)FONT_FiraCode_Regular_ttf, FONT_FiraCode_Regular_ttf_len);
         return 1;
     }else if(fontname == "commit"){
         Graphics_SetFont((char *)FONT_commit_mono_ttf, FONT_commit_mono_ttf_len);
@@ -1636,7 +1663,7 @@ int SwitchFontCommandStart(View *view){
 
     std::vector<FontDescription> fonts = {
         {"default"},
-        {"consolas"},
+        {"firacode"},
         {"commit"},
         {"ubuntu"},
         {"dejavu"},

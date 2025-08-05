@@ -63,6 +63,7 @@ set(CORE_FILES  ${CMAKE_CURRENT_SOURCE_DIR}/src/core/app.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/symbol.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/encoding.cpp
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/hash.cpp
+                ${CMAKE_CURRENT_SOURCE_DIR}/src/external/parson.c
                 ${CMAKE_CURRENT_SOURCE_DIR}/src/core/buffers.cpp)
 
 # graphics directory
@@ -270,6 +271,9 @@ if(CODY_BUILD)
     target_link_options(${CODY} PRIVATE ${LINK_OPTS})
 
     install(TARGETS ${CODY} RUNTIME DESTINATION /bin)
+    install(FILES ${CMAKE_CURRENT_SOURCE_DIR}/external/consolas_modified.ttf
+                  DESTINATION share/fonts
+                  COMPONENT fonts)
     #install(FILES ${DESKTOP_FILE} DESTINATION ~/.local/share/applications)
     #install(FILES ${ICON_FILE} DESTINATION ~/.local/share/icons/hicolor/128x128/apps)
 endif()

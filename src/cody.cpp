@@ -156,36 +156,35 @@ std::map<const char *, ArgDesc> arg_map = {
 };
 
 void LoadStaticFilesOnStart(){
-    // TODO: Port to storage arch
-    std::string path = AppGetConfigFilePath();
-    FILE *fp = fopen(path.c_str(), "r");
-    if(fp){
-        char line[256];
-        char folder[PATH_MAX];
-        FileEntry entry;
-        std::string rootPath = AppGetRootDirectory();
-        while (fgets(line, sizeof(line), fp) != NULL){
-            {
-                uint n = (uint)strlen(line);
-                line[n-1] = 0;
+    JSON_Value *root = AppGetConfigFileRoot();
+    std::string rootPath = AppGetRootDirectory();
 
-                std::string lineStr(line);
-                SwapPathDelimiter(lineStr);
+    char folder[PATH_MAX];
+    FileEntry entry;
 
-                std::string p = rootPath + std::string(SEPARATOR_STRING) + lineStr;
+    auto path_processor = [&](const char *line) -> bool{
+        uint n = (uint)strlen(line);
+        std::string lineStr(line);
+        SwapPathDelimiter(lineStr);
 
-                if(AppIsStoredFile(p)) continue;
+        std::string p = rootPath + std::string(SEPARATOR_STRING) + lineStr;
+        if(AppIsStoredFile(p))
+            return true;
 
-                int r = GuessFileEntry((char *)p.c_str(), (uint)p.size(), &entry, folder);
-                int fileType = -1;
-                if(!(r < 0) && entry.type == DescriptorFile){
-                    if(FileProvider_Load((char *)p.c_str(), (uint)p.size(), fileType))
-                        AppAddStoredFile(lineStr);
-                }
-            }
+        int r = GuessFileEntry((char *)p.c_str(), (uint)p.size(),
+                               &entry, folder);
+        int fileType = -1;
+        if(!(r < 0) && entry.type == DescriptorFile){
+            if(FileProvider_Load((char *)p.c_str(), (uint)p.size(), fileType))
+                AppAddStoredFile(lineStr);
         }
-        fclose(fp);
-    }
+
+        return true;
+    };
+
+    JsonExtractArray<json_array_get_string, decltype(path_processor)>(
+        root, "StartupLoad", path_processor
+    );
 }
 
 void InitializeEmptyView(BufferView **view=nullptr){
@@ -264,9 +263,9 @@ int cody_entry(int argc, char **argv){
     if(!args.is_remote){
         if(args.unknownPath.size() > 0){
             char folder[PATH_MAX];
-            char* p = (char*)args.unknownPath.c_str();
-            uint len = (uint)strlen(p);
             FileEntry entry;
+            char* p = (char*)args.unknownPath.c_str();
+            uint len = (uint)args.unknownPath.size();
             int r = GuessFileEntry(p, len, &entry, folder);
 
             if(r == -1){

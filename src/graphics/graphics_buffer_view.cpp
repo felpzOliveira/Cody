@@ -8,6 +8,8 @@
 #include <iostream>
 #include <dbgapp.h>
 #include <audio.h>
+#include <sstream>
+#include <iomanip>
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                      Float &x, Float &y, uint lineNr);
@@ -1189,28 +1191,38 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
     int eState = LineBuffer_IsEncrypted(view->lineBuffer);
 
     int audioFlags = AudioGetState();
-    const char *audioString = "";
+    std::string audioString;
     if(audioFlags & AUDIO_STATE_PLAYING_BIT){
-        audioString = "♫♪";
+        audioString = "♫♪ [";
     }else if(audioFlags & AUDIO_STATE_RUNNING_BIT){
-        audioString = "—";
+        audioString = "— [";
+    }
+
+    if(audioString.size() > 0){
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2) <<
+                        (AudioGetCurrentGain() * 100);
+        audioString += ss.str();
+        audioString += "%]";
+        audioString = audioString;
     }
 
     // TODO: Maybe add a dedicated routine to gether all strings related to the state
     //       of the linebuffer so we can easily add more states here to print
     if(is_tab){
-        k = snprintf(enddesc, sizeof(enddesc), " %s %s %s TAB - %d %s",
-                     audioString,
+        k = snprintf(enddesc, sizeof(enddesc), "%s %s %s TAB - %d %s",
+                     audioString.c_str(),
                      eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
                      tabSpace, EncoderName(fileEncoder));
     }else{
-        k = snprintf(enddesc, sizeof(enddesc), " %s %s %s SPACE - %d %s",
-                     audioString,
+        k = snprintf(enddesc, sizeof(enddesc), "%s %s %s SPACE - %d %s",
+                     audioString.c_str(),
                      eState == 1 ? "[Encrypted]" : "", detached_active ? "…" : "",
                      tabSpace, EncoderName(fileEncoder));
     }
 
-    Float f = fonsComputeStringAdvance(font->fsContext, enddesc, k, &dummyGlyph, encoder);
+    Float f = fonsComputeStringAdvance(font->fsContext, enddesc,
+                                        k, &dummyGlyph, encoder);
     Float rScale = font->fontMath.invReduceScale / scale;
     w = w * rScale;
     vec2f half = (vec2f(geometry->upper) - vec2f(geometry->lower)) *
@@ -1225,7 +1237,9 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
 
     y = (a0.y + 0.15f * font->fontMath.fontSizeAtRenderCall) * rScale;
 
-    Graphics_PushText(state, x, y, (char *)enddesc, k, c, &dummyGlyph, encoder);
+    Graphics_PushText(state, x, y, (char *)enddesc, k, c,
+                        &dummyGlyph, encoder);
+
     Graphics_FlushText(state);
 
     Graphics_SetFontSize(state, (Float)currFontSize, FONT_UPSCALE_DEFAULT_SIZE);

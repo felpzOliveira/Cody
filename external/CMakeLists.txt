@@ -5,7 +5,7 @@ set (BUILD_SHARED_LIBS OFF CACHE BOOL " " FORCE)
 set (USE_HTTPS OFF CACHE BOOL " " FORCE)
 set (BUILD_TESTS OFF CACHE BOOL " " FORCE)
 
-add_subdirectory(libgit2)
+add_subdirectory(libgit2 EXCLUDE_FROM_ALL)
 set (LIB_GIT2_INCLUDEDIR
             ${CMAKE_CURRENT_SOURCE_DIR}/libgit2/include PARENT_SCOPE)
 set (LIB_GIT2_TARGET git2 PARENT_SCOPE)

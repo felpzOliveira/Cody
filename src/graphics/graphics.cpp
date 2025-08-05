@@ -888,7 +888,7 @@ void RegisterInputs(DisplayWindow *window){
 }
 
 bool IsFontInternal(int *fontAddr){
-    return fontAddr == (int *)FONT_consolas_ttf ||
+    return fontAddr == (int *)FONT_FiraCode_Regular_ttf ||
            fontAddr == (int *)FONT_commit_mono_ttf ||
            fontAddr == (int *)FONT_ubuntu_mono_ttf ||
            fontAddr == (int *)FONT_dejavu_sans_ttf ||
@@ -957,8 +957,15 @@ void OpenGLFontSetup(OpenGLState *state){
     font->sdfSettings.sdfEnabled = 0;
 
     font->fsContext = nullptr;
-    fontfileContents = (char *)FONT_consolas_ttf;
-    filesize = FONT_consolas_ttf_len;
+    fontfileContents = (char *)FONT_commit_mono_ttf;
+    filesize = FONT_commit_mono_ttf_len;
+
+    unsigned int tmpFontLen = 0;
+    unsigned char *tmpFont = AppGetUserPreferredFont(tmpFontLen);
+    if(tmpFont){
+        fontfileContents = (char *)tmpFont;
+        tmpFontLen = filesize;
+    }
 
     Graphics_SetFont(fontfileContents, filesize);
 }
@@ -1016,7 +1023,7 @@ void OpenGLInitialize(OpenGLState *state){
     SetOpenGLVersion(4, 5);
     state->mouse.position = vec2ui(0);
     state->mouse.isPressed = false;
-    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.1");
+    state->window = CreateDisplayWindow(width, height, "Cody - 0.0.2");
     state->isCursorDisplayEventRunning = 0;
 
     SetWindowIcon(state->window, logo_png, logo_png_len);

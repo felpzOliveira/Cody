@@ -3,8 +3,8 @@
 
 extern unsigned char FONT_liberation_mono_ttf[];
 extern unsigned int FONT_liberation_mono_ttf_len;
-extern unsigned char FONT_consolas_ttf[];
-extern unsigned int FONT_consolas_ttf_len;
+extern unsigned char FONT_FiraCode_Regular_ttf[];
+extern unsigned int FONT_FiraCode_Regular_ttf_len;
 extern unsigned char FONT_commit_mono_ttf[];
 extern unsigned int FONT_commit_mono_ttf_len;
 extern unsigned char FONT_ubuntu_mono_ttf[];
@@ -13,7 +13,6 @@ extern unsigned char FONT_dejavu_sans_ttf[];
 extern unsigned int FONT_dejavu_sans_ttf_len;
 extern unsigned char FONT_jet_mono_ttf[];
 extern unsigned int FONT_jet_mono_ttf_len;
-
 
 extern const char *shader_icon_f;
 extern const char *shader_cursor_f;

@@ -1,6 +1,19 @@
 /* date = July 27th 2025 16:15 */
 #pragma once
 
+//     :
+//     ::
+//     :':.
+//     :  ::
+//     :   ::
+//     :    ::
+//     :    ::
+//     :   :'
+//     :  '
+// .:::.:
+// ::::::
+// `::::'
+
 #define AUDIO_MESSAGE_MAX_SIZE 256
 
 #define AUDIO_STATE_BIT(n) (1 << n)
@@ -17,6 +30,7 @@ typedef enum{
     AUDIO_CODE_PLAY,
     AUDIO_CODE_PAUSE,
     AUDIO_CODE_RESUME,
+    AUDIO_CODE_GAIN,
     AUDIO_CODE_FINISH,
 }AudioMessageCode;
 
@@ -57,3 +71,18 @@ void AudioRequest(AudioMessage &message);
  * audio thread to take ownership of the file. (deleting it after use).
  */
 void AudioRequestAddMusic(const char *path, int takeFile);
+
+/*
+ * Returns the default gain change for volume control.
+ */
+float AudioDefaultGainChange();
+
+/*
+ * Returns the current gain value in the audio system.
+ */
+float AudioGetCurrentGain();
+
+/*
+ * Returns the current track progress.
+ */
+float AudioGetTrackProgress();

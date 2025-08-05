@@ -9,6 +9,7 @@
 #include <view_tree.h>
 #include <dbgapp.h>
 #include <optional>
+#include <parson.h>
 
 struct BufferView;
 struct Buffer;
@@ -42,6 +43,9 @@ typedef struct{
     std::string configFolder;
     std::vector<std::string> filesStored;
     CursorStyle cStyle;
+    JSON_Value *configFileRoot;
+    unsigned char *userFont;
+    unsigned int userFontLen;
 }AppConfig;
 
 extern AppConfig appGlobalConfig;
@@ -174,6 +178,16 @@ void AppSetRenderViewIndices(int should_render);
 * Gets the flag indicating if the graphic interface should render view indices.
 */
 int AppGetRenderViewIndices();
+
+/*
+* Get user preferred font.
+*/
+unsigned char *AppGetUserPreferredFont(unsigned int &len);
+
+/*
+* Gets the root from the configuration file.
+*/
+JSON_Value *AppGetConfigFileRoot();
 
 /*
 * Gets the path compression global configuration.

@@ -10,6 +10,7 @@
 #include <sys/stat.h>
 #include <vector>
 #include <encoding.h>
+#include <parson.h>
 
 #if defined(_WIN32)
     #include <Windows.h>
@@ -383,6 +384,38 @@ inline
 void SkipWhiteSpaces(char **ptr){
     while(**ptr == ' ' && **ptr != 0)
         (*ptr) += 1;
+}
+
+/*
+* Utility for reading paths from json.
+*/
+template<auto Fetcher, typename Fn> inline
+void JsonExtractArray(JSON_Value *root, const char *cpath, Fn fn){
+    std::string path(cpath);
+    JSON_Array *target_array = nullptr;
+
+    JSON_Object *obj = json_value_get_object(root);
+    char *token = strtok(path.data(), ".");
+
+    while(token != nullptr){
+        char *next = strtok(NULL, ".");
+        if(next == nullptr){
+            target_array = json_object_get_array(obj, token);
+        }else{
+            obj = json_object_get_object(obj, token);
+        }
+
+        token = next;
+    }
+
+    if(target_array != nullptr){
+        size_t count = json_array_get_count(target_array);
+        for(size_t i = 0; i < count; i++){
+            auto target = Fetcher(target_array, i);
+            if(!fn(target))
+                break;
+        }
+    }
 }
 
 /*
