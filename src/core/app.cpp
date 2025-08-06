@@ -247,17 +247,21 @@ void AppEarlyInitialize(bool use_tabs){
                     json_parse_string_with_comments(fileMem);
 
         AllocatorFree(fileMem);
+        fileMem = nullptr;
+        fileSize = 0;
         if(appGlobalConfig.configFileRoot == nullptr){
             printf("[ERROR] Il-formed config file!\n");
         }else{
             obj = json_value_get_object(appGlobalConfig.configFileRoot);
 
             const char *userFont = json_object_get_string(obj, "PreferFont");
-            fileSize = 0;
             fileMem = storage->GetContentsOf(userFont, &fileSize);
 
-            appGlobalConfig.userFont = (unsigned char *)fileMem;
-            appGlobalConfig.userFontLen = fileSize;
+            if(fileMem && fileSize > 0){
+                appGlobalConfig.userFont = (unsigned char *)fileMem;
+                appGlobalConfig.userFontLen = fileSize;
+                fileMem = nullptr;
+            }
         }
     }
 

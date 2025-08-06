@@ -1,18 +1,18 @@
 /* date = July 27th 2025 16:15 */
 #pragma once
 
-//     :
-//     ::
-//     :':.
-//     :  ::
-//     :   ::
-//     :    ::
-//     :    ::
-//     :   :'
-//     :  '
-// .:::.:
-// ::::::
-// `::::'
+//     :         Per aspera ad astra      Fortitudine semper     Finite bellum
+//     ::        Umbrae crescunt          Vincimus               Pacem petimus
+//     :':.      In tenebris lucem                               In luminoso via
+//     :  ::     Spero fidele             Pugna incipit          Propter honorem
+//     :   ::                             Sanguis in arena
+//     :    ::   Timor involvens          Hostis invalidus
+//     :    ::   Animi resolutio          Cadit victus
+//     :   :'    Virtus emergit
+//     :  '      Novi exordii             Vox angeli
+// .:::.:                                 In silentio audi
+// ::::::        Dominus tenebris         Amor et spera
+// `::::'        Rex aeternus             In corde mane
 
 #define AUDIO_MESSAGE_MAX_SIZE 256
 

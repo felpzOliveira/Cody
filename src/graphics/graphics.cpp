@@ -888,12 +888,16 @@ void RegisterInputs(DisplayWindow *window){
 }
 
 bool IsFontInternal(int *fontAddr){
+    unsigned int len = 0;
+    unsigned char *addr = AppGetUserPreferredFont(len);
+
     return fontAddr == (int *)FONT_FiraCode_Regular_ttf ||
            fontAddr == (int *)FONT_commit_mono_ttf ||
            fontAddr == (int *)FONT_ubuntu_mono_ttf ||
            fontAddr == (int *)FONT_dejavu_sans_ttf ||
            fontAddr == (int *)FONT_jet_mono_ttf ||
-           fontAddr == (int *)FONT_liberation_mono_ttf;
+           fontAddr == (int *)FONT_liberation_mono_ttf ||
+           fontAddr == (int *)addr;
 }
 
 // TODO: Should we work with multiple fonts at the same time?
@@ -918,8 +922,8 @@ void Graphics_SetFont(char *ttf, uint len){
     // NOTE: Default into internal font so user can actually see something
     if(font->fontId == FONS_INVALID){
         font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
-                                     (uint8 *)FONT_liberation_mono_ttf,
-                                     FONT_liberation_mono_ttf_len, 0, font->sdfSettings);
+                            (uint8 *)FONT_liberation_mono_ttf,
+                            FONT_liberation_mono_ttf_len, 0, font->sdfSettings);
     }
 
     AssertA(font->fontId != FONS_INVALID, "Failed to create font");
@@ -957,14 +961,15 @@ void OpenGLFontSetup(OpenGLState *state){
     font->sdfSettings.sdfEnabled = 0;
 
     font->fsContext = nullptr;
-    fontfileContents = (char *)FONT_commit_mono_ttf;
-    filesize = FONT_commit_mono_ttf_len;
 
     unsigned int tmpFontLen = 0;
     unsigned char *tmpFont = AppGetUserPreferredFont(tmpFontLen);
     if(tmpFont){
         fontfileContents = (char *)tmpFont;
-        tmpFontLen = filesize;
+        filesize = tmpFontLen;
+    }else{
+        fontfileContents = (char *)FONT_commit_mono_ttf;
+        filesize = FONT_commit_mono_ttf_len;
     }
 
     Graphics_SetFont(fontfileContents, filesize);

@@ -649,6 +649,8 @@ int BaseCommand_CursorSetFormat(char *cmd, uint size, View *){
 
 int SwapFontInternal(std::string fontname){
     // NOTE: hard-coded fonts
+    unsigned int len = 0;
+    unsigned char *addr = AppGetUserPreferredFont(len);
     if(fontname == "default"){
         Graphics_SetFont((char *)FONT_liberation_mono_ttf, FONT_liberation_mono_ttf_len);
         return 1;
@@ -666,6 +668,9 @@ int SwapFontInternal(std::string fontname){
         return 1;
     }else if(fontname == "jet"){
         Graphics_SetFont((char *)FONT_jet_mono_ttf, FONT_jet_mono_ttf_len);
+        return 1;
+    }else if(fontname == "user" && addr != nullptr && len > 0){
+        Graphics_SetFont((char *)addr, len);
         return 1;
     }
 
@@ -1669,6 +1674,12 @@ int SwitchFontCommandStart(View *view){
         {"dejavu"},
         {"jet"}
     };
+
+    unsigned int len = 0;
+    unsigned char *addr = AppGetUserPreferredFont(len);
+    if(addr != nullptr && len > 0){
+        fonts.push_back({"user"});
+    }
 
     LineBuffer_InitBlank(lineBuffer);
     for(uint i = 0; i < fonts.size(); i++){

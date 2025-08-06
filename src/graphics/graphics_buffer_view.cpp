@@ -10,6 +10,7 @@
 #include <audio.h>
 #include <sstream>
 #include <iomanip>
+#include <font.h>
 
 int OpenGLRenderLine(BufferView *view, OpenGLState *state,
                      Float &x, Float &y, uint lineNr);
@@ -1193,7 +1194,16 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
     int audioFlags = AudioGetState();
     std::string audioString;
     if(audioFlags & AUDIO_STATE_PLAYING_BIT){
-        audioString = "♫♪ [";
+        const char *audioSymbol = "♫♪";
+        int off = 0;
+        EncoderDecoder *encoder = UTF8Encoder();
+        int cp = StringToCodepoint(encoder, (char *)audioSymbol,
+                                   strlen(audioSymbol), &off);
+        if(Font_SupportsCodepoint(cp)){
+            audioString = "♫♪ [";
+        }else{
+            audioString = "» [";
+        }
     }else if(audioFlags & AUDIO_STATE_RUNNING_BIT){
         audioString = "— [";
     }
