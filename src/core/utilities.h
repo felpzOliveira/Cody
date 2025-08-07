@@ -23,6 +23,7 @@
     #define SEPARATOR_CHAR '\\'
     #define SEPARATOR_STRING "\\"
     #define SLEEP(n) Sleep(n)
+    #define SYSTEM_CONFIG_FILE ""
 #else
     #include <unistd.h>
     #define CHDIR(x) chdir(x)
@@ -31,6 +32,7 @@
     #define SEPARATOR_CHAR '/'
     #define SEPARATOR_STRING "/"
     #define SLEEP(n) sleep(n)
+    #define SYSTEM_CONFIG_FILE "/opt/cody/config"
 #endif
 
 #define MAX_STACK_SIZE 1024

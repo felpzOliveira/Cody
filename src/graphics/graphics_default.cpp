@@ -47,6 +47,7 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
 
     Graphics_FlushText(state);
     Graphics_SetFontSize(state, currFontSize);
+    Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 
     glDisable(GL_SCISSOR_TEST);
     return 0;

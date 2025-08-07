@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define WITH_ASSERTS
+//#define WITH_ASSERTS
 
 typedef unsigned char uint8;
 

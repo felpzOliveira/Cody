@@ -150,6 +150,12 @@ struct GlobalWidgets{
     DbgWidgetExpressionViewer *wdbgVw;
 };
 
+struct ExtensionRenderProps{
+    vec4i darkThemeColor;
+    vec4i brightThemeColor;
+    std::string title;
+};
+
 struct OpenGLState{
     DisplayWindow *window;
     RenderProps params;
@@ -199,6 +205,7 @@ struct OpenGLState{
 
     // TODO: Maybe don't use maps
     std::map<std::string, uint> textureMap;
+    std::unordered_map<std::string, ExtensionRenderProps> extensionMap;
     std::map<FileExtension, std::string> fileMap;
 };
 
@@ -214,8 +221,9 @@ typedef struct{
     uint stageCount;
 }RenderList;
 
-// expose the downscale flag
+// expose the global rendering flag
 extern int useDriverDownscale;
+extern int useIcons;
 
 void Graphics_Initialize();
 int  Graphics_IsRunning();
@@ -276,6 +284,12 @@ void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src);
 */
 uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off);
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off);
+
+/*
+* Get a simple rendering property for a file extension if not using icons.
+*/
+uint Graphics_FetchExtensionRenderProps(char *textBuffer, uint size,
+                                        vec4i &col, FileEntry *entry);
 
 /*
 * Get all information from a texture given its id.

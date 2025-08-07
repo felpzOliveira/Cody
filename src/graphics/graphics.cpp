@@ -46,6 +46,7 @@ constexpr Float iconBlur = 0.0f;
 
 constexpr double CursorDisplayEventInterval = 2;
 int useDriverDownscale = 1;
+int useIcons = 1;
 
 static OpenGLState GlobalGLState;
 
@@ -991,6 +992,48 @@ void Graphics_QuadPushBorder(OpenGLState *state, Float x0, Float y0,
     Graphics_QuadPushBorder(quad, x0, y0, x1, y1, w, col);
 }
 
+static void OpenGLSetExtensionProps(OpenGLState *state, vec4i dcol,
+                                    vec4i bcol, const char *title,
+                                    const char *key)
+{
+    state->extensionMap[key] = {
+        .darkThemeColor   = dcol,
+        .brightThemeColor = bcol,
+        .title            = std::string(title)
+    };
+}
+
+static void OpenGLLoadExntesionProps(OpenGLState *state){
+    OpenGLSetExtensionProps(state, vec4i(87, 147, 164, 255),
+                            vec4i(150, 20, 126, 255), "(C++)    ", ".cpp");
+    OpenGLSetExtensionProps(state, vec4i(87, 147, 164, 255),
+                            vec4i(150, 20, 126, 255), "(C++)    ", ".h");
+    OpenGLSetExtensionProps(state, vec4i(87, 147, 164, 255),
+                            vec4i(150, 20, 126, 255), "(C++)    ", ".hpp");
+    OpenGLSetExtensionProps(state, vec4i(87, 147, 230, 255),
+                            vec4i(150, 20, 126, 255), "(C)      ", ".c");
+    OpenGLSetExtensionProps(state, vec4i(117, 163, 106, 255),
+                            vec4i(241, 1, 67, 255), "(CMake)  ", ".cmake");
+    OpenGLSetExtensionProps(state, vec4i(72, 216, 103, 255),
+                            vec4i(39, 39, 39, 255), "(Tex)    ", ".tex");
+    OpenGLSetExtensionProps(state, vec4i(72, 216, 103, 255),
+                            vec4i(36, 108, 50, 255), "(Cuda)   ", ".cu");
+    OpenGLSetExtensionProps(state, vec4i(72, 216, 103, 255),
+                            vec4i(39, 39, 39, 255), "(Pyt)    ", ".py");
+    OpenGLSetExtensionProps(state, vec4i(87, 147, 164, 255),
+                            vec4i(39, 39, 39, 255), "(GLSL)   ", ".glsl");
+    OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
+                            vec4i(39, 39, 39, 255), "(Txt)    ", ".txt");
+    OpenGLSetExtensionProps(state, vec4i(128, 128, 128, 128),
+                            vec4i(128, 128, 128, 128), "(DIR)    ", ".folder");
+    OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
+                            vec4i(39, 39, 39, 255), "(LIT)    ", ".lit_dark");
+    OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
+                            vec4i(39, 39, 39, 255), "(LIT)    ", ".lit_white");
+    OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
+                            vec4i(39, 39, 39, 255), "(LIT)    ", ".lit");
+}
+
 static void OpenGLLoadIcons(OpenGLState *state){
     Graphics_TextureInit(state, folder_png, folder_png_len, ".folder", FILE_EXTENSION_FOLDER);
     Graphics_TextureInit(state, cmake_png, cmake_png_len, ".cmake", FILE_EXTENSION_CMAKE);
@@ -1046,6 +1089,7 @@ void OpenGLInitialize(OpenGLState *state){
     SwapInterval(state->window, 0);
     RegisterInputs(state->window);
     OpenGLLoadIcons(state);
+    OpenGLLoadExntesionProps(state);
 
     WindowOnSizeChange(width, height, nullptr);
     onMouseAction();
@@ -1057,13 +1101,15 @@ void OpenGLInitialize(OpenGLState *state){
     //       everything larger and allow the driver/gpu setup to downscale.
     const GLubyte *vendor = glGetString(GL_VENDOR);
     std::string vendor_str((const char *)vendor);
-    if(vendor_str.find("NVIDIA") != std::string::npos &&
-       vendor_str.find("nvidia") != std::string::npos)
+    if(vendor_str.find("NVIDIA") == std::string::npos &&
+       vendor_str.find("nvidia") == std::string::npos)
     {
         // if on integrated graphics render everything to scale
         useDriverDownscale = 0;
+        useIcons = 0;
     }
 
+    //printf("Using native downscale: %d\n", useDriverDownscale);
     //printf("Vendor: %s\n", glGetString(GL_VENDOR));
     //printf("GL  version: %s\n", glGetString(GL_VERSION));
     //printf("GLSL version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
@@ -1399,6 +1445,41 @@ uint Graphics_FetchTextureFor(OpenGLState *state, FileEntry *e, int *off){
     }
 
     return id;
+}
+
+uint Graphics_FetchExtensionRenderProps(char *textBuffer, uint size,
+                                        vec4i &col, FileEntry *entry)
+{
+    if(entry->type == DescriptorDirectory){
+        if(!CurrentThemeIsLight())
+            col = vec4i(128, 128, 128, 128);
+        else
+            col = vec4i(128, 128, 128, 256);
+        return snprintf(textBuffer, size, "(DIR)    ");
+    }else{
+        int p = GetFilePathExtension(entry->path, entry->pLen);
+        char *ext = &entry->path[p];
+        std::string strExt(ext);
+        std::string str(entry->path);
+        strExt = Graphics_TranslateFileExtension(strExt);
+
+        if(str == "CMakeLists.txt")
+            strExt = ".cmake";
+
+        OpenGLState *state = &GlobalGLState;
+        if(state->extensionMap.find(strExt) == state->extensionMap.end()){
+            return snprintf(textBuffer, size, "         ");
+        }else{
+            ExtensionRenderProps &rProp = state->extensionMap[strExt];
+            if(CurrentThemeIsLight()){
+                col = rProp.brightThemeColor;
+            }else{
+                col = rProp.darkThemeColor;
+            }
+
+            return snprintf(textBuffer, size, "%s", rProp.title.c_str());
+        }
+    }
 }
 
 uint Graphics_FetchTextureFor(OpenGLState *state, FileExtension type, int *off){

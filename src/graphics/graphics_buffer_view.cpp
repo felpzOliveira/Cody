@@ -29,6 +29,7 @@ void OpenGLRenderEmptyCursorRect(OpenGLBuffer *quad, vec2f lower,
     if(quad->length + 24 > quad->size){
         Graphics_QuadFlush(quad);
     }
+
     uint w = thickness;
     Graphics_QuadPush(quad, vec2ui(x0+0, y0+0), vec2ui(x0+w, y1+0), color);
     Graphics_QuadPush(quad, vec2ui(x0+0, y1+0), vec2ui(x1+w, y1+w), color);
@@ -86,8 +87,8 @@ void OpenGLComputeCursor(OpenGLFont *font, OpenGLCursor *glCursor, const char *b
 
     y0 = 0;
     y1 = y0 + font->fontMath.fontSizeAtRenderCall;
-    y0 += baseHeight;
-    y1 += baseHeight;
+    y0 += baseHeight - (1 - useDriverDownscale) * 2;
+    y1 += baseHeight - (1 - useDriverDownscale) * 2;
 
     x0 += cursorOffset;
     x1 += cursorOffset;
@@ -126,8 +127,6 @@ void OpenGLComputeCursor(OpenGLState *state, OpenGLCursor *glCursor,
 
         if(useDriverDownscale)
             x0 = Max(0, x0-CursorDefaultPadding);
-        else
-            x0 += 5;
 
         // TODO: Why does this makes sense on windows and not on linux?
     #if defined(_WIN32)
@@ -209,6 +208,7 @@ void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
                              Float y1, vec4f color, uint thickness, int isActive)
 {
     OpenGLState *state = Graphics_GetGlobalContext();
+    x1 -= (1 - useDriverDownscale);
     if(isActive){
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             if(state->cursorVisible)
@@ -487,9 +487,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
                 uint rawp = Buffer_Utf8PositionToRawPosition(buffer, cursor->textPos.y, &len, encoder);
                 char *chr = &buffer->data[rawp];
                 if(*chr != '\t'){
-                    if(!useDriverDownscale){
-                        p.x += 1;
-                    }
+                    p.x += (1 - useDriverDownscale);
                     Graphics_PrepareTextRendering(state, projection, &state->model);
                     vec4i cc = GetUIColor(defaultTheme, UICharOverCursor);
                     fonsStashMultiTextColor(font->fsContext, p.x, p.y, cc.ToUnsigned(),
@@ -1360,9 +1358,9 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
 
     glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, ones);
-    Float baseHeight = 0;
+    Float baseHeight = (1 - useDriverDownscale) * 2;
     if(vview->descLocation == DescriptionTop){
-        baseHeight = font->fontMath.fontSizeAtRenderCall;
+        baseHeight += font->fontMath.fontSizeAtRenderCall;
     }
 
     // Decouple the line numbering for the text viewing, this allows for horizontal

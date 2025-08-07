@@ -156,8 +156,17 @@ int BaseCommand_AddFileEntryIntoAutoLoader(char *entry, uint size){
         }
 
         JSON_Array *array = json_object_get_array(obj, "StartupLoad");
-        if(!array)
-            return 0;
+        if(!array){
+            // first time?
+            JSON_Status status = JSONSuccess;
+
+            JSON_Value *array_value = json_value_init_array();
+            status = json_object_set_value(obj, "StartupLoad", array_value);
+            if(status != JSONSuccess)
+                return 0;
+
+            array = json_value_get_array(array_value);
+        }
 
         json_array_append_string_with_len(array, entry, size);
 
@@ -1162,7 +1171,7 @@ void BaseCommand_InitializeCommandMap(){
 
 int BaseCommand_Interpret(char *cmd, uint size, View *view){
     // TODO: map of commands? maybe set some function pointers to this
-    // TODO: create a standard for this, a json or at least something like bubbles
+    // TODO: create a standard for this, a json maybe
     int rv = -1;
     if(BaseCommand_Interpret_AliasInsert(cmd, size, view)){
         QueryBar_EnableInputToHistory(View_GetQueryBar(view));

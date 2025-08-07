@@ -196,6 +196,53 @@ void AppSetFontSize(uint size){
     ViewTree_ForAllViews(fn);
 }
 
+static bool LoadUserFont(const char *path){
+    bool rv = false;
+    uint fileSize = 0;
+    StorageDevice *storage = FetchStorageDevice();
+    char *fileMem = storage->GetContentsOf(path, &fileSize);
+
+    if(fileMem && fileSize > 0){
+        if(appGlobalConfig.userFont)
+            AllocatorFree(appGlobalConfig.userFont);
+
+        appGlobalConfig.userFont = (unsigned char *)fileMem;
+        appGlobalConfig.userFontLen = fileSize;
+        fileMem = nullptr;
+        rv = true;
+    }else if(fileMem){
+        AllocatorFree(fileMem);
+    }
+
+    return rv;
+}
+
+void AppAttemptToLoadSystemConfig(){
+    JSON_Object *obj = nullptr;
+    JSON_Value *value = nullptr;
+    const char *preferred_font = nullptr;
+    if(!FileExists((char *)SYSTEM_CONFIG_FILE))
+        goto __finish;
+
+    value = json_parse_file_with_comments(SYSTEM_CONFIG_FILE);
+    if(value == nullptr)
+        goto __finish;
+
+    obj = json_value_get_object(value);
+    if(!obj)
+        goto __finish;
+
+    // TODO: Parse globals
+    preferred_font = json_object_get_string(obj, "PreferFont");
+    if(LoadUserFont(preferred_font)){
+        //printf("[SYSTEM] Font: %s\n", preferred_font);
+    }
+
+__finish:
+    if(value)
+        json_value_free(value);
+}
+
 void AppEarlyInitialize(bool use_tabs){
     View *view = nullptr;
     StorageDevice *storage = FetchStorageDevice();
@@ -210,6 +257,8 @@ void AppEarlyInitialize(bool use_tabs){
     appGlobalConfig.cStyle = CURSOR_RECT;
     appGlobalConfig.autoCompleteSize = 0;
     appGlobalConfig.configFileRoot = nullptr;
+    appGlobalConfig.userFont = nullptr;
+    appGlobalConfig.userFontLen = 0;
 
     ViewTree_Initialize();
     FileProvider_Initialize();
@@ -226,6 +275,10 @@ void AppEarlyInitialize(bool use_tabs){
     storage->GetWorkingDirectory(appContext.cwd, PATH_MAX);
 
     appContext.autoCompleteMapping = AutoComplete_Initialize();
+
+    // try to load system config
+    AppAttemptToLoadSystemConfig();
+
     std::string dir(appContext.cwd);
     if(dir[dir.size()-1] != '/' && dir[dir.size()-1] != '\\'){
         dir += SEPARATOR_STRING;
@@ -250,17 +303,13 @@ void AppEarlyInitialize(bool use_tabs){
         fileMem = nullptr;
         fileSize = 0;
         if(appGlobalConfig.configFileRoot == nullptr){
-            printf("[ERROR] Il-formed config file!\n");
+            // Failed to load or not valid
         }else{
             obj = json_value_get_object(appGlobalConfig.configFileRoot);
 
             const char *userFont = json_object_get_string(obj, "PreferFont");
-            fileMem = storage->GetContentsOf(userFont, &fileSize);
-
-            if(fileMem && fileSize > 0){
-                appGlobalConfig.userFont = (unsigned char *)fileMem;
-                appGlobalConfig.userFontLen = fileSize;
-                fileMem = nullptr;
+            if(LoadUserFont(userFont)){
+                //printf("[USER] Font: %s\n", userFont);
             }
         }
     }

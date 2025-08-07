@@ -218,6 +218,11 @@ void Graphics_RenderQueryBarSelection(View *view, OpenGLState *state, Theme *the
 
         y1 = y0 + state->font.fontMath.fontSizeAtRenderCall;
 
+        y0 += (1 - useDriverDownscale) * 2;
+        y1 += (1 - useDriverDownscale) * 2;
+        x0 += (1 - useDriverDownscale) * 2;
+        x1 += (1 - useDriverDownscale) * 2;
+
         // 4- Render line highlight
         glUseProgram(font->cursorShader.id);
         Shader_UniformMatrix4(font->cursorShader, "projection", &state->projection.m);

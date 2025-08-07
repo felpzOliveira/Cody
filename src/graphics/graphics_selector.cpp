@@ -52,16 +52,20 @@ void RenderSelectableListItensBackground(OpenGLState *state, SelectableList *lis
     }
 }
 
-void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *list,
+void RenderSelectableListItens(View *view, OpenGLState *state,
+                               SelectableList *list,
                                Theme *theme, Float lWidth, FrameStyle *style,
                                FileOpener *opener = nullptr)
 {
     vec2ui range = SelectableList_GetViewRange(list);
     Float y0 = 0;
+    Float xOffset = useDriverDownscale ? 16 : 4;
 
     EncoderDecoder *encoder = UTF8Encoder();
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
     uint maxn = 0;
+    char textBuffer[64];
+    uint textBufferSize = 64;
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
         SelectableList_GetItem(list, i, &buffer);
@@ -69,17 +73,11 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
         maxn = Max(buffer->taken, maxn);
     }
 
-    Float multiplier = opener ? (opener->entries ? 0.03 : 0.01) : 0;
-
     for(uint i = range.x; i < range.y; i++){
         Buffer *buffer = nullptr;
-    #if defined(_WIN32)
-        uint size = useDriverDownscale ? 35 : 10;
-    #else
-        uint size = useDriverDownscale ? 80 : 10;
-    #endif
+
         int pGlyph = -1;
-        Float x = lWidth * multiplier;
+        Float x = xOffset;
         Float y1 = y0 + style->yScaling * state->font.fontMath.fontSizeAtRenderCall;
         Float ym = (y1 + y0) * 0.5 - 0.4 * state->font.fontMath.fontSizeAtRenderCall;
 
@@ -87,10 +85,6 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
 
         SelectableList_GetItem(list, i, &buffer);
         AssertA(buffer != nullptr, "Invalid buffer returned by View_SelectableListGetItem");
-
-        if(opener && style->with_load && opener->entries){
-            x = Max(x, 2 * size);
-        }
 
         uint ni = 0;
         if(view->allowPathCompression){
@@ -101,37 +95,25 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
         vec4i s_col = (int)i == list->active ? style->item_active_foreground_color :
                         style->item_foreground_color;
 
-        Graphics_PushText(state, x, ym, dataPtr, len, s_col, &pGlyph, encoder);
-
-        if(view->bufferFlags.size() > 0 && rindex < view->bufferFlags.size()){
-            if(view->bufferFlags[rindex] > 0){
-                s_col.w *= 0.5;
-                std::string value = "  (" + std::string(buffer->data, ni-1) + ")";
-                Graphics_PushText(state, x, ym, (char *)value.c_str(),
-                                  value.size(), s_col, &pGlyph, encoder);
-            }
-        }
-
-        // TODO: How to compute icon width/height?
-        if(opener && style->with_load){
-            if(opener->entries){
+        // Fetch the extension name
+        if(opener && style->with_load && opener->entries){
+            FileEntry *e = &opener->entries[rindex];
+            if(useIcons == 0){
+                vec4i e_col;
+                uint extLen =
+                    Graphics_FetchExtensionRenderProps(textBuffer,
+                                                       textBufferSize,
+                                                       e_col, e);
+                Graphics_PushText(state, x, ym, textBuffer, extLen,
+                                  e_col, &pGlyph, encoder);
+            }else{
                 uint mid = 0;
                 int off = 0;
-                FileEntry *e = &opener->entries[rindex];
                 mid = Graphics_FetchTextureFor(state, e, &off);
-                if(useDriverDownscale)
-                    size -= off;
-                else
-                    size = 30;
 
-                #if defined(_WIN32)
-                    vec2ui p = vec2ui(20, (uint)ym-10);
-                    if (off < 0) size *= .65;
-                #else
-                    vec2ui p = vec2ui(useDriverDownscale ? 50 : 5,
-                                      useDriverDownscale ? (uint)ym-20 :
-                                                           (uint)ym-10);
-                #endif
+                Float size = 0.8f * (y1-y0);
+                vec2ui p(x, ym - 0.15f * (y1-y0));
+
                 int needs_render = Graphics_ImagePush(state, p, p+size, mid);
                 if(needs_render){
                     // before flushing the images we need to flush the quad
@@ -146,16 +128,32 @@ void RenderSelectableListItens(View *view, OpenGLState *state, SelectableList *l
                     Graphics_ImagePush(state, p, p+size, mid);
                 }
 
-                if(e->isLoaded){
-                    const char *ld = " LOADED *";
-                    uint llen = 9;
-                    if(!FileProvider_IsLineBufferDirty(dataPtr, len)){
-                        llen = 7;
-                    }
+                x += 1.5f * size;
+            }
+        }
 
-                    Graphics_PushText(state, x, ym, (char *)ld, llen,
-                                      style->item_load_color, &pGlyph, encoder);
+        Graphics_PushText(state, x, ym, dataPtr, len, s_col, &pGlyph, encoder);
+
+        if(view->bufferFlags.size() > 0 && rindex < view->bufferFlags.size()){
+            if(view->bufferFlags[rindex] > 0){
+                s_col.w *= 0.5;
+                std::string value = "  (" + std::string(buffer->data, ni-1) + ")";
+                Graphics_PushText(state, x, ym, (char *)value.c_str(),
+                                  value.size(), s_col, &pGlyph, encoder);
+            }
+        }
+
+        if(opener && style->with_load && opener->entries){
+            FileEntry *e = &opener->entries[rindex];
+            if(e->isLoaded){
+                const char *ld = " LOADED *";
+                uint llen = 9;
+                if(!FileProvider_IsLineBufferDirty(dataPtr, len)){
+                    llen = 7;
                 }
+
+                Graphics_PushText(state, x, ym, (char *)ld, llen,
+                                style->item_load_color, &pGlyph, encoder);
             }
         }
 
