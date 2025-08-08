@@ -36,7 +36,7 @@ void RenderSelectableListItensBackground(OpenGLState *state, SelectableList *lis
                           style->item_background_color);
 
         if((int)i == list->active && style->with_line_border){
-            int w = GetSelectorBorderWidth(theme);
+            int w = GetSelectorBorderWidth(theme) - (1-useDriverDownscale) * 2;
             Graphics_QuadPushBorder(state, 0, y0, lWidth, y1, w,
                                     style->item_active_border_color);
         }

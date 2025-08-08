@@ -236,7 +236,7 @@ void Graphics_RenderCursorAt(OpenGLBuffer *quad, Float x0, Float y0, Float x1,
     }else{
         if(appGlobalConfig.cStyle == CURSOR_RECT){
             OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x1, y1),
-                                        color, 2);
+                                        color, 2-(1-useDriverDownscale));
         }else if(appGlobalConfig.cStyle == CURSOR_DASH){
             x0 = x0 > 3 ? x0 - 3 : 0;
             OpenGLRenderEmptyCursorRect(quad, vec2f(x0, y0), vec2f(x0+3, y1),
@@ -295,7 +295,6 @@ static void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
         memset(linen, ' ', spacing-ncount);
         int k = snprintf(&linen[spacing-ncount], 32, "%u", dif);
         linen[spacing-ncount + k] = 0;
-
         x = fonsStashMultiTextColor(font->fsContext, x, y, col.ToUnsigned(),
                                     linen, NULL, &previousGlyph, UTF8Encoder());
     }
@@ -331,6 +330,8 @@ void OpenGLRenderAllLineNumbers(OpenGLState *state, BufferView *view, Theme *the
         if(lines.y < view->lineBuffer->lineCount-1){
             ed0 += 1;
         }
+
+        y += (1-useDriverDownscale) * 4;
 
         for(uint i = st0; i < ed0; i++){
             OpenGLRenderLineNumber(view, font, x, y, i, linen, theme);
@@ -471,7 +472,7 @@ void _Graphics_RenderCursorElements(OpenGLState *state, View *view, Float lineSp
 
         if(state->glGhostCursor.valid){
             col = Graphics_GetCursorColor(bufferView, defaultTheme, 1);
-            OpenGLRenderCursor(state, &state->glGhostCursor, col, dashThick, 0);
+            OpenGLRenderCursor(state, &state->glGhostCursor, col, dashThick-(1-useDriverDownscale), 0);
         }
     }
 
@@ -684,6 +685,8 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
             }
 
             Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
+			cy0 += (1 - useDriverDownscale) * 2;
+			cy1 += (1 - useDriverDownscale) * 2;
             Graphics_QuadPush(state, vec2ui(0, cy0),
             vec2ui(lineSpan, cy1), col);
 
@@ -740,7 +743,7 @@ void Graphics_RenderWrongIdentation(OpenGLState *state, View *vview, Transform *
                                 Buffer *buffer, EncoderDecoder *encoder)
     {
         vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
-        vec2f x(2.0f, 2.0f);
+        vec2f x(0.0f, 0.0f);
         if(buffer->tokenCount > 0){
             Token *token = &buffer->tokens[0];
             if(token->identifier != TOKEN_ID_SPACE){
@@ -782,7 +785,7 @@ void Graphics_RenderSpacesHighlight(OpenGLState *state, View *vview, Transform *
                                 Buffer *buffer, EncoderDecoder *encoder)
     {
         vec2f y = Graphics_GetLineYPos(state, visibleLines, i, vview);
-        vec2f x(2.0f, 2.0f);
+        vec2f x(0.0f, 0.0f);
         bool added_by_wi = false;
 
         if(buffer->tokenCount > 0 && render_wi){

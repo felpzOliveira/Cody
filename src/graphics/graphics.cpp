@@ -391,12 +391,16 @@ Float Graphics_GetTokenXPos(OpenGLState *state, Buffer *buffer,
 
 vec2f Graphics_GetLineYPos(OpenGLState *state, vec2ui visible, uint i, View *vview){
     OpenGLFont *font = &state->font;
+    Float y1 = 0;
     Float y0 = ((Float)i - (Float)visible.x) * font->fontMath.fontSizeAtRenderCall;
     if(vview->descLocation == DescriptionTop){
         y0 += font->fontMath.fontSizeAtRenderCall;
     }
 
-    return vec2f(y0, y0 + font->fontMath.fontSizeAtRenderCall);
+    y0 += (1 - useDriverDownscale) * 2;
+    y1 = y0 + font->fontMath.fontSizeAtRenderCall;
+
+    return vec2f(y0, y1);
 }
 
 void Graphics_ComputeTransformsForFontSize(OpenGLFont *font, Float fontSize,
@@ -1025,7 +1029,7 @@ static void OpenGLLoadExntesionProps(OpenGLState *state){
     OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
                             vec4i(39, 39, 39, 255), "(Txt)    ", ".txt");
     OpenGLSetExtensionProps(state, vec4i(128, 128, 128, 128),
-                            vec4i(128, 128, 128, 128), "(DIR)    ", ".folder");
+                            vec4i(39, 39, 39, 255), "(DIR)    ", ".folder");
     OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
                             vec4i(39, 39, 39, 255), "(LIT)    ", ".lit_dark");
     OpenGLSetExtensionProps(state, vec4i(240, 240, 240, 255),
@@ -1454,7 +1458,7 @@ uint Graphics_FetchExtensionRenderProps(char *textBuffer, uint size,
         if(!CurrentThemeIsLight())
             col = vec4i(128, 128, 128, 128);
         else
-            col = vec4i(128, 128, 128, 256);
+            col = vec4i(39, 39, 39, 255);
         return snprintf(textBuffer, size, "(DIR)    ");
     }else{
         int p = GetFilePathExtension(entry->path, entry->pLen);
