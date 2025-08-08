@@ -1,7 +1,7 @@
 #include <transform.h>
 #include <string.h>
 
-bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2], 
+bool SolveLinearSystem2x2(const Float A[2][2], const Float B[2],
                           Float *x0, Float *x1)
 {
     Float det = A[0][0] * A[1][1] - A[0][1] * A[1][0];
@@ -17,7 +17,7 @@ Matrix4x4::Matrix4x4(Float mat[4][4]) { memcpy(m, mat, 16 * sizeof(Float)); }
 Matrix4x4::Matrix4x4(Float t00, Float t01, Float t02, Float t03, Float t10,
                      Float t11, Float t12, Float t13, Float t20, Float t21,
                      Float t22, Float t23, Float t30, Float t31, Float t32,
-                     Float t33) 
+                     Float t33)
 {
     m[0][0] = t00; m[0][1] = t01; m[0][2] = t02; m[0][3] = t03;
     m[1][0] = t10; m[1][1] = t11; m[1][2] = t12; m[1][3] = t13;
@@ -50,7 +50,7 @@ Matrix4x4 Inverse(const Matrix4x4 &m){
                             irow = j;
                             icol = k;
                         }
-                    } 
+                    }
                 }
             }
         }
@@ -61,12 +61,12 @@ Matrix4x4 Inverse(const Matrix4x4 &m){
         }
         indxr[i] = irow;
         indxc[i] = icol;
-        
+
         // Set $m[icol][icol]$ to one by scaling row _icol_ appropriately
         Float pivinv = 1. / minv[icol][icol];
         minv[icol][icol] = 1.;
         for (int j = 0; j < 4; j++) minv[icol][j] *= pivinv;
-        
+
         // Subtract this row from others to zero out their columns
         for (int j = 0; j < 4; j++) {
             if (j != icol) {
@@ -146,13 +146,13 @@ Transform Rotate(Float theta, const vec3f &axis) {
     m.m[0][1] = a.x * a.y * (1 - cosTheta) - a.z * sinTheta;
     m.m[0][2] = a.x * a.z * (1 - cosTheta) + a.y * sinTheta;
     m.m[0][3] = 0;
-    
+
     // Compute rotations of second and third basis vectors
     m.m[1][0] = a.x * a.y * (1 - cosTheta) + a.z * sinTheta;
     m.m[1][1] = a.y * a.y + (1 - a.y * a.y) * cosTheta;
     m.m[1][2] = a.y * a.z * (1 - cosTheta) - a.x * sinTheta;
     m.m[1][3] = 0;
-    
+
     m.m[2][0] = a.x * a.z * (1 - cosTheta) - a.y * sinTheta;
     m.m[2][1] = a.y * a.z * (1 - cosTheta) + a.x * sinTheta;
     m.m[2][2] = a.z * a.z + (1 - a.z * a.z) * cosTheta;

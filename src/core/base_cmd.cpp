@@ -968,6 +968,11 @@ int BaseCommandSwapTabs(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_SwapLineNoRenderMode(char *, uint, View *){
+    SwapLineNumberRenderinType();
+    return 1;
+}
+
 int BaseCommand_ToogleWrongIdent(char *, uint, View *){
     int val = AppGetDisplayWrongIdent() > 0 ? 1 : 0;
     AppSetDisplayWrongIdent(1 - val);
@@ -1129,6 +1134,7 @@ int BaseCommandSetEncrypted(char *cmd, uint size, View *view){
 
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
+    cmdMap[CMD_SWAP_LINE_NO_RENDER_MODE_STR] = {CMD_SWAP_LINE_NO_RENDER_MODE_HELP, BaseCommand_SwapLineNoRenderMode};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
     cmdMap[CMD_SEARCH_STR] = {CMD_SEARCH_HELP, BaseCommand_SearchAllFiles};
     cmdMap[CMD_ENCODING_STR] = {CMD_ENCODING_HELP, BaseCommand_EncodingSwap};

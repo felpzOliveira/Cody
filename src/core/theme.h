@@ -140,7 +140,7 @@ typedef struct{
     vec4i querybarTypeLineColor;
     // color used for the 'LOADED' string of the selection file
     vec4i selectorLoadedColor;
-    // reserved for testing/development
+    // color used for values defined with #define
     vec4i userDefineColor;
     // the amount of levels available for code identation colors
     short backTextCount;
@@ -166,6 +166,9 @@ typedef struct{
     // this helps better select what icons are to be used and make decisions
     // on components that have different colors on dark/light modes
     bool isLight;
+    // flag indicating this theme would like line numbers to be rendered
+    // as differences instead of raw values
+    bool renderLineNumberDiff;
     // effect values for the theme, i.e.: brightness, saturation and contrast
     ThemeVisuals visuals;
 }Theme;
@@ -191,8 +194,10 @@ Float GetLineBorderWidth(Theme *theme);
 short GetBackTextCount(Theme *theme);
 void GetThemeList(std::vector<ThemeDescription> **themes);
 void SwapDefaultTheme(char *name, uint len);
+void SwapLineNumberRenderinType();
 int GetSelectorBorderWidth(Theme *theme);
 bool CurrentThemeIsLight();
+bool CurrentThemeLineNumberByDiff();
 void CurrentThemeSetDimm(int dim);
 void CurrentThemeSetBrightness(Float value);
 void CurrentThemeSetSaturation(Float value);

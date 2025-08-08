@@ -1,6 +1,86 @@
 #include <theme.h>
 #include <utilities.h>
 
+Theme themeEverDark = {
+    .backgroundColor = ColorFromHex(0xFF0B1210),
+    .hoverableItemForegroundColor = ColorFromHex(0xFF30373D),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFFA5BF83),
+    .selectorBackground = ColorFromHex(0xAA0B1210),
+    .searchBackgroundColor = ColorFromHex(0xFFA5BF83),
+    .selectableListBackground = ColorFromHex(0xFF0B1210),
+    .searchWordColor = ColorFromHex(0xFF30373D),
+    .backgroundLineNumbers = ColorFromHex(0xFF0B1210),
+    .lineNumberColor = ColorFromHex(0x9955635F),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF7F8C84),
+    .cursorLineHighlight = ColorFromHex(0xFF0E1614),
+    .fileHeaderColor = ColorFromHex(0xCC7AD5A4),
+    .operatorColor   = ColorFromHex(0xCCE97C81),
+
+    .datatypeColor   = ColorFromHex(0xCC7AB9B1),
+    .commentColor    = ColorFromHex(0xFF5B6660),
+    .commentTodoColor = ColorFromHex(0xFFE87C7F),
+    .commentNoteColor      = ColorFromHex(0xFF7FA782),
+    .commentImportantColor = ColorFromHex(0xFFA7A782),
+    .stringColor     = ColorFromHex(0xCC7FBE92),
+    .numberColor     = ColorFromHex(0xCCD696B2),
+    .reservedColor   = ColorFromHex(0xCCD4C5AA),
+    .functionColor   = ColorFromHex(0xCCA5BD82),
+    .includeColor    = ColorFromHex(0xCCACB705),
+    .mathColor       = ColorFromHex(0xCCDCBA82),
+    .tokensColor     = ColorFromHex(0xCCD2C4A9),
+    .tokensOverCursorColor = ColorFromHex(0xFF30373D),
+
+    /////////////////////////////////////////////////////
+    .preprocessorColor = ColorFromHex(0xCCA6BE82),
+    .preprocessorDefineColor = ColorFromHex(0xCC7BB9B2),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    /////////////////////////////////////////////////////
+
+    .braces = ColorFromHex(0xFF73B079),
+    .cursorColor = ColorFromHex(0xFFD2C4AB),
+
+    .querybarCursorColor = ColorFromHex(0xFFD2C4AB),
+    .ghostCursorColor = ColorFromHex(0xFFD2C4AB),
+    .parenthesis = {
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+        ColorFromHex(0xFF73B079),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFF0B1210),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xCC7AB9B1),
+
+    ///////////////////////////////////////////////////
+    .userDatatypeEnum = ColorFromHex(0xCC7AB9B1),
+    ///////////////////////////////////////////////////
+
+    .scopeLineColor = ColorFromHex(0xAA7B8680),
+    .scrollbarColor = ColorFromHex(0xFF0E1614),
+    .querybarTypeLineColor = ColorFromHex(0xFF221409),
+    .selectorLoadedColor = ColorFromHex(0xFFE99779),
+    .userDefineColor = ColorFromHex(0xCC7AB9B1),
+
+    .backTextCount = 0,
+    .lineBorderWidth = 0,
+    .alphaDimm = 0,
+    .dynamicCursor = false,
+    .borderWidth = 3,
+    .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFF0E1614),
+    .isLight = false,
+    .renderLineNumberDiff = true,
+    .visuals = {
+        .brightness = 0.05f,
+        .saturation = 1.2f,
+        .contrast = 2.5f,
+    },
+};
+
 Theme themeToxi = {
     .backgroundColor = ColorFromHex(0xFF0B1210),
     .hoverableItemForegroundColor = ColorFromHex(0xFFFDFB00),
@@ -73,13 +153,13 @@ Theme themeToxi = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.75f,
     },
 };
-
 
 Theme themeGrayVim = {
     .backgroundColor = ColorFromHex(0xFF191819),
@@ -158,6 +238,7 @@ Theme themeGrayVim = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232123),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -242,6 +323,7 @@ Theme themeDarkVim = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -321,6 +403,7 @@ Theme themeCatppuccin = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -395,6 +478,7 @@ Theme themeTerminal = {
     .dbgLinehighlightColor = ColorFromHex(0xff2e084a),
     .mouseSelectionColor = ColorFromHex(0xff2e084a),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.15f,
         .saturation = 1.0f,
@@ -414,7 +498,8 @@ Theme themeGruvboxLight = {
     .backgroundLineNumbers = ColorFromHex(0xFFfbf1c7),
     .lineNumberColor = ColorFromHex(0xFF928374),
     .lineNumberHighlitedColor = ColorFromHex(0xFF180f58),
-    .cursorLineHighlight = ColorFromHex(0xFFebdbb2),
+    //.cursorLineHighlight = ColorFromHex(0xFFebdbb2),
+    .cursorLineHighlight = ColorFromHex(0xFFE0E1BD),
     .fileHeaderColor = ColorFromHex(0xFF9b0511),
 
     .operatorColor   = ColorFromHex(0xCC960d01),
@@ -432,7 +517,7 @@ Theme themeGruvboxLight = {
     .mathColor       = ColorFromHex(0xFF9d0006),
 
     .tokensColor     = ColorFromHex(0xFF3c3836),
-    .tokensOverCursorColor = ColorFromHex(0xFFebdab4),
+    .tokensOverCursorColor = ColorFromHex(0x88fbf1c7),
 
     .preprocessorColor = ColorFromHex(0xFF00476d),
     .preprocessorDefineColor = ColorFromHex(0xFF00476d),
@@ -467,12 +552,13 @@ Theme themeGruvboxLight = {
     .pasteColor = ColorFromHex(0xffffddee),
     .dbgArrowColor = ColorFromHex(0xff000000),
     .dbgLinehighlightColor = ColorFromHex(0xFFfbdbb2),
-    .mouseSelectionColor = ColorFromHex(0xFFebdbb2),
+    .mouseSelectionColor = ColorFromHex(0xFFE0E1BD),
     .isLight = true,
+    .renderLineNumberDiff = false,
     .visuals = {
-        .brightness = 0.05f,
+        .brightness = 0.02f,
         .saturation = 1.0f,
-        .contrast = 1.0f,
+        .contrast = 2.3f,
     },
 };
 
@@ -539,6 +625,7 @@ Theme themeDracula = {
     .dbgLinehighlightColor = ColorFromHex(0xFF44476a),
     .mouseSelectionColor = ColorFromHex(0xff151616),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -609,6 +696,7 @@ Theme themeYavid = {
     .dbgLinehighlightColor = ColorFromHex(0xFF272739),
     .mouseSelectionColor = ColorFromHex(0xFF272729),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -682,6 +770,7 @@ Theme themeRadical = {
     .dbgLinehighlightColor = ColorFromHex(0xFF241640),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -758,6 +847,7 @@ Theme theme4coderAlt = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xff0f0f0f),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -838,6 +928,7 @@ Theme theme4Coder = {
     .dbgLinehighlightColor = ColorFromHex(0xFF232340),
     .mouseSelectionColor = ColorFromHex(0xFF232333),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -908,6 +999,7 @@ Theme themeNoah = {
     .dbgLinehighlightColor = ColorFromHex(0xff252848),
     .mouseSelectionColor = ColorFromHex(0xff252838),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.05f,
         .saturation = 1.0f,
@@ -982,6 +1074,7 @@ Theme themeGreenish = {
     .dbgLinehighlightColor = ColorFromHex(0xff191919),
     .mouseSelectionColor = ColorFromHex(0x112c4d2c),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.1f,
         .saturation = 0.8f,
@@ -1056,6 +1149,7 @@ Theme themeHalloween = {
     .dbgLinehighlightColor = ColorFromHex(0xff191919),
     .mouseSelectionColor = ColorFromHex(0x114d2c2c),
     .isLight = false,
+    .renderLineNumberDiff = false,
     .visuals = {
         .brightness = 0.1f,
         .saturation = 0.8f,
@@ -1066,7 +1160,8 @@ Theme themeHalloween = {
 // swap this to make the default theme, i.e.: theme enabled when opening
 // otherwise use swap theme for changing between these
 
-Theme *defaultTheme = &themeToxi;
+Theme *defaultTheme = &themeEverDark;
+//Theme *defaultTheme = &themeToxi;
 //Theme *defaultTheme = &themeGrayVim;
 //Theme *defaultTheme = &themeHalloween;
 //Theme *defaultTheme = &themeGreenish;
@@ -1080,6 +1175,9 @@ Theme *defaultTheme = &themeToxi;
 //Theme *defaultTheme = &themeTerminal;
 //Theme *defaultTheme = &themeGruvboxLight;
 //Theme *defaultTheme = &themeNoah;
+
+static
+bool defaultLineNumberMode = defaultTheme->renderLineNumberDiff;
 
 std::vector<ThemeDescription> themesDesc = {
     { .name = "Radical", .theme = &themeRadical, },
@@ -1095,12 +1193,17 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "GrayVim", .theme = &themeGrayVim, },
     { .name = "GreenVilage", .theme = &themeGreenish, },
     { .name = "Halloween", .theme = &themeHalloween, },
-    { .name = "Toxi", .theme = &themeToxi, }
+    { .name = "Toxi", .theme = &themeToxi, },
+    { .name = "EverDark", .theme = &themeEverDark, }
 };
 
 static int globalActive = 0;
 void SetAlpha(int active){
     globalActive = active;
+}
+
+void SwapLineNumberRenderinType(){
+    defaultLineNumberMode = !defaultLineNumberMode;
 }
 
 inline vec4i ApplyAlpha(vec4i color, Theme *theme){
@@ -1283,6 +1386,10 @@ int GetSelectorBorderWidth(Theme *theme){
 
 bool CurrentThemeIsLight(){
     return defaultTheme->isLight;
+}
+
+bool CurrentThemeLineNumberByDiff(){
+    return defaultLineNumberMode;
 }
 
 void CurrentThemeSetDimm(int dim){

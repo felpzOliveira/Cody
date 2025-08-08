@@ -268,20 +268,19 @@ void OpenGLRenderCursor(OpenGLState *state, OpenGLCursor *glCursor, vec4f color,
 }
 
 static void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
-                                   Float &x, Float &y, uint lineNr, char linen[32],
-                                   Theme *theme)
+                                   Float &x, Float &y, uint lineNr,
+                                   char linen[32], Theme *theme)
 {
     if(view->renderLineNbs){
         int previousGlyph = -1;
         vec2ui cursor = BufferView_GetCursorPosition(view);
         int spacing = DigitCount(BufferView_GetLineCount(view));
-        int ncount = DigitCount(lineNr+1);
-        memset(linen, ' ', spacing-ncount);
+
         vec4i col = GetUIColor(theme, UILineNumbers);
         uint dif = lineNr+1;
         if(lineNr == cursor.x){
             col = GetUIColor(theme, UILineNumberHighlighted);
-        }else if(false){
+        }else if(CurrentThemeLineNumberByDiff()){
             if(cursor.x > lineNr)
                 dif = cursor.x - lineNr;
             else
@@ -292,6 +291,8 @@ static void OpenGLRenderLineNumber(BufferView *view, OpenGLFont *font,
             col.w *= 0.2;
         }
 
+        int ncount = DigitCount(dif);
+        memset(linen, ' ', spacing-ncount);
         int k = snprintf(&linen[spacing-ncount], 32, "%u", dif);
         linen[spacing-ncount + k] = 0;
 

@@ -12,12 +12,12 @@ struct Buffer;
 #define BUFFER_CHANGE_INITIALIZER {.bufferInfo = vec2ui(0,0), .buffer = nullptr,\
     .change = CHANGE_NONE}
 
-#define OPERATION_INSERT_CHAR 0
-#define OPERATION_REMOVE_CHAR 1
+#define OPERATION_INSERT_CHAR  0
+#define OPERATION_REMOVE_CHAR  1
 #define OPERATION_INSERT_BLOCK 2
 #define OPERATION_REMOVE_BLOCK 3
-#define OPERATION_INSERT_LINE 4
-#define OPERATION_REMOVE_LINE 5
+#define OPERATION_INSERT_LINE  4
+#define OPERATION_REMOVE_LINE  5
 
 typedef enum{
     CHANGE_NONE,

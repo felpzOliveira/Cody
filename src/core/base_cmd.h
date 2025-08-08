@@ -112,6 +112,9 @@ struct FileEntry;
 #define CMD_SWAP_TABS "swap-tab"
 #define CMD_SWAP_TABS_HELP "Swaps the flag for using tab(spacing)."
 
+#define CMD_SWAP_LINE_NO_RENDER_MODE_STR "swap-lineno"
+#define CMD_SWAP_LINE_NO_RENDER_MODE_HELP "Swaps the render mode for line numbers"
+
 #define CMD_MUSIC_ADD "music-add"
 #define CMD_MUSIC_ADD_HELP "Add a mp3 track to play."
 

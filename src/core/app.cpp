@@ -2440,7 +2440,7 @@ void AppCommandEnterKey(){
         case ImageView: break;
         //case GitStatusView: AppCommandGitStatusChangeBuffer(); break;
         default: {
-            printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
+            //printf("Unimplemented enter for view type %s\n", ViewTypeString(type));
         }
     }
 }
