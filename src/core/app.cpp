@@ -217,10 +217,34 @@ static bool LoadUserFont(const char *path){
     return rv;
 }
 
+static void LoadConfigProperties(JSON_Object *obj){
+    const char *preferred_font = nullptr;
+    const char *preferred_theme = nullptr;
+    int preferred_font_size = 0;
+    // TODO: Parse globals
+    preferred_font = json_object_get_string(obj, "PreferFont");
+    if(LoadUserFont(preferred_font)){
+        //printf("[SYSTEM] Font: %s\n", preferred_font);
+    }
+
+    preferred_font_size = json_object_get_number(obj, "PreferFontSize");
+    if(preferred_font_size > 0){
+        appGlobalConfig.defaultFontSize = preferred_font_size;
+    }
+
+    preferred_theme = json_object_get_string(obj, "PreferTheme");
+    if(preferred_theme){
+        SwapDefaultTheme((char *)preferred_theme, strlen(preferred_theme));
+    }
+
+}
+
 void AppAttemptToLoadSystemConfig(){
     JSON_Object *obj = nullptr;
     JSON_Value *value = nullptr;
     const char *preferred_font = nullptr;
+    const char *preferred_theme = nullptr;
+    int preferred_font_size = 19;
     if(!FileExists((char *)SYSTEM_CONFIG_FILE))
         goto __finish;
 
@@ -232,11 +256,7 @@ void AppAttemptToLoadSystemConfig(){
     if(!obj)
         goto __finish;
 
-    // TODO: Parse globals
-    preferred_font = json_object_get_string(obj, "PreferFont");
-    if(LoadUserFont(preferred_font)){
-        //printf("[SYSTEM] Font: %s\n", preferred_font);
-    }
+    LoadConfigProperties(obj);
 
 __finish:
     if(value)
@@ -306,11 +326,7 @@ void AppEarlyInitialize(bool use_tabs){
             // Failed to load or not valid
         }else{
             obj = json_value_get_object(appGlobalConfig.configFileRoot);
-
-            const char *userFont = json_object_get_string(obj, "PreferFont");
-            if(LoadUserFont(userFont)){
-                //printf("[USER] Font: %s\n", userFont);
-            }
+            LoadConfigProperties(obj);
         }
     }
 

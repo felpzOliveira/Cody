@@ -1,6 +1,86 @@
 #include <theme.h>
 #include <utilities.h>
 
+Theme themeEverBright = {
+    .backgroundColor = ColorFromHex(0xFFF8F3F0),
+    .hoverableItemForegroundColor = ColorFromHex(0xFF41342C),
+    .hoverableItemBackgroundColor = ColorFromHex(0xFFE9DFD8),
+    .selectorBackground = ColorFromHex(0xFFF8F3F0),
+    .searchBackgroundColor = ColorFromHex(0xFFCB627F),
+    .selectableListBackground = ColorFromHex(0xFFF8F3F0),
+    .searchWordColor = ColorFromHex(0xCC004447),
+    .backgroundLineNumbers = ColorFromHex(0xFFF8F3F0),
+    .lineNumberColor = ColorFromHex(0xFF945566),
+    .lineNumberHighlitedColor = ColorFromHex(0xFF17405A),
+    .cursorLineHighlight = ColorFromHex(0xFFDACCC1),
+    .fileHeaderColor = ColorFromHex(0xFF945566),
+    .operatorColor   = ColorFromHex(0xFF006403),
+
+    .datatypeColor   = ColorFromHex(0xCC140073),
+    .commentColor    = ColorFromHex(0xFF8F847C),
+    .commentTodoColor = ColorFromHex(0xFF881C1F),
+    .commentNoteColor      = ColorFromHex(0xFF0F6712),
+    .commentImportantColor = ColorFromHex(0xFF676712),
+    .stringColor     = ColorFromHex(0xCC367352),
+    .numberColor     = ColorFromHex(0xCC087D7F),
+    .reservedColor   = ColorFromHex(0xCC47372F),
+    .functionColor   = ColorFromHex(0xFF17405A),
+    .includeColor    = ColorFromHex(0xCC007477),
+    .mathColor       = ColorFromHex(0xCC41342C),
+    .tokensColor     = ColorFromHex(0xCC41342C),
+    .tokensOverCursorColor = ColorFromHex(0xFFF8F3F0),
+
+    /////////////////////////////////////////////////////
+    .preprocessorColor = ColorFromHex(0xCC004447),
+    .preprocessorDefineColor = ColorFromHex(0xCC7BB9B2),
+    .borderColor = ColorFromHex(0xFFFF7F50),
+    /////////////////////////////////////////////////////
+
+    .braces = ColorFromHex(0xCC41342C),
+    .cursorColor = ColorFromHex(0xFF17405A),
+
+    .querybarCursorColor = ColorFromHex(0xFF17405A),
+    .ghostCursorColor = ColorFromHex(0xFF17405A),
+    .parenthesis = {
+        ColorFromHex(0xCC61544C),
+        ColorFromHex(0xCC81746C),
+        ColorFromHex(0xCCA1948C),
+        ColorFromHex(0xCCA1948C),
+    },
+    .backTextColors = {
+        ColorFromHex(0xFFF8F3F0),
+    },
+
+    .userDatatypeColor = ColorFromHex(0xCC140073),
+
+    ///////////////////////////////////////////////////
+    .userDatatypeEnum = ColorFromHex(0xCC41342C),
+    ///////////////////////////////////////////////////
+
+    .scopeLineColor = ColorFromHex(0xFF17405A),
+    .scrollbarColor = ColorFromHex(0xFFE9DFD8),
+    .querybarTypeLineColor = ColorFromHex(0xFFCB829F),
+    .selectorLoadedColor = ColorFromHex(0xFF367352),
+    .userDefineColor = ColorFromHex(0xCC483665),
+
+    .backTextCount = 0,
+    .lineBorderWidth = 0,
+    .alphaDimm = 0,
+    .dynamicCursor = false,
+    .borderWidth = 6,
+    .pasteColor = ColorFromHex(0xffffddee),
+    .dbgArrowColor = ColorFromHex(0xffffffff),
+    .dbgLinehighlightColor = ColorFromHex(0xFF232340),
+    .mouseSelectionColor = ColorFromHex(0xFFDACCC1),
+    .isLight = true,
+    .renderLineNumberDiff = true,
+    .visuals = {
+        .brightness = 0.05f,
+        .saturation = 1.0f,
+        .contrast = 2.0f,
+    },
+};
+
 Theme themeEverDark = {
     .backgroundColor = ColorFromHex(0xFF0B1210),
     .hoverableItemForegroundColor = ColorFromHex(0xFF30373D),
@@ -1160,6 +1240,7 @@ Theme themeHalloween = {
 // swap this to make the default theme, i.e.: theme enabled when opening
 // otherwise use swap theme for changing between these
 
+//Theme *defaultTheme = &themeEverBright;
 Theme *defaultTheme = &themeEverDark;
 //Theme *defaultTheme = &themeToxi;
 //Theme *defaultTheme = &themeGrayVim;
@@ -1194,7 +1275,8 @@ std::vector<ThemeDescription> themesDesc = {
     { .name = "GreenVilage", .theme = &themeGreenish, },
     { .name = "Halloween", .theme = &themeHalloween, },
     { .name = "Toxi", .theme = &themeToxi, },
-    { .name = "EverDark", .theme = &themeEverDark, }
+    { .name = "EverDark", .theme = &themeEverDark, },
+    { .name = "EverBright", .theme = &themeEverBright, }
 };
 
 static int globalActive = 0;

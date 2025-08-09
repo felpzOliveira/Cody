@@ -1,3 +1,5 @@
 {
-    "PreferFont": "/usr/local/share/fonts/consolas_modified.ttf"
+    "PreferFont": "/usr/local/share/fonts/consolas_modified.ttf",
+    "PreferFontSize" : 19,
+    "PreferTheme" : "EverDark"
 }
