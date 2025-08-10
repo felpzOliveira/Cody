@@ -1114,7 +1114,9 @@ int fonsAddFontSdfMem(FONScontext* cstash, const char* name, unsigned char* data
 
  // Init font
     stash->nscratch = 0;
-    if (!fons__tt_loadFont(stash, &font->font, data, dataSize)) goto error;
+    if (!fons__tt_loadFont(stash, &font->font, data, dataSize)){
+        goto error;
+    }
 
  // Store normalized line height. The real line height is got
  // by multiplying the lineh by font size.

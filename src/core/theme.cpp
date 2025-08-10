@@ -118,6 +118,7 @@ Theme themeEverDark = {
 
     .braces = ColorFromHex(0xFF73B079),
     .cursorColor = ColorFromHex(0xFFD2C4AB),
+    //.cursorColor = ColorFromHex(0xFFF45659),
 
     .querybarCursorColor = ColorFromHex(0xFFD2C4AB),
     .ghostCursorColor = ColorFromHex(0xFFD2C4AB),

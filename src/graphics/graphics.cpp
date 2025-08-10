@@ -143,6 +143,12 @@ void Graphics_ToogleCursorSegment(){
     TOOGLE_VAR(GlobalGLState.params.cursorSegments);
 }
 
+void OpenGLFontCopyTerms(OpenGLFont *dst, OpenGLFont *src){
+    dst->fontMath = src->fontMath;
+    dst->shader = src->shader;
+    dst->cursorShader = src->cursorShader;
+}
+
 void OpenGLFontCopy(OpenGLFont *dst, OpenGLFont *src){
     dst->fsContext = src->fsContext;
     dst->sdfSettings = src->sdfSettings;
@@ -424,10 +430,12 @@ uint Graphics_GetDefaultLineHeight(){
 }
 
 void Graphics_SetFontSize(OpenGLState *state, Float fontSize, Float reference){
-    Float scalingFactor = fontSize / reference;
     OpenGLFont *font = &state->font;
+    OpenGLFont *symbolFont = &state->symbolFont;
+    Float scalingFactor = fontSize / reference;
     state->imageModel = Scale(scalingFactor, scalingFactor, 1);
     Graphics_ComputeTransformsForFontSize(font, fontSize, &state->scale, reference);
+    OpenGLFontCopyTerms(symbolFont, font);
 }
 
 void Graphics_SetDefaultFontSize(uint fontSize){
@@ -574,6 +582,7 @@ vec4f Graphics_GetCursorColor(BufferView *view, Theme *theme, int ghost){
 void Graphics_PrepareTextRendering(OpenGLFont *font, Transform *projection,
                                    Transform *model)
 {
+    fonsSetFont(font->fsContext, font->fontId);
     fonsClearState(font->fsContext);
     fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
     fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
@@ -906,8 +915,11 @@ bool IsFontInternal(int *fontAddr){
 }
 
 // TODO: Should we work with multiple fonts at the same time?
+// TODO: yes we should!
 void Graphics_SetFont(char *ttf, uint len){
     OpenGLFont *font = &GlobalGLState.font;
+    OpenGLFont *symbolFont = &GlobalGLState.symbolFont;
+    bool createSymbolFont = symbolFont->fsContext == nullptr;
     if(font->fsContext){
         // NOTE: we need to some minimal checks here to verify we dont attempt to free
         //       the internal font address
@@ -919,6 +931,19 @@ void Graphics_SetFont(char *ttf, uint len){
         glfonsDelete(font->fsContext);
         glfonsDeleteContext(font->fsContext);
     }
+
+    // TODO: Figure out symbol font (where is it, what it is going to render with
+    //        example usage is commented in graphics_buffer_view.cpp in
+    //        Graphics_RenderFrame for codepoint rendering.
+    static char *test_memory = nullptr;
+    static uint test_mem_size = 0;
+    createSymbolFont = false;
+#if 0
+    if(test_memory == nullptr){
+        const char *path = "/home/felipe/Documents/Cody/build/test.otf";
+        test_memory = GetFileContents(path, &test_mem_size);
+    }
+#endif
 
     font->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
     font->fontId = fonsAddFontSdfMem(font->fsContext, "Default",
@@ -932,6 +957,14 @@ void Graphics_SetFont(char *ttf, uint len){
     }
 
     AssertA(font->fontId != FONS_INVALID, "Failed to create font");
+
+    if(createSymbolFont){
+        symbolFont->fsContext = glfonsCreate(512, 512, FONS_ZERO_TOPLEFT);
+        symbolFont->fontId = fonsAddFontSdfMem(symbolFont->fsContext, "Symbolic",
+                                               (uint8 *)test_memory,
+                                        test_mem_size, 0, font->sdfSettings);
+    }
+
     Graphics_SetFontSize(&GlobalGLState, AppGetFontSize());
 }
 

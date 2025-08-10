@@ -1152,16 +1152,7 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
 
     Graphics_QuadFlush(state);
 
-    fonsClearState(font->fsContext);
-    fonsSetSize(font->fsContext, font->fontMath.fontSizeAtRenderCall);
-    fonsSetAlign(font->fsContext, FONS_ALIGN_LEFT | FONS_ALIGN_TOP);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-
-    glUseProgram(font->shader.id);
-    Shader_UniformMatrix4(font->shader, "projection", &projection->m);
-    Shader_UniformMatrix4(font->shader, "modelView", &state->scale.m);
+    Graphics_PrepareTextRendering(font, projection, &state->scale);
 
     Float x = (Float)a0.x;
     Float y = (Float)a0.y;
@@ -1184,7 +1175,8 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
 
     Graphics_SetFontSize(state, (Float)fSize,
                 (Float)fSize + FONT_UPSCALE_DEFAULT_OFFSET);
-    Graphics_PrepareTextRendering(state, projection, &state->scale);
+#if 1
+    Graphics_PrepareTextRendering(font, projection, &state->scale);
 
     int is_tab = 0;
     int tabSpace = AppGetTabLength(&is_tab);
@@ -1249,30 +1241,21 @@ void Graphics_RenderFrame(OpenGLState *state, View *vview, Transform *projection
 
     y = (a0.y + 0.15f * font->fontMath.fontSizeAtRenderCall) * rScale;
 
-    Graphics_PushText(state, x, y, (char *)enddesc, k, c,
-                        &dummyGlyph, encoder);
-
-    Graphics_FlushText(state);
-
+    Graphics_PushText(font, x, y, (char *)enddesc, k, c, &dummyGlyph, encoder);
+    Graphics_FlushText(font);
+#else
+    OpenGLFont *symbolFont = &state->symbolFont;
+    unsigned int codeps[] = {0xE60B};
+    int size = 1;
+    Graphics_PrepareTextRendering(symbolFont, projection, &state->scale);
+    x = fonsStashCodepoints(symbolFont->fsContext, x, y,
+                            c.ToUnsigned(), codeps, size, &dummyGlyph);
+    //Graphics_PushText(symbolFont, x, y, (char *)enddesc, k, c, &dummyGlyph, encoder);
+    Graphics_FlushText(symbolFont);
+#endif
     Graphics_SetFontSize(state, (Float)currFontSize, FONT_UPSCALE_DEFAULT_SIZE);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
-#if 0
-    if(eState){
-        uint id = 0;
-        int off = 0;
-        // TODO: The dark icon is kinda bad, need a swap
-        if(CurrentThemeIsLight())
-            id = Graphics_FetchTextureFor(state, FILE_EXTENSION_LOCK_DARK, &off);
-        else
-            id = Graphics_FetchTextureFor(state, FILE_EXTENSION_LOCK_WHITE, &off);
 
-        Float dif = 1.0f * (a1.y - a0.y);
-        uint iX = (uint)(x/scale - dif);
-        uint iY = (uint)(a0.y);
-        Graphics_ImagePush(state, vec2ui(iX, iY), vec2ui(iX + (uint)dif, iY + (uint)dif), id);
-        Graphics_ImageFlush(state);
-    }
-#endif
     glDisable(GL_BLEND);
 }
 

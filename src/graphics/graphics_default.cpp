@@ -46,6 +46,7 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
     Graphics_PushText(state, p.x, p.y, (char *)line0, line0len, color, &pGlyph, encoder);
 
     Graphics_FlushText(state);
+
     Graphics_SetFontSize(state, currFontSize);
     Graphics_PrepareTextRendering(state, &state->projection, &state->scale);
 

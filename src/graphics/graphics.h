@@ -160,6 +160,7 @@ struct OpenGLState{
     DisplayWindow *window;
     RenderProps params;
     OpenGLFont font;
+    OpenGLFont symbolFont;
     OpenGLBuffer glQuadBuffer;
     OpenGLImageQuadBuffer glQuadImageBuffer;
     OpenGLBuffer glLineBuffer;
