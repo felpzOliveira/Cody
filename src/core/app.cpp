@@ -185,6 +185,7 @@ void AppSetFontSize(uint size){
     * line viewing range computation and scrolling otherwise everything will get clipped.
     */
     uint lineHeight = Graphics_GetDefaultLineHeight();
+    appContext.currentLineHeight = lineHeight;
     auto fn = [&](ViewNode *node) -> int{
         View *view = node->view;
         if(view){

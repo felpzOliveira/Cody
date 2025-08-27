@@ -267,7 +267,7 @@ uint Buffer_Utf8RawPositionToPosition(Buffer *buffer, uint rawp, EncoderDecoder 
 }
 
 void Buffer_EraseSymbols(Buffer *buffer, SymbolTable *symTable){
-    if(buffer){
+    if(buffer && !buffer->erased){
         for(uint i = 0; i < buffer->tokenCount; i++){
             Token *token = &buffer->tokens[i];
             if(Symbol_IsTokenAutoCompletable(token->identifier) &&
@@ -1154,7 +1154,8 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
     TokenizerStateContext *stateContext = &buffer->stateContext;
     SymbolTable *symTable = tokenizer->symbolTable;
     uint start = base - stateContext->backTrack;
-    AssertA(start < lineBuffer->lineCount, "BUG: Overflow during backtrack computation");
+    AssertA(start < lineBuffer->lineCount,
+        "BUG: Overflow during backtrack computation");
 
     buffer = LineBuffer_GetBufferAt(lineBuffer, start);
     uint expectedEnd = start + buffer->stateContext.forwardTrack + offset + 1;
@@ -1170,31 +1171,15 @@ void LineBuffer_ReTokenizeFromBuffer(LineBuffer *lineBuffer, Tokenizer *tokenize
         // Before re-tokenizing check for user tokens and allow symbol table
         // to remove them
         if(!buffer->erased){
-            for(uint s = 0; s < buffer->tokenCount; s++){
-                Token *token = &buffer->tokens[s];
-                if(token){
-                    if(Symbol_IsTokenAutoCompletable(token->identifier) &&
-                       token->size > AutoCompleteMinInsertLen)
-                    {
-                        char *p = &buffer->data[token->position];
-                        AutoComplete_Remove(p, token->size);
-                    }
-
-                    if(Lex_IsUserToken(token) && token->reserved != nullptr){
-                        SymbolTable_Remove(symTable, (char *)token->reserved,
-                        token->size, token->identifier);
-                        AllocatorFree(token->reserved);
-                        token->reserved = nullptr;
-                    }
-                }
-            }
+            Buffer_EraseSymbols(buffer, symTable);
         }
 
         LineBuffer_RemountBuffer(lineBuffer, buffer, tokenizer, i);
         buffer->erased = false;
 
         i++;
-        if(i >= lineBuffer->lineCount) break;
+        if(i >= lineBuffer->lineCount)
+            break;
     }
 
     activeLineBuffer = nullptr;
