@@ -2432,7 +2432,9 @@ vec2ui AppActivateViewAt(int x, int y, bool force_binding){
     ViewTree_Begin(&iterator);
     while(iterator.value){
         view = iterator.value->view;
-        if(Geometry_IsPointInside(&view->geometry, r)){
+        // only do this on visible views! i.e.: recall this can be expanded!
+        BufferView *bView = View_GetBufferView(view);
+        if(bView->is_visible && Geometry_IsPointInside(&view->geometry, r)){
             // Activate the view and re-map position
             ViewTree_SetActive(iterator.value);
 
