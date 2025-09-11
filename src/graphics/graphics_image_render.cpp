@@ -103,8 +103,8 @@ int Graphics_RenderImage(View *view, OpenGLState *state, Theme *theme, Float dt)
 
     vec4f backgroundColor = GetUIColorf(theme, UISelectorBackground);
     vec4f textColor = GetColorf(theme, TOKEN_ID_NONE);
-    Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z,
-                     backgroundColor.w };
+    Float fcol[] = { backgroundColor.x, backgroundColor.y,
+                     backgroundColor.z, backgroundColor.w };
 
     ActivateViewportAndProjection(state, view, ViewportAllView);
     glClearBufferfv(GL_COLOR, 0, fcol);

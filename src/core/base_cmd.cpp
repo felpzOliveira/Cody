@@ -71,7 +71,7 @@ static void InitializeMathSymbolList(){
         lookupSymbol["e4"] = "⁴"; lookupSymbol["e5"] = "⁵";
         lookupSymbol["e6"] = "⁶"; lookupSymbol["e7"] = "⁷";
         lookupSymbol["ctimes"] = "×"; lookupSymbol["e-"] = "⁻";
-        lookupSymbol["e+"] = "⁺";
+        lookupSymbol["e+"] = "⁺"; lookupSymbol["l_call"] = "ℓ";
         is_lookup_symbols_inited = true;
     }
 }

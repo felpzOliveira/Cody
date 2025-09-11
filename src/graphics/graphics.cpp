@@ -176,6 +176,15 @@ void OpenGLResetCursors(OpenGLState *state){
     ResetGLCursor(&state->glGhostCursor);
 }
 
+void Graphics_RenderBackground(OpenGLState *state){
+    Theme *theme = defaultTheme;
+    vec4f backgroundColor = GetUIColorf(theme, UIBackground);
+    Float fcol[] = { backgroundColor.x, backgroundColor.y,
+                     backgroundColor.z, backgroundColor.w };
+    glViewport(0, 0, state->width, state->height);
+    glClearBufferfv(GL_COLOR, 0, fcol);
+}
+
 std::string OpenGLValidateErrorStr(int *err){
     int val = glGetError();
     std::string error;
@@ -1698,6 +1707,8 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
     Shader_UniformFloat(font->shader, "saturation", visuals.saturation);
 
     fonsSetFont(font->fsContext, font->fontId);
+
+    Graphics_RenderBackground(state);
 
     ViewTreeIterator iterator;
     ViewTree_Begin(&iterator);

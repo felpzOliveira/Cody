@@ -1321,10 +1321,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
     state->renderLineWidth = originalScaleWidth;
     Transform translate;
 
-    vec4f backgroundColor = GetUIColorf(theme, UIBackground);
     vec4f backgroundLineNColor = GetUIColorf(theme, UILineNumberBackground);
-    Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z,
-        backgroundColor.w };
     Float fcolLN[] = { backgroundLineNColor.x, backgroundLineNColor.y,
         backgroundLineNColor.z, backgroundLineNColor.w };
 
@@ -1343,7 +1340,6 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
 
     ActivateViewportAndProjection(state, vview, ViewportAllView);
 
-    glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, ones);
     Float baseHeight = (1 - useDriverDownscale) * 2;
     if(vview->descLocation == DescriptionTop){

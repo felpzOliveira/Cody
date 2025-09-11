@@ -21,17 +21,13 @@ int Graphics_RenderDefaultView(View *view, OpenGLState *state, Theme *theme, Flo
     // this geometry so that lower = vec2ui(0) and all rendering
     // primitives can work under [0, 0] [w, h]
 
-    vec4f backgroundColor = GetUIColorf(theme, UISelectorBackground);
     vec4i color = GetUIColor(theme, UIScopeLine) * 1.3;
-    Float fcol[] = { backgroundColor.x, backgroundColor.y, backgroundColor.z,
-        backgroundColor.w };
 
     uint currFontSize = state->font.fontMath.fontSizeAtDisplay;
     uint fontSize = currFontSize + 16;
     EncoderDecoder *encoder = UTF8Encoder();
 
     ActivateViewportAndProjection(state, view, ViewportAllView);
-    glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, kOnes);
 
     Graphics_SetFontSize(state, fontSize);
