@@ -47,6 +47,7 @@ typedef struct ThemeVisuals{
     Float brightness;
     Float saturation;
     Float contrast;
+    bool multicolor_background;
 }ThemeVisuals;
 
 typedef struct{
@@ -203,4 +204,7 @@ void CurrentThemeSetBrightness(Float value);
 void CurrentThemeSetSaturation(Float value);
 void CurrentThemeSetContrast(Float value);
 void CurrentThemeGetVisuals(ThemeVisuals &visuals);
+bool ThemeMultiColorBackground(Theme *theme);
+bool CurrentThemeMultiColorBackground();
+void SwapMultiColorBackground();
 #endif //THEME_H

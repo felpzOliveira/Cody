@@ -164,12 +164,14 @@ struct OpenGLState{
     OpenGLBuffer glQuadBuffer;
     OpenGLImageQuadBuffer glQuadImageBuffer;
     OpenGLBuffer glLineBuffer;
+    OpenGLBuffer glBackgroundBuffer;
     OpenGLCursor glCursor, glGhostCursor;
     OpenGLTexture textures[MAX_TEXTURES_COUNT];
     uint texBinds;
     Shader imageShader;
     Shader imRendererShader;
     Shader imBorderShader;
+    Shader backgroundShader;
     Mouse mouse;
     double cursorBlinkLastTime;
     bool cursorBlinking;

@@ -78,6 +78,7 @@ Theme themeEverBright = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 2.0f,
+        .multicolor_background = false,
     },
 };
 
@@ -159,6 +160,7 @@ Theme themeEverDark = {
         .brightness = 0.05f,
         .saturation = 1.2f,
         .contrast = 2.5f,
+        .multicolor_background = false,
     },
 };
 
@@ -239,6 +241,7 @@ Theme themeToxi = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.75f,
+        .multicolor_background = false,
     },
 };
 
@@ -324,6 +327,7 @@ Theme themeGrayVim = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.4f,
+        .multicolor_background = false,
     },
 };
 
@@ -409,6 +413,7 @@ Theme themeDarkVim = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.2f,
+        .multicolor_background = false,
     },
 };
 
@@ -489,6 +494,7 @@ Theme themeCatppuccin = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.75f,
+        .multicolor_background = false,
     },
 };
 
@@ -564,6 +570,7 @@ Theme themeTerminal = {
         .brightness = 0.15f,
         .saturation = 1.0f,
         .contrast = 1.0f,
+        .multicolor_background = false,
     },
 };
 
@@ -640,6 +647,7 @@ Theme themeGruvboxLight = {
         .brightness = 0.02f,
         .saturation = 1.0f,
         .contrast = 2.3f,
+        .multicolor_background = false,
     },
 };
 
@@ -711,6 +719,7 @@ Theme themeDracula = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.0f,
+        .multicolor_background = false,
     },
 };
 
@@ -782,6 +791,7 @@ Theme themeYavid = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.0f,
+        .multicolor_background = false,
     },
 };
 
@@ -856,6 +866,7 @@ Theme themeRadical = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.5f,
+        .multicolor_background = false,
     },
 };
 
@@ -933,6 +944,7 @@ Theme theme4coderAlt = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.35f,
+        .multicolor_background = false,
     },
 };
 
@@ -1014,6 +1026,7 @@ Theme theme4Coder = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.35f,
+        .multicolor_background = false,
     },
 };
 
@@ -1085,6 +1098,7 @@ Theme themeNoah = {
         .brightness = 0.05f,
         .saturation = 1.0f,
         .contrast = 1.0f,
+        .multicolor_background = false,
     },
 };
 
@@ -1160,6 +1174,7 @@ Theme themeGreenish = {
         .brightness = 0.1f,
         .saturation = 0.8f,
         .contrast = 1.2f,
+        .multicolor_background = false,
     },
 };
 
@@ -1235,6 +1250,7 @@ Theme themeHalloween = {
         .brightness = 0.1f,
         .saturation = 0.8f,
         .contrast = 1.2f,
+        .multicolor_background = false,
     },
 };
 
@@ -1259,7 +1275,8 @@ Theme *defaultTheme = &themeEverDark;
 //Theme *defaultTheme = &themeNoah;
 
 static
-bool defaultLineNumberMode = defaultTheme->renderLineNumberDiff;
+bool defaultLineNumberMode = defaultTheme->renderLineNumberDiff,
+     defaultMultiColorBg   = defaultTheme->visuals.multicolor_background;
 
 std::vector<ThemeDescription> themesDesc = {
     { .name = "Radical", .theme = &themeRadical, },
@@ -1289,6 +1306,12 @@ void SwapLineNumberRenderinType(){
     defaultLineNumberMode = !defaultLineNumberMode;
 }
 
+void SwapMultiColorBackground(){
+    defaultMultiColorBg = !defaultMultiColorBg;
+    defaultTheme->visuals.multicolor_background = defaultMultiColorBg;
+}
+
+
 inline vec4i ApplyAlpha(vec4i color, Theme *theme){
     if(theme->alphaDimm){
         Float w = (Float)color.w;
@@ -1313,6 +1336,7 @@ void SwapDefaultTheme(char *name, uint len){
         if(slen == len){
             if(StringEqual(name, (char *)desc->name, len)){
                 defaultTheme = desc->theme;
+                defaultTheme->visuals.multicolor_background = defaultMultiColorBg;
                 break;
             }
         }
@@ -1495,4 +1519,14 @@ void CurrentThemeGetVisuals(ThemeVisuals &out){
     out.brightness = defaultTheme->visuals.brightness;
     out.contrast = defaultTheme->visuals.contrast;
     out.saturation = defaultTheme->visuals.saturation;
+    out.multicolor_background = defaultTheme->visuals.multicolor_background;
 }
+
+bool ThemeMultiColorBackground(Theme *theme){
+    return theme->visuals.multicolor_background;
+}
+
+bool CurrentThemeMultiColorBackground(){
+    return ThemeMultiColorBackground(defaultTheme);
+}
+

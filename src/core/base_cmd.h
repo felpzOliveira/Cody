@@ -115,6 +115,9 @@ struct FileEntry;
 #define CMD_SWAP_LINE_NO_RENDER_MODE_STR "swap-lineno"
 #define CMD_SWAP_LINE_NO_RENDER_MODE_HELP "Swaps the render mode for line numbers"
 
+#define CMD_TOOGLE_MULTICOLOR_BACKGROUND_MODE_STR "multi-bg"
+#define CMD_TOOGLE_MULTICOLOR_BACKGROUND_MODE_HELP "Toogle rendering of multi-color background."
+
 #define CMD_MUSIC_ADD "music-add"
 #define CMD_MUSIC_ADD_HELP "Add a mp3 track to play."
 

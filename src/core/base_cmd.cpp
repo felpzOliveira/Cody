@@ -994,6 +994,11 @@ int BaseCommand_CursorBlink(char *, uint, View *){
     return 1;
 }
 
+int BaseCommand_ToogleMultiBgRenderMode(char *, uint, View *){
+    SwapMultiColorBackground();
+    return 1;
+}
+
 int BaseCommand_HistoryClear(char *, uint, View *){
     AppClearHistory();
     return 1;
@@ -1135,6 +1140,7 @@ int BaseCommandSetEncrypted(char *cmd, uint size, View *view){
 void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_DIMM_STR] = {CMD_DIMM_HELP, BaseCommand_SetDimm};
     cmdMap[CMD_SWAP_LINE_NO_RENDER_MODE_STR] = {CMD_SWAP_LINE_NO_RENDER_MODE_HELP, BaseCommand_SwapLineNoRenderMode};
+    cmdMap[CMD_TOOGLE_MULTICOLOR_BACKGROUND_MODE_STR] = {CMD_TOOGLE_MULTICOLOR_BACKGROUND_MODE_HELP, BaseCommand_ToogleMultiBgRenderMode};
     cmdMap[CMD_KILLSPACES_STR] = {CMD_KILLSPACES_HELP, BaseCommand_KillSpaces};
     cmdMap[CMD_SEARCH_STR] = {CMD_SEARCH_HELP, BaseCommand_SearchAllFiles};
     cmdMap[CMD_ENCODING_STR] = {CMD_ENCODING_HELP, BaseCommand_EncodingSwap};

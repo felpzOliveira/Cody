@@ -522,7 +522,9 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
                                   Transform *projection, Transform *model, Theme *theme)
 {
     BufferView *view = View_GetBufferView(vview);
-    if(view->isActive){
+    // NOTE: Disable nest level rendering in case we are using
+    //       multi-color backgrounds as it makes it weird
+    if(view->isActive && !ThemeMultiColorBackground(theme)){
         EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
         OpenGLFont *font = &state->font;
         vec2ui cursor = BufferView_GetCursorPosition(view);
@@ -674,7 +676,8 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
         }
 
         // Only render the line highlight if the mouse has not selected a range
-        if(!BufferView_GetRangeVisible(view)){
+        // also only if the theme does not want multi-color background
+        if(!BufferView_GetRangeVisible(view) && !ThemeMultiColorBackground(theme)){
             Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
             vec4f col = GetUIColorf(theme, UICursorLineHighlight);
             Float cy0 = ((Float)cursor.x - (Float)visibleLines.x) *
@@ -685,8 +688,8 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
             }
 
             Float cy1 = cy0 + font->fontMath.fontSizeAtRenderCall;
-			cy0 += (1 - useDriverDownscale) * 2;
-			cy1 += (1 - useDriverDownscale) * 2;
+            cy0 += (1 - useDriverDownscale) * 2;
+            cy1 += (1 - useDriverDownscale) * 2;
             Graphics_QuadPush(state, vec2ui(0, cy0),
             vec2ui(lineSpan, cy1), col);
 
@@ -1323,7 +1326,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
 
     vec4f backgroundLineNColor = GetUIColorf(theme, UILineNumberBackground);
     Float fcolLN[] = { backgroundLineNColor.x, backgroundLineNColor.y,
-        backgroundLineNColor.z, backgroundLineNColor.w };
+                       backgroundLineNColor.z, backgroundLineNColor.w };
 
     int is_animating = 0;
     vec2ui cursor = BufferView_GetCursorPosition(view);
@@ -1350,7 +1353,9 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
     // scrolling to not affect line numbers.
     if(view->renderLineNbs){
         ActivateViewportAndProjection(state, vview, ViewportLineNumbers);
-        glClearBufferfv(GL_COLOR, 0, fcolLN);
+        if(!ThemeMultiColorBackground(theme)){
+            glClearBufferfv(GL_COLOR, 0, fcolLN);
+        }
 
         OpenGLRenderAllLineNumbers(state, view, theme);
     }
