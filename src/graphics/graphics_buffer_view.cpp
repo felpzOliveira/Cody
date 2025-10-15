@@ -1343,7 +1343,21 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
 
     ActivateViewportAndProjection(state, vview, ViewportAllView);
 
+#if 1
+    // TODO: Currently when rendering multi-bg using Ctrl + B + Q
+    //       causes issues on innactive view. Likely because background
+    //       doesnt get cleaned. Adding this fixes it but also removes
+    //       the ability to actually do multi-bg. So inspect and fix.
+    //       It seems to work on the activew view, so this might be something
+    //       relating to some flag on the innactive views.
+    vec4f backgroundColor = GetUIColorf(theme, UIBackground);
+    Float fcol[] = { backgroundColor.x, backgroundColor.y,
+                     backgroundColor.z, backgroundColor.w };
+    glClearBufferfv(GL_COLOR, 0, fcol);
+#endif
+
     glClearBufferfv(GL_DEPTH, 0, ones);
+
     Float baseHeight = (1 - useDriverDownscale) * 2;
     if(vview->descLocation == DescriptionTop){
         baseHeight += font->fontMath.fontSizeAtRenderCall;

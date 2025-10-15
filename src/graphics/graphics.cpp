@@ -1825,6 +1825,7 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
         }
         ViewTree_Next(&iterator);
     }
+
     return animating;
 }
 

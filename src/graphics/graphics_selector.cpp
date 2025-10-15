@@ -171,6 +171,8 @@ int Graphics_RenderHoverableList(View *view, OpenGLState *state, Theme *theme,
     Float lWidth = (geometry->upper.x - geometry->lower.x) * font->fontMath.invReduceScale;
     Float lHeight = (geometry->upper.y - geometry->lower.y) * font->fontMath.invReduceScale;
 
+    Float fcol[] = { backColor.x, backColor.y, backColor.z, backColor.w };
+    glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, kOnes);
 
     vec4i tcol = GetColor(theme, TOKEN_ID_NONE);
@@ -311,10 +313,15 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     Geometry geometry = view->geometry;
     SelectableList *list = &view->selectableList;
 
+    vec4f backgroundColor = GetUIColorf(theme, UIBackground);
+    Float fcol[] = { backgroundColor.x, backgroundColor.y,
+                     backgroundColor.z, backgroundColor.w };
+
     Float lWidth = (geometry.upper.x - geometry.lower.x) *
                         font->fontMath.invReduceScale;
 
     ActivateViewportAndProjection(state, view, ViewportFrame);
+    glClearBufferfv(GL_COLOR, 0, fcol);
     glClearBufferfv(GL_DEPTH, 0, kOnes);
 
     vec4f col = GetUIColorf(theme, UISelectableListBackground);
