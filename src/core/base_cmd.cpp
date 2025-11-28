@@ -593,7 +593,7 @@ int BaseCommand_Interpret_AliasInsert(char *cmd, uint size, View *view){
         std::string valueStr(ref);
 
         aliasMap[targetStr] = valueStr;
-        //printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
+        printf("Alias [%s] = [%s]\n", targetStr.c_str(), valueStr.c_str());
     }
 
     return r;
@@ -622,10 +622,16 @@ int BaseCommand_SetExecPath(char *cmd, uint size){
     return r;
 }
 
-std::string BaseCommand_Interpret_Alias(char *cmd, uint size){
+std::string BaseCommand_Interpret_Alias(char *cmd, uint size, bool &changed){
     std::string strCmd(cmd);
-    if(aliasMap.find(strCmd) != aliasMap.end()){
-        strCmd = aliasMap[strCmd];
+    changed = false;
+    for(auto &[from, to] : aliasMap){
+        size_t pos = 0;
+        while((pos = strCmd.find(from, pos)) != std::string::npos){
+            strCmd.replace(pos, from.length(), to);
+            pos += to.length();
+            changed = true;
+        }
     }
 
     return strCmd;
@@ -1182,7 +1188,7 @@ void BaseCommand_InitializeCommandMap(){
     cmdMap[CMD_MUSIC_STOP] = {CMD_MUSIC_STOP_HELP, BaseCommandMusicMng_Stop};
 }
 
-int BaseCommand_Interpret(char *cmd, uint size, View *view){
+int BaseCommand_Interpret(char *cmd, uint size, View *view, bool recurseOnAlias){
     // TODO: map of commands? maybe set some function pointers to this
     // TODO: create a standard for this, a json maybe
     int rv = -1;
@@ -1224,7 +1230,11 @@ int BaseCommand_Interpret(char *cmd, uint size, View *view){
     }
 
     bool swapViews = true;
-    std::string strCmd = BaseCommand_Interpret_Alias(cmd, size);
+    bool aliasChange = false;
+    std::string strCmd = BaseCommand_Interpret_Alias(cmd, size, aliasChange);
+    if(recurseOnAlias && aliasChange)
+        return BaseCommand_Interpret((char *)strCmd.c_str(), strCmd.size(), view, false);
+
     if(strCmd.size() > 4 &&
        StringStartsWith((char *)strCmd.c_str(), strCmd.size(), (char *)"[nv]", 4))
     {

@@ -211,11 +211,12 @@ void StartWithFile(const char *path=nullptr){
 
     if(path != nullptr){
         LineBuffer *lineBuffer = nullptr;
-        uint length = (uint)strlen(path);
         int fileType = -1;
-
-        if(FileProvider_Load((char *)path, length, fileType, &lineBuffer, false))
+        uint len = strlen(path);
+        if(FileProvider_Load((char *)path,  len, fileType, &lineBuffer, false)){
             BufferView_SwapBuffer(bView, lineBuffer, CodeView);
+        }
+
     }else{
         LoadStaticFilesOnStart();
     }
@@ -278,7 +279,9 @@ int cody_entry(int argc, char **argv){
             AppEarlyInitialize(args.use_tabs);
 
             if(entry.type == DescriptorFile){
-                StartWithFile(entry.path);
+                std::string tmpPath(folder);
+                tmpPath += std::string(SEPARATOR_STRING) + entry.path;
+                StartWithFile(tmpPath.c_str());
             }else{
                 StartWithFile();
             }

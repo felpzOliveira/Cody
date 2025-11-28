@@ -195,6 +195,7 @@ __forceinline__ RESERVED
 reinterpret_cast OPERATOR
 cudaMemcpyHostToDevice RESERVED
 cudaMemcpyDeviceToHost RESERVED
+cudaMemcpyDeviceToDevice RESERVED
 cudaHostAllocMapped RESERVED
 cudaHostAllocDefault RESERVED
 cudaHostAllocPortable RESERVED
@@ -783,6 +784,7 @@ __forceinline__ RESERVED
 reinterpret_cast OPERATOR
 cudaMemcpyHostToDevice RESERVED
 cudaMemcpyDeviceToHost RESERVED
+cudaMemcpyDeviceToDevice RESERVED
 cudaHostAllocMapped RESERVED
 cudaHostAllocDefault RESERVED
 cudaHostAllocPortable RESERVED

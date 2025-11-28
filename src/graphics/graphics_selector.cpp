@@ -327,7 +327,7 @@ int Graphics_RenderListSelector(View *view, OpenGLState *state, Theme *theme, Fl
     vec4f col = GetUIColorf(theme, UISelectableListBackground);
     vec4i tcol = GetColor(theme, TOKEN_ID_NONE);
     vec4i tcolSel = GetUIColor(theme, UISelectorLoadedColor);
-    vec4f scol = GetUIColorf(theme, UIQueryBarCursor);
+    vec4f scol = GetUIColorf(theme, UISelectorLoadedColor);
 
     FrameStyle style = {
         .with_line_border = 1,

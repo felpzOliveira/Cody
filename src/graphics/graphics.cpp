@@ -200,7 +200,7 @@ void Graphics_RenderBackground(OpenGLState *state){
         secondaryColor = primaryColor * 0.95f;
     }else{
         // Slightly lighter shade for dark theme
-        secondaryColor = primaryColor * 1.95f;
+        secondaryColor = primaryColor * 1.05f;
     }
 
     secondaryColor.w = 1.0f;

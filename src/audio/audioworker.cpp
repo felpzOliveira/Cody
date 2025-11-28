@@ -75,7 +75,7 @@ static int _AudioInit(AudioController *controller){
     controller->spec.freq     = 48000;
     controller->spec.format   = SDL_AUDIO_S16;
     controller->spec.channels = 2;
-    controller->currentGain   = 1;
+    controller->currentGain   = 0.5f;
 
     controller->stream =
               SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,

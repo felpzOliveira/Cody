@@ -239,7 +239,7 @@ int SwitchFontCommandStart(View *view);
 /*
 * Interpret and execute a given command applied to a given view.
 */
-int BaseCommand_Interpret(char *cmd, uint size, View *view);
+int BaseCommand_Interpret(char *cmd, uint size, View *view, bool recurseOnAlias=true);
 
 /*
 * Pushes a new filename, existing or not, into the config for auto-loading.

@@ -222,6 +222,7 @@ static void LoadConfigProperties(JSON_Object *obj){
     const char *preferred_font = nullptr;
     const char *preferred_theme = nullptr;
     int preferred_font_size = 0;
+    int preferred_path_compression = -1;
     // TODO: Parse globals
     preferred_font = json_object_get_string(obj, "PreferFont");
     if(LoadUserFont(preferred_font)){
@@ -231,6 +232,11 @@ static void LoadConfigProperties(JSON_Object *obj){
     preferred_font_size = json_object_get_number(obj, "PreferFontSize");
     if(preferred_font_size > 0){
         appGlobalConfig.defaultFontSize = preferred_font_size;
+    }
+
+    preferred_path_compression = json_object_get_number(obj, "PreferPathCompression");
+    if(preferred_path_compression > 0){
+        AppSetPathCompression(preferred_path_compression);
     }
 
     preferred_theme = json_object_get_string(obj, "PreferTheme");
@@ -2392,8 +2398,10 @@ View *AppGetViewAt(int x, int y){
     while(iterator.value){
         view = iterator.value->view;
         if(Geometry_IsPointInside(&view->geometry, r)){
-            rView = view;
-            break;
+            if(view->bufferView.is_visible != 0){
+                rView = view;
+                break;
+            }
         }
 
         ViewTree_Next(&iterator);

@@ -2,6 +2,7 @@
 #include <utilities.h>
 #include <unordered_map>
 #include <file_provider.h>
+#include <atomic>
 
 #define SoftZoom 0.15
 
@@ -426,7 +427,7 @@ int select_one(int x, int total, int &dRight, int &dLeft,
     }
 }
 
-static std::atomic<bool> loadDispatchRunning = false;
+static std::atomic<bool> loadDispatchRunning{false};
 bool PdfView_IsDispatchRunning(){ return loadDispatchRunning; }
 
 bool PdfView_FetchPage(PdfViewState *pdfView, int pageIndex,
