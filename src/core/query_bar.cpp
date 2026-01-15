@@ -273,6 +273,12 @@ void QueryBar_Free(QueryBar *queryBar){
     replace->searchCallback = QueryBar_EmptySearchReplaceCallback;
 }
 
+void QueryBar_ClearHiddenCharacters(QueryBar *queryBar){
+    queryBar->filter.hideChars = false;
+    queryBar->pendingMemAddr = 0;
+    memset(queryBar->pendingMemory, 0, sizeof(queryBar->pendingMemory));
+}
+
 /*
 * Sets the query bar to null values.
 */
@@ -295,6 +301,8 @@ void QueryBar_Initialize(QueryBar *queryBar){
     queryBar->filter.allowCursorJump = false;
     Buffer_Init(&queryBar->buffer, DefaultAllocatorSize);
     EncoderDecoder_InitFor(&queryBar->encoder, ENCODER_DECODER_UTF8);
+
+    QueryBar_ClearHiddenCharacters(queryBar);
 }
 
 /* Moves cursor left */
@@ -377,8 +385,14 @@ void QueryBar_ActiveCustomFull(QueryBar *queryBar, char *title, uint titlelen,
     queryBar->cancelCallback = cancel;
     queryBar->commitCallback = commit;
     if(filter) queryBar->filter = *filter;
-    queryBar->filter.toHistory = false;
-    queryBar->filter.allowCursorJump = false;
+    else{
+        queryBar->filter.toHistory = false;
+        queryBar->filter.allowCursorJump = false;
+    }
+}
+
+void QueryBar_SetFilter(QueryBar *queryBar, QueryBarInputFilter *filter){
+    if(filter && queryBar) queryBar->filter = *filter;
 }
 
 void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
@@ -386,14 +400,24 @@ void QueryBar_ActivateCustom(QueryBar *queryBar, char *title, uint titlelen,
                              OnQueryBarCommit commit, QueryBarInputFilter *filter)
 {
     AssertA(queryBar != nullptr, "Invalid QueryBar pointer");
+    // need a copy in case it is a re-load of the querybar
+    QueryBarInputFilter filterCopy;
+    if(filter){
+        filterCopy = *filter;
+    }
+
     QueryBar_StartCommand(queryBar, QUERY_BAR_CMD_CUSTOM, title, titlelen);
 
     queryBar->entryCallback  = entry;
     queryBar->cancelCallback = cancel;
     queryBar->commitCallback = commit;
-    if(filter) queryBar->filter = *filter;
-    queryBar->filter.toHistory = false;
-    queryBar->filter.allowCursorJump = false;
+
+    // ????
+    if(filter) queryBar->filter = filterCopy;
+    else{
+        queryBar->filter.toHistory = false;
+        queryBar->filter.allowCursorJump = false;
+    }
 }
 
 void QueryBar_GetWrittenContent(QueryBar *queryBar, char **ptr, uint *len){
@@ -472,7 +496,21 @@ int QueryBar_AddEntry(QueryBar *queryBar, View *view, char *str, uint len){
         uint p = queryBar->cursor.textPosition.y;
         uint rawP = Buffer_Utf8PositionToRawPosition(&queryBar->buffer, p,
                                                 nullptr, &queryBar->encoder);
-        rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len, &queryBar->encoder);
+        if(queryBar->filter.hideChars){
+            std::string tmp(len, '*');
+            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, tmp.data(), len,
+                                          &queryBar->encoder);
+
+            if((queryBar->pendingMemAddr + len) < sizeof(queryBar->pendingMemory)){
+                strncat(queryBar->pendingMemory, str, len);
+                queryBar->pendingMemAddr += len;
+            }else{
+                printf("oops, cannot hold more data!\n");
+            }
+        }else{
+            rawP += Buffer_InsertStringAt(&queryBar->buffer, p, str, len,
+                                          &queryBar->encoder);
+        }
 
         queryBar->cursor.textPosition.y =
             Buffer_Utf8RawPositionToPosition(&queryBar->buffer, rawP, &queryBar->encoder);

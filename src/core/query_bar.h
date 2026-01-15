@@ -14,7 +14,7 @@
 #define OnQueryBarCancel std::function<int(QueryBar *, View*)>
 #define OnQueryBarCommit std::function<int(QueryBar *, View*)>
 
-#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, .allowFreeType = 1, .allowCursorJump = false, }
+#define INPUT_FILTER_INITIALIZER { .digitOnly = 0, .allowFreeType = 1, .allowCursorJump = false, .hideChars = false, }
 
 #define QUERY_BAR_DEFAULT_JUMP_STR     " ,/"
 #define QUERY_BAR_DEFAULT_JUMP_STR_LEN 3
@@ -30,6 +30,7 @@ struct QueryBarInputFilter{
     int allowFreeType;
     bool allowCursorJump;
     bool toHistory;
+    bool hideChars;
 };
 
 struct QueryBarHistoryItem{
@@ -69,6 +70,8 @@ struct QueryBar{
     bool hasPendingCallbacks;
     char pendingTitle[64];
     uint pendingSize;
+    char pendingMemory[256];
+    uint pendingMemAddr;
     QueryBarInputFilter pendingFilter;
     OnQueryBarEntry pushedEntryCallback;
     OnQueryBarCancel pushedCancelCallback;
@@ -79,6 +82,16 @@ struct QueryBar{
 * Initializes a QueryBar.
 */
 void QueryBar_Initialize(QueryBar *queryBar);
+
+/*
+* Clears the query bar internal pending memory.
+*/
+void QueryBar_ClearHiddenCharacters(QueryBar *queryBar);
+
+/*
+* Force a query bar to have a specific filter.
+*/
+void QueryBar_SetFilter(QueryBar *queryBar, QueryBarInputFilter *filter);
 
 /*
 * Sets the geometry of the QueryBar.

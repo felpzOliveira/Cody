@@ -2625,17 +2625,17 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
         BufferView *bView = View_GetBufferView(view);
         Tokenizer *tokenizer = nullptr;
         LineBuffer *lBuffer = nullptr;
-        char *content = nullptr;
-        uint size = 0;
         int fileType = -1;
         AppOnTypeChange();
-        QueryBar_GetWrittenContent(bar, &content, &size);
 
-        if(FileProvider_LoadTemporary(content, size, fileType, &lBuffer, false) ==
-           FILE_LOAD_SUCCESS)
+        if(FileProvider_LoadTemporary(bar->pendingMemory, bar->pendingMemAddr,
+                                      fileType, &lBuffer, false) ==
+            FILE_LOAD_SUCCESS)
         {
             BufferView_SwapBuffer(bView, lBuffer, CodeView);
         }
+
+        QueryBar_ClearHiddenCharacters(bar);
 
         return 1;
     };
@@ -2645,6 +2645,9 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
         Tokenizer *tokenizer = nullptr;
         LineBuffer *lBuffer = nullptr;
         BufferView *bView = View_GetBufferView(view);
+        QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
+        QueryBar *qbar = View_GetQueryBar(view);
+
         if(entry){
             FileOpener *opener = View_GetFileOpener(view);
             uint l = snprintf(targetPath, PATH_MAX, "%s%s", opener->basePath, entry->path);
@@ -2654,9 +2657,8 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
                 if(ret == FILE_LOAD_SUCCESS)
                     BufferView_SwapBuffer(bView, lBuffer, CodeView);
                 else if(ret == FILE_LOAD_REQUIRES_DECRYPT){
-                    QueryBarInputFilter filter = INPUT_FILTER_INITIALIZER;
                     filter.toHistory = false;
-                    QueryBar *qbar = View_GetQueryBar(view);
+                    filter.hideChars = true;
                     QueryBar_SetPendingCall(qbar, (char *)"Password", 8, emptyFunc,
                                             emptyFunc, fileOpenEncrypted, &filter);
                 }else if(ret == FILE_LOAD_REQUIRES_VIEWER){
@@ -2702,6 +2704,7 @@ void AppCommandOpenFileWithViewType(ViewType type, int creationFlags){
 
     int r = FileOpenerCommandStart(view, appContext.cwd,
                                    strlen(appContext.cwd), fileOpen);
+
     if(r >= 0){
         AppSetBindingsForState(View_SelectableList);
     }
