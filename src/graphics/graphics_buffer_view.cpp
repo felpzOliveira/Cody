@@ -522,9 +522,8 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
                                   Transform *projection, Transform *model, Theme *theme)
 {
     BufferView *view = View_GetBufferView(vview);
-    // NOTE: Disable nest level rendering in case we are using
-    //       multi-color backgrounds as it makes it weird
-    if(view->isActive && !ThemeMultiColorBackground(theme)){
+
+    if(view->isActive){
         EncoderDecoder *encoder = LineBuffer_GetEncoderDecoder(view->lineBuffer);
         OpenGLFont *font = &state->font;
         vec2ui cursor = BufferView_GetCursorPosition(view);
@@ -675,9 +674,7 @@ void Graphics_RenderScopeSections(OpenGLState *state, View *vview, Float lineSpa
             Graphics_QuadFlush(state, 0);
         }
 
-        // Only render the line highlight if the mouse has not selected a range
-        // also only if the theme does not want multi-color background
-        if(!BufferView_GetRangeVisible(view) && !ThemeMultiColorBackground(theme)){
+        if(!BufferView_GetRangeVisible(view)){
             Shader_UniformMatrix4(font->cursorShader, "modelView", &state->scale.m);
             vec4f col = GetUIColorf(theme, UICursorLineHighlight);
             Float cy0 = ((Float)cursor.x - (Float)visibleLines.x) *
@@ -1367,9 +1364,7 @@ int Graphics_RenderBufferView(View *vview, OpenGLState *state, Theme *theme,
     // scrolling to not affect line numbers.
     if(view->renderLineNbs){
         ActivateViewportAndProjection(state, vview, ViewportLineNumbers);
-        if(!ThemeMultiColorBackground(theme)){
-            glClearBufferfv(GL_COLOR, 0, fcolLN);
-        }
+        glClearBufferfv(GL_COLOR, 0, fcolLN);
 
         OpenGLRenderAllLineNumbers(state, view, theme);
     }

@@ -45,8 +45,6 @@ extern unsigned char wave_white_png[];
 extern unsigned int wave_white_png_len;
 extern const char *shader_button_v;
 extern const char *shader_button_f;
-extern const char *shader_background_v;
-extern const char *shader_background_f;
 extern unsigned char py_png[];
 extern unsigned int py_png_len;
 extern const char *shader__text_f_glsl;

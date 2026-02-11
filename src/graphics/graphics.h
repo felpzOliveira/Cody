@@ -171,7 +171,6 @@ struct OpenGLState{
     Shader imageShader;
     Shader imRendererShader;
     Shader imBorderShader;
-    Shader backgroundShader;
     Mouse mouse;
     double cursorBlinkLastTime;
     bool cursorBlinking;

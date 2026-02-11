@@ -176,68 +176,6 @@ void OpenGLResetCursors(OpenGLState *state){
     ResetGLCursor(&state->glGhostCursor);
 }
 
-void Graphics_RenderBackground(OpenGLState *state){
-    Theme *theme = defaultTheme;
-    vec4f primaryColor = GetUIColorf(theme, UIBackground);
-
-    // Clear with the primary color first as fallback
-    Float fcol[] = { primaryColor.x, primaryColor.y,
-                     primaryColor.z, primaryColor.w };
-    glViewport(0, 0, state->width, state->height);
-    glClearBufferfv(GL_COLOR, 0, fcol);
-
-    // Check if the current theme wants multi-color background rendering
-    if(!CurrentThemeMultiColorBackground()){
-        // Theme prefers simple single-color background - we're done
-        return;
-    }
-
-    // Theme wants multi-color background - proceed with triangle rendering
-    // Choose secondary color based on theme - subtle variation
-    vec4f secondaryColor;
-    if(CurrentThemeIsLight()){
-        // Slightly darker shade for light theme
-        secondaryColor = primaryColor * 0.95f;
-    }else{
-        // Slightly lighter shade for dark theme
-        secondaryColor = primaryColor * 1.05f;
-    }
-
-    secondaryColor.w = 1.0f;
-
-    // Use the pre-initialized background buffer (set up once during OpenGL init)
-    OpenGLBuffer *bgBuffer = &state->glBackgroundBuffer;
-
-    // Render with background shader
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    glUseProgram(state->backgroundShader.id);
-
-    // Use identity matrices for fullscreen rendering  
-    Transform identity; // Constructor already creates identity matrix
-
-    // Set uniforms
-    Shader_UniformMatrix4(state->backgroundShader, "projection", &identity.m);
-    Shader_UniformMatrix4(state->backgroundShader, "modelView", &identity.m);
-    Shader_UniformVec4(state->backgroundShader, "primaryColor", primaryColor);
-    Shader_UniformVec4(state->backgroundShader, "secondaryColor", secondaryColor);
-
-    // Render fullscreen quad
-    OpenGLCHK(glBindVertexArray(bgBuffer->vertexArray));
-    OpenGLCHK(glEnableVertexAttribArray(0));
-    OpenGLCHK(glBindBuffer(GL_ARRAY_BUFFER, bgBuffer->vertexBuffer));
-    OpenGLCHK(glBufferData(GL_ARRAY_BUFFER, bgBuffer->length * 2 * sizeof(Float),
-                           bgBuffer->vertex, GL_DYNAMIC_DRAW));
-    OpenGLCHK(glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, NULL));
-
-    OpenGLCHK(glDrawArrays(GL_TRIANGLES, 0, bgBuffer->length));
-
-    glDisableVertexAttribArray(0);
-    glBindVertexArray(0);
-    glDisable(GL_BLEND);
-    glUseProgram(0);
-}
-
 std::string OpenGLValidateErrorStr(int *err){
     int val = glGetError();
     std::string error;
@@ -1050,8 +988,6 @@ void OpenGLFontSetup(OpenGLState *state){
     uint imVertex     = Shader_CompileSource(vertexImgContent, SHADER_TYPE_VERTEX);
     uint imFragment   = Shader_CompileSource(fragmentImgContent, SHADER_TYPE_FRAGMENT);
     uint imBorderFrag = Shader_CompileSource(borderFragmentImg, SHADER_TYPE_FRAGMENT);
-    uint bgVertex     = Shader_CompileSource(shader_background_v, SHADER_TYPE_VERTEX);
-    uint bgFragment   = Shader_CompileSource(shader_background_f, SHADER_TYPE_FRAGMENT);
 
     Shader_Create(font->shader, vertex, fragment);
     Shader_Create(font->cursorShader, cvertex, cfragment);
@@ -1059,7 +995,6 @@ void OpenGLFontSetup(OpenGLState *state){
     Shader_Create(state->buttonShader, bvertex, bfragment);
     Shader_Create(state->imRendererShader, imVertex, imFragment);
     Shader_Create(state->imBorderShader, imVertex, imBorderFrag);
-    Shader_Create(state->backgroundShader, bgVertex, bgFragment);
 
     font->sdfSettings.sdfEnabled = 0;
 
@@ -1785,8 +1720,6 @@ int OpenGLRenderMainWindow(WidgetRenderContext *wctx){
     Shader_UniformFloat(font->shader, "saturation", visuals.saturation);
 
     fonsSetFont(font->fsContext, font->fontId);
-
-    Graphics_RenderBackground(state);
 
     ViewTreeIterator iterator;
     ViewTree_Begin(&iterator);
