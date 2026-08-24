@@ -590,7 +590,8 @@ void RPCServer::Start(int port){
 
     while(1){
         // if not bridge'd change directory
-        if(mode == 0) CODY_IGNORE(storage->Chdir(HOME.c_str()));
+        if(mode == 0)
+            CODY_IGNORE(storage->Chdir(HOME.c_str()));
 
         linuxNet->clientfd = -1;
         LOG_SERVER("Waiting for connection on port " << port);
@@ -598,13 +599,21 @@ void RPCServer::Start(int port){
         clientfd = accept(linuxNet->sockfd, NULL, NULL);
         if(clientfd < 0){
             LOG_ERR("Failed to accept client");
-            goto err_close;
+            continue;
         }
 
-        linuxNet->clientfd = clientfd;
-        net.prv = (void *)linuxNet;
+        // TODO: Hello windows?
+        pid_t pid = fork();
+        if(pid == 0){
+            close(linuxNet->sockfd);
+            linuxNet->clientfd = clientfd;
+            net.prv = (void *)linuxNet;
 
-        ServerService(this);
+            ServerService(this);
+            exit(0);
+        }
+
+        close(clientfd);
     }
 err_close:
     delete linuxNet;
